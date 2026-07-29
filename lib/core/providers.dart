@@ -24,10 +24,17 @@ final appInitProvider = FutureProvider<void>((ref) async {
   await ensureStarterCatalog(db);
 });
 
+/// The regime being trained. Exactly one row is active at a time, but the query
+/// is limited rather than assuming it: `watchSingleOrNull` throws on two rows,
+/// and a half-applied restore would take the whole app down with it.
 final activeRegimeProvider = StreamProvider<Regime?>((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.regimes)
-    ..where((t) => t.isActive.equals(true) & t.deletedAt.isNull());
+    ..where((t) => t.isActive.equals(true) & t.deletedAt.isNull())
+    ..orderBy([
+      (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+    ])
+    ..limit(1);
   return query.watchSingleOrNull();
 });
 

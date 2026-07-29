@@ -520,4 +520,108 @@ void main() {
     expect(names, isNot(contains('Deadlift')));
     expect(index.first.timesPerformed, 1);
   });
+
+  /// Logs one session end to end and returns its workout id.
+  Future<String> logSession(Session session, {double weight = 20}) async {
+    final regime = await activeRegime();
+    final id =
+        await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+    final detail = await repo.workoutDetail(id);
+    final set = detail!.entries.first.sets.first;
+    await repo.updateSet(set.id,
+        weight: Value(weight), reps: const Value(8), isDone: const Value(true));
+    await repo.completeWorkout(id);
+    return id;
+  }
+
+  test('starting the same session twice returns the workout already running',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final first =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final second =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    expect(second, first);
+    final open = await (db.select(db.workouts)
+          ..where((t) => t.status.equalsValue(WorkoutStatus.inProgress)))
+        .get();
+    expect(open, hasLength(1));
+  });
+
+  test('deleting a workout removes it from every history view', () async {
+    final push1 = await sessionNamed('Push 1');
+    final id = await logSession(push1);
+
+    expect(await repo.workoutFeed(), hasLength(1));
+    await repo.deleteWorkout(id);
+
+    expect(await repo.workoutFeed(), isEmpty);
+    expect(await repo.workoutDetail(id), isNull);
+    expect(await repo.exercisesWithHistory(), isEmpty);
+    expect(await repo.sessionsWithHistory(), isEmpty);
+
+    // Prefill must forget it too, or next week suggests numbers from a day
+    // that no longer exists.
+    final detail = await repo.workoutDetail(id);
+    expect(detail, isNull);
+    final incline = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Incline Dumbbell Press')))
+        .getSingleOrNull();
+    if (incline != null) {
+      expect(await repo.pastPerformances(incline.id), isEmpty);
+    }
+  });
+
+  test('deleting the workout that closed a cycle reopens it', () async {
+    final regime = await activeRegime();
+    final sessions = await (db.select(db.sessions)
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    String? last;
+    for (final session in sessions) {
+      last = await logSession(session);
+    }
+
+    // Every session trained: cycle 1 closed and cycle 2 opened.
+    expect((await repo.cycleStatus(regime.id)).cycleIndex, 2);
+
+    await repo.deleteWorkout(last!);
+
+    final status = await repo.cycleStatus(regime.id);
+    expect(status.cycleIndex, 1, reason: 'the cycle was never finished');
+    expect(status.done, sessions.length - 1);
+    expect(status.nextSessionId, sessions.last.id);
+  });
+
+  test('deleting an ordinary workout leaves the cycle alone', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final pull1 = await sessionNamed('Pull 1');
+
+    await logSession(push1);
+    final second = await logSession(pull1);
+    await repo.deleteWorkout(second);
+
+    final status = await repo.cycleStatus(regime.id);
+    expect(status.cycleIndex, 1);
+    expect(status.completedSessionIds, {push1.id});
+  });
+
+  test('the table lists sessions from older regimes too', () async {
+    final push1 = await sessionNamed('Push 1');
+    await logSession(push1);
+
+    // Switching programmes must not hide what was trained under the old one.
+    await createRegimeFromTemplate(
+      db,
+      regimeTemplates.firstWhere((t) => t.key == 'upper_lower'),
+    );
+
+    final sessions = await repo.sessionsWithHistory();
+    expect(sessions.map((s) => s.id), [push1.id]);
+  });
 }

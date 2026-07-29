@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 
 /// Rows fetched per page. Enough to fill a phone screen twice over, small
@@ -152,6 +153,12 @@ final exercisesWithHistoryProvider =
 final workoutDetailProvider =
     StreamProvider.autoDispose.family<WorkoutDetail?, String>((ref, workoutId) {
   return ref.watch(trainingRepositoryProvider).watchWorkoutDetail(workoutId);
+});
+
+/// Sessions with at least one completed workout, most recently trained first.
+/// The tab strip on the side-by-side table.
+final sessionsWithHistoryProvider = StreamProvider<List<Session>>((ref) {
+  return ref.watch(trainingRepositoryProvider).watchSessionsWithHistory();
 });
 
 /// How many date columns the side-by-side table has pulled in. Grows as the

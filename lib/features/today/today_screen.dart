@@ -14,6 +14,48 @@ import '../settings/settings_screen.dart';
 import 'heatmap_providers.dart';
 import 'widgets/heatmap.dart';
 
+/// True between tapping Start and the log screen appearing.
+///
+/// Starting a workout writes a row per set before it returns; a second tap in
+/// that window used to open a parallel session that could never be finished.
+final _startingProvider = StateProvider<bool>((ref) => false);
+
+/// Creates the workout and opens the log, once.
+///
+/// Everything after the first `await` goes through the [ProviderContainer]
+/// rather than the caller's `ref`: creating the workout swaps this card for the
+/// resume card, disposing the widget that started it. Clearing the flag through
+/// a dead `ref` throws, and the button stays disabled for the rest of the
+/// session — which is how this was found.
+Future<void> _startSession(
+  BuildContext context,
+  WidgetRef ref, {
+  required String regimeId,
+  required String sessionId,
+}) async {
+  if (ref.read(_startingProvider)) return;
+
+  final container = ProviderScope.containerOf(context, listen: false);
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+
+  container.read(_startingProvider.notifier).state = true;
+  try {
+    final id = await container
+        .read(trainingRepositoryProvider)
+        .startWorkout(regimeId: regimeId, sessionId: sessionId);
+    await navigator.push(
+      MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Could not start the session: $e')),
+    );
+  } finally {
+    container.read(_startingProvider.notifier).state = false;
+  }
+}
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -281,7 +323,14 @@ class _NextSessionCard extends ConsumerWidget {
                 backgroundColor: accent,
                 foregroundColor: c.onAccent,
               ),
-              onPressed: () => _start(context, ref, nextId),
+              onPressed: ref.watch(_startingProvider)
+                  ? null
+                  : () => _startSession(
+                        context,
+                        ref,
+                        regimeId: regimeId,
+                        sessionId: nextId,
+                      ),
               child: Text('Start ${session?.name ?? 'session'}'),
             ),
           if (status.deloadAfterThisCycle && !status.isDeload) ...[
@@ -302,14 +351,6 @@ class _NextSessionCard extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _start(BuildContext context, WidgetRef ref, String sessionId) async {
-    final repo = ref.read(trainingRepositoryProvider);
-    final navigator = Navigator.of(context);
-    final id = await repo.startWorkout(regimeId: regimeId, sessionId: sessionId);
-    if (!context.mounted) return;
-    navigator.push(MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)));
   }
 }
 
@@ -435,6 +476,16 @@ class _AllSessions extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionLabel('This cycle'),
+        // A tap that does nothing reads as a broken app. Say why the list is
+        // inert instead of leaving the user pressing rows.
+        if (disabled)
+          Padding(
+            padding: const EdgeInsets.only(left: Space.xs, bottom: Space.sm),
+            child: Text(
+              'Finish or discard the session in progress to start another.',
+              style: context.t.labelSmall,
+            ),
+          ),
         AppCard(
           padding: EdgeInsets.zero,
           child: Column(
@@ -442,12 +493,11 @@ class _AllSessions extends ConsumerWidget {
               for (var i = 0; i < sessions.length; i++) ...[
                 if (i > 0) Divider(color: c.border, height: 1),
                 _SessionRow(
+                  regimeId: regimeId,
                   session: sessions[i],
                   done: status.completedSessionIds.contains(sessions[i].id),
                   isNext: status.nextSessionId == sessions[i].id,
-                  onTap: disabled
-                      ? null
-                      : () => _start(context, ref, sessions[i].id),
+                  disabled: disabled,
                 ),
               ],
             ],
@@ -456,34 +506,32 @@ class _AllSessions extends ConsumerWidget {
       ],
     );
   }
-
-  Future<void> _start(BuildContext context, WidgetRef ref, String sessionId) async {
-    final repo = ref.read(trainingRepositoryProvider);
-    final navigator = Navigator.of(context);
-    final id = await repo.startWorkout(regimeId: regimeId, sessionId: sessionId);
-    if (!context.mounted) return;
-    navigator.push(MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)));
-  }
 }
 
-class _SessionRow extends StatelessWidget {
+class _SessionRow extends ConsumerWidget {
   const _SessionRow({
+    required this.regimeId,
     required this.session,
     required this.done,
     required this.isNext,
-    required this.onTap,
+    required this.disabled,
   });
 
+  final String regimeId;
   final Session session;
   final bool done;
   final bool isNext;
-  final VoidCallback? onTap;
+  final bool disabled;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final slots = ref.watch(sessionSlotCountProvider(session.id)).valueOrNull;
+    final isEmpty = slots == 0;
+    final muted = disabled || done;
+
     return InkWell(
-      onTap: onTap,
+      onTap: disabled ? null : () => _tap(context, ref, isEmpty: isEmpty),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Space.lg,
@@ -498,19 +546,67 @@ class _SessionRow extends StatelessWidget {
             ),
             const SizedBox(width: Space.md),
             Expanded(
-              child: Text(
-                session.name,
-                style: context.t.titleSmall?.copyWith(
-                  color: done ? c.textSecondary : c.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.name,
+                    style: context.t.titleSmall?.copyWith(
+                      color: muted ? c.textSecondary : c.textPrimary,
+                    ),
+                  ),
+                  // An empty session can be started, but only produces an empty
+                  // log — offer the fix instead of the dead end.
+                  if (isEmpty)
+                    Text('No exercises yet', style: context.t.labelSmall),
+                ],
               ),
             ),
-            if (isNext) Pill('Next', color: c.accent),
+            if (isNext && !disabled) Pill('Next', color: c.accent),
             const SizedBox(width: Space.sm),
-            Icon(Icons.chevron_right, size: 18, color: c.textTertiary),
+            Icon(
+              isEmpty ? Icons.edit_outlined : Icons.chevron_right,
+              size: 18,
+              color: c.textTertiary,
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _tap(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isEmpty,
+  }) async {
+    if (isEmpty) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SessionEditorScreen(sessionId: session.id),
+        ),
+      );
+      return;
+    }
+
+    // Training the same day twice in a cycle is legitimate, but it is far more
+    // often a mis-tap on a row that already has a tick against it.
+    if (done) {
+      final again = await confirmAction(
+        context,
+        title: '${session.name} is already done',
+        message: 'You logged it in this cycle. Train it again?',
+        confirmLabel: 'Train again',
+        destructive: false,
+      );
+      if (!again || !context.mounted) return;
+    }
+
+    await _startSession(
+      context,
+      ref,
+      regimeId: regimeId,
+      sessionId: session.id,
     );
   }
 }

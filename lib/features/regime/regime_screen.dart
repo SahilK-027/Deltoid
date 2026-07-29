@@ -10,18 +10,19 @@ import '../../data/repositories/regime_repository.dart';
 import '../../domain/cycle_engine.dart';
 import 'exercise_catalog_screen.dart';
 import 'regime_setup.dart';
+import 'regimes_screen.dart';
 import 'session_editor.dart';
 
 final regimeRepositoryProvider = Provider<RegimeRepository>(
   (ref) => RegimeRepository(ref.watch(databaseProvider)),
 );
 
-final allRegimesProvider = StreamProvider<List<Regime>>((ref) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.regimes)
-    ..where((t) => t.deletedAt.isNull())
-    ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]);
-  return query.watch();
+/// Every regime with its size and how much was logged under it. Watched rather
+/// than read on demand: a `ref.read` of a provider nobody listens to always
+/// comes back empty, which is exactly how the old switcher managed to make a
+/// full shelf of regimes look deleted.
+final regimeSummariesProvider = StreamProvider<List<RegimeSummary>>((ref) {
+  return ref.watch(regimeRepositoryProvider).watchRegimeSummaries();
 });
 
 /// Exercise count per session, for the summary rows.
@@ -55,8 +56,10 @@ class RegimeScreen extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Switch regime',
-            onPressed: () => _showRegimeSwitcher(context, ref),
+            tooltip: 'Regimes',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RegimesScreen()),
+            ),
           ),
           const SizedBox(width: Space.sm),
         ],
@@ -96,57 +99,6 @@ class RegimeScreen extends ConsumerWidget {
 
   Future<void> _createRegime(BuildContext context, WidgetRef ref) =>
       createRegimeFlow(context, ref);
-
-  Future<void> _showRegimeSwitcher(BuildContext context, WidgetRef ref) async {
-    final regimes = ref.read(allRegimesProvider).valueOrNull ?? const [];
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.sm),
-              child: Text('Regimes', style: ctx.t.titleLarge),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-              child: Text(
-                'Switching keeps every past workout intact and still '
-                'attached to the programme it was run under.',
-                style: ctx.t.bodySmall,
-              ),
-            ),
-            for (final r in regimes)
-              ListTile(
-                leading: Icon(
-                  r.isActive ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: r.isActive ? ctx.c.accent : ctx.c.textTertiary,
-                ),
-                title: Text(r.name),
-                onTap: () async {
-                  final navigator = Navigator.of(ctx);
-                  await ref.read(regimeRepositoryProvider).setActiveRegime(r.id);
-                  navigator.pop();
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('New regime'),
-              subtitle: const Text('Blank, or from a template'),
-              onTap: () async {
-                final navigator = Navigator.of(ctx);
-                navigator.pop();
-                await _createRegime(context, ref);
-              },
-            ),
-            const SizedBox(height: Space.sm),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _RegimeHeader extends ConsumerWidget {
@@ -158,6 +110,9 @@ class _RegimeHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final all = ref.watch(regimeSummariesProvider).valueOrNull ?? const [];
+    final position = all.indexWhere((s) => s.regime.id == regime.id) + 1;
+
     return AppCard(
       padding: const EdgeInsets.all(Space.xl),
       onTap: () => _rename(context, ref),
@@ -172,6 +127,27 @@ class _RegimeHeader extends ConsumerWidget {
           ),
           const SizedBox(height: Space.sm),
           Text(regime.name, style: context.t.titleLarge),
+          // The other regimes are not gone, they are just not active. Saying so
+          // here is the difference between "switching" and "losing" one.
+          if (all.length > 1) ...[
+            const SizedBox(height: Space.sm),
+            InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const RegimesScreen()),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$position of ${all.length} regimes',
+                    style: context.t.labelMedium?.copyWith(color: c.accent),
+                  ),
+                  const SizedBox(width: Space.xs),
+                  Icon(Icons.chevron_right, size: 14, color: c.accent),
+                ],
+              ),
+            ),
+          ],
           if (status != null) ...[
             const SizedBox(height: Space.md),
             Row(
@@ -433,35 +409,77 @@ Future<void> addSessionPrompt(
 }
 
 /// Small single-field prompt used for names throughout the regime editor.
+///
+/// Returns the trimmed text, or null when dismissed. Never returns an empty
+/// string: Save stays disabled until there is something to save, so a stray tap
+/// can't create a session called "".
 Future<String?> promptForText(
   BuildContext context, {
   required String title,
   String? hint,
   String initial = '',
 }) {
-  final controller = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
+    builder: (_) => _TextPromptDialog(title: title, hint: hint, initial: initial),
+  );
+}
+
+class _TextPromptDialog extends StatefulWidget {
+  const _TextPromptDialog({
+    required this.title,
+    required this.hint,
+    required this.initial,
+  });
+
+  final String title;
+  final String? hint;
+  final String initial;
+
+  @override
+  State<_TextPromptDialog> createState() => _TextPromptDialogState();
+}
+
+class _TextPromptDialogState extends State<_TextPromptDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
       content: TextField(
-        controller: controller,
+        controller: _controller,
         autofocus: true,
-        decoration: InputDecoration(hintText: hint),
-        onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        textCapitalization: TextCapitalization.sentences,
+        textInputAction: TextInputAction.done,
+        decoration: InputDecoration(hintText: widget.hint),
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _submit(),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+          onPressed: _controller.text.trim().isEmpty ? null : _submit,
           child: const Text('Save'),
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
 /// Session template rows joined with their exercises.

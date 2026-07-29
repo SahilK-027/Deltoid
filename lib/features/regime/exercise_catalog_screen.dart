@@ -1,13 +1,24 @@
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'regime_screen.dart';
+
+/// Exercises taken out of circulation. Archiving is reversible, so there has to
+/// be somewhere to reverse it from — without this the row is simply gone.
+final _archivedExercisesProvider = StreamProvider<List<Exercise>>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.exercises)
+    ..where((t) => t.archived.equals(true) & t.deletedAt.isNull())
+    ..orderBy([(t) => OrderingTerm(expression: t.name)]);
+  return query.watch();
+});
 
 /// The exercise catalog, shared by every regime.
 ///
@@ -24,10 +35,14 @@ class ExerciseCatalogScreen extends ConsumerStatefulWidget {
 
 class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
   String _query = '';
+  bool _showArchived = false;
 
   @override
   Widget build(BuildContext context) {
-    final all = ref.watch(exerciseCatalogProvider).valueOrNull;
+    final archived = ref.watch(_archivedExercisesProvider).valueOrNull ?? const [];
+    final all = _showArchived
+        ? archived
+        : ref.watch(exerciseCatalogProvider).valueOrNull;
     final c = context.c;
     final q = _query.trim().toLowerCase();
     final filtered = all == null
@@ -42,14 +57,30 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                 .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Exercises')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: c.accent,
-        foregroundColor: c.onAccent,
-        onPressed: () => showExerciseEditor(context, initialName: _query.trim()),
-        icon: const Icon(Icons.add),
-        label: const Text('New exercise'),
+      appBar: AppBar(
+        title: Text(_showArchived ? 'Archived' : 'Exercises'),
+        actions: [
+          if (archived.isNotEmpty || _showArchived)
+            TextButton(
+              onPressed: () => setState(() => _showArchived = !_showArchived),
+              child: Text(
+                _showArchived ? 'Active' : 'Archived (${archived.length})',
+                style: context.t.titleSmall?.copyWith(color: c.accent),
+              ),
+            ),
+          const SizedBox(width: Space.sm),
+        ],
       ),
+      floatingActionButton: _showArchived
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: c.accent,
+              foregroundColor: c.onAccent,
+              onPressed: () =>
+                  showExerciseEditor(context, initialName: _query.trim()),
+              icon: const Icon(Icons.add),
+              label: const Text('New exercise'),
+            ),
       body: Column(
         children: [
           Padding(
@@ -71,6 +102,14 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
           ),
           if (all == null)
             const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (filtered.isEmpty && _showArchived)
+            const Expanded(
+              child: EmptyState(
+                icon: Icons.archive_outlined,
+                title: 'Nothing archived',
+                message: 'Exercises you retire land here, and can come back.',
+              ),
+            )
           else if (filtered.isEmpty)
             Expanded(
               child: EmptyState(
@@ -119,9 +158,14 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          tooltip: 'Archive',
-                          icon: const Icon(Icons.archive_outlined, size: 18),
-                          onPressed: () => _archive(e),
+                          tooltip: _showArchived ? 'Restore' : 'Archive',
+                          icon: Icon(
+                            _showArchived
+                                ? Icons.unarchive_outlined
+                                : Icons.archive_outlined,
+                            size: 18,
+                          ),
+                          onPressed: () => _setArchived(e, !_showArchived),
                         ),
                       ],
                     ),
@@ -143,19 +187,21 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
 
   /// Archive rather than delete: past workouts point at this row, and history
   /// with a hole in it is worse than a catalog with one extra entry.
-  Future<void> _archive(Exercise e) async {
+  ///
+  /// Reversible in both directions and from both lists — an undo that only
+  /// lives as long as a snackbar is not an undo.
+  Future<void> _setArchived(Exercise e, bool archived) async {
     final messenger = ScaffoldMessenger.of(context);
-    await ref
-        .read(regimeRepositoryProvider)
-        .updateExercise(e.id, archived: const Value(true));
+    final repo = ref.read(regimeRepositoryProvider);
+    await repo.updateExercise(e.id, archived: Value(archived));
+    messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        content: Text('${e.name} archived'),
+        content: Text('${e.name} ${archived ? 'archived' : 'restored'}'),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () => ref
-              .read(regimeRepositoryProvider)
-              .updateExercise(e.id, archived: const Value(false)),
+          onPressed: () =>
+              repo.updateExercise(e.id, archived: Value(!archived)),
         ),
       ),
     );

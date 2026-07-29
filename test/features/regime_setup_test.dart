@@ -68,7 +68,15 @@ void main() {
     await tester.tap(find.text('Start from scratch'));
     await tester.pumpAndSettle();
 
+    // Nothing typed yet, so there is nothing to save — a blank name would
+    // create a regime called "".
+    expect(
+      tester.widget<TextButton>(find.widgetWithText(TextButton, 'Save')).onPressed,
+      isNull,
+    );
+
     await tester.enterText(find.byType(TextField), 'Bench only');
+    await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 

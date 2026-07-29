@@ -10,6 +10,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/metrics.dart';
+import '../history/history_providers.dart';
 import '../log/widgets/exercise_sheets.dart';
 
 enum ChartRange { threeMonths, year, all }
@@ -49,9 +50,14 @@ class ProgressScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(exerciseCatalogProvider).valueOrNull ?? const [];
-    final selectedId =
-        ref.watch(selectedExerciseProvider) ??
-        (catalog.isEmpty ? null : catalog.first.id);
+    // Opening on the alphabetically first exercise showed "no data" to most
+    // people most of the time. Default to the movement trained most recently —
+    // the one whose trend you actually came to look at.
+    final trained = ref.watch(exercisesWithHistoryProvider).valueOrNull;
+    final fallback = trained != null && trained.isNotEmpty
+        ? trained.first.exercise.id
+        : (catalog.isEmpty ? null : catalog.first.id);
+    final selectedId = ref.watch(selectedExerciseProvider) ?? fallback;
     final selected = catalog.where((e) => e.id == selectedId).firstOrNull;
 
     return Scaffold(

@@ -777,6 +777,12 @@ class TrainingRepository {
     required String regimeId,
     required String sessionId,
   }) async {
+    // A double tap on "Start" — or a screen that hasn't rebuilt yet — must not
+    // open a second parallel log for the same session. Hand back the running
+    // one instead; the sets already in it are the ones being asked for.
+    final running = await openWorkout();
+    if (running != null && running.sessionId == sessionId) return running.id;
+
     final regime =
         await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
     final cycle = await ensureOpenCycle(regimeId);
@@ -860,8 +866,12 @@ class TrainingRepository {
     return workoutId;
   }
 
+  /// Null once the workout is gone — deleted from history, or discarded from
+  /// the log screen. Screens showing it can then say so instead of holding a
+  /// stale copy of a day that no longer exists.
   Future<WorkoutDetail?> workoutDetail(String workoutId) async {
-    final workout = await (db.select(db.workouts)..where((t) => t.id.equals(workoutId)))
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId) & t.deletedAt.isNull()))
         .getSingleOrNull();
     if (workout == null) return null;
 
@@ -1123,6 +1133,161 @@ class TrainingRepository {
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
+    );
+  }
+
+  /// Removes one logged day from history.
+  ///
+  /// The whole tree is tombstoned — workout, exercise snapshots, sets — so a
+  /// session logged by accident leaves the feed, the heatmap, the progress
+  /// chart and prefill together, rather than half of each.
+  Future<void> deleteWorkout(String workoutId) async {
+    final workout =
+        await (db.select(db.workouts)..where((t) => t.id.equals(workoutId)))
+            .getSingleOrNull();
+    if (workout == null) return;
+
+    final stamp = nowMs();
+    await db.transaction(() async {
+      final weIds = [
+        for (final we in await (db.select(db.workoutExercises)
+              ..where((t) => t.workoutId.equals(workoutId)))
+            .get())
+          we.id,
+      ];
+
+      if (weIds.isNotEmpty) {
+        await (db.update(db.setLogs)
+              ..where((t) => t.workoutExerciseId.isIn(weIds)))
+            .write(
+          SetLogsCompanion(
+            deletedAt: Value(stamp),
+            updatedAt: Value(stamp),
+            dirty: const Value(true),
+          ),
+        );
+      }
+
+      await (db.update(db.workoutExercises)
+            ..where((t) => t.workoutId.equals(workoutId)))
+          .write(
+        WorkoutExercisesCompanion(
+          deletedAt: Value(stamp),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+
+      await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
+          .write(
+        WorkoutsCompanion(
+          deletedAt: Value(stamp),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+    });
+
+    await _reopenCycleIfIncomplete(workout);
+  }
+
+  /// A cycle closes the moment its last owed session is logged. Deleting that
+  /// workout has to reopen it, or the programme counts a cycle for a day that
+  /// never happened — and the deload lands early.
+  ///
+  /// The cycles after it are dropped, but only while they are still empty:
+  /// closing a cycle immediately opens the next one, so an untouched successor
+  /// is a placeholder rather than history. A successor with real training in it
+  /// means the cycle genuinely happened, and nothing is renumbered.
+  Future<void> _reopenCycleIfIncomplete(Workout workout) async {
+    final cycleId = workout.cycleId;
+    if (cycleId == null) return;
+
+    final cycle = await (db.select(db.cycles)..where((t) => t.id.equals(cycleId)))
+        .getSingleOrNull();
+    if (cycle == null || cycle.completedAt == null) return;
+
+    final sessionIds = await _sessionIds(cycle.regimeId);
+    final done = await _completedSessionIds(cycle.id);
+    if (sessionIds.isEmpty || sessionIds.every(done.contains)) return;
+
+    final later = await (db.select(db.cycles)
+          ..where((t) =>
+              t.regimeId.equals(cycle.regimeId) &
+              t.deletedAt.isNull() &
+              t.cycleIndex.isBiggerThanValue(cycle.cycleIndex)))
+        .get();
+
+    for (final c in later) {
+      if ((await _completedSessionIds(c.id)).isNotEmpty) return;
+    }
+
+    await db.transaction(() async {
+      for (final c in later) {
+        await (db.update(db.cycles)..where((t) => t.id.equals(c.id))).write(
+          CyclesCompanion(
+            deletedAt: Value(nowMs()),
+            updatedAt: Value(nowMs()),
+            dirty: const Value(true),
+          ),
+        );
+      }
+      await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
+        CyclesCompanion(
+          completedAt: const Value(null),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
+  }
+
+  /// Completed workouts logged under a regime. Shown before deleting one, so
+  /// "this removes the programme, not the training" is a number rather than a
+  /// promise.
+  Future<int> completedWorkoutCount(String regimeId) async {
+    final counted = db.workouts.id.count();
+    final row = await (db.selectOnly(db.workouts)
+          ..addColumns([counted])
+          ..where(db.workouts.regimeId.equals(regimeId) &
+              db.workouts.deletedAt.isNull() &
+              db.workouts.status.equalsValue(WorkoutStatus.completed)))
+        .getSingle();
+    return row.read(counted) ?? 0;
+  }
+
+  /// Sessions with at least one completed workout, newest activity first.
+  ///
+  /// Deliberately not "the active regime's sessions": the side-by-side table is
+  /// a history view, and switching regimes must not hide the history of the one
+  /// that came before.
+  Future<List<Session>> sessionsWithHistory() async {
+    final lastTrained = db.workouts.startedAt.max();
+    final rows = await (db.selectOnly(db.workouts)
+          ..addColumns([db.workouts.sessionId, lastTrained])
+          ..where(db.workouts.deletedAt.isNull() &
+              db.workouts.sessionId.isNotNull() &
+              db.workouts.status.equalsValue(WorkoutStatus.completed))
+          ..groupBy([db.workouts.sessionId])
+          ..orderBy([OrderingTerm(expression: lastTrained, mode: OrderingMode.desc)]))
+        .get();
+    if (rows.isEmpty) return const [];
+
+    final ids = [for (final r in rows) r.read(db.workouts.sessionId)!];
+    final sessions =
+        await (db.select(db.sessions)..where((t) => t.id.isIn(ids))).get();
+    final byId = {for (final s in sessions) s.id: s};
+
+    return [
+      for (final id in ids)
+        if (byId[id] != null) byId[id]!,
+    ];
+  }
+
+  Stream<List<Session>> watchSessionsWithHistory() {
+    return db.watchQuery(
+      [db.workouts, db.sessions],
+      sessionsWithHistory,
     );
   }
 }

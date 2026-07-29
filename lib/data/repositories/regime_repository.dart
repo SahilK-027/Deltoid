@@ -3,6 +3,21 @@ import 'package:drift/drift.dart';
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../db/watch.dart';
+
+/// One regime plus the two numbers that describe it in a list: how many
+/// training days it holds, and how many sessions were logged under it.
+class RegimeSummary {
+  const RegimeSummary({
+    required this.regime,
+    required this.sessionCount,
+    required this.workoutCount,
+  });
+
+  final Regime regime;
+  final int sessionCount;
+  final int workoutCount;
+}
 
 /// Edits to the programme itself: regimes, their sessions, and the exercise
 /// slots inside them.
@@ -46,6 +61,104 @@ class RegimeRepository {
         ),
       );
     });
+  }
+
+  /// Removes a regime from the programme list without touching training.
+  ///
+  /// Workouts hold their own snapshots and stay in History exactly as they were
+  /// logged; what disappears is the split, its sessions and its cycle counter.
+  Future<void> deleteRegime(String regimeId) async {
+    await db.transaction(() async {
+      final stamp = nowMs();
+      await (db.update(db.regimes)..where((t) => t.id.equals(regimeId))).write(
+        RegimesCompanion(
+          isActive: const Value(false),
+          deletedAt: Value(stamp),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+
+      // Deleting the active one must never leave the app with no regime while
+      // others exist — Today would show the first-launch screen to someone who
+      // has three programmes.
+      final active = await (db.select(db.regimes)
+            ..where((t) => t.deletedAt.isNull() & t.isActive.equals(true))
+            ..limit(1))
+          .getSingleOrNull();
+      if (active != null) return;
+
+      final fallback = await (db.select(db.regimes)
+            ..where((t) => t.deletedAt.isNull())
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.createdAt, mode: OrderingMode.desc)
+            ])
+            ..limit(1))
+          .getSingleOrNull();
+      if (fallback == null) return;
+
+      await (db.update(db.regimes)..where((t) => t.id.equals(fallback.id)))
+          .write(
+        RegimesCompanion(
+          isActive: const Value(true),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
+  }
+
+  /// Every regime with the two numbers that decide whether it is safe to
+  /// delete: how big it is, and how much was trained under it.
+  Future<List<RegimeSummary>> regimeSummaries() async {
+    final regimes = await (db.select(db.regimes)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
+        .get();
+    if (regimes.isEmpty) return const [];
+
+    final ids = regimes.map((r) => r.id).toList();
+
+    final sessionCount = db.sessions.id.count();
+    final sessionRows = await (db.selectOnly(db.sessions)
+          ..addColumns([db.sessions.regimeId, sessionCount])
+          ..where(db.sessions.regimeId.isIn(ids) & db.sessions.deletedAt.isNull())
+          ..groupBy([db.sessions.regimeId]))
+        .get();
+    final sessions = {
+      for (final r in sessionRows)
+        r.read(db.sessions.regimeId)!: r.read(sessionCount) ?? 0,
+    };
+
+    final workoutCount = db.workouts.id.count();
+    final workoutRows = await (db.selectOnly(db.workouts)
+          ..addColumns([db.workouts.regimeId, workoutCount])
+          ..where(db.workouts.regimeId.isIn(ids) &
+              db.workouts.deletedAt.isNull() &
+              db.workouts.status.equalsValue(WorkoutStatus.completed))
+          ..groupBy([db.workouts.regimeId]))
+        .get();
+    final workouts = {
+      for (final r in workoutRows)
+        r.read(db.workouts.regimeId)!: r.read(workoutCount) ?? 0,
+    };
+
+    return [
+      for (final r in regimes)
+        RegimeSummary(
+          regime: r,
+          sessionCount: sessions[r.id] ?? 0,
+          workoutCount: workouts[r.id] ?? 0,
+        ),
+    ];
+  }
+
+  Stream<List<RegimeSummary>> watchRegimeSummaries() {
+    return db.watchQuery(
+      [db.regimes, db.sessions, db.workouts],
+      regimeSummaries,
+    );
   }
 
   Future<void> _deactivateAll() async {
@@ -156,6 +269,19 @@ class RegimeRepository {
     await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
       SessionExercisesCompanion(
         deletedAt: Value(nowMs()),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
+  /// Undo for [removeSessionExercise]. The row was only tombstoned, so putting
+  /// a slot back is clearing the stamp rather than rebuilding it — which also
+  /// keeps its set target and rep range.
+  Future<void> restoreSessionExercise(String id) async {
+    await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
+      SessionExercisesCompanion(
+        deletedAt: const Value(null),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),

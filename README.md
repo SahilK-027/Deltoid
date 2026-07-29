@@ -40,7 +40,8 @@ Never "simplify" this to a plain most-recent lookup.
 ## Domain model
 
 ```
-Regime  ──  the programme (PPL, Upper/Lower). Switching = new Regime row.
+Regime  ──  the programme (PPL, Upper/Lower). Any number of them exist at
+            once; exactly one is active. Creating one never deletes another.
   └─ Session  ──  one training day template, ordered ("Push 1" … "Leg 2")
        └─ SessionExercise  ──  an exercise slot: order, target sets, rep range
 
@@ -96,11 +97,16 @@ three different things:
 
 - **Sessions** — every finished workout, newest first, grouped by month and
   paged as you scroll. Tap a day to see exactly what was logged in it, set by
-  set, from that workout's own snapshot rows.
+  set, from that workout's own snapshot rows. A day logged by mistake can be
+  deleted from there; if it closed a cycle, the cycle reopens.
 - **Exercises** — every movement that has actually been trained, each opening
-  its own paged history with the session it belonged to on every row.
+  its own paged history with the session it belonged to on every row. Rows
+  expand in place rather than opening the day they came from — drilling day →
+  exercise → day → exercise was a loop with no destination.
 - **Table** — the old Notion layout for one session: exercises down the side,
-  one column per date, pulling in older columns as it scrolls right.
+  one column per date, pulling in older columns as it scrolls right. Lists
+  every session ever trained, including regimes you have since switched away
+  from.
 
 Paging is keyset (`startedAt`, then id) rather than offset, so finishing a
 session while scrolling can't push an unread row past the cursor. See
@@ -166,6 +172,21 @@ case (same weight as last week, one more rep). Without `_adoptGhost` the set
 stores reps against a null weight: invisible to the chart, and unable to
 register as a PR.
 
+**`ref.read` on a provider nobody watches returns nothing.** The regime switcher
+read `allRegimesProvider` on demand, got `AsyncLoading` every time, and rendered
+an empty list — which is why creating a regime looked like it deleted the old
+one. Watch the provider, or go through the repository.
+
+**Don't hold a `WidgetRef` across an `await` that changes the screen.** Starting
+a workout swaps the "up next" card for the resume card, disposing the widget
+that started it; clearing a flag through that dead ref throws inside `finally`
+and leaves the button disabled forever. Capture
+`ProviderScope.containerOf(context)` before the first await.
+
+**`formatWeight` also formats computed numbers.** An estimated 1RM is an
+arbitrary double — `55.733333333333334 kg` shipped to the screen before it was
+capped at two decimals.
+
 ---
 
 ## Status
@@ -181,6 +202,12 @@ the rest render correctly but their happy path has not been clicked through.
   custom gym keypad with ±2.5 and one-tap "Last: 22.5", auto rest timer, per-set
   notes, swap / skip-with-reason / move / add exercise mid-session. Resuming an
   interrupted session survives a force-stop.
+
+  Finishing with sets still open is allowed but never silent: the confirmation
+  names every exercise and how far it got. Turning the page early is allowed
+  too — supersets and busy racks are normal — and the page says how much is
+  left behind. Starting a session twice in one tap-tap creates one workout, not
+  two.
 - **Session-scoped prefill** _(driven on the emulator)_ — ghost values,
   cross-session borrowing labelled, ghost adopted on completion, beat-last-time
   highlight.
@@ -204,16 +231,22 @@ the rest render correctly but their happy path has not been clicked through.
 - **Bodyweight log** — schema, repository, interpolation and BW / BW+X load maths
   are unit-tested; the Settings entry renders, but no weight has been logged
   through the UI.
-- **Regime editor** — create a regime blank or from a template, rename it,
-  add/reorder/delete sessions, edit slots, deload config. The template picker
-  and the catalog screen are new and unverified on device.
+- **Regime editor** _(driven on the emulator)_ — create a regime blank or from a
+  template, rename it, add/reorder/delete sessions, edit slots, deload config.
+  Deleting a session asks first; removing a slot offers an undo.
+- **Multiple regimes** _(driven on the emulator)_ — a full list under the Regime
+  tab: switch the active one, rename, delete. Deleting shows how many workouts
+  were logged under it, keeps them in History, and hands the active flag to
+  another regime rather than dropping the app to its first-launch state.
 - **Exercise catalog** — searchable, create / edit / archive, reachable from the
   Regime tab as well as mid-session. Archive rather than delete: past workouts
-  point at these rows.
+  point at these rows. Archived entries have their own list and can be restored
+  long after the undo snackbar is gone.
 - Light / dark / system theme, adaptive launcher icon.
 
-89 tests: prefill rules, cycle/deload timing, metrics, backup round-trip,
-history paging, the create-regime flow as a widget test, and repository
+102 tests: prefill rules, cycle/deload timing, metrics, backup round-trip,
+history paging, deleting a workout (including the cycle it reopens), the
+multi-regime rules, the create-regime flow as a widget test, and repository
 integration against a real in-memory SQLite.
 
 ### Not done

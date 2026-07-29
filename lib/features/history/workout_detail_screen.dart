@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
+import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
@@ -23,12 +24,22 @@ class WorkoutDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(workoutDetailProvider(workoutId)).valueOrNull;
+    final async = ref.watch(workoutDetailProvider(workoutId));
+    final detail = async.valueOrNull;
     final c = context.c;
 
     if (detail == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      // Loaded-and-null means the day was deleted, which is reachable: the feed
+      // behind this screen can outlive it. Saying so beats a spinner forever.
+      return Scaffold(
+        appBar: AppBar(title: const Text('Session')),
+        body: async.hasValue
+            ? const EmptyState(
+                icon: Icons.delete_outline,
+                title: 'Session deleted',
+                message: 'This day is no longer in your history.',
+              )
+            : const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -37,7 +48,26 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final accent = workout.isDeload ? c.deload : c.accent;
 
     return Scaffold(
-      appBar: AppBar(title: Text(detail.session?.name ?? 'Ad-hoc session')),
+      appBar: AppBar(
+        title: Text(detail.session?.name ?? 'Ad-hoc session'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'delete') _delete(context, ref, detail);
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(
+                  'Delete this session',
+                  style: TextStyle(color: c.negative),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.sm, Space.lg, Space.huge),
@@ -89,6 +119,38 @@ class WorkoutDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Logging the wrong session, or logging one twice, has to be undoable —
+  /// otherwise the heatmap, the cycle count and every "last time" number carry
+  /// a day that never happened.
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final sets =
+        detail.entries.expand((e) => e.sets).where((s) => s.isDone).length;
+    final date = DateFormat('d MMMM yyyy').format(
+      dateFromDayKey(detail.workout.dayKey),
+    );
+
+    final ok = await confirmAction(
+      context,
+      title: 'Delete this session?',
+      message: '${detail.session?.name ?? 'Ad-hoc session'} · $date\n\n'
+          '$sets logged set${sets == 1 ? '' : 's'} will be removed from '
+          'history, the heatmap and every last-time suggestion. If it closed a '
+          'cycle, the cycle reopens.\n\nThis cannot be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok || !context.mounted) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(trainingRepositoryProvider).deleteWorkout(detail.workout.id);
+    navigator.pop();
+    messenger.showSnackBar(const SnackBar(content: Text('Session deleted')));
   }
 
   static List<String> _facts(WorkoutDetail detail) {

@@ -111,6 +111,42 @@ class Pill extends StatelessWidget {
   }
 }
 
+/// Yes/no gate in front of anything that loses work.
+///
+/// Every destructive action in the app goes through this, so the wording is
+/// always "what happens", never "are you sure" — and [destructive] paints the
+/// confirming button so the dangerous option is never the quiet one.
+Future<bool> confirmAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  String cancelLabel = 'Cancel',
+  bool destructive = true,
+}) async {
+  final answer = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(cancelLabel),
+        ),
+        TextButton(
+          style: destructive
+              ? TextButton.styleFrom(foregroundColor: ctx.c.negative)
+              : null,
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return answer ?? false;
+}
+
 /// Shown when a list is genuinely empty. Explains the next action rather than
 /// leaving a blank rectangle.
 class EmptyState extends StatelessWidget {

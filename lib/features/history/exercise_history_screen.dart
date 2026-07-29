@@ -11,7 +11,6 @@ import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
-import 'workout_detail_screen.dart';
 
 final _exerciseProvider =
     StreamProvider.autoDispose.family<Exercise?, String>((ref, id) {
@@ -125,28 +124,39 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
   }
 }
 
-class _PerformanceCard extends StatelessWidget {
+/// One past performance, expanding in place.
+///
+/// It deliberately does not open the day it came from. This screen is reached
+/// *from* a day, and pushing back into one made history a loop you could walk
+/// forever without ever arriving anywhere new. Everything the row could send
+/// you looking for — every set, its type and its note — opens here instead.
+class _PerformanceCard extends StatefulWidget {
   const _PerformanceCard({required this.performance, required this.exercise});
 
   final ExercisePerformance performance;
   final Exercise? exercise;
 
   @override
+  State<_PerformanceCard> createState() => _PerformanceCardState();
+}
+
+class _PerformanceCardState extends State<_PerformanceCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final performance = widget.performance;
+    final exercise = widget.exercise;
     final c = context.c;
     final date = dateFromDayKey(performance.dayKey);
     final done = performance.sets.where((s) => s.isDone).toList();
     final skipped = performance.skipReason != SkipReason.none;
+    final canExpand = !skipped && done.isNotEmpty;
 
     return AppCard(
       padding:
           const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              WorkoutDetailScreen(workoutId: performance.workoutId),
-        ),
-      ),
+      onTap: canExpand ? () => setState(() => _expanded = !_expanded) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -168,6 +178,14 @@ class _PerformanceCard extends StatelessWidget {
               const Spacer(),
               if (performance.isDeload) Pill('Deload', color: c.deload),
               if (skipped) Pill(performance.skipReason.label, color: c.negative),
+              if (canExpand) ...[
+                const SizedBox(width: Space.sm),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                  color: c.textTertiary,
+                ),
+              ],
             ],
           ),
           if (!skipped) ...[
@@ -188,6 +206,17 @@ class _PerformanceCard extends StatelessWidget {
                     '${performance.topSetReps == null ? '' : ' × ${performance.topSetReps}'}'}',
                 style: context.t.labelSmall,
               ),
+            ],
+            if (_expanded && done.isNotEmpty) ...[
+              const SizedBox(height: Space.md),
+              Divider(color: c.border, height: 1),
+              const SizedBox(height: Space.sm),
+              for (var i = 0; i < done.length; i++)
+                _ExpandedSetLine(
+                  set: done[i],
+                  position: i,
+                  exercise: exercise,
+                ),
             ],
           ],
         ],
@@ -211,5 +240,74 @@ class _PerformanceCard extends StatelessWidget {
     final weight = set.weight;
     if (weight == null) return '$reps$suffix';
     return '${formatWeight(weight)}×$reps$suffix';
+  }
+
+  /// Spelled out rather than compressed, for the expanded rows: `22.5 kg × 2`
+  /// on a dumbbell is the number you'd read off the rack.
+  static String _loadLabel(SetLog set, Exercise? exercise) {
+    final added = set.addedWeight;
+    if (exercise?.loadMode == LoadMode.bodyweight) return 'Bodyweight';
+    if (exercise?.loadMode == LoadMode.bodyweightPlus) {
+      return added == null || added == 0
+          ? 'Bodyweight'
+          : 'BW + ${formatWeight(added)} kg';
+    }
+    final weight = set.weight;
+    if (weight == null) return '—';
+    final perSide = exercise?.loadMode == LoadMode.perSide ? ' × 2' : '';
+    return '${formatWeight(weight)} kg$perSide';
+  }
+}
+
+/// One set inside an expanded card: what it was, what it weighed, and anything
+/// written about it at the time.
+class _ExpandedSetLine extends StatelessWidget {
+  const _ExpandedSetLine({
+    required this.set,
+    required this.position,
+    required this.exercise,
+  });
+
+  final SetLog set;
+  final int position;
+  final Exercise? exercise;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final type = set.setType.shortLabel;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 34,
+            child: Text(
+              type.isEmpty ? '${position + 1}' : type,
+              style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _PerformanceCardState._loadLabel(set, exercise),
+                  style: context.t.labelLarge,
+                ),
+                if (set.note != null && set.note!.isNotEmpty)
+                  Text(set.note!, style: context.t.labelSmall),
+              ],
+            ),
+          ),
+          Text(
+            '${set.reps ?? 0} reps',
+            style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 }

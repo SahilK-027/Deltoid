@@ -102,10 +102,21 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        // Back dismisses the keypad first: it covers half the screen, and
+        // losing the whole session to one stray swipe would be unforgivable.
         if (_editing != null) {
           setState(() => _editing = null);
           return;
         }
+        // Leaving without finishing is fine — the session keeps running and
+        // survives a force-stop — but it has to be said out loud, or the sets
+        // logged so far look lost.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session still running — resume it from Today'),
+            duration: Duration(seconds: 3),
+          ),
+        );
         Navigator.of(context).pop();
       },
       child: Scaffold(
@@ -451,27 +462,38 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     final repo = ref.read(trainingRepositoryProvider);
 
     if (done == 0) {
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Nothing logged'),
-          content: const Text('No sets were completed. Discard this session?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Keep logging'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Discard'),
-            ),
-          ],
-        ),
+      final discard = await confirmAction(
+        context,
+        title: 'Nothing logged',
+        message: 'No sets were completed. Discard this session?',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep logging',
       );
-      if (discard != true) return;
+      if (!discard) return;
       await repo.abandonWorkout(detail.workout.id);
       navigator.pop();
       return;
+    }
+
+    // Finishing early is allowed — life gets in the way, and an app that
+    // refuses to close a session is an app you stop logging in. It does have to
+    // be deliberate, though: unfinished sets are dropped on the way out, and
+    // whatever is left blank never happened as far as next week is concerned.
+    final unfinished = _unfinished(detail);
+    if (unfinished.isNotEmpty) {
+      final total = _totalSets(detail);
+      final ok = await confirmAction(
+        context,
+        title: 'Finish with sets left?',
+        message: '$done of $total sets logged.\n\n'
+            '${unfinished.map((e) => '· $e').join('\n')}\n\n'
+            'The empty sets are discarded — the session is saved with exactly '
+            'what you did.',
+        confirmLabel: 'Finish anyway',
+        cancelLabel: 'Keep logging',
+        destructive: false,
+      );
+      if (!ok) return;
     }
 
     await repo.completeWorkout(detail.workout.id);
@@ -490,6 +512,21 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   static int _doneSets(WorkoutDetail d) =>
       d.entries.expand((e) => e.sets).where((s) => s.isDone).length;
+
+  /// Exercises with sets still open, named and counted. Skipped ones are
+  /// deliberately absent: a skip is a decision already recorded, not an
+  /// omission to be nagged about.
+  static List<String> _unfinished(WorkoutDetail d) {
+    final out = <String>[];
+    for (final entry in d.entries) {
+      if (entry.workoutExercise.skipReason != SkipReason.none) continue;
+      final total = entry.sets.length;
+      final done = entry.sets.where((s) => s.isDone).length;
+      if (total == 0 || done == total) continue;
+      out.add('${entry.exercise.name} — $done of $total sets');
+    }
+    return out;
+  }
 
   static int _totalSets(WorkoutDetail d) =>
       d.entries.expand((e) => e.sets).length;
@@ -682,6 +719,26 @@ class _ExercisePage extends ConsumerWidget {
         ],
         if (nextName != null) ...[
           const SizedBox(height: Space.xxl),
+          // Moving on early is allowed — supersets and busy racks are normal —
+          // but it should never be silent. The rail keeps the count; this says
+          // it in words at the moment you are about to leave.
+          if (!allDone && !skipped && entry.sets.isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: c.textTertiary),
+                const SizedBox(width: Space.sm),
+                Expanded(
+                  child: Text(
+                    '${entry.sets.length - done} set'
+                    '${entry.sets.length - done == 1 ? '' : 's'} still open '
+                    'here — you can come back to them.',
+                    style: context.t.labelSmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Space.md),
+          ],
           // Turning the page works too; this is the discoverable version, and
           // it lights up once the exercise is actually finished.
           OutlinedButton(

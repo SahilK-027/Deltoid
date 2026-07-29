@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
-import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
@@ -442,15 +441,24 @@ class _SessionTable extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
-    final selected = ref.watch(selectedHistorySessionProvider) ??
-        (sessions.isEmpty ? null : sessions.first.id);
+    // Every session that has actually been trained, not just the active
+    // regime's: this is a history view, and switching programmes must not hide
+    // the history of the one before it.
+    final sessions = ref.watch(sessionsWithHistoryProvider).valueOrNull ?? const [];
+
+    // A stored id survives a regime switch and a session delete. Fall back
+    // instead of showing an empty table for a session that isn't on the tabs.
+    final stored = ref.watch(selectedHistorySessionProvider);
+    final selected = sessions.any((s) => s.id == stored)
+        ? stored
+        : (sessions.isEmpty ? null : sessions.first.id);
 
     if (sessions.isEmpty) {
       return const EmptyState(
         icon: Icons.view_column_outlined,
-        title: 'No sessions yet',
-        message: 'Sessions from your active regime appear here.',
+        title: 'Nothing logged yet',
+        message: 'Finish a session and it gets a column here, newest on the '
+            'left — the old spreadsheet, one session at a time.',
       );
     }
 
@@ -763,5 +771,16 @@ class _Cell extends StatelessWidget {
 }
 
 /// Trailing zeros are noise on a gym screen: 22.5 stays 22.5, 60.0 becomes 60.
-String formatWeight(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+///
+/// Capped at two decimals because this also formats *computed* numbers — an
+/// estimated 1RM is an arbitrary double, and `55.733333333333334 kg` is not a
+/// weight anyone has ever lifted.
+String formatWeight(double v) {
+  if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+  final rounded = (v * 100).round() / 100;
+  if (rounded == rounded.roundToDouble()) return rounded.toStringAsFixed(0);
+  return rounded
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
+}

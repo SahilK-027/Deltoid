@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../data/repositories/regime_repository.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'regime_screen.dart';
 
@@ -42,6 +43,16 @@ class SessionEditorScreen extends ConsumerWidget {
                 await repo.renameSession(sessionId, name);
               } else if (value == 'delete') {
                 final navigator = Navigator.of(context);
+                final ok = await confirmAction(
+                  context,
+                  title: 'Delete ${session?.name ?? 'this session'}?',
+                  message: 'It leaves the cycle, and its exercise slots go '
+                      'with it.\n\nWorkouts already logged under this session '
+                      'stay in History — they hold their own record of what '
+                      'you did.',
+                  confirmLabel: 'Delete',
+                );
+                if (!ok) return;
                 await repo.deleteSession(sessionId);
                 navigator.pop();
               }
@@ -139,8 +150,13 @@ class SessionEditorScreen extends ConsumerWidget {
                             IconButton(
                               visualDensity: VisualDensity.compact,
                               icon: const Icon(Icons.close, size: 18),
-                              onPressed: () =>
-                                  repo.removeSessionExercise(entry.slot.id),
+                              tooltip: 'Remove from session',
+                              onPressed: () => _remove(
+                                context,
+                                repo,
+                                slotId: entry.slot.id,
+                                name: entry.exercise.name,
+                              ),
                             ),
                           ],
                         ),
@@ -157,6 +173,28 @@ class SessionEditorScreen extends ConsumerWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add exercise'),
             ),
+    );
+  }
+
+  /// Removing a slot is one tap, so it gets an undo rather than a dialog — the
+  /// row is only tombstoned, and putting it back keeps its sets and rep range.
+  Future<void> _remove(
+    BuildContext context,
+    RegimeRepository repo, {
+    required String slotId,
+    required String name,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await repo.removeSessionExercise(slotId);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('$name removed'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => repo.restoreSessionExercise(slotId),
+        ),
+      ),
     );
   }
 
