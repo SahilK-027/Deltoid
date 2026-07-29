@@ -1,0 +1,196 @@
+import 'dart:math' as math;
+
+import 'enums.dart';
+
+/// Round a suggested weight to something you can actually load.
+double roundLoad(double kg) => (kg * 2).round() / 2;
+
+/// Effective load moved by one set, in kg.
+///
+/// [LoadMode] is what makes this honest: a dumbbell entered as 22.5 is 45kg of
+/// total load, and a pull-up is only comparable across months if bodyweight is
+/// part of the number.
+double? effectiveLoad({
+  required LoadMode mode,
+  double? weight,
+  double? addedWeight,
+  double? bodyweightKg,
+}) {
+  switch (mode) {
+    case LoadMode.total:
+      return weight;
+    case LoadMode.perSide:
+      return weight == null ? null : weight * 2;
+    case LoadMode.bodyweight:
+      return bodyweightKg;
+    case LoadMode.bodyweightPlus:
+      if (bodyweightKg == null) return addedWeight;
+      return bodyweightKg + (addedWeight ?? 0);
+  }
+}
+
+/// Epley estimated 1RM.
+///
+/// Reps are capped at 12 because the formula drifts badly into high-rep
+/// territory and would otherwise reward a 20-rep lateral raise over a heavy
+/// triple.
+double? estimated1RM({double? load, int? reps}) {
+  if (load == null || reps == null || reps <= 0 || load <= 0) return null;
+  final r = math.min(reps, 12);
+  return load * (1 + r / 30);
+}
+
+/// Whether a set beats the same slot last time.
+///
+/// Deliberately not [estimated1RM]: that caps reps at 12 so high-rep work can't
+/// masquerade as strength, which also makes 12 → 13 reps invisible — exactly
+/// the improvement most worth celebrating on a hypertrophy set.
+///
+/// The rule is strict on purpose. More load at no cost in reps, or more reps at
+/// the same load, is unambiguously better. Heavier for fewer reps is a
+/// trade-off, not a win, and lighting it up green would make the highlight
+/// meaningless.
+bool beatsPrevious({
+  double? load,
+  int? reps,
+  double? previousLoad,
+  int? previousReps,
+}) {
+  if (load == null || reps == null || previousLoad == null || previousReps == null) {
+    return false;
+  }
+  if (load > previousLoad && reps >= previousReps) return true;
+  if (load == previousLoad && reps > previousReps) return true;
+  return false;
+}
+
+/// One completed set, reduced to what the progress maths needs.
+class ScoredSet {
+  const ScoredSet({
+    required this.type,
+    this.weight,
+    this.reps,
+    this.addedWeight,
+  });
+
+  final SetType type;
+  final double? weight;
+  final int? reps;
+  final double? addedWeight;
+}
+
+/// Summary of a single exercise performance, used by charts and history.
+class PerformanceScore {
+  const PerformanceScore({
+    required this.topSetLoad,
+    required this.topSetReps,
+    required this.best1RM,
+    required this.workingSets,
+    required this.totalReps,
+    required this.volume,
+  });
+
+  /// Heaviest working set's effective load.
+  final double? topSetLoad;
+  final int? topSetReps;
+
+  /// Best estimated 1RM across working sets — the fairest single number for
+  /// "did I get stronger", since it credits both weight and reps.
+  final double? best1RM;
+
+  final int workingSets;
+  final int totalReps;
+
+  /// Load × reps across working sets.
+  final double volume;
+
+  bool get isEmpty => workingSets == 0;
+}
+
+PerformanceScore scorePerformance({
+  required List<ScoredSet> sets,
+  required LoadMode mode,
+  double? bodyweightKg,
+}) {
+  double? topLoad;
+  int? topReps;
+  double? best;
+  var count = 0;
+  var reps = 0;
+  var volume = 0.0;
+
+  for (final s in sets) {
+    // Warmups, drops and rest-pause extensions are excluded on purpose:
+    // including them is what makes naive logs claim progress that isn't there.
+    if (!s.type.countsForProgress) continue;
+
+    final load = effectiveLoad(
+      mode: mode,
+      weight: s.weight,
+      addedWeight: s.addedWeight,
+      bodyweightKg: bodyweightKg,
+    );
+
+    count++;
+    reps += s.reps ?? 0;
+    if (load != null && s.reps != null) volume += load * s.reps!;
+
+    if (load != null && (topLoad == null || load > topLoad)) {
+      topLoad = load;
+      topReps = s.reps;
+    }
+    final e = estimated1RM(load: load, reps: s.reps);
+    if (e != null && (best == null || e > best)) best = e;
+  }
+
+  return PerformanceScore(
+    topSetLoad: topLoad,
+    topSetReps: topReps,
+    best1RM: best,
+    workingSets: count,
+    totalReps: reps,
+    volume: volume,
+  );
+}
+
+/// Bodyweight on a given day, linearly interpolated between the surrounding
+/// entries. Without this, weighing yourself twice a month would leave most
+/// pull-up sets unscoreable.
+double? bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) {
+  if (log.isEmpty) return null;
+  final sorted = [...log]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
+
+  if (dayKey <= sorted.first.dayKey) return sorted.first.weightKg;
+  if (dayKey >= sorted.last.dayKey) return sorted.last.weightKg;
+
+  for (var i = 0; i < sorted.length - 1; i++) {
+    final a = sorted[i];
+    final b = sorted[i + 1];
+    if (dayKey >= a.dayKey && dayKey <= b.dayKey) {
+      if (b.dayKey == a.dayKey) return b.weightKg;
+      final t = (dayKey - a.dayKey) / (b.dayKey - a.dayKey);
+      return a.weightKg + (b.weightKg - a.weightKg) * t;
+    }
+  }
+  return sorted.last.weightKg;
+}
+
+/// How many consecutive recent performances failed to beat the best e1RM that
+/// came before them.
+///
+/// This is the actual answer to "am I progressing" — cheap to compute, and
+/// surfaced as a quiet badge rather than a dashboard.
+int stalledSessions(List<double?> chronological1RMs) {
+  final values = chronological1RMs.whereType<double>().toList();
+  if (values.length < 2) return 0;
+
+  var best = values.first;
+  var bestIndex = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (values[i] > best) {
+      best = values[i];
+      bestIndex = i;
+    }
+  }
+  return values.length - 1 - bestIndex;
+}
