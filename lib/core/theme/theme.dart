@@ -23,6 +23,10 @@ TextTheme _textTheme(DeltoidColors c) {
     // Big numbers: cycle counters, chart readouts, timers.
     displaySmall: base(34, 40, FontWeight.w600, c.textPrimary)
         .copyWith(fontFeatures: tabular),
+    // The one thing a screen is about — the hero session name. Text, not a
+    // number, so no tabular figures: this was missing from the scale entirely
+    // and every `displayMedium` on Today silently fell back to 14pt body.
+    displayMedium: base(30, 36, FontWeight.w600, c.textPrimary),
     // Screen titles.
     titleLarge: base(22, 28, FontWeight.w600, c.textPrimary),
     // Card headers, exercise names.

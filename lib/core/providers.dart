@@ -2,8 +2,6 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/enums.dart';
-
 import '../data/db/database.dart';
 import '../data/repositories/training_repository.dart';
 import '../data/seed/seeder.dart';
@@ -112,42 +110,6 @@ final cycleStatusProvider = StreamProvider<CycleStatus?>((ref) {
   return repo.watchCycleStatus(regime.id);
 });
 
-/// The unfinished workout, if any. Drives the "resume" affordance on Today.
-final openWorkoutProvider = StreamProvider<Workout?>((ref) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.workouts)
-    ..where((t) =>
-        t.status.equalsValue(WorkoutStatus.inProgress) & t.deletedAt.isNull())
-    ..orderBy([
-      (t) => OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc)
-    ])
-    ..limit(1);
-  return query.watchSingleOrNull();
-});
-
-/// Whether anything has ever been finished. Separates "brand new install" from
-/// "regime set up, nothing logged yet" on Today.
-final hasCompletedWorkoutProvider = StreamProvider<bool>((ref) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.workouts)
-    ..where((t) =>
-        t.status.equalsValue(WorkoutStatus.completed) & t.deletedAt.isNull())
-    ..limit(1);
-  return query.watch().map((rows) => rows.isNotEmpty);
-});
-
-/// Exercise names for a session template, used for the preview on Today.
-final sessionPreviewProvider =
-    StreamProvider.family<List<String>, String>((ref, sessionId) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.sessionExercises).join([
-    innerJoin(db.exercises, db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
-  ])
-    ..where(db.sessionExercises.sessionId.equals(sessionId) &
-        db.sessionExercises.deletedAt.isNull())
-    ..orderBy([OrderingTerm(expression: db.sessionExercises.orderIndex)]);
-
-  return query.watch().map(
-        (rows) => rows.map((r) => r.readTable(db.exercises).name).toList(),
-      );
-});
+// The open workout, the "anything ever finished" flag and the session preview
+// used to live here as three more watched queries. They are part of the Today
+// snapshot now — see `todaySnapshot` in the repository for why.

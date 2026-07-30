@@ -11,7 +11,10 @@ import 'seed_data.dart';
 /// before they can start. Idempotent — skipped entirely once any exercise
 /// exists.
 Future<void> ensureStarterCatalog(AppDatabase db) async {
-  final existing = await db.select(db.exercises).get();
+  // Limited to one row: this runs before first paint on every launch, and
+  // reading the whole catalog to ask whether it is empty put the entire
+  // exercise table on the critical path forever.
+  final existing = await (db.select(db.exercises)..limit(1)).get();
   if (existing.isNotEmpty) return;
 
   await db.transaction(() async {
