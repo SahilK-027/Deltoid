@@ -312,47 +312,7 @@ Found while fixing the first round, 2026-07-30, by reading the code rather than
 driving it. Numbered `A1…` so they can't be confused with the old set. Same
 convention as before: a finding is deleted when it's fixed, not ticked.
 
-### Performance
-
-**A7. Every keystroke rebuilds the whole exercise page**
-`log/log_screen.dart` (`_ExercisePage`, `buffer`)
-
-- **Bug** — finding 19 removed the per-second rebuild and debounced the writes,
-  but the keypad buffer is still passed down as a widget parameter, so each
-  digit rebuilds the page and every `SetRow` on it. Cheaper than it was — no
-  database round trip now — but it is still the largest rebuild in the app
-  happening on the most frequent interaction.
-- **Good UX** — invisible on a Pixel; the reason to care is that this is the one
-  screen used with cold hands and a two-year-old phone.
-- **Fix** — hold the buffer in a `ValueNotifier` and let the active cell listen,
-  so a keystroke repaints one cell instead of a page.
-
-**A8. Prefill's map is rebuilt on every set write**
-`log/log_providers.dart`
-
-- **Bug** — `workoutPrefillProvider` watches `workoutDetailProvider`, which
-  re-emits on every write to `workouts`, `workout_exercises` or `set_logs`. The
-  per-exercise providers cache, so no history is re-walked, but the map is
-  rebuilt and every listener rebuilds with it — on a stream that fires for each
-  set you complete.
-- **Good UX** — as above: invisible until it isn't.
-- **Fix** — watch the _identity_ of the exercise list rather than the detail —
-  a `select` on the ids — so the map only rebuilds when the list actually
-  changes.
-
 ### Consistency and smaller things
-
-**A9. Rest targets silently do nothing for an added exercise**
-`repositories/training_repository.dart` (`setRestTarget`)
-
-- **Bug** — the target is stored on the `session_exercises` row, so nudging the
-  timer on an exercise added mid-session writes to a row that doesn't exist. The
-  update matches nothing and returns without complaint; next week it is 120s
-  again.
-- **Good UX** — either it remembers or it says it can't.
-- **Fix** — fall back to the last rest actually recorded for that exercise
-  (`restTargetFor` already reads it), or offer to add the exercise to the
-  template when a target is set for one that isn't in it.
 
 **A10. The last-time line and the ghosts say the same thing twice**
 `log/log_screen.dart` (`_summariseSets`)
@@ -365,16 +325,6 @@ convention as before: a finding is deleted when it's fixed, not ticked.
 - **Fix** — decide with the app in your hand: keep it, hide it once any set is
   logged, or show it only above some number of sets.
 
-**A11. The duplicate-name check ignores archived exercises**
-`log/widgets/exercise_sheets.dart`
-
-- **Bug** — the collision query filters `archived = false`, so creating an
-  exercise named after an archived one passes silently. Un-archive it later and
-  the picker has two identical rows, which is the state finding 28 existed to
-  prevent.
-- **Fix** — check archived rows too and say so ("there's an archived Cable Fly
-  — restore it instead?"), which is the better answer anyway.
-
 **A12. Bodyweight history is a peek, not a list**
 `settings/settings_screen.dart`
 
@@ -385,16 +335,6 @@ convention as before: a finding is deleted when it's fixed, not ticked.
 - **Fix** — a real bodyweight screen: full paged history, and a chart, given the
   numbers already exist and already scale every bodyweight lift.
 
-**A13. `RestAlert` gives up permanently on one failure**
-`core/rest_alert.dart`
-
-- **Bug** — any exception sets `_failed` and the tone never plays again for the
-  life of the process. That is right for "no audio plugin in a widget test" and
-  wrong for a transient audio-focus refusal during a phone call, which is a
-  thing that happens in a gym.
-- **Fix** — distinguish "this platform has no audio" from "this attempt failed";
-  retry the second, latch the first. Haptics fire either way, which is why this
-  is minor.
 
 ### Deliberately not fixed, so nobody re-opens them
 

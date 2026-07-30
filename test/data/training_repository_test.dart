@@ -880,6 +880,42 @@ void main() {
     );
   });
 
+  test('a rest target has nowhere to live on an exercise added mid-session',
+      () async {
+    // The target is stored on the session slot, and an exercise added today
+    // has no slot. The write matched nothing and returned quietly, so the
+    // timer was simply back at 120s next week with no explanation.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final curl = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Barbell Curl')))
+        .getSingle();
+    await repo.addExerciseToWorkout(id, curl.id);
+
+    expect(
+      await repo.setRestTarget(
+        exerciseId: curl.id,
+        sessionId: push1.id,
+        seconds: 90,
+      ),
+      isFalse,
+      reason: 'there is no template slot to remember it against',
+    );
+
+    // An exercise that *is* in the template still saves.
+    final detail = await repo.workoutDetail(id);
+    expect(
+      await repo.setRestTarget(
+        exerciseId: detail!.entries.first.exercise.id,
+        sessionId: push1.id,
+        seconds: 90,
+      ),
+      isTrue,
+    );
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

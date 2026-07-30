@@ -14,6 +14,12 @@ import 'package:flutter/services.dart';
 /// Every method is best-effort. There is no audio plugin in a widget test and
 /// no reason for a missing beep to take a logged set down with it, so failures
 /// are swallowed.
+///
+/// Two kinds of failure, deliberately treated differently: *this platform has
+/// no audio at all* (a widget test) latches off permanently, while *this
+/// attempt failed* (audio focus refused during a phone call, which happens in
+/// a gym) is retried on the next rest. One shared latch meant a single call
+/// silenced the app until it was next launched.
 class RestAlert {
   RestAlert._();
 
@@ -22,12 +28,14 @@ class RestAlert {
   static final _asset = AssetSource('audio/rest_done.mp3');
 
   AudioPlayer? _player;
-  bool _failed = false;
+
+  /// Set only when the platform has no audio support to build against.
+  bool _unsupported = false;
 
   /// Builds the player and pulls the asset into memory. Called when a workout
   /// opens so the first rest of the session isn't the one that stutters.
   Future<void> warmUp() async {
-    if (_failed || _player != null) return;
+    if (_unsupported || _player != null) return;
     try {
       final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
       await player.setAudioContext(
@@ -45,9 +53,13 @@ class RestAlert {
       );
       await player.setSource(_asset);
       _player = player;
+    } on MissingPluginException {
+      // No audio plugin at all — a widget test, or a platform without one.
+      // Nothing will change that within this process, so stop trying.
+      _unsupported = true;
     } catch (_) {
-      // No audio on this platform or in this test harness; haptics still fire.
-      _failed = true;
+      // Something else went wrong building the player. Leave it null and try
+      // again on the next rest rather than going silent for the session.
     }
   }
 
@@ -61,7 +73,7 @@ class RestAlert {
       HapticFeedback.heavyImpact,
     );
 
-    if (_failed) return;
+    if (_unsupported) return;
     try {
       await warmUp();
       final player = _player;
@@ -70,8 +82,11 @@ class RestAlert {
       // when the target is nudged down.
       await player.stop();
       await player.resume();
+    } on MissingPluginException {
+      _unsupported = true;
     } catch (_) {
-      _failed = true;
+      // A refused audio focus, a device busy on a call. The haptics above
+      // already fired, and the next rest gets another go.
     }
   }
 
@@ -80,6 +95,7 @@ class RestAlert {
   Future<void> release() async {
     final player = _player;
     _player = null;
+    // Not a permanent state: opening another workout builds a fresh player.
     if (player == null) return;
     try {
       await player.dispose();

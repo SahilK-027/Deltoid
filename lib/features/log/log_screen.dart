@@ -196,17 +196,32 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   /// Nudging the timer sets the target for this exercise, for good: next week
   /// opens on the number you settled on.
-  void _adjustRest(WorkoutDetail detail, int delta) {
+  Future<void> _adjustRest(WorkoutDetail detail, int delta) async {
     final seconds = (_restTargetSeconds + delta).clamp(15, 900).toInt();
     setState(() => _restTargetSeconds = seconds);
 
     if (detail.entries.isEmpty) return;
     final page = _page.clamp(0, detail.entries.length - 1);
-    ref.read(trainingRepositoryProvider).setRestTarget(
-          exerciseId: detail.entries[page].exercise.id,
+    final entry = detail.entries[page];
+    final saved = await ref.read(trainingRepositoryProvider).setRestTarget(
+          exerciseId: entry.exercise.id,
           sessionId: detail.workout.sessionId,
           seconds: seconds,
         );
+
+    // An exercise added mid-session has no slot in the template to hold this,
+    // so the write matches nothing. Silently forgetting it is worse than
+    // saying so: the timer would simply be back at 120s next week.
+    if (saved || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Rest set for today. ${entry.exercise.name} is not in this '
+          'session\'s template, so it will not be remembered.',
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _dismissRestBar() {

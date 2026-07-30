@@ -1076,13 +1076,18 @@ class TrainingRepository {
 
   /// Remembers a rest target against the session slot, so next week opens with
   /// the number you settled on rather than a flat 120 seconds.
-  Future<void> setRestTarget({
+  ///
+  /// Returns false when there is no slot to write it to — an exercise added
+  /// mid-session isn't in the template, and the update would match no rows and
+  /// return without complaint, leaving the timer back at 120s next week with
+  /// no indication why. The caller says so instead.
+  Future<bool> setRestTarget({
     required String exerciseId,
     required String? sessionId,
     required int seconds,
   }) async {
-    if (sessionId == null) return;
-    await (db.update(db.sessionExercises)
+    if (sessionId == null) return false;
+    final rows = await (db.update(db.sessionExercises)
           ..where((t) =>
               t.sessionId.equals(sessionId) &
               t.exerciseId.equals(exerciseId) &
@@ -1094,6 +1099,7 @@ class TrainingRepository {
         dirty: const Value(true),
       ),
     );
+    return rows > 0;
   }
 
   /// How many logged sets an exercise carries.

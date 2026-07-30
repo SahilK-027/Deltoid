@@ -578,20 +578,27 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     final repo = RegimeRepository(db);
     final notes = _notes.text.trim();
 
-    // Two rows with the same name are indistinguishable in the picker, and
-    // the picker is where you choose what a set gets logged against.
+    // Two rows with the same name are indistinguishable in the picker, and the
+    // picker is where you choose what a set gets logged against. Archived rows
+    // count: they are one tap from being restored, and restoring one into a
+    // collision is the state this check exists to prevent.
     final clash = await (db.select(db.exercises)
-          ..where((t) => t.name.equals(name) & t.archived.equals(false)))
+          ..where((t) => t.name.equals(name) & t.deletedAt.isNull()))
         .get();
     final duplicates =
         clash.where((e) => e.id != widget.existing?.id).toList();
     if (duplicates.isNotEmpty) {
       if (!mounted) return;
+      final archived = duplicates.every((e) => e.archived);
       final ok = await confirmAction(
         context,
         title: 'There is already a "$name"',
-        message: 'Two exercises with the same name are impossible to tell '
-            'apart when picking one mid-session. Keep both?',
+        message: archived
+            ? 'An archived exercise has this name. Restoring it later would '
+                'leave two you cannot tell apart in the picker — restore that '
+                'one instead?'
+            : 'Two exercises with the same name are impossible to tell apart '
+                'when picking one mid-session. Keep both?',
         confirmLabel: 'Keep both',
         destructive: false,
       );
