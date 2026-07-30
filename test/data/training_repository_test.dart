@@ -91,6 +91,36 @@ void main() {
     expect(active.single.name, 'Upper / Lower');
   });
 
+  test('renaming a starter exercise does not duplicate it on the next template',
+      () async {
+    // Templates used to look catalog rows up by name, so a renamed starter
+    // came back as a second row under its old name — two entries in the picker
+    // that nothing can tell apart.
+    // Upper / Lower opens with barbell_bench, so renaming that row is what the
+    // template has to survive.
+    final bench = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Barbell Bench Press')))
+        .getSingle();
+    expect(bench.starterKey, 'barbell_bench');
+    await (db.update(db.exercises)..where((t) => t.id.equals(bench.id)))
+        .write(const ExercisesCompanion(name: Value('Comp bench')));
+
+    final before = (await db.select(db.exercises).get()).length;
+    await createRegimeFromTemplate(
+      db,
+      regimeTemplates.firstWhere((t) => t.key == 'upper_lower'),
+    );
+
+    expect((await db.select(db.exercises).get()).length, before);
+    expect(
+      await (db.select(db.exercises)
+            ..where((t) => t.name.equals('Barbell Bench Press')))
+          .get(),
+      isEmpty,
+      reason: 'the renamed row was reused, not duplicated under its old name',
+    );
+  });
+
   test('starting a workout snapshots the template and creates set rows',
       () async {
     final regime = await activeRegime();

@@ -103,20 +103,16 @@ class $ExercisesTable extends Exercises
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       ).withConverter<LoadMode>($ExercisesTable.$converterloadMode);
-  static const VerificationMeta _isUnilateralMeta = const VerificationMeta(
-    'isUnilateral',
+  static const VerificationMeta _starterKeyMeta = const VerificationMeta(
+    'starterKey',
   );
   @override
-  late final GeneratedColumn<bool> isUnilateral = GeneratedColumn<bool>(
-    'is_unilateral',
+  late final GeneratedColumn<String> starterKey = GeneratedColumn<String>(
+    'starter_key',
     aliasedName,
-    false,
-    type: DriftSqlType.bool,
+    true,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_unilateral" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
   );
   @override
   late final GeneratedColumnWithTypeConverter<List<String>, String>
@@ -163,7 +159,7 @@ class $ExercisesTable extends Exercises
     muscle,
     equipment,
     loadMode,
-    isUnilateral,
+    starterKey,
     formVideoUrls,
     notes,
     archived,
@@ -215,13 +211,10 @@ class $ExercisesTable extends Exercises
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
-    if (data.containsKey('is_unilateral')) {
+    if (data.containsKey('starter_key')) {
       context.handle(
-        _isUnilateralMeta,
-        isUnilateral.isAcceptableOrUnknown(
-          data['is_unilateral']!,
-          _isUnilateralMeta,
-        ),
+        _starterKeyMeta,
+        starterKey.isAcceptableOrUnknown(data['starter_key']!, _starterKeyMeta),
       );
     }
     if (data.containsKey('notes')) {
@@ -287,10 +280,10 @@ class $ExercisesTable extends Exercises
           data['${effectivePrefix}load_mode'],
         )!,
       ),
-      isUnilateral: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_unilateral'],
-      )!,
+      starterKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}starter_key'],
+      ),
       formVideoUrls: $ExercisesTable.$converterformVideoUrls.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -333,7 +326,13 @@ class Exercise extends DataClass implements Insertable<Exercise> {
   final MuscleGroup muscle;
   final Equipment equipment;
   final LoadMode loadMode;
-  final bool isUnilateral;
+
+  /// The `starterExercises` key this row was seeded from, when it was.
+  ///
+  /// Templates match on this rather than on the name, so renaming "Dips" to
+  /// "Weighted dips" and then applying a template reuses the row instead of
+  /// creating a second one under the old name.
+  final String? starterKey;
   final List<String> formVideoUrls;
   final String? notes;
   final bool archived;
@@ -347,7 +346,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     required this.muscle,
     required this.equipment,
     required this.loadMode,
-    required this.isUnilateral,
+    this.starterKey,
     required this.formVideoUrls,
     this.notes,
     required this.archived,
@@ -378,7 +377,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
         $ExercisesTable.$converterloadMode.toSql(loadMode),
       );
     }
-    map['is_unilateral'] = Variable<bool>(isUnilateral);
+    if (!nullToAbsent || starterKey != null) {
+      map['starter_key'] = Variable<String>(starterKey);
+    }
     {
       map['form_video_urls'] = Variable<String>(
         $ExercisesTable.$converterformVideoUrls.toSql(formVideoUrls),
@@ -404,7 +405,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       muscle: Value(muscle),
       equipment: Value(equipment),
       loadMode: Value(loadMode),
-      isUnilateral: Value(isUnilateral),
+      starterKey: starterKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(starterKey),
       formVideoUrls: Value(formVideoUrls),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
@@ -434,7 +437,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       loadMode: $ExercisesTable.$converterloadMode.fromJson(
         serializer.fromJson<String>(json['loadMode']),
       ),
-      isUnilateral: serializer.fromJson<bool>(json['isUnilateral']),
+      starterKey: serializer.fromJson<String?>(json['starterKey']),
       formVideoUrls: $ExercisesTable.$converterformVideoUrls.fromJson(
         serializer.fromJson<String>(json['formVideoUrls']),
       ),
@@ -461,7 +464,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       'loadMode': serializer.toJson<String>(
         $ExercisesTable.$converterloadMode.toJson(loadMode),
       ),
-      'isUnilateral': serializer.toJson<bool>(isUnilateral),
+      'starterKey': serializer.toJson<String?>(starterKey),
       'formVideoUrls': serializer.toJson<String>(
         $ExercisesTable.$converterformVideoUrls.toJson(formVideoUrls),
       ),
@@ -480,7 +483,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     MuscleGroup? muscle,
     Equipment? equipment,
     LoadMode? loadMode,
-    bool? isUnilateral,
+    Value<String?> starterKey = const Value.absent(),
     List<String>? formVideoUrls,
     Value<String?> notes = const Value.absent(),
     bool? archived,
@@ -494,7 +497,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     muscle: muscle ?? this.muscle,
     equipment: equipment ?? this.equipment,
     loadMode: loadMode ?? this.loadMode,
-    isUnilateral: isUnilateral ?? this.isUnilateral,
+    starterKey: starterKey.present ? starterKey.value : this.starterKey,
     formVideoUrls: formVideoUrls ?? this.formVideoUrls,
     notes: notes.present ? notes.value : this.notes,
     archived: archived ?? this.archived,
@@ -510,9 +513,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       muscle: data.muscle.present ? data.muscle.value : this.muscle,
       equipment: data.equipment.present ? data.equipment.value : this.equipment,
       loadMode: data.loadMode.present ? data.loadMode.value : this.loadMode,
-      isUnilateral: data.isUnilateral.present
-          ? data.isUnilateral.value
-          : this.isUnilateral,
+      starterKey: data.starterKey.present
+          ? data.starterKey.value
+          : this.starterKey,
       formVideoUrls: data.formVideoUrls.present
           ? data.formVideoUrls.value
           : this.formVideoUrls,
@@ -533,7 +536,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           ..write('muscle: $muscle, ')
           ..write('equipment: $equipment, ')
           ..write('loadMode: $loadMode, ')
-          ..write('isUnilateral: $isUnilateral, ')
+          ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
           ..write('notes: $notes, ')
           ..write('archived: $archived')
@@ -552,7 +555,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     muscle,
     equipment,
     loadMode,
-    isUnilateral,
+    starterKey,
     formVideoUrls,
     notes,
     archived,
@@ -570,7 +573,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           other.muscle == this.muscle &&
           other.equipment == this.equipment &&
           other.loadMode == this.loadMode &&
-          other.isUnilateral == this.isUnilateral &&
+          other.starterKey == this.starterKey &&
           other.formVideoUrls == this.formVideoUrls &&
           other.notes == this.notes &&
           other.archived == this.archived);
@@ -586,7 +589,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
   final Value<MuscleGroup> muscle;
   final Value<Equipment> equipment;
   final Value<LoadMode> loadMode;
-  final Value<bool> isUnilateral;
+  final Value<String?> starterKey;
   final Value<List<String>> formVideoUrls;
   final Value<String?> notes;
   final Value<bool> archived;
@@ -601,7 +604,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     this.muscle = const Value.absent(),
     this.equipment = const Value.absent(),
     this.loadMode = const Value.absent(),
-    this.isUnilateral = const Value.absent(),
+    this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
     this.notes = const Value.absent(),
     this.archived = const Value.absent(),
@@ -617,7 +620,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     required MuscleGroup muscle,
     required Equipment equipment,
     required LoadMode loadMode,
-    this.isUnilateral = const Value.absent(),
+    this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
     this.notes = const Value.absent(),
     this.archived = const Value.absent(),
@@ -636,7 +639,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Expression<String>? muscle,
     Expression<String>? equipment,
     Expression<String>? loadMode,
-    Expression<bool>? isUnilateral,
+    Expression<String>? starterKey,
     Expression<String>? formVideoUrls,
     Expression<String>? notes,
     Expression<bool>? archived,
@@ -652,7 +655,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       if (muscle != null) 'muscle': muscle,
       if (equipment != null) 'equipment': equipment,
       if (loadMode != null) 'load_mode': loadMode,
-      if (isUnilateral != null) 'is_unilateral': isUnilateral,
+      if (starterKey != null) 'starter_key': starterKey,
       if (formVideoUrls != null) 'form_video_urls': formVideoUrls,
       if (notes != null) 'notes': notes,
       if (archived != null) 'archived': archived,
@@ -670,7 +673,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Value<MuscleGroup>? muscle,
     Value<Equipment>? equipment,
     Value<LoadMode>? loadMode,
-    Value<bool>? isUnilateral,
+    Value<String?>? starterKey,
     Value<List<String>>? formVideoUrls,
     Value<String?>? notes,
     Value<bool>? archived,
@@ -686,7 +689,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       muscle: muscle ?? this.muscle,
       equipment: equipment ?? this.equipment,
       loadMode: loadMode ?? this.loadMode,
-      isUnilateral: isUnilateral ?? this.isUnilateral,
+      starterKey: starterKey ?? this.starterKey,
       formVideoUrls: formVideoUrls ?? this.formVideoUrls,
       notes: notes ?? this.notes,
       archived: archived ?? this.archived,
@@ -730,8 +733,8 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
         $ExercisesTable.$converterloadMode.toSql(loadMode.value),
       );
     }
-    if (isUnilateral.present) {
-      map['is_unilateral'] = Variable<bool>(isUnilateral.value);
+    if (starterKey.present) {
+      map['starter_key'] = Variable<String>(starterKey.value);
     }
     if (formVideoUrls.present) {
       map['form_video_urls'] = Variable<String>(
@@ -762,7 +765,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
           ..write('muscle: $muscle, ')
           ..write('equipment: $equipment, ')
           ..write('loadMode: $loadMode, ')
-          ..write('isUnilateral: $isUnilateral, ')
+          ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
           ..write('notes: $notes, ')
           ..write('archived: $archived, ')
@@ -5044,26 +5047,6 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _rpeMeta = const VerificationMeta('rpe');
-  @override
-  late final GeneratedColumn<double> rpe = GeneratedColumn<double>(
-    'rpe',
-    aliasedName,
-    true,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _parentSetIdMeta = const VerificationMeta(
-    'parentSetId',
-  );
-  @override
-  late final GeneratedColumn<String> parentSetId = GeneratedColumn<String>(
-    'parent_set_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
   static const VerificationMeta _restSecondsMeta = const VerificationMeta(
     'restSeconds',
   );
@@ -5121,8 +5104,6 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     weight,
     reps,
     addedWeight,
-    rpe,
-    parentSetId,
     restSeconds,
     completedAt,
     note,
@@ -5204,21 +5185,6 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         addedWeight.isAcceptableOrUnknown(
           data['added_weight']!,
           _addedWeightMeta,
-        ),
-      );
-    }
-    if (data.containsKey('rpe')) {
-      context.handle(
-        _rpeMeta,
-        rpe.isAcceptableOrUnknown(data['rpe']!, _rpeMeta),
-      );
-    }
-    if (data.containsKey('parent_set_id')) {
-      context.handle(
-        _parentSetIdMeta,
-        parentSetId.isAcceptableOrUnknown(
-          data['parent_set_id']!,
-          _parentSetIdMeta,
         ),
       );
     }
@@ -5307,14 +5273,6 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         DriftSqlType.double,
         data['${effectivePrefix}added_weight'],
       ),
-      rpe: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}rpe'],
-      ),
-      parentSetId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}parent_set_id'],
-      ),
       restSeconds: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}rest_seconds'],
@@ -5359,10 +5317,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
 
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
   final double? addedWeight;
-  final double? rpe;
-
-  /// Drop and rest-pause sets hang off the working set they extend.
-  final String? parentSetId;
   final int? restSeconds;
   final int? completedAt;
   final String? note;
@@ -5379,8 +5333,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     this.weight,
     this.reps,
     this.addedWeight,
-    this.rpe,
-    this.parentSetId,
     this.restSeconds,
     this.completedAt,
     this.note,
@@ -5411,12 +5363,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     }
     if (!nullToAbsent || addedWeight != null) {
       map['added_weight'] = Variable<double>(addedWeight);
-    }
-    if (!nullToAbsent || rpe != null) {
-      map['rpe'] = Variable<double>(rpe);
-    }
-    if (!nullToAbsent || parentSetId != null) {
-      map['parent_set_id'] = Variable<String>(parentSetId);
     }
     if (!nullToAbsent || restSeconds != null) {
       map['rest_seconds'] = Variable<int>(restSeconds);
@@ -5450,10 +5396,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       addedWeight: addedWeight == null && nullToAbsent
           ? const Value.absent()
           : Value(addedWeight),
-      rpe: rpe == null && nullToAbsent ? const Value.absent() : Value(rpe),
-      parentSetId: parentSetId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(parentSetId),
       restSeconds: restSeconds == null && nullToAbsent
           ? const Value.absent()
           : Value(restSeconds),
@@ -5484,8 +5426,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       weight: serializer.fromJson<double?>(json['weight']),
       reps: serializer.fromJson<int?>(json['reps']),
       addedWeight: serializer.fromJson<double?>(json['addedWeight']),
-      rpe: serializer.fromJson<double?>(json['rpe']),
-      parentSetId: serializer.fromJson<String?>(json['parentSetId']),
       restSeconds: serializer.fromJson<int?>(json['restSeconds']),
       completedAt: serializer.fromJson<int?>(json['completedAt']),
       note: serializer.fromJson<String?>(json['note']),
@@ -5509,8 +5449,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       'weight': serializer.toJson<double?>(weight),
       'reps': serializer.toJson<int?>(reps),
       'addedWeight': serializer.toJson<double?>(addedWeight),
-      'rpe': serializer.toJson<double?>(rpe),
-      'parentSetId': serializer.toJson<String?>(parentSetId),
       'restSeconds': serializer.toJson<int?>(restSeconds),
       'completedAt': serializer.toJson<int?>(completedAt),
       'note': serializer.toJson<String?>(note),
@@ -5530,8 +5468,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     Value<double?> weight = const Value.absent(),
     Value<int?> reps = const Value.absent(),
     Value<double?> addedWeight = const Value.absent(),
-    Value<double?> rpe = const Value.absent(),
-    Value<String?> parentSetId = const Value.absent(),
     Value<int?> restSeconds = const Value.absent(),
     Value<int?> completedAt = const Value.absent(),
     Value<String?> note = const Value.absent(),
@@ -5548,8 +5484,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weight: weight.present ? weight.value : this.weight,
     reps: reps.present ? reps.value : this.reps,
     addedWeight: addedWeight.present ? addedWeight.value : this.addedWeight,
-    rpe: rpe.present ? rpe.value : this.rpe,
-    parentSetId: parentSetId.present ? parentSetId.value : this.parentSetId,
     restSeconds: restSeconds.present ? restSeconds.value : this.restSeconds,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
     note: note.present ? note.value : this.note,
@@ -5572,10 +5506,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       addedWeight: data.addedWeight.present
           ? data.addedWeight.value
           : this.addedWeight,
-      rpe: data.rpe.present ? data.rpe.value : this.rpe,
-      parentSetId: data.parentSetId.present
-          ? data.parentSetId.value
-          : this.parentSetId,
       restSeconds: data.restSeconds.present
           ? data.restSeconds.value
           : this.restSeconds,
@@ -5601,8 +5531,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           ..write('weight: $weight, ')
           ..write('reps: $reps, ')
           ..write('addedWeight: $addedWeight, ')
-          ..write('rpe: $rpe, ')
-          ..write('parentSetId: $parentSetId, ')
           ..write('restSeconds: $restSeconds, ')
           ..write('completedAt: $completedAt, ')
           ..write('note: $note, ')
@@ -5624,8 +5552,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weight,
     reps,
     addedWeight,
-    rpe,
-    parentSetId,
     restSeconds,
     completedAt,
     note,
@@ -5646,8 +5572,6 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           other.weight == this.weight &&
           other.reps == this.reps &&
           other.addedWeight == this.addedWeight &&
-          other.rpe == this.rpe &&
-          other.parentSetId == this.parentSetId &&
           other.restSeconds == this.restSeconds &&
           other.completedAt == this.completedAt &&
           other.note == this.note &&
@@ -5666,8 +5590,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
   final Value<double?> weight;
   final Value<int?> reps;
   final Value<double?> addedWeight;
-  final Value<double?> rpe;
-  final Value<String?> parentSetId;
   final Value<int?> restSeconds;
   final Value<int?> completedAt;
   final Value<String?> note;
@@ -5685,8 +5607,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.weight = const Value.absent(),
     this.reps = const Value.absent(),
     this.addedWeight = const Value.absent(),
-    this.rpe = const Value.absent(),
-    this.parentSetId = const Value.absent(),
     this.restSeconds = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -5705,8 +5625,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.weight = const Value.absent(),
     this.reps = const Value.absent(),
     this.addedWeight = const Value.absent(),
-    this.rpe = const Value.absent(),
-    this.parentSetId = const Value.absent(),
     this.restSeconds = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -5726,8 +5644,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Expression<double>? weight,
     Expression<int>? reps,
     Expression<double>? addedWeight,
-    Expression<double>? rpe,
-    Expression<String>? parentSetId,
     Expression<int>? restSeconds,
     Expression<int>? completedAt,
     Expression<String>? note,
@@ -5746,8 +5662,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       if (weight != null) 'weight': weight,
       if (reps != null) 'reps': reps,
       if (addedWeight != null) 'added_weight': addedWeight,
-      if (rpe != null) 'rpe': rpe,
-      if (parentSetId != null) 'parent_set_id': parentSetId,
       if (restSeconds != null) 'rest_seconds': restSeconds,
       if (completedAt != null) 'completed_at': completedAt,
       if (note != null) 'note': note,
@@ -5768,8 +5682,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Value<double?>? weight,
     Value<int?>? reps,
     Value<double?>? addedWeight,
-    Value<double?>? rpe,
-    Value<String?>? parentSetId,
     Value<int?>? restSeconds,
     Value<int?>? completedAt,
     Value<String?>? note,
@@ -5788,8 +5700,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       weight: weight ?? this.weight,
       reps: reps ?? this.reps,
       addedWeight: addedWeight ?? this.addedWeight,
-      rpe: rpe ?? this.rpe,
-      parentSetId: parentSetId ?? this.parentSetId,
       restSeconds: restSeconds ?? this.restSeconds,
       completedAt: completedAt ?? this.completedAt,
       note: note ?? this.note,
@@ -5836,12 +5746,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     if (addedWeight.present) {
       map['added_weight'] = Variable<double>(addedWeight.value);
     }
-    if (rpe.present) {
-      map['rpe'] = Variable<double>(rpe.value);
-    }
-    if (parentSetId.present) {
-      map['parent_set_id'] = Variable<String>(parentSetId.value);
-    }
     if (restSeconds.present) {
       map['rest_seconds'] = Variable<int>(restSeconds.value);
     }
@@ -5874,8 +5778,6 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
           ..write('weight: $weight, ')
           ..write('reps: $reps, ')
           ..write('addedWeight: $addedWeight, ')
-          ..write('rpe: $rpe, ')
-          ..write('parentSetId: $parentSetId, ')
           ..write('restSeconds: $restSeconds, ')
           ..write('completedAt: $completedAt, ')
           ..write('note: $note, ')
@@ -6634,7 +6536,7 @@ typedef $$ExercisesTableCreateCompanionBuilder =
       required MuscleGroup muscle,
       required Equipment equipment,
       required LoadMode loadMode,
-      Value<bool> isUnilateral,
+      Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
       Value<String?> notes,
       Value<bool> archived,
@@ -6651,7 +6553,7 @@ typedef $$ExercisesTableUpdateCompanionBuilder =
       Value<MuscleGroup> muscle,
       Value<Equipment> equipment,
       Value<LoadMode> loadMode,
-      Value<bool> isUnilateral,
+      Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
       Value<String?> notes,
       Value<bool> archived,
@@ -6760,8 +6662,8 @@ class $$ExercisesTableFilterComposer
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
 
-  ColumnFilters<bool> get isUnilateral => $composableBuilder(
-    column: $table.isUnilateral,
+  ColumnFilters<String> get starterKey => $composableBuilder(
+    column: $table.starterKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6886,8 +6788,8 @@ class $$ExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isUnilateral => $composableBuilder(
-    column: $table.isUnilateral,
+  ColumnOrderings<String> get starterKey => $composableBuilder(
+    column: $table.starterKey,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6943,8 +6845,8 @@ class $$ExercisesTableAnnotationComposer
   GeneratedColumnWithTypeConverter<LoadMode, String> get loadMode =>
       $composableBuilder(column: $table.loadMode, builder: (column) => column);
 
-  GeneratedColumn<bool> get isUnilateral => $composableBuilder(
-    column: $table.isUnilateral,
+  GeneratedColumn<String> get starterKey => $composableBuilder(
+    column: $table.starterKey,
     builder: (column) => column,
   );
 
@@ -7051,7 +6953,7 @@ class $$ExercisesTableTableManager
                 Value<MuscleGroup> muscle = const Value.absent(),
                 Value<Equipment> equipment = const Value.absent(),
                 Value<LoadMode> loadMode = const Value.absent(),
-                Value<bool> isUnilateral = const Value.absent(),
+                Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
@@ -7066,7 +6968,7 @@ class $$ExercisesTableTableManager
                 muscle: muscle,
                 equipment: equipment,
                 loadMode: loadMode,
-                isUnilateral: isUnilateral,
+                starterKey: starterKey,
                 formVideoUrls: formVideoUrls,
                 notes: notes,
                 archived: archived,
@@ -7083,7 +6985,7 @@ class $$ExercisesTableTableManager
                 required MuscleGroup muscle,
                 required Equipment equipment,
                 required LoadMode loadMode,
-                Value<bool> isUnilateral = const Value.absent(),
+                Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
@@ -7098,7 +7000,7 @@ class $$ExercisesTableTableManager
                 muscle: muscle,
                 equipment: equipment,
                 loadMode: loadMode,
-                isUnilateral: isUnilateral,
+                starterKey: starterKey,
                 formVideoUrls: formVideoUrls,
                 notes: notes,
                 archived: archived,
@@ -10913,8 +10815,6 @@ typedef $$SetLogsTableCreateCompanionBuilder =
       Value<double?> weight,
       Value<int?> reps,
       Value<double?> addedWeight,
-      Value<double?> rpe,
-      Value<String?> parentSetId,
       Value<int?> restSeconds,
       Value<int?> completedAt,
       Value<String?> note,
@@ -10934,8 +10834,6 @@ typedef $$SetLogsTableUpdateCompanionBuilder =
       Value<double?> weight,
       Value<int?> reps,
       Value<double?> addedWeight,
-      Value<double?> rpe,
-      Value<String?> parentSetId,
       Value<int?> restSeconds,
       Value<int?> completedAt,
       Value<String?> note,
@@ -11023,16 +10921,6 @@ class $$SetLogsTableFilterComposer
 
   ColumnFilters<double> get addedWeight => $composableBuilder(
     column: $table.addedWeight,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get rpe => $composableBuilder(
-    column: $table.rpe,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11139,16 +11027,6 @@ class $$SetLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get rpe => $composableBuilder(
-    column: $table.rpe,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => ColumnOrderings(column),
@@ -11234,14 +11112,6 @@ class $$SetLogsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get rpe =>
-      $composableBuilder(column: $table.rpe, builder: (column) => column);
-
-  GeneratedColumn<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => column,
@@ -11321,8 +11191,6 @@ class $$SetLogsTableTableManager
                 Value<double?> weight = const Value.absent(),
                 Value<int?> reps = const Value.absent(),
                 Value<double?> addedWeight = const Value.absent(),
-                Value<double?> rpe = const Value.absent(),
-                Value<String?> parentSetId = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -11340,8 +11208,6 @@ class $$SetLogsTableTableManager
                 weight: weight,
                 reps: reps,
                 addedWeight: addedWeight,
-                rpe: rpe,
-                parentSetId: parentSetId,
                 restSeconds: restSeconds,
                 completedAt: completedAt,
                 note: note,
@@ -11361,8 +11227,6 @@ class $$SetLogsTableTableManager
                 Value<double?> weight = const Value.absent(),
                 Value<int?> reps = const Value.absent(),
                 Value<double?> addedWeight = const Value.absent(),
-                Value<double?> rpe = const Value.absent(),
-                Value<String?> parentSetId = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -11380,8 +11244,6 @@ class $$SetLogsTableTableManager
                 weight: weight,
                 reps: reps,
                 addedWeight: addedWeight,
-                rpe: rpe,
-                parentSetId: parentSetId,
                 restSeconds: restSeconds,
                 completedAt: completedAt,
                 note: note,

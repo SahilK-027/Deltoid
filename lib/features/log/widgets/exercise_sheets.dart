@@ -578,6 +578,26 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     final repo = RegimeRepository(db);
     final notes = _notes.text.trim();
 
+    // Two rows with the same name are indistinguishable in the picker, and
+    // the picker is where you choose what a set gets logged against.
+    final clash = await (db.select(db.exercises)
+          ..where((t) => t.name.equals(name) & t.archived.equals(false)))
+        .get();
+    final duplicates =
+        clash.where((e) => e.id != widget.existing?.id).toList();
+    if (duplicates.isNotEmpty) {
+      if (!mounted) return;
+      final ok = await confirmAction(
+        context,
+        title: 'There is already a "$name"',
+        message: 'Two exercises with the same name are impossible to tell '
+            'apart when picking one mid-session. Keep both?',
+        confirmLabel: 'Keep both',
+        destructive: false,
+      );
+      if (!ok) return;
+    }
+
     final id = widget.existing?.id;
     if (id == null) {
       final created = await repo.createExercise(

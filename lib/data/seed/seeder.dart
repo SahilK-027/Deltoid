@@ -23,6 +23,7 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
               muscle: e.muscle,
               equipment: e.equipment,
               loadMode: e.loadMode,
+              starterKey: Value(e.key),
             ),
           );
     }
@@ -32,9 +33,10 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
 /// Writes [template] as a real regime: ordinary sessions and slots, editable
 /// like any other. Returns the new regime's id.
 ///
-/// Catalog rows are matched by name and created when missing, so a template
-/// picked after the user has already renamed or archived things doesn't
-/// duplicate half the catalog.
+/// Catalog rows are matched on the starter key they were seeded with — falling
+/// back to the name for rows that predate it — and created when missing. Name
+/// matching alone meant renaming a starter exercise and then applying a
+/// template created a duplicate under the old name.
 Future<String> createRegimeFromTemplate(
   AppDatabase db,
   RegimeTemplate template, {
@@ -66,6 +68,10 @@ Future<String> createRegimeFromTemplate(
 
     final catalog = await db.select(db.exercises).get();
     final idByName = {for (final e in catalog) e.name: e.id};
+    final idByStarterKey = {
+      for (final e in catalog)
+        if (e.starterKey != null) e.starterKey!: e.id,
+    };
     final starterByKey = {for (final e in starterExercises) e.key: e};
 
     Future<String> exerciseIdFor(String key) async {
@@ -74,7 +80,7 @@ Future<String> createRegimeFromTemplate(
         throw StateError('Template "${template.key}" references unknown '
             'exercise key "$key"');
       }
-      final existing = idByName[starter.name];
+      final existing = idByStarterKey[key] ?? idByName[starter.name];
       if (existing != null) return existing;
 
       final id = newId();
@@ -85,9 +91,11 @@ Future<String> createRegimeFromTemplate(
               muscle: starter.muscle,
               equipment: starter.equipment,
               loadMode: starter.loadMode,
+              starterKey: Value(key),
             ),
           );
       idByName[starter.name] = id;
+      idByStarterKey[key] = id;
       return id;
     }
 

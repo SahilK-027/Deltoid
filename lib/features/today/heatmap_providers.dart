@@ -7,14 +7,9 @@ import '../../domain/enums.dart';
 
 /// One day on the consistency heatmap.
 class HeatDay {
-  const HeatDay({
-    required this.workouts,
-    required this.sets,
-    required this.isDeload,
-  });
+  const HeatDay({required this.workouts, required this.isDeload});
 
   final int workouts;
-  final int sets;
 
   /// Deload days render in a different hue — an easy week should be visibly an
   /// easy week, not a gap in the record.
@@ -52,7 +47,6 @@ final heatmapProvider =
       final existing = days[w.dayKey];
       days[w.dayKey] = HeatDay(
         workouts: (existing?.workouts ?? 0) + 1,
-        sets: existing?.sets ?? 0,
         isDeload: (existing?.isDeload ?? false) || w.isDeload,
       );
     }
