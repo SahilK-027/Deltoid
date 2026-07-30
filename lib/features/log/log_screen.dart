@@ -909,7 +909,13 @@ class _ExercisePage extends ConsumerWidget {
                   // The shape of last time's work, in one line. Per-set ghosts
                   // answer "what do I put in this row"; this answers "what did
                   // I actually do", which is the question the app exists for.
-                  if (prefill?.hasSuggestion ?? false) ...[
+                  //
+                  // It goes away once the first set is logged. Before set 1 it
+                  // is the whole point; after that every number in it is also
+                  // sitting in the rows below as a ghost, and the top of the
+                  // screen is worth more than a restatement.
+                  if ((prefill?.hasSuggestion ?? false) &&
+                      !entry.sets.any((s) => s.isDone)) ...[
                     const SizedBox(height: 2),
                     Text(
                       _summariseSets(prefill!, entry.exercise.loadMode, unit),

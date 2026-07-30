@@ -86,6 +86,7 @@ lib/
 
   core/            theme tokens, shared providers, primitives, id generation
                    rest_alert.dart  end-of-rest buzz + tone (audio session)
+                   widgets/ticking.dart  the only per-second rebuild there is
   features/        today · log · history · progress · regime · settings
 
 assets/
@@ -259,8 +260,9 @@ picker).
   only the restore file picker was opened; the share sheet and a real restore
   were not completed.
 - **Bodyweight log** — schema, repository, interpolation and BW / BW+X load maths
-  are unit-tested; the Settings entry renders, but no weight has been logged
-  through the UI.
+  are unit-tested. Its own screen behind Settings: full history, add, correct by
+  tapping a row, delete, and the change against the previous entry. No weight
+  has been logged through the UI.
 - **Regime editor** _(driven on the emulator)_ — create a regime blank or from a
   template, rename it, add/reorder/delete sessions, edit slots, deload config.
   Deleting a session asks first; removing a slot offers an undo.
@@ -274,7 +276,7 @@ picker).
   long after the undo snackbar is gone.
 - Light / dark / system theme, adaptive launcher icon.
 
-137 tests: prefill rules (including a deload never re-scaling a light week),
+142 tests: prefill rules (including a deload never re-scaling a light week),
 cycle/deload timing and closing a cycle early, metrics, unit conversion, keypad
 key handling, backup round-trip, history paging, deleting a workout (including
 the cycle it reopens), swap-in-place, mid-session prefill, date and note
@@ -295,64 +297,12 @@ widget test, and repository integration against a real in-memory SQLite.
 
 1. Drive the last round of fixes on a device. Reinstall first — the schema
    changed. The emulator marks above predate all of it.
-2. The second-round backlog below, starting with **A1** and **A2**, which are
-   half-finished work rather than old debt.
-3. Supabase sync (above).
-4. iOS verification once Xcode exists.
-5. Per-exercise deload overrides — the columns exist
+2. Supabase sync (above).
+3. iOS verification once Xcode exists.
+4. Per-exercise deload overrides — the columns exist
    (`session_exercises.deload_set_delta` / `deload_weight_pct`), no UI yet.
 
 ---
-
----
-
-## Second-round backlog
-
-Found while fixing the first round, 2026-07-30, by reading the code rather than
-driving it. Numbered `A1…` so they can't be confused with the old set. Same
-convention as before: a finding is deleted when it's fixed, not ticked.
-
-### Consistency and smaller things
-
-**A10. The last-time line and the ghosts say the same thing twice**
-`log/log_screen.dart` (`_summariseSets`)
-
-- **Bug** — not a defect, a judgement to make on a real screen. Finding 20 added
-  "22.5×8, 22.5×8, 20×7" under the caption, and every one of those numbers is
-  also sitting in the rows below as a ghost. On a three-set exercise it is pure
-  duplication; its value is on a six-set one where the shape isn't visible at a
-  glance.
-- **Fix** — decide with the app in your hand: keep it, hide it once any set is
-  logged, or show it only above some number of sets.
-
-**A12. Bodyweight history is a peek, not a list**
-`settings/settings_screen.dart`
-
-- **Bug** — the entry list renders only when there is more than one entry, shows
-  six, and the query behind it is capped at 30. Editing and deleting were added
-  in finding 24, but only for entries inside that window; a typo from two months
-  ago cannot be reached at all.
-- **Fix** — a real bodyweight screen: full paged history, and a chart, given the
-  numbers already exist and already scale every bodyweight lift.
-
-
-### Deliberately not fixed, so nobody re-opens them
-
-- **Drop and rest-pause sets are still only visually indented.** The column that
-  linked them to the set they extend was dead and was dropped in the last round
-  rather than wired up. Real linking is a feature, not a bug fix.
-- **RPE is gone**, same reasoning.
-- **`_ValueCell` flashes whenever a value appears**, including on first load,
-  not only on ghost adoption. Reads as a hint that the row is live; leave it
-  unless it turns out to be distracting on a device.
-
-### Order to fix
-
-1. **A5, A6** — prefill correctness. Both small.
-3. **A7, A8** — the log screen's remaining rebuild cost, once there is a device
-   to feel it on.
-4. **A9, A11, A13** — small consistency fixes.
-5. **A10, A12** — decide on a real screen; A12 is a feature.
 
 ---
 
