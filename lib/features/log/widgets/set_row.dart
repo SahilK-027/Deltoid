@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -39,7 +40,7 @@ class SetRow extends StatelessWidget {
   final WeightUnit unit;
   final PastSet? ghost;
   final EditTarget? editing;
-  final String buffer;
+  final ValueListenable<String> buffer;
   final void Function(SetLog, SetField) onEdit;
   final void Function(SetLog, bool) onToggleDone;
 
@@ -175,7 +176,7 @@ class _ValueCell extends StatefulWidget {
   final double? value;
   final double? ghost;
   final bool active;
-  final String buffer;
+  final ValueListenable<String> buffer;
   final VoidCallback onTap;
   final String? prefix;
   final String? suffix;
@@ -211,9 +212,17 @@ class _ValueCellState extends State<_ValueCell> {
 
   @override
   Widget build(BuildContext context) {
+    // Only the cell being typed into listens to the keypad buffer, so a
+    // keystroke repaints one cell rather than the page.
+    if (!widget.active) return _build(context, _fmt(widget.value, widget));
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.buffer,
+      builder: (context, buffer, _) => _build(context, buffer),
+    );
+  }
+
+  Widget _build(BuildContext context, String display) {
     final c = context.c;
-    final display =
-        widget.active ? widget.buffer : _fmt(widget.value, widget);
     final hasValue = display.isNotEmpty;
     final ghostText = _fmt(widget.ghost, widget);
     // A suggestion must never look like a record: the ghost is italic and

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart' hide Column, Table;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,7 +53,14 @@ class LogScreen extends ConsumerStatefulWidget {
 
 class _LogScreenState extends ConsumerState<LogScreen> {
   EditTarget? _editing;
-  String _buffer = '';
+
+  /// The keypad's in-progress text, held in a notifier rather than in state.
+  ///
+  /// It used to be a plain field passed down as a widget parameter, so every
+  /// digit rebuilt the exercise page and every SetRow on it — the largest
+  /// rebuild in the app, on its most frequent interaction. Only the cell being
+  /// typed into and the keypad's own readout listen now.
+  final _buffer = ValueNotifier<String>('');
   Timer? _clock;
   DateTime? _restStartedAt;
   int _restTargetSeconds = 120;
@@ -113,6 +121,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   void dispose() {
     _clock?.cancel();
     _restBarHide?.cancel();
+    _buffer.dispose();
     // Anything typed in the last 300ms still belongs to the log.
     _flushWrite();
     WakelockPlus.disable().ignore();
@@ -390,7 +399,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     _flushWrite();
     setState(() {
       _editing = EditTarget(set.id, field);
-      _buffer = switch (field) {
+      _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
         SetField.added => _fmtLoadIn(set.addedWeight),
         SetField.reps => set.reps?.toString() ?? '',
@@ -437,7 +446,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     // The key has to name what it does. On a reps field with nothing typed and
     // no ghost to borrow from, "Done" completes nothing at all.
     final needsReps = target.field == SetField.reps &&
-        (int.tryParse(_buffer) ?? 0) <= 0 &&
+        (int.tryParse(_buffer.value) ?? 0) <= 0 &&
         ghost?.reps == null;
 
     return SetKeypad(
@@ -446,7 +455,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           '${target.field.labelIn(_unit)}',
       field: target.field,
       unit: _unit,
-      value: _buffer,
+      buffer: _buffer,
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
       nextLabel: needsReps
@@ -456,7 +465,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
               : 'Next',
       onKey: (key) {
         final next = applyKey(
-          _buffer,
+          _buffer.value,
           key,
           field: target.field,
           unit: _unit,
@@ -480,7 +489,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// session. The pending write is flushed on Next, on dismiss, on page turn
   /// and on dispose, so nothing typed can be lost.
   void _commit(String next, EditTarget target) {
-    setState(() => _buffer = next);
+    // No setState: the notifier repaints the one cell and the readout.
+    _buffer.value = next;
     _pendingWrite?.cancel();
     _pending = (target: target, value: next);
     _pendingWrite = Timer(const Duration(milliseconds: 300), _flushWrite);
@@ -516,7 +526,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (from.field == SetField.reps) {
       // Read the buffer, not the row: the write for this keystroke may still be
       // in flight, and a stale row would silently skip marking the set done.
-      var reps = int.tryParse(_buffer) ?? 0;
+      var reps = int.tryParse(_buffer.value) ?? 0;
       // A weight with no reps used to do nothing at all while the key said
       // "Done": the keypad simply closed. Fall back to last time's reps, which
       // is what adopting the ghost would have written anyway; with no ghost to
@@ -838,7 +848,7 @@ class _ExercisePage extends ConsumerWidget {
   final WeightUnit unit;
 
   final EditTarget? editing;
-  final String buffer;
+  final ValueListenable<String> buffer;
   final void Function(SetLog, SetField) onEdit;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;

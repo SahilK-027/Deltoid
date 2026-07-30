@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -32,7 +33,7 @@ class SetKeypad extends StatelessWidget {
     required this.title,
     required this.field,
     required this.unit,
-    required this.value,
+    required this.buffer,
     required this.onKey,
     required this.onNext,
     required this.onDismiss,
@@ -45,8 +46,10 @@ class SetKeypad extends StatelessWidget {
   final SetField field;
   final WeightUnit unit;
 
-  /// Current buffer, shown in the readout.
-  final String value;
+  /// Current buffer, shown in the readout. A notifier rather than a value so
+  /// a keystroke repaints this row and the cell being typed into, and nothing
+  /// else on the screen.
+  final ValueListenable<String> buffer;
 
   /// A digit, `.`, or `⌫`.
   final ValueChanged<String> onKey;
@@ -103,13 +106,16 @@ class SetKeypad extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      value.isEmpty ? '—' : value,
-                      style: context.t.titleLarge?.copyWith(
-                        fontFeatures: tabular,
-                        color: value.isEmpty ? c.textTertiary : c.textPrimary,
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: buffer,
+                      builder: (context, value, _) => Text(
+                        value.isEmpty ? '—' : value,
+                        style: context.t.titleLarge?.copyWith(
+                          fontFeatures: tabular,
+                          color: value.isEmpty ? c.textTertiary : c.textPrimary,
+                        ),
+                        maxLines: 1,
                       ),
-                      maxLines: 1,
                     ),
                   ),
                   if (hint != null && onUseHint != null)

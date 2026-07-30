@@ -52,15 +52,29 @@ final exercisePrefillProvider = FutureProvider.family<
 final workoutPrefillProvider =
     FutureProvider.family<Map<String, PrefillResult>, String>(
         (ref, workoutId) async {
-  final detail = await ref.watch(workoutDetailProvider(workoutId).future);
-  if (detail == null) return const {};
+  // Watch the *identity* of the exercise list, not the whole detail. The detail
+  // stream re-emits on every write to workouts, workout_exercises or set_logs —
+  // once per completed set — and rebuilding this map on each of those made
+  // every listener rebuild with it. The ids only change when an exercise is
+  // added, swapped or removed, which is exactly when this map is stale.
+  // Joined into a string on purpose: Dart lists compare by identity, so
+  // selecting a List would rebuild every time regardless and quietly do
+  // nothing at all.
+  final exerciseIds = await ref.watch(
+    workoutDetailProvider(workoutId).selectAsync(
+      (detail) => [
+        for (final e in detail?.entries ?? const []) e.exercise.id,
+      ].join(','),
+    ),
+  );
 
   final out = <String, PrefillResult>{};
-  for (final entry in detail.entries) {
-    out[entry.exercise.id] = await ref.watch(
+  for (final exerciseId in exerciseIds.split(',')) {
+    if (exerciseId.isEmpty) continue;
+    out[exerciseId] = await ref.watch(
       exercisePrefillProvider((
         workoutId: workoutId,
-        exerciseId: entry.exercise.id,
+        exerciseId: exerciseId,
       )).future,
     );
   }
