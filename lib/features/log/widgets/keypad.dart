@@ -255,7 +255,17 @@ class _Key extends StatelessWidget {
 ///
 /// Kept pure and separate from the widget so the increment and backspace edge
 /// cases are unit-testable.
-String applyKey(String buffer, String key, {required SetField field}) {
+///
+/// [hint] is last time's value for this field, when there is one. It only ever
+/// matters for `+` / `−` on an empty buffer: "one plate more than last time" is
+/// the most common intent in the gym, and starting that from zero made it a
+/// three-tap operation ending in a dead `2.5`.
+String applyKey(
+  String buffer,
+  String key, {
+  required SetField field,
+  double? hint,
+}) {
   switch (key) {
     case '⌫':
       return buffer.isEmpty ? buffer : buffer.substring(0, buffer.length - 1);
@@ -264,7 +274,9 @@ String applyKey(String buffer, String key, {required SetField field}) {
       return buffer.isEmpty ? '0.' : '$buffer.';
     case '+':
     case '-':
-      final current = double.tryParse(buffer) ?? 0;
+      // An empty buffer means "I haven't said anything yet", so step from last
+      // time. Once anything is typed the buffer wins — including a typed 0.
+      final current = double.tryParse(buffer) ?? (buffer.isEmpty ? hint ?? 0 : 0);
       final next = key == '+' ? current + field.step : current - field.step;
       if (next < 0) return '0';
       if (field == SetField.reps) return next.toStringAsFixed(0);

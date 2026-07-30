@@ -57,23 +57,34 @@ class RestTimerBar extends StatelessWidget {
                     color: over ? c.positive : c.textSecondary,
                   ),
                   const SizedBox(width: Space.md),
-                  Text(
-                    _format(remaining.abs()),
-                    style: context.t.titleMedium?.copyWith(
-                      fontFeatures: tabular,
-                      color: over ? c.positive : c.textPrimary,
+                  // Counting up past zero is a number nobody acts on, so the
+                  // bar states the fact and stops. What was actually rested is
+                  // still measured from `startedAt` by the log screen.
+                  if (over)
+                    Text(
+                      'Rest done',
+                      style: context.t.titleMedium?.copyWith(
+                        color: c.positive,
+                      ),
+                    )
+                  else ...[
+                    Text(
+                      _format(remaining),
+                      style: context.t.titleMedium?.copyWith(
+                        fontFeatures: tabular,
+                        color: c.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: Space.sm),
-                  Text(
-                    over ? 'over' : 'rest',
-                    style: context.t.labelSmall,
-                  ),
+                    const SizedBox(width: Space.sm),
+                    Text('rest', style: context.t.labelSmall),
+                  ],
                   const Spacer(),
-                  _StepButton(label: '−30', onTap: () => onAdjust(-30)),
-                  const SizedBox(width: Space.sm),
-                  _StepButton(label: '+30', onTap: () => onAdjust(30)),
-                  const SizedBox(width: Space.sm),
+                  if (!over) ...[
+                    _StepButton(label: '−30', onTap: () => onAdjust(-30)),
+                    const SizedBox(width: Space.sm),
+                    _StepButton(label: '+30', onTap: () => onAdjust(30)),
+                    const SizedBox(width: Space.sm),
+                  ],
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.close, size: 18),

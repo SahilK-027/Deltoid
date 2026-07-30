@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -147,7 +149,7 @@ class SetRow extends StatelessWidget {
   }
 }
 
-class _ValueCell extends StatelessWidget {
+class _ValueCell extends StatefulWidget {
   const _ValueCell({
     required this.field,
     required this.value,
@@ -169,40 +171,86 @@ class _ValueCell extends StatelessWidget {
   final String? suffix;
 
   @override
+  State<_ValueCell> createState() => _ValueCellState();
+}
+
+class _ValueCellState extends State<_ValueCell> {
+  /// Brief accent wash after a ghost turns into a real value, so adoption is
+  /// something you see happen rather than something you infer from grey
+  /// becoming white in gym lighting.
+  bool _flash = false;
+  Timer? _flashEnd;
+
+  @override
+  void didUpdateWidget(_ValueCell old) {
+    super.didUpdateWidget(old);
+    if (old.value == null && widget.value != null && !widget.active) {
+      _flashEnd?.cancel();
+      setState(() => _flash = true);
+      _flashEnd = Timer(Motion.slow, () {
+        if (mounted) setState(() => _flash = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _flashEnd?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final display = active ? buffer : _fmt(value);
+    final display = widget.active ? widget.buffer : _fmt(widget.value);
     final hasValue = display.isNotEmpty;
-    final ghostText = _fmt(ghost);
+    final ghostText = _fmt(widget.ghost);
+    // A suggestion must never look like a record: the ghost is italic and
+    // carries a leading dot, so the difference survives a glance from arm's
+    // length with the phone on the floor.
+    final showingGhost = !hasValue && ghostText.isNotEmpty;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: AnimatedContainer(
         duration: Motion.fast,
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: Space.md),
         decoration: BoxDecoration(
-          color: active ? c.accent.withValues(alpha: 0.12) : c.surfaceHigh,
+          color: widget.active
+              ? c.accent.withValues(alpha: 0.12)
+              : (_flash ? c.accent.withValues(alpha: 0.28) : c.surfaceHigh),
           borderRadius: BorderRadius.circular(Radii.sm),
-          border: Border.all(color: active ? c.accent : Colors.transparent),
+          border: Border.all(
+            color: widget.active ? c.accent : Colors.transparent,
+          ),
         ),
         child: Row(
           children: [
-            if (prefix != null) ...[
-              Text(prefix!, style: context.t.labelMedium),
+            if (widget.prefix != null) ...[
+              Text(widget.prefix!, style: context.t.labelMedium),
               const SizedBox(width: 2),
+            ],
+            if (showingGhost) ...[
+              Text(
+                '·',
+                style: context.t.labelLarge?.copyWith(color: c.textTertiary),
+              ),
+              const SizedBox(width: 3),
             ],
             Expanded(
               child: Text(
                 hasValue ? display : (ghostText.isEmpty ? '—' : ghostText),
                 style: context.t.labelLarge?.copyWith(
                   color: hasValue ? c.textPrimary : c.textTertiary,
+                  fontStyle: showingGhost ? FontStyle.italic : FontStyle.normal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.clip,
               ),
             ),
-            if (suffix != null) Text(suffix!, style: context.t.labelSmall),
+            if (widget.suffix != null)
+              Text(widget.suffix!, style: context.t.labelSmall),
           ],
         ),
       ),

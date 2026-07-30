@@ -85,7 +85,11 @@ lib/
     backup/          whole-DB JSON export / restore
 
   core/            theme tokens, shared providers, primitives, id generation
+                   rest_alert.dart  end-of-rest buzz + tone (audio session)
   features/        today · log · history · progress · regime · settings
+
+assets/
+  audio/           rest_done.mp3 — the end-of-rest tone
 ```
 
 Four tabs: **Today** (next session, heatmap), **History**, **Progress** (one
@@ -202,6 +206,14 @@ the rest render correctly but their happy path has not been clicked through.
   custom gym keypad with ±2.5 and one-tap "Last: 22.5", auto rest timer, per-set
   notes, swap / skip-with-reason / move / add exercise mid-session. Resuming an
   interrupted session survives a force-stop.
+
+  Rest ends out loud: a double haptic and a tone on the Android alarm stream
+  (`core/rest_alert.dart`, audio focus `gainTransientMayDuck`, so music dips
+  rather than stops), and the screen is held awake for the whole session. The
+  bar then says "Rest done" and removes itself after five seconds — it never
+  counts overtime, but the start time is kept, because actual rest is measured
+  from it. _Not yet driven on the emulator: the tone and the wakelock want a
+  real device._
 
   Finishing with sets still open is allowed but never silent: the confirmation
   names every exercise and how far it got. Turning the page early is allowed
@@ -489,18 +501,6 @@ order-based on purpose, so training out of order never strands the programme.
 
 ### Logging ease — friction with chalky hands
 
-**14. The rest timer never tells you rest is over**
-`log/widgets/rest_timer.dart`
-
-- **Bug** — no sound, no haptic, no notification. The bar turns green and counts
-  up. `HapticFeedback` fires only when a set is completed, and there is no
-  wakelock, audio or notifications package in `pubspec.yaml`. So the one app
-  built to be opened mid-set requires you to hold it and watch it.
-- **Good UX** — put the phone down, get a buzz at zero, pick it up.
-- **Fix** — haptic plus an optional short sound when `remaining` crosses zero,
-  and keep the screen awake while a workout is open. Two small packages.
-  Biggest felt improvement in the app.
-
 **15. `+2.5` starts from zero instead of last time's weight**
 `log/widgets/keypad.dart:267`
 
@@ -684,8 +684,8 @@ its timestamp under Data.
 
 ### Order to fix
 
-1. **14, 15, 16** — the gym-hands set. Cheapest change with the largest felt
-   difference, and none of it touches stored data.
+1. **15, 16** — the rest of the gym-hands set (14 is done). Cheapest change with
+   the largest felt difference, and none of it touches stored data.
 2. **11, 12** (+ **7** first) — wire the cycle escape hatches. UI only; both
    repository methods already exist.
 3. **1, 2** — swap-in-place and prefill refresh. Correctness, and 2 is quietly

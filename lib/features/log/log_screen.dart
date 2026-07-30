@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/ids.dart';
 import '../../core/providers.dart';
+import '../../core/rest_alert.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
@@ -53,6 +55,18 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   DateTime? _restStartedAt;
   int _restTargetSeconds = 120;
 
+  /// Set once the current rest has reached zero, so the buzz fires on the
+  /// crossing and not on every tick after it. Cleared whenever the rest is
+  /// restarted or extended past zero.
+  bool _restAlerted = false;
+
+  /// Whether the rest bar is on screen. Separate from [_restStartedAt] on
+  /// purpose: the bar goes away shortly after the buzz — counting overtime is
+  /// a number nobody acts on — but the start time has to survive, because the
+  /// rest a set actually got is measured from it.
+  bool _showRestBar = false;
+  Timer? _restBarHide;
+
   // Latest build's data, so callbacks can resolve a set's ghost values without
   // threading them through every widget.
   Map<String, PrefillResult> _prefill = const {};
@@ -69,15 +83,66 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     super.initState();
     // One second tick drives both the session elapsed time and the rest timer.
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      _checkRestElapsed();
+      setState(() {});
     });
+    // The whole point of this screen is to be put down between sets, so the
+    // screen must not lock while a workout is open.
+    WakelockPlus.enable().ignore();
+    // Load the tone now; the first rest of the session shouldn't be the one
+    // that pays for decoding it.
+    RestAlert.instance.warmUp().ignore();
   }
 
   @override
   void dispose() {
     _clock?.cancel();
+    _restBarHide?.cancel();
+    WakelockPlus.disable().ignore();
+    RestAlert.instance.release().ignore();
     _pages.dispose();
     super.dispose();
+  }
+
+  /// Buzzes once when rest reaches zero. Without this the timer only ever
+  /// turns green, which you can't see with the phone face down on a bench.
+  void _checkRestElapsed() {
+    final startedAt = _restStartedAt;
+    if (startedAt == null) {
+      _restAlerted = false;
+      return;
+    }
+    final remaining =
+        _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds;
+    if (remaining > 0) {
+      // An extended target puts rest back on the clock, so re-arm the alert.
+      _restAlerted = false;
+      return;
+    }
+    if (_restAlerted) return;
+    _restAlerted = true;
+    RestAlert.instance.fire();
+    // Hold the "done" state briefly so picking the phone up right after the
+    // buzz still shows what happened, then get out of the way.
+    _restBarHide?.cancel();
+    _restBarHide = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showRestBar = false);
+    });
+  }
+
+  void _startRest() {
+    _restBarHide?.cancel();
+    setState(() {
+      _restStartedAt = DateTime.now();
+      _restAlerted = false;
+      _showRestBar = true;
+    });
+  }
+
+  void _dismissRestBar() {
+    _restBarHide?.cancel();
+    setState(() => _showRestBar = false);
   }
 
   @override
@@ -200,7 +265,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                       },
                     ),
             ),
-            if (_restStartedAt != null && _editing == null)
+            if (_showRestBar && _restStartedAt != null && _editing == null)
               RestTimerBar(
                 startedAt: _restStartedAt!,
                 targetSeconds: _restTargetSeconds,
@@ -210,7 +275,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                     900,
                   ),
                 ),
-                onDismiss: () => setState(() => _restStartedAt = null),
+                onDismiss: _dismissRestBar,
               ),
             if (_editing != null) _keypad(detail, prefill, cells),
           ],
@@ -284,7 +349,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
       nextLabel: isLast ? 'Done' : 'Next',
       onKey: (key) {
-        final next = applyKey(_buffer, key, field: target.field);
+        final next = applyKey(
+          _buffer,
+          key,
+          field: target.field,
+          hint: double.tryParse(hint),
+        );
         _commit(next, target);
       },
       onNext: () => _advance(detail, cells, target),
@@ -320,7 +390,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
             .read(trainingRepositoryProvider)
             .updateSet(from.setId, isDone: const Value(true));
         HapticFeedback.mediumImpact();
-        setState(() => _restStartedAt = DateTime.now());
+        _startRest();
       }
     }
 
@@ -362,7 +432,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     ref.read(trainingRepositoryProvider).updateSet(set.id, isDone: Value(done));
     if (done) {
       HapticFeedback.mediumImpact();
-      setState(() => _restStartedAt = DateTime.now());
+      _startRest();
     }
   }
 
