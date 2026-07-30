@@ -56,14 +56,14 @@ Workout  ──  one Session actually performed, on a day, inside a Cycle
 
 ### Invariants that are easy to break
 
-| Invariant | Why |
-|---|---|
-| `WorkoutExercise` / `SetLog` are **snapshots** | Reordering or swapping mid-workout must never rewrite what you did in March. Same reason switching regimes creates a new `Regime` instead of editing sessions in place. |
-| `_cyclesSinceDeload(beforeIndex:)` is **exclusive** | A `CycleStatus` describes a cycle by what came *before* it. Counting the cycle itself makes the deload land one cycle early. This was a real bug. |
-| `LoadMode` decides what a number means | `22.5` on a dumbbell is 45kg of load; `73` on a pec deck is 73kg. Without it every comparison downstream is garbage. |
-| Warmups / drops / rest-pause are excluded from progress | `scorePerformance` only counts `working` and `amrap`. Including the rest is how naive logs claim progress that isn't there. |
-| `estimated1RM` caps reps at 12 | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison uses `beatsPrevious` instead, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win. |
-| The log screen owns the **horizontal axis** | It's a `PageView`, one exercise per page. Nothing inside it may use a horizontal gesture. |
+| Invariant                                               | Why                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WorkoutExercise` / `SetLog` are **snapshots**          | Reordering or swapping mid-workout must never rewrite what you did in March. Same reason switching regimes creates a new `Regime` instead of editing sessions in place.                                                                                                              |
+| `_cyclesSinceDeload(beforeIndex:)` is **exclusive**     | A `CycleStatus` describes a cycle by what came _before_ it. Counting the cycle itself makes the deload land one cycle early. This was a real bug.                                                                                                                                    |
+| `LoadMode` decides what a number means                  | `22.5` on a dumbbell is 45kg of load; `73` on a pec deck is 73kg. Without it every comparison downstream is garbage.                                                                                                                                                                 |
+| Warmups / drops / rest-pause are excluded from progress | `scorePerformance` only counts `working` and `amrap`. Including the rest is how naive logs claim progress that isn't there.                                                                                                                                                          |
+| `estimated1RM` caps reps at 12                          | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison uses `beatsPrevious` instead, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win. |
+| The log screen owns the **horizontal axis**             | It's a `PageView`, one exercise per page. Nothing inside it may use a horizontal gesture.                                                                                                                                                                                            |
 
 ---
 
@@ -237,6 +237,7 @@ picker).
   too — supersets and busy racks are normal — and the page says how much is
   left behind. Starting a session twice in one tap-tap creates one workout, not
   two.
+
 - **Session-scoped prefill** _(driven on the emulator)_ — ghost values,
   cross-session borrowing labelled, ghost adopted on completion, beat-last-time
   highlight.
@@ -313,35 +314,6 @@ convention as before: a finding is deleted when it's fixed, not ticked.
 
 ### Correctness
 
-**A3. A backdated session lands in today's cycle, whatever its date**
-`repositories/training_repository.dart` (`startWorkout`)
-
-- **Bug** — "log a past session" writes the date but still attaches the workout
-  to `ensureOpenCycle(regimeId)` — the cycle open *now*. Backfilling yesterday
-  is fine, because that is usually the same cycle. Backfilling three weeks ago
-  is not: it counts towards the current cycle and can complete it, so a cycle
-  closes on the strength of work done under a previous one, and the deload
-  counter moves early.
-- **Good UX** — a session logged for a date belongs to the cycle that was open
-  on that date, or to none at all.
-- **Fix** — pick the cycle by date (`cycles` carries `createdAt`/`completedAt`),
-  and when the date predates every cycle, decide deliberately whether it counts
-  at all. Say which cycle it landed in on the confirmation, because this is the
-  kind of thing nobody notices for a month.
-
-**A4. An abandoned backdated log becomes unreachable**
-`repositories/training_repository.dart` (`openWorkout`), `core/providers.dart:116`
-
-- **Bug** — the resume path takes the single newest in-progress workout by
-  `startedAt`. Start a backdated session, leave it unfinished, then start
-  today's: the backdated one is older, so it drops out of the query and there is
-  no screen anywhere that lists it. It stays `inProgress` forever, invisible.
-- **Good UX** — nothing is stranded where the app cannot show it to you.
-- **Fix** — either forbid a second open workout outright (the Today entry point
-  already refuses; the repository does not), or list every in-progress workout
-  when there is more than one. The first is simpler and matches how one person
-  actually trains.
-
 **A5. Merged prefill candidates lose their tie-break**
 `repositories/training_repository.dart` (`pastPerformances`)
 
@@ -360,7 +332,7 @@ convention as before: a finding is deleted when it's fixed, not ticked.
 - **Bug** — `exercisePrefillProvider` is keyed by workout and exercise and is
   invalidated by nothing. Delete a past workout — reachable from History while a
   session is open — and the ghosts in the running log still show numbers from
-  the day you just deleted. Finding 2 fixed the *added exercise* case; this is
+  the day you just deleted. Finding 2 fixed the _added exercise_ case; this is
   the mirror of it.
 - **Good UX** — the suggestion reflects the history that exists now.
 - **Fix** — invalidate on `historyChanges()`, which already exists and already
@@ -390,7 +362,7 @@ convention as before: a finding is deleted when it's fixed, not ticked.
   rebuilt and every listener rebuilds with it — on a stream that fires for each
   set you complete.
 - **Good UX** — as above: invisible until it isn't.
-- **Fix** — watch the *identity* of the exercise list rather than the detail —
+- **Fix** — watch the _identity_ of the exercise list rather than the detail —
   a `select` on the ids — so the map only rebuilds when the list actually
   changes.
 
@@ -462,13 +434,11 @@ convention as before: a finding is deleted when it's fixed, not ticked.
 
 ### Order to fix
 
-1. **A3, A4** — backdating's two loose ends, before the feature gets used
-   enough to leave a mess in the cycle history.
-3. **A5, A6** — prefill correctness. Both small.
-4. **A7, A8** — the log screen's remaining rebuild cost, once there is a device
+1. **A5, A6** — prefill correctness. Both small.
+3. **A7, A8** — the log screen's remaining rebuild cost, once there is a device
    to feel it on.
-5. **A9, A11, A13** — small consistency fixes.
-6. **A10, A12** — decide on a real screen; A12 is a feature.
+4. **A9, A11, A13** — small consistency fixes.
+5. **A10, A12** — decide on a real screen; A12 is a feature.
 
 ---
 

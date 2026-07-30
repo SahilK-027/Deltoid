@@ -523,6 +523,98 @@ void main() {
     );
   });
 
+  test('a backdated session joins the cycle that was open on its date',
+      () async {
+    // Attaching it to whatever cycle is open *now* let a three-week-old
+    // backfill complete the current cycle and move the deload counter early.
+    final regime = await activeRegime();
+    final sessions = await (db.select(db.sessions)
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    // Cycle 1, closed a week ago.
+    final firstCycle = await repo.ensureOpenCycle(regime.id);
+    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    await (db.update(db.cycles)..where((t) => t.id.equals(firstCycle.id)))
+        .write(CyclesCompanion(
+      startedAt: Value(
+        DateTime.now().subtract(const Duration(days: 14)).millisecondsSinceEpoch,
+      ),
+      completedAt: Value(weekAgo.millisecondsSinceEpoch),
+    ));
+
+    // Cycle 2 opens where the first one ended.
+    final second = await repo.ensureOpenCycle(regime.id);
+    expect(second.id, isNot(firstCycle.id));
+    await (db.update(db.cycles)..where((t) => t.id.equals(second.id))).write(
+      CyclesCompanion(
+        startedAt: Value(weekAgo.millisecondsSinceEpoch + 1),
+      ),
+    );
+
+    // Backfilled into the closed cycle's window.
+    final tenDaysAgo = DateTime.now().subtract(const Duration(days: 10));
+    final old = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: sessions.first.id,
+      at: tenDaysAgo,
+    );
+    var detail = await repo.workoutDetail(old);
+    expect(detail!.workout.cycleId, firstCycle.id);
+
+    // Finishing it must not stamp a new completion onto a cycle that already
+    // closed, nor close the current one on its strength.
+    await repo.completeWorkout(old);
+    final reread = await (db.select(db.cycles)
+          ..where((t) => t.id.equals(firstCycle.id)))
+        .getSingle();
+    expect(reread.completedAt, weekAgo.millisecondsSinceEpoch);
+    expect((await repo.cycleStatus(regime.id)).cycleId, second.id);
+
+    // And today's session still lands in the open cycle.
+    final today = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: sessions[1].id,
+    );
+    detail = await repo.workoutDetail(today);
+    expect(detail!.workout.cycleId, second.id);
+  });
+
+  test('a date older than every cycle belongs to no cycle', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    await repo.ensureOpenCycle(regime.id);
+
+    final id = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+      at: DateTime(2016, 3, 4),
+    );
+
+    final detail = await repo.workoutDetail(id);
+    expect(detail!.workout.cycleId, isNull);
+    // Finishing it is a no-op for cycles rather than a crash.
+    await repo.completeWorkout(id);
+    expect((await repo.cycleStatus(regime.id)).cycleIndex, 1);
+  });
+
+  test('only one workout can be open at a time', () async {
+    // openWorkout returns the newest by startedAt, so an abandoned backdated
+    // log would be hidden by the next session started and become unreachable.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    expect(
+      () => repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+        at: DateTime.now().subtract(const Duration(days: 2)),
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('workout notes can be written and cleared', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

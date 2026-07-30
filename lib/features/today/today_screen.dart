@@ -112,13 +112,32 @@ Future<void> _logPastSession(
   final navigator = Navigator.of(context);
   final messenger = ScaffoldMessenger.of(context);
   final container = ProviderScope.containerOf(context, listen: false);
+  final repo = container.read(trainingRepositoryProvider);
   try {
-    final id = await container
-        .read(trainingRepositoryProvider)
-        .startWorkout(regimeId: regimeId, sessionId: sessionId, at: date);
+    // Which cycle a backfill lands in is decided by its date, not by today, so
+    // say which one. Otherwise it is invisible until a deload arrives early and
+    // nobody knows why.
+    final cycle = await repo.cycleCovering(regimeId, date);
+    final id = await repo.startWorkout(
+      regimeId: regimeId,
+      sessionId: sessionId,
+      at: date,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          cycle == null
+              ? 'Older than this regime — counts towards no cycle'
+              : 'Counts towards cycle ${cycle.cycleIndex}',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
     await navigator.push(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
+  } on StateError catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
   } catch (e) {
     messenger.showSnackBar(
       SnackBar(content: Text('Could not open that session: $e')),

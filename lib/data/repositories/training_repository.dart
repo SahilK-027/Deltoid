@@ -314,6 +314,33 @@ class TrainingRepository {
     await ensureOpenCycle(regimeId);
   }
 
+  /// The cycle that was open on [at], or null when the date predates every
+  /// cycle this regime has had.
+  ///
+  /// A backdated workout used to attach to whatever cycle is open *now*.
+  /// Backfilling yesterday is usually the same cycle and nobody notices;
+  /// backfilling three weeks ago counted towards the current cycle, could
+  /// complete it on the strength of work done under a previous one, and moved
+  /// the deload counter early.
+  Future<Cycle?> cycleCovering(String regimeId, DateTime at) async {
+    final stamp = at.millisecondsSinceEpoch;
+    final cycles = await (db.select(db.cycles)
+          ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(
+                expression: t.cycleIndex, mode: OrderingMode.desc)
+          ]))
+        .get();
+
+    for (final c in cycles) {
+      final ended = c.completedAt;
+      // Open-ended on the right: the cycle still running covers everything
+      // since it began, including today.
+      if (c.startedAt <= stamp && (ended == null || stamp <= ended)) return c;
+    }
+    return null;
+  }
+
   /// Closes the open cycle if every session it still owes has been trained.
   ///
   /// Only `completeWorkout` used to close a cycle, so deleting the last
@@ -880,14 +907,26 @@ class TrainingRepository {
     // A double tap on "Start" — or a screen that hasn't rebuilt yet — must not
     // open a second parallel log for the same session. Hand back the running
     // one instead; the sets already in it are the ones being asked for.
+    final running = await openWorkout();
     if (at == null) {
-      final running = await openWorkout();
       if (running != null && running.sessionId == sessionId) return running.id;
+    } else if (running != null) {
+      // Only one workout may be open at a time. `openWorkout` returns the
+      // newest by startedAt, so an abandoned backdated log would be hidden by
+      // the next session you start and become unreachable — in progress
+      // forever, listed nowhere.
+      throw StateError('Finish the session in progress first');
     }
 
     final regime =
         await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
-    final cycle = await ensureOpenCycle(regimeId);
+    // A backdated session belongs to the cycle that was open on its date, not
+    // to the one open now. When the date predates every cycle — backfilling
+    // from before this regime existed — it belongs to no cycle at all rather
+    // than being forced into the current one.
+    final cycle = at == null
+        ? await ensureOpenCycle(regimeId)
+        : await cycleCovering(regimeId, at);
     final slots = await (db.select(db.sessionExercises)
           ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
@@ -915,7 +954,7 @@ class TrainingRepository {
         prefill: resolvePrefill(
           candidates: past,
           sessionId: sessionId,
-          targetIsDeload: cycle.isDeload,
+          targetIsDeload: cycle?.isDeload ?? false,
           deloadSetDelta: slot.deloadSetDelta ?? regime.deloadSetDelta,
           deloadWeightPct: slot.deloadWeightPct ?? regime.deloadWeightPct,
           unit: unit,
@@ -929,12 +968,12 @@ class TrainingRepository {
               id: Value(workoutId),
               regimeId: regimeId,
               sessionId: Value(sessionId),
-              cycleId: Value(cycle.id),
+              cycleId: Value(cycle?.id),
               dayKey: dayKeyOf(now),
               // Explicit rather than the column default, so a backdated
               // session sorts into history where it belongs.
               startedAt: Value(now.millisecondsSinceEpoch),
-              isDeload: Value(cycle.isDeload),
+              isDeload: Value(cycle?.isDeload ?? false),
               status: const Value(WorkoutStatus.inProgress),
             ),
           );
@@ -944,7 +983,7 @@ class TrainingRepository {
         final prefill = plans[i].prefill;
 
         var targetSets = slot.targetSets;
-        if (cycle.isDeload) {
+        if (cycle?.isDeload ?? false) {
           final delta = slot.deloadSetDelta ?? regime.deloadSetDelta;
           targetSets = (targetSets + delta).clamp(1, 99);
         }
@@ -1487,6 +1526,12 @@ class TrainingRepository {
     if (cycleId == null) return;
 
     final status = await cycleStatus(workout.regimeId);
+    // `cycleStatus` describes the cycle open *now*. A backdated session can
+    // belong to an older, already-closed one — finishing it must not stamp a
+    // fresh completion onto a cycle that closed weeks ago, and must not close
+    // the current cycle on the strength of a workout that isn't in it.
+    if (status.cycleId != cycleId) return;
+
     if (status.isComplete) {
       await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
         CyclesCompanion(
