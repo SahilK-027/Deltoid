@@ -35,6 +35,7 @@ class PastPerformance {
     required this.dayKey,
     required this.isDeload,
     required this.sets,
+    this.startedAt = 0,
     this.skipReason = SkipReason.none,
   });
 
@@ -42,6 +43,11 @@ class PastPerformance {
   final String? sessionId;
   final String sessionName;
   final int dayKey;
+
+  /// When the workout began. Ordering on [dayKey] alone is not enough: train
+  /// the same session twice in a day and "last time" has to mean the later of
+  /// the two, not whichever the map happened to hold first.
+  final int startedAt;
   final bool isDeload;
   final List<PastSet> sets;
 

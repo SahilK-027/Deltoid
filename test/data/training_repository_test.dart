@@ -643,6 +643,42 @@ void main() {
     expect(await repo.bodyweightSeries(), isEmpty);
   });
 
+  test('two performances on one day keep their order', () async {
+    // Merging the same-session and recent queries and re-sorting on dayKey
+    // alone left same-day rows in map insertion order, so prefill could pick
+    // the earlier of two and call it last time.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final morning =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    var detail = await repo.workoutDetail(morning);
+    final exerciseId = detail!.entries.first.exercise.id;
+    for (final s in detail.entries.first.sets) {
+      await repo.updateSet(s.id,
+          weight: const Value(20), reps: const Value(10), isDone: const Value(true));
+    }
+    await repo.completeWorkout(morning);
+
+    // Same day, heavier, later.
+    final evening =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    detail = await repo.workoutDetail(evening);
+    for (final s in detail!.entries.first.sets) {
+      await repo.updateSet(s.id,
+          weight: const Value(25), reps: const Value(8), isDone: const Value(true));
+    }
+    await repo.completeWorkout(evening);
+
+    final candidates =
+        await repo.pastPerformances(exerciseId, sessionId: push1.id);
+    expect(candidates.first.workoutId, evening);
+
+    final prefill =
+        resolvePrefill(candidates: candidates, sessionId: push1.id);
+    expect(prefill.sets.first.weight, 25);
+  });
+
   test('the same-session lookup has no horizon', () async {
     // Fan one movement across many training days and the slot you care about
     // can fall out of a fixed candidate window, dropping prefill to another

@@ -312,32 +312,6 @@ Found while fixing the first round, 2026-07-30, by reading the code rather than
 driving it. Numbered `A1…` so they can't be confused with the old set. Same
 convention as before: a finding is deleted when it's fixed, not ticked.
 
-### Correctness
-
-**A5. Merged prefill candidates lose their tie-break**
-`repositories/training_repository.dart` (`pastPerformances`)
-
-- **Bug** — the two queries are merged and re-sorted on `dayKey` alone, while
-  each query ordered by `startedAt`. Two performances of the same exercise on
-  the same day — the same session trained twice, or an ad-hoc repeat — now sit
-  in map insertion order, so prefill can pick the earlier of the two and call it
-  "last time".
-- **Good UX** — "last time" means the most recent one, including within a day.
-- **Fix** — carry `startedAt` on `PastPerformance` and sort on it, which is what
-  both queries already order by. Cheap; it only needs the field.
-
-**A6. Prefill goes stale when history changes under an open log**
-`log/log_providers.dart`
-
-- **Bug** — `exercisePrefillProvider` is keyed by workout and exercise and is
-  invalidated by nothing. Delete a past workout — reachable from History while a
-  session is open — and the ghosts in the running log still show numbers from
-  the day you just deleted. Finding 2 fixed the _added exercise_ case; this is
-  the mirror of it.
-- **Good UX** — the suggestion reflects the history that exists now.
-- **Fix** — invalidate on `historyChanges()`, which already exists and already
-  emits for exactly these tables.
-
 ### Performance
 
 **A7. Every keystroke rebuilds the whole exercise page**

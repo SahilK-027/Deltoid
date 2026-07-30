@@ -417,8 +417,11 @@ class TrainingRepository {
     for (final p in sameSession) {
       byWorkout.putIfAbsent(p.workoutId, () => p);
     }
+    // Sort on the same key both queries ordered by. Sorting the merged list on
+    // dayKey alone put two performances from one day in map insertion order,
+    // so prefill could pick the earlier and call it last time.
     final merged = byWorkout.values.toList()
-      ..sort((a, b) => b.dayKey.compareTo(a.dayKey));
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
     return merged;
   }
 
@@ -472,6 +475,7 @@ class TrainingRepository {
             sessionId: w.sessionId,
             sessionName: session?.name ?? 'Ad-hoc',
             dayKey: w.dayKey,
+            startedAt: w.startedAt,
             isDeload: w.isDeload,
             // Sets logged before the exercise was marked skipped did happen:
             // two sets then a bad shoulder is two real sets. They stay
@@ -1213,6 +1217,19 @@ class TrainingRepository {
     return db.watchQuery(
       [db.workouts, db.workoutExercises, db.exercises],
       exercisesWithHistory,
+    );
+  }
+
+  /// Emits when the *shape* of history changes — a workout deleted or
+  /// backdated, an exercise added, swapped or skipped — but not when a set is
+  /// written.
+  ///
+  /// Deliberately narrower than [historyChanges]: `set_logs` is the hot table
+  /// during a session, and anything that re-resolves history on it would run
+  /// once per keystroke.
+  Stream<void> historyShapeChanges() {
+    return db.tableUpdates(
+      TableUpdateQuery.onAllTables([db.workouts, db.workoutExercises]),
     );
   }
 
