@@ -304,8 +304,12 @@ class _Chart extends ConsumerWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 38,
+                      // The axis sits inches from the tooltip. One of them
+                      // rendering kilograms while the other says pounds is the
+                      // worst possible version of a units bug: both numbers on
+                      // screen at once, neither labelled.
                       getTitlesWidget: (value, meta) => Text(
-                        value.toStringAsFixed(0),
+                        formatWeight(value, unit),
                         style: context.t.labelSmall,
                       ),
                     ),
@@ -510,14 +514,15 @@ class _Stat extends StatelessWidget {
   }
 }
 
-class _PerformanceList extends StatelessWidget {
+class _PerformanceList extends ConsumerWidget {
   const _PerformanceList({required this.points});
 
   final List<ProgressPoint> points;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -553,7 +558,8 @@ class _PerformanceList extends StatelessWidget {
                     const SizedBox(width: Space.sm),
                   ],
                   Text(
-                    '${_fmt(points[i].topSetLoad)} × ${points[i].topSetReps ?? '—'}',
+                    '${_fmt(points[i].topSetLoad, unit)} × '
+                    '${points[i].topSetReps ?? '—'}',
                     style: context.t.labelLarge,
                   ),
                 ],
@@ -565,8 +571,6 @@ class _PerformanceList extends StatelessWidget {
     );
   }
 
-  static String _fmt(double? v) {
-    if (v == null) return '—';
-    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
-  }
+  static String _fmt(double? kg, WeightUnit unit) =>
+      kg == null ? '—' : formatWeight(kg, unit);
 }

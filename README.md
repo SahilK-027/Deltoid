@@ -311,36 +311,6 @@ Found while fixing the first round, 2026-07-30, by reading the code rather than
 driving it. Numbered `A1…` so they can't be confused with the old set. Same
 convention as before: a finding is deleted when it's fixed, not ticked.
 
-**The first two are mine.** They are gaps in work committed on this branch, not
-pre-existing debt, and they are why this list starts where it does.
-
-### Left half-done by the units change
-
-**A1. Two weight readouts on Progress still say kilograms**
-`progress/progress_screen.dart:307`, `progress/progress_screen.dart:568`
-
-- **Bug** — finding 30 converted the chart tooltip and the "Best e1RM" stat but
-  missed the chart's own **left axis labels** (`value.toStringAsFixed(0)`) and
-  the **top-set column** in the per-session list below it (a local `_fmt` that
-  predates the unit work). In pounds mode the chart plots a line whose axis is
-  labelled in kg while its tooltip says lb — the worst possible version of this
-  bug, because both numbers are on screen at once and neither is marked.
-- **Good UX** — one unit per screen, no exceptions.
-- **Fix** — both through `formatWeight(value, unit)`; `_Chart` and
-  `_PerformanceList` already have or can take a `WidgetRef`. Then grep for
-  `toStringAsFixed` across `features/` — that call is the tell, since the unit
-  helpers never produce one directly.
-
-**A2. `formatWeight` defaults to kilograms, so forgetting the unit is silent**
-`history/history_screen.dart` (`formatWeight`)
-
-- **Bug** — the signature is `formatWeight(double kg, [WeightUnit unit =
-  WeightUnit.kg])`. An optional parameter means every call site that forgets it
-  compiles, runs, and quietly renders pounds as kilograms. That is exactly how
-  **A1** survived the change.
-- **Good UX** — invisible; this is about the next edit not reintroducing A1.
-- **Fix** — make the parameter required and let the analyzer find the stragglers.
-
 ### Correctness
 
 **A3. A backdated session lands in today's cycle, whatever its date**
@@ -492,8 +462,7 @@ pre-existing debt, and they are why this list starts where it does.
 
 ### Order to fix
 
-1. **A1, A2** — finish the units change; A2 first, so the analyzer finds A1.
-2. **A3, A4** — backdating's two loose ends, before the feature gets used
+1. **A3, A4** — backdating's two loose ends, before the feature gets used
    enough to leave a mess in the cycle history.
 3. **A5, A6** — prefill correctness. Both small.
 4. **A7, A8** — the log screen's remaining rebuild cost, once there is a device

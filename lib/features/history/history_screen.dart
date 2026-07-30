@@ -793,7 +793,12 @@ class _Cell extends ConsumerWidget {
 /// decimals because this also formats *computed* numbers — an estimated 1RM is
 /// an arbitrary double, and `55.733333333333334 kg` is not a weight anyone has
 /// ever lifted.
-String formatWeight(double kg, [WeightUnit unit = WeightUnit.kg]) {
+///
+/// [unit] is required on purpose. It was optional with a kilogram default for
+/// exactly one commit, and in that commit two call sites forgot it and rendered
+/// pounds as kilograms — next to a tooltip that had it right. An optional unit
+/// makes "wrong" the thing that compiles.
+String formatWeight(double kg, WeightUnit unit) {
   final v = unit.display(kg);
   if (v == v.roundToDouble()) return v.toStringAsFixed(0);
   final rounded = (v * 100).round() / 100;
