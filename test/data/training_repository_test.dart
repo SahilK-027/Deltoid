@@ -384,6 +384,73 @@ void main() {
     expect(prefill.sets.first.weight, 18); // 22.5 × 80%
   });
 
+  test('swapping an exercise keeps its place in the workout', () async {
+    // A swap is a substitution, not a delete plus an append: the page you are
+    // standing on must not jump to the end of the session mid-set.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final before = await repo.workoutDetail(id);
+    final second = before!.entries[1];
+    final replacement = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Cable Crossover')))
+        .getSingle();
+
+    await repo.replaceExerciseInWorkout(
+      second.workoutExercise.id,
+      replacement.id,
+    );
+
+    final after = await repo.workoutDetail(id);
+    expect(after!.entries.length, before.entries.length);
+    expect(after.entries[1].exercise.id, replacement.id);
+    expect(
+      after.entries[1].workoutExercise.targetSets,
+      second.workoutExercise.targetSets,
+    );
+    // Everything else stayed where it was.
+    expect(
+      after.entries.map((e) => e.exercise.id).skip(2),
+      before.entries.map((e) => e.exercise.id).skip(2),
+    );
+  });
+
+  test('an exercise added mid-session knows its own history', () async {
+    // Resolving prefill once when the log opened meant an exercise added at
+    // 19:40 read "first time" with a year behind it, and a set typed with only
+    // reps was stored against a null weight.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final pull1 = await sessionNamed('Pull 1');
+
+    // Train an exercise that is not in Push 1, so it can be added later.
+    final rows = await repo.startWorkout(regimeId: regime.id, sessionId: pull1.id);
+    final rowDetail = await repo.workoutDetail(rows);
+    final rowEntry = rowDetail!.entries.first;
+    for (final s in rowEntry.sets) {
+      await repo.updateSet(s.id,
+          weight: const Value(60), reps: const Value(10), isDone: const Value(true));
+    }
+    await repo.completeWorkout(rows);
+
+    final push = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.addExerciseToWorkout(push, rowEntry.exercise.id);
+
+    final prefill = await repo.prefillForWorkout(
+      workoutId: push,
+      exerciseId: rowEntry.exercise.id,
+    );
+    expect(prefill.source, PrefillSource.otherSession);
+    expect(prefill.sets.first.weight, 60);
+
+    // And the rows it arrived with mirror that shape rather than a flat three.
+    final detail = await repo.workoutDetail(push);
+    final added = detail!.entries
+        .firstWhere((e) => e.exercise.id == rowEntry.exercise.id);
+    expect(added.sets.length, prefill.sets.length);
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

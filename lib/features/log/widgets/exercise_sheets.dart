@@ -117,9 +117,11 @@ Future<void> showExerciseMenu(
               final replacement = await pickExercise(context, ref);
               navigator.pop();
               if (replacement == null) return;
-              await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
-              await repo.addExerciseToWorkout(
-                entry.workoutExercise.workoutId,
+              // In place: same position, same target sets, set shape from the
+              // replacement's own history. Remove-then-add used to drop it at
+              // the end of the workout.
+              await repo.replaceExerciseInWorkout(
+                entry.workoutExercise.id,
                 replacement.id,
               );
             },

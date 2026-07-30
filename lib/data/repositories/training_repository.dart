@@ -1047,10 +1047,70 @@ class TrainingRepository {
     );
   }
 
-  Future<String> addExerciseToWorkout(String workoutId, String exerciseId) async {
+  /// Last time's numbers for one exercise in the context of one workout.
+  ///
+  /// The same resolution `startWorkout` does, available afterwards: an exercise
+  /// added at 19:40 must know the history it would have known at 19:00.
+  Future<PrefillResult> prefillForWorkout({
+    required String workoutId,
+    required String exerciseId,
+  }) async {
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId)))
+        .getSingleOrNull();
+    if (workout == null) return const PrefillResult.empty();
+
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(workout.regimeId)))
+        .getSingleOrNull();
+
+    final past = await pastPerformances(
+      exerciseId,
+      excludeWorkoutId: workoutId,
+    );
+
+    return resolvePrefill(
+      candidates: past,
+      sessionId: workout.sessionId,
+      targetIsDeload: workout.isDeload,
+      deloadSetDelta: regime?.deloadSetDelta ?? -1,
+      deloadWeightPct: regime?.deloadWeightPct ?? 80,
+    );
+  }
+
+  /// The set rows a newly added exercise should start with.
+  ///
+  /// Mirrors last time's shape exactly as `startWorkout` does, so an exercise
+  /// added mid-session doesn't arrive with a flat three sets — and, in a deload
+  /// week, doesn't arrive with a full-weight structure in a light week.
+  Future<List<SetType>> _shapeFor({
+    required String workoutId,
+    required String exerciseId,
+    required int targetSets,
+  }) async {
+    final prefill = await prefillForWorkout(
+      workoutId: workoutId,
+      exerciseId: exerciseId,
+    );
+    return prefill.hasSuggestion
+        ? prefill.sets.map((s) => s.type).toList()
+        : List.filled(targetSets, SetType.working);
+  }
+
+  Future<String> addExerciseToWorkout(
+    String workoutId,
+    String exerciseId, {
+    int targetSets = 3,
+  }) async {
     final existing = await (db.select(db.workoutExercises)
           ..where((t) => t.workoutId.equals(workoutId) & t.deletedAt.isNull()))
         .get();
+    final shape = await _shapeFor(
+      workoutId: workoutId,
+      exerciseId: exerciseId,
+      targetSets: targetSets,
+    );
+
     final id = newId();
     await db.transaction(() async {
       await db.into(db.workoutExercises).insert(
@@ -1059,14 +1119,72 @@ class TrainingRepository {
               workoutId: workoutId,
               exerciseId: exerciseId,
               orderIndex: existing.length,
+              targetSets: Value(targetSets),
             ),
           );
-      for (var k = 0; k < 3; k++) {
+      for (var k = 0; k < shape.length; k++) {
         await db.into(db.setLogs).insert(
               SetLogsCompanion.insert(
                 id: Value(newId()),
                 workoutExerciseId: id,
                 setIndex: k,
+                setType: Value(shape[k]),
+              ),
+            );
+      }
+    });
+    return id;
+  }
+
+  /// Substitutes one exercise for another in place.
+  ///
+  /// A swap is a substitution, not a delete plus an append: the replacement
+  /// takes the old slot's position and target, so the page you are standing on
+  /// does not move out from under you mid-session. Doing this as
+  /// remove-then-add sent the replacement to the end of the workout.
+  Future<String> replaceExerciseInWorkout(
+    String workoutExerciseId,
+    String newExerciseId,
+  ) async {
+    final old = await (db.select(db.workoutExercises)
+          ..where((t) => t.id.equals(workoutExerciseId)))
+        .getSingle();
+
+    final shape = await _shapeFor(
+      workoutId: old.workoutId,
+      exerciseId: newExerciseId,
+      targetSets: old.targetSets,
+    );
+
+    final id = newId();
+    await db.transaction(() async {
+      await (db.update(db.workoutExercises)
+            ..where((t) => t.id.equals(workoutExerciseId)))
+          .write(
+        WorkoutExercisesCompanion(
+          deletedAt: Value(nowMs()),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+
+      await db.into(db.workoutExercises).insert(
+            WorkoutExercisesCompanion.insert(
+              id: Value(id),
+              workoutId: old.workoutId,
+              exerciseId: newExerciseId,
+              orderIndex: old.orderIndex,
+              targetSets: Value(old.targetSets),
+            ),
+          );
+
+      for (var k = 0; k < shape.length; k++) {
+        await db.into(db.setLogs).insert(
+              SetLogsCompanion.insert(
+                id: Value(newId()),
+                workoutExerciseId: id,
+                setIndex: k,
+                setType: Value(shape[k]),
               ),
             );
       }
