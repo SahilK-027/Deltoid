@@ -13,6 +13,7 @@ import '../../core/providers.dart';
 import '../../core/rest_alert.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../core/widgets/ticking.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
@@ -67,6 +68,13 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   bool _showRestBar = false;
   Timer? _restBarHide;
 
+  /// Whether the opening exercise's rest target has been fetched yet.
+  bool _restTargetLoaded = false;
+
+  /// The keystroke waiting to be written, and its debounce.
+  ({EditTarget target, String value})? _pending;
+  Timer? _pendingWrite;
+
   // Latest build's data, so callbacks can resolve a set's ghost values without
   // threading them through every widget.
   Map<String, PrefillResult> _prefill = const {};
@@ -81,11 +89,13 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   @override
   void initState() {
     super.initState();
-    // One second tick drives both the session elapsed time and the rest timer.
+    // The tick no longer rebuilds the screen. It used to call setState on the
+    // whole log — PageView included — once a second whether or not anything on
+    // it showed a clock; the two widgets that need one now tick themselves.
+    // This is left running only to catch the moment rest reaches zero, which
+    // has to fire even with the keypad covering the bar.
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      _checkRestElapsed();
-      setState(() {});
+      if (mounted) _checkRestElapsed();
     });
     // The whole point of this screen is to be put down between sets, so the
     // screen must not lock while a workout is open.
@@ -99,6 +109,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   void dispose() {
     _clock?.cancel();
     _restBarHide?.cancel();
+    // Anything typed in the last 300ms still belongs to the log.
+    _flushWrite();
     WakelockPlus.disable().ignore();
     RestAlert.instance.release().ignore();
     _pages.dispose();
@@ -131,6 +143,35 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     });
   }
 
+  /// How long the set being completed actually rested, or null when it is the
+  /// first set of the exercise and there was nothing to rest from.
+  ///
+  /// Capped: a set completed forty minutes after the last one is a phone left
+  /// on a bench, not a rest interval, and storing it would poison the default
+  /// for next week.
+  int? _restTakenSeconds() {
+    final startedAt = _restStartedAt;
+    if (startedAt == null) return null;
+    final seconds = DateTime.now().difference(startedAt).inSeconds;
+    if (seconds <= 0 || seconds > 1800) return null;
+    return seconds;
+  }
+
+  /// Loads the rest target for the exercise now on screen.
+  ///
+  /// Per exercise rather than one number for the session: the target used to
+  /// reset to 120 s every time the log opened, which is wrong for a heavy
+  /// squat and wrong again for a cable fly.
+  Future<void> _loadRestTarget(WorkoutDetail detail, int index) async {
+    if (index < 0 || index >= detail.entries.length) return;
+    final seconds = await ref.read(trainingRepositoryProvider).restTargetFor(
+          exerciseId: detail.entries[index].exercise.id,
+          sessionId: detail.workout.sessionId,
+        );
+    if (!mounted) return;
+    setState(() => _restTargetSeconds = seconds);
+  }
+
   void _startRest() {
     _restBarHide?.cancel();
     setState(() {
@@ -138,6 +179,21 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       _restAlerted = false;
       _showRestBar = true;
     });
+  }
+
+  /// Nudging the timer sets the target for this exercise, for good: next week
+  /// opens on the number you settled on.
+  void _adjustRest(WorkoutDetail detail, int delta) {
+    final seconds = (_restTargetSeconds + delta).clamp(15, 900).toInt();
+    setState(() => _restTargetSeconds = seconds);
+
+    if (detail.entries.isEmpty) return;
+    final page = _page.clamp(0, detail.entries.length - 1);
+    ref.read(trainingRepositoryProvider).setRestTarget(
+          exerciseId: detail.entries[page].exercise.id,
+          sessionId: detail.workout.sessionId,
+          seconds: seconds,
+        );
   }
 
   void _dismissRestBar() {
@@ -156,6 +212,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     _prefill = prefill;
     _detail = detail;
     final c = context.c;
+
+    // The first page's rest target isn't known until the workout loads.
+    if (detail != null && !_restTargetLoaded) {
+      _restTargetLoaded = true;
+      _loadRestTarget(detail, _page);
+    }
 
     if (detail == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -203,10 +265,14 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                   ],
                 ],
               ),
-              Text(
-                '${_elapsed(detail.workout.startedAt)}  ·  '
-                '${_doneSets(detail)} of ${_totalSets(detail)} sets',
-                style: context.t.labelMedium,
+              // Its own clock, so the session timer advances without the rest
+              // of the screen rebuilding behind it once a second.
+              Ticking(
+                builder: (context) => Text(
+                  '${_elapsed(detail.workout.startedAt)}  ·  '
+                  '${_doneSets(detail)} of ${_totalSets(detail)} sets',
+                  style: context.t.labelMedium,
+                ),
               ),
             ],
           ),
@@ -258,6 +324,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                           editing: _editing,
                           buffer: _buffer,
                           onEdit: _focus,
+                          rowKeyFor: _rowKey,
                           onToggleDone: _toggleDone,
                           onNextExercise: () => _goToPage(index + 1),
                           onMove: (delta) => _move(detail, index, delta),
@@ -269,12 +336,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
               RestTimerBar(
                 startedAt: _restStartedAt!,
                 targetSeconds: _restTargetSeconds,
-                onAdjust: (delta) => setState(
-                  () => _restTargetSeconds = (_restTargetSeconds + delta).clamp(
-                    15,
-                    900,
-                  ),
-                ),
+                onAdjust: (delta) => _adjustRest(detail, delta),
                 onDismiss: _dismissRestBar,
               ),
             if (_editing != null) _keypad(detail, prefill, cells),
@@ -309,7 +371,15 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     return cells;
   }
 
+  /// One key per set row, so the row being typed into can be scrolled back
+  /// into view when the keypad takes half the screen.
+  final _rowKeys = <String, GlobalKey>{};
+
+  GlobalKey _rowKey(String setId) =>
+      _rowKeys.putIfAbsent(setId, GlobalKey.new);
+
   void _focus(SetLog set, SetField field) {
+    _flushWrite();
     setState(() {
       _editing = EditTarget(set.id, field);
       _buffer = switch (field) {
@@ -317,6 +387,23 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         SetField.added => _fmt(set.addedWeight),
         SetField.reps => set.reps?.toString() ?? '',
       };
+    });
+    _revealRow(set.id);
+  }
+
+  /// The keypad is a sibling in the Column, so opening it shrinks the page
+  /// under it. Nothing scrolled the active row back, which on an exercise with
+  /// five or more sets could leave you typing into a row you cannot see.
+  void _revealRow(String setId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _rowKeys[setId]?.currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.35,
+        duration: Motion.base,
+        curve: Motion.curve,
+      );
     });
   }
 
@@ -338,6 +425,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     };
 
     final isLast = cells.isNotEmpty && cells.last == target;
+    // The key has to name what it does. On a reps field with nothing typed and
+    // no ghost to borrow from, "Done" completes nothing at all.
+    final needsReps = target.field == SetField.reps &&
+        (int.tryParse(_buffer) ?? 0) <= 0 &&
+        ghost?.reps == null;
 
     return SetKeypad(
       title:
@@ -347,7 +439,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       value: _buffer,
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
-      nextLabel: isLast ? 'Done' : 'Next',
+      nextLabel: needsReps
+          ? 'Reps?'
+          : isLast
+              ? 'Done'
+              : 'Next',
       onKey: (key) {
         final next = applyKey(
           _buffer,
@@ -358,39 +454,86 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         _commit(next, target);
       },
       onNext: () => _advance(detail, cells, target),
-      onDismiss: () => setState(() => _editing = null),
+      onDismiss: () {
+        _flushWrite();
+        setState(() => _editing = null);
+      },
     );
   }
 
+  /// Buffers the keystroke on screen immediately and the write shortly after.
+  ///
+  /// Every digit used to be its own `updateSet`, and every write re-ran the
+  /// three queries behind `watchWorkoutDetail` for the whole workout. Invisible
+  /// on a new phone, not on an old one, and it burns battery for an hour a
+  /// session. The pending write is flushed on Next, on dismiss, on page turn
+  /// and on dispose, so nothing typed can be lost.
   void _commit(String next, EditTarget target) {
     setState(() => _buffer = next);
-    final repo = ref.read(trainingRepositoryProvider);
-    final parsed = double.tryParse(next);
+    _pendingWrite?.cancel();
+    _pending = (target: target, value: next);
+    _pendingWrite = Timer(const Duration(milliseconds: 300), _flushWrite);
+  }
 
-    switch (target.field) {
+  void _flushWrite() {
+    _pendingWrite?.cancel();
+    _pendingWrite = null;
+    final pending = _pending;
+    if (pending == null) return;
+    _pending = null;
+
+    final repo = ref.read(trainingRepositoryProvider);
+    final parsed = double.tryParse(pending.value);
+
+    switch (pending.target.field) {
       case SetField.weight:
-        repo.updateSet(target.setId, weight: Value(parsed));
+        repo.updateSet(pending.target.setId, weight: Value(parsed));
       case SetField.added:
-        repo.updateSet(target.setId, addedWeight: Value(parsed));
+        repo.updateSet(pending.target.setId, addedWeight: Value(parsed));
       case SetField.reps:
-        repo.updateSet(target.setId, reps: Value(parsed?.round()));
+        repo.updateSet(pending.target.setId, reps: Value(parsed?.round()));
     }
   }
 
   /// Moves to the next value. Leaving a reps field marks that set complete and
   /// starts the rest clock — the two things you'd otherwise forget to do.
   void _advance(WorkoutDetail detail, List<EditTarget> cells, EditTarget from) {
+    _flushWrite();
+
     if (from.field == SetField.reps) {
       // Read the buffer, not the row: the write for this keystroke may still be
       // in flight, and a stale row would silently skip marking the set done.
-      final typedReps = int.tryParse(_buffer) ?? 0;
-      if (typedReps > 0) {
+      var reps = int.tryParse(_buffer) ?? 0;
+      // A weight with no reps used to do nothing at all while the key said
+      // "Done": the keypad simply closed. Fall back to last time's reps, which
+      // is what adopting the ghost would have written anyway; with no ghost to
+      // fall back on the key says "Reps?" and this never runs.
+      if (reps <= 0) {
+        final located = _locate(detail, from.setId);
+        if (located != null) {
+          final ghost =
+              _ghostSet(_prefill[located.$1.exercise.id], located.$3);
+          if (ghost?.reps != null) {
+            reps = ghost!.reps!;
+            _commit(reps.toString(), from);
+            _flushWrite();
+          }
+        }
+      }
+
+      if (reps > 0) {
         _adoptGhost(from.setId);
-        ref
-            .read(trainingRepositoryProvider)
-            .updateSet(from.setId, isDone: const Value(true));
+        ref.read(trainingRepositoryProvider).updateSet(
+              from.setId,
+              isDone: const Value(true),
+              // Rest was already being measured; it was simply thrown away.
+              restSeconds: Value(_restTakenSeconds()),
+            );
         HapticFeedback.mediumImpact();
         _startRest();
+      } else {
+        // Nothing to complete the set with: keep the field, keep the keypad.
+        return;
       }
     }
 
@@ -492,6 +635,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   }
 
   void _onPageChanged(WorkoutDetail detail, int index) {
+    _flushWrite();
+    _loadRestTarget(detail, index);
     setState(() {
       _page = index;
       // Turning the page by hand away from the value being typed dismisses the
@@ -623,6 +768,26 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   }
 }
 
+/// Last time's sets as one line: "22.5×8, 22.5×8, 20×7".
+String _summariseSets(PrefillResult prefill, LoadMode mode) {
+  final parts = <String>[];
+  for (final s in prefill.sets) {
+    final load = mode == LoadMode.bodyweightPlus ? s.addedWeight : s.weight;
+    final reps = s.reps;
+    final loadLabel = switch (mode) {
+      LoadMode.bodyweight => 'BW',
+      LoadMode.bodyweightPlus =>
+        load == null ? 'BW' : 'BW+${_fmtLoad(load)}',
+      _ => load == null ? '—' : _fmtLoad(load),
+    };
+    parts.add(reps == null ? loadLabel : '$loadLabel×$reps');
+  }
+  return parts.join(', ');
+}
+
+String _fmtLoad(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
 /// Prefill set aligned to a position in the current exercise, or null when
 /// today has more sets than last time.
 PastSet? _ghostSet(PrefillResult? prefill, int index) {
@@ -646,6 +811,7 @@ class _ExercisePage extends ConsumerWidget {
     required this.editing,
     required this.buffer,
     required this.onEdit,
+    required this.rowKeyFor,
     required this.onToggleDone,
     required this.onNextExercise,
     required this.onMove,
@@ -659,6 +825,7 @@ class _ExercisePage extends ConsumerWidget {
   final EditTarget? editing;
   final String buffer;
   final void Function(SetLog, SetField) onEdit;
+  final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
   final VoidCallback onNextExercise;
   final ValueChanged<int> onMove;
@@ -699,6 +866,21 @@ class _ExercisePage extends ConsumerWidget {
                   ),
                   const SizedBox(height: Space.xs),
                   _PrefillCaption(prefill: prefill),
+                  // The shape of last time's work, in one line. Per-set ghosts
+                  // answer "what do I put in this row"; this answers "what did
+                  // I actually do", which is the question the app exists for.
+                  if (prefill?.hasSuggestion ?? false) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _summariseSets(prefill!, entry.exercise.loadMode),
+                      style: context.t.labelMedium?.copyWith(
+                        color: c.textSecondary,
+                        fontFeatures: tabular,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -738,6 +920,7 @@ class _ExercisePage extends ConsumerWidget {
               children: [
                 for (var i = 0; i < entry.sets.length; i++)
                   SetRow(
+                    key: rowKeyFor(entry.sets[i].id),
                     set: entry.sets[i],
                     position: i,
                     loadMode: entry.exercise.loadMode,

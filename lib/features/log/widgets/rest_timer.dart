@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/ticking.dart';
 
 /// Rest clock that starts itself when a set is checked off.
 ///
@@ -22,6 +23,12 @@ class RestTimerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The bar keeps its own clock now that the log screen no longer rebuilds
+    // itself once a second on everyone's behalf.
+    return Ticking(builder: _build);
+  }
+
+  Widget _build(BuildContext context) {
     final c = context.c;
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     final remaining = targetSeconds - elapsed;

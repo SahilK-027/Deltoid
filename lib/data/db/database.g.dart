@@ -2145,6 +2145,17 @@ class $SessionExercisesTable extends SessionExercises
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _restSecondsMeta = const VerificationMeta(
+    'restSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> restSeconds = GeneratedColumn<int>(
+    'rest_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _deloadSetDeltaMeta = const VerificationMeta(
     'deloadSetDelta',
   );
@@ -2181,6 +2192,7 @@ class $SessionExercisesTable extends SessionExercises
     targetRepLow,
     targetRepHigh,
     notes,
+    restSeconds,
     deloadSetDelta,
     deloadWeightPct,
   ];
@@ -2277,6 +2289,15 @@ class $SessionExercisesTable extends SessionExercises
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('rest_seconds')) {
+      context.handle(
+        _restSecondsMeta,
+        restSeconds.isAcceptableOrUnknown(
+          data['rest_seconds']!,
+          _restSecondsMeta,
+        ),
+      );
+    }
     if (data.containsKey('deload_set_delta')) {
       context.handle(
         _deloadSetDeltaMeta,
@@ -2352,6 +2373,10 @@ class $SessionExercisesTable extends SessionExercises
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      restSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rest_seconds'],
+      ),
       deloadSetDelta: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}deload_set_delta'],
@@ -2383,6 +2408,13 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
   final int? targetRepHigh;
   final String? notes;
 
+  /// Rest target for this slot, in seconds.
+  ///
+  /// Per slot rather than global: heavy compounds want three minutes and cable
+  /// work wants sixty seconds, and re-dialling that on every exercise is the
+  /// kind of friction that gets an app closed mid-session.
+  final int? restSeconds;
+
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   final int? deloadSetDelta;
   final int? deloadWeightPct;
@@ -2399,6 +2431,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     this.targetRepLow,
     this.targetRepHigh,
     this.notes,
+    this.restSeconds,
     this.deloadSetDelta,
     this.deloadWeightPct,
   });
@@ -2424,6 +2457,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || restSeconds != null) {
+      map['rest_seconds'] = Variable<int>(restSeconds);
     }
     if (!nullToAbsent || deloadSetDelta != null) {
       map['deload_set_delta'] = Variable<int>(deloadSetDelta);
@@ -2456,6 +2492,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      restSeconds: restSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(restSeconds),
       deloadSetDelta: deloadSetDelta == null && nullToAbsent
           ? const Value.absent()
           : Value(deloadSetDelta),
@@ -2483,6 +2522,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       targetRepLow: serializer.fromJson<int?>(json['targetRepLow']),
       targetRepHigh: serializer.fromJson<int?>(json['targetRepHigh']),
       notes: serializer.fromJson<String?>(json['notes']),
+      restSeconds: serializer.fromJson<int?>(json['restSeconds']),
       deloadSetDelta: serializer.fromJson<int?>(json['deloadSetDelta']),
       deloadWeightPct: serializer.fromJson<int?>(json['deloadWeightPct']),
     );
@@ -2503,6 +2543,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       'targetRepLow': serializer.toJson<int?>(targetRepLow),
       'targetRepHigh': serializer.toJson<int?>(targetRepHigh),
       'notes': serializer.toJson<String?>(notes),
+      'restSeconds': serializer.toJson<int?>(restSeconds),
       'deloadSetDelta': serializer.toJson<int?>(deloadSetDelta),
       'deloadWeightPct': serializer.toJson<int?>(deloadWeightPct),
     };
@@ -2521,6 +2562,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     Value<int?> targetRepLow = const Value.absent(),
     Value<int?> targetRepHigh = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<int?> restSeconds = const Value.absent(),
     Value<int?> deloadSetDelta = const Value.absent(),
     Value<int?> deloadWeightPct = const Value.absent(),
   }) => SessionExercise(
@@ -2538,6 +2580,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
         ? targetRepHigh.value
         : this.targetRepHigh,
     notes: notes.present ? notes.value : this.notes,
+    restSeconds: restSeconds.present ? restSeconds.value : this.restSeconds,
     deloadSetDelta: deloadSetDelta.present
         ? deloadSetDelta.value
         : this.deloadSetDelta,
@@ -2569,6 +2612,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
           ? data.targetRepHigh.value
           : this.targetRepHigh,
       notes: data.notes.present ? data.notes.value : this.notes,
+      restSeconds: data.restSeconds.present
+          ? data.restSeconds.value
+          : this.restSeconds,
       deloadSetDelta: data.deloadSetDelta.present
           ? data.deloadSetDelta.value
           : this.deloadSetDelta,
@@ -2593,6 +2639,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
           ..write('targetRepLow: $targetRepLow, ')
           ..write('targetRepHigh: $targetRepHigh, ')
           ..write('notes: $notes, ')
+          ..write('restSeconds: $restSeconds, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct')
           ..write(')'))
@@ -2613,6 +2660,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     targetRepLow,
     targetRepHigh,
     notes,
+    restSeconds,
     deloadSetDelta,
     deloadWeightPct,
   );
@@ -2632,6 +2680,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
           other.targetRepLow == this.targetRepLow &&
           other.targetRepHigh == this.targetRepHigh &&
           other.notes == this.notes &&
+          other.restSeconds == this.restSeconds &&
           other.deloadSetDelta == this.deloadSetDelta &&
           other.deloadWeightPct == this.deloadWeightPct);
 }
@@ -2649,6 +2698,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
   final Value<int?> targetRepLow;
   final Value<int?> targetRepHigh;
   final Value<String?> notes;
+  final Value<int?> restSeconds;
   final Value<int?> deloadSetDelta;
   final Value<int?> deloadWeightPct;
   final Value<int> rowid;
@@ -2665,6 +2715,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     this.targetRepLow = const Value.absent(),
     this.targetRepHigh = const Value.absent(),
     this.notes = const Value.absent(),
+    this.restSeconds = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2682,6 +2733,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     this.targetRepLow = const Value.absent(),
     this.targetRepHigh = const Value.absent(),
     this.notes = const Value.absent(),
+    this.restSeconds = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2701,6 +2753,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     Expression<int>? targetRepLow,
     Expression<int>? targetRepHigh,
     Expression<String>? notes,
+    Expression<int>? restSeconds,
     Expression<int>? deloadSetDelta,
     Expression<int>? deloadWeightPct,
     Expression<int>? rowid,
@@ -2718,6 +2771,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
       if (targetRepLow != null) 'target_rep_low': targetRepLow,
       if (targetRepHigh != null) 'target_rep_high': targetRepHigh,
       if (notes != null) 'notes': notes,
+      if (restSeconds != null) 'rest_seconds': restSeconds,
       if (deloadSetDelta != null) 'deload_set_delta': deloadSetDelta,
       if (deloadWeightPct != null) 'deload_weight_pct': deloadWeightPct,
       if (rowid != null) 'rowid': rowid,
@@ -2737,6 +2791,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     Value<int?>? targetRepLow,
     Value<int?>? targetRepHigh,
     Value<String?>? notes,
+    Value<int?>? restSeconds,
     Value<int?>? deloadSetDelta,
     Value<int?>? deloadWeightPct,
     Value<int>? rowid,
@@ -2754,6 +2809,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
       targetRepLow: targetRepLow ?? this.targetRepLow,
       targetRepHigh: targetRepHigh ?? this.targetRepHigh,
       notes: notes ?? this.notes,
+      restSeconds: restSeconds ?? this.restSeconds,
       deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
       deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
       rowid: rowid ?? this.rowid,
@@ -2799,6 +2855,9 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (restSeconds.present) {
+      map['rest_seconds'] = Variable<int>(restSeconds.value);
+    }
     if (deloadSetDelta.present) {
       map['deload_set_delta'] = Variable<int>(deloadSetDelta.value);
     }
@@ -2826,6 +2885,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
           ..write('targetRepLow: $targetRepLow, ')
           ..write('targetRepHigh: $targetRepHigh, ')
           ..write('notes: $notes, ')
+          ..write('restSeconds: $restSeconds, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
           ..write('rowid: $rowid')
@@ -8318,6 +8378,7 @@ typedef $$SessionExercisesTableCreateCompanionBuilder =
       Value<int?> targetRepLow,
       Value<int?> targetRepHigh,
       Value<String?> notes,
+      Value<int?> restSeconds,
       Value<int?> deloadSetDelta,
       Value<int?> deloadWeightPct,
       Value<int> rowid,
@@ -8336,6 +8397,7 @@ typedef $$SessionExercisesTableUpdateCompanionBuilder =
       Value<int?> targetRepLow,
       Value<int?> targetRepHigh,
       Value<String?> notes,
+      Value<int?> restSeconds,
       Value<int?> deloadSetDelta,
       Value<int?> deloadWeightPct,
       Value<int> rowid,
@@ -8441,6 +8503,11 @@ class $$SessionExercisesTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8560,6 +8627,11 @@ class $$SessionExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get deloadSetDelta => $composableBuilder(
     column: $table.deloadSetDelta,
     builder: (column) => ColumnOrderings(column),
@@ -8664,6 +8736,11 @@ class $$SessionExercisesTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get deloadSetDelta => $composableBuilder(
     column: $table.deloadSetDelta,
     builder: (column) => column,
@@ -8763,6 +8840,7 @@ class $$SessionExercisesTableTableManager
                 Value<int?> targetRepLow = const Value.absent(),
                 Value<int?> targetRepHigh = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<int?> restSeconds = const Value.absent(),
                 Value<int?> deloadSetDelta = const Value.absent(),
                 Value<int?> deloadWeightPct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8779,6 +8857,7 @@ class $$SessionExercisesTableTableManager
                 targetRepLow: targetRepLow,
                 targetRepHigh: targetRepHigh,
                 notes: notes,
+                restSeconds: restSeconds,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 rowid: rowid,
@@ -8797,6 +8876,7 @@ class $$SessionExercisesTableTableManager
                 Value<int?> targetRepLow = const Value.absent(),
                 Value<int?> targetRepHigh = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<int?> restSeconds = const Value.absent(),
                 Value<int?> deloadSetDelta = const Value.absent(),
                 Value<int?> deloadWeightPct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8813,6 +8893,7 @@ class $$SessionExercisesTableTableManager
                 targetRepLow: targetRepLow,
                 targetRepHigh: targetRepHigh,
                 notes: notes,
+                restSeconds: restSeconds,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 rowid: rowid,

@@ -81,6 +81,13 @@ class SessionExercises extends Table with SyncColumns {
   IntColumn get targetRepHigh => integer().nullable()();
   TextColumn get notes => text().nullable()();
 
+  /// Rest target for this slot, in seconds.
+  ///
+  /// Per slot rather than global: heavy compounds want three minutes and cable
+  /// work wants sixty seconds, and re-dialling that on every exercise is the
+  /// kind of friction that gets an app closed mid-session.
+  IntColumn get restSeconds => integer().nullable()();
+
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   IntColumn get deloadSetDelta => integer().nullable()();
   IntColumn get deloadWeightPct => integer().nullable()();

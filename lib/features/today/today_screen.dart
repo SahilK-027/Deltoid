@@ -126,6 +126,9 @@ Future<void> _logPastSession(
   }
 }
 
+/// Anchors the "this cycle" list so the card above it can scroll to it.
+final _sessionListKey = GlobalKey();
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -180,17 +183,32 @@ class TodayScreen extends ConsumerWidget {
                   regimeId: r.id,
                   status: status,
                   sessions: sessions,
+                  onShowAll: () {
+                    final target = _sessionListKey.currentContext;
+                    if (target == null) return;
+                    Scrollable.ensureVisible(
+                      target,
+                      alignment: 0.1,
+                      duration: Motion.base,
+                      curve: Motion.curve,
+                    );
+                  },
                 ),
               const SizedBox(height: Space.xxl),
-              _ConsistencyCard(hasHistory: hasHistory),
-              const SizedBox(height: Space.xxl),
+              // The session list sits above the heatmap on purpose. The card
+              // names the first session not yet done, not an obligation — and
+              // the alternatives have to be visible without scrolling, or the
+              // app reads as though it won't let you train Pull before Push.
               if (status != null)
                 _AllSessions(
+                  key: _sessionListKey,
                   regimeId: r.id,
                   status: status,
                   sessions: sessions,
                   disabled: open != null,
                 ),
+              const SizedBox(height: Space.xxl),
+              _ConsistencyCard(hasHistory: hasHistory),
             ],
           ),
       },
@@ -343,7 +361,11 @@ class _NextSessionCard extends ConsumerWidget {
     required this.regimeId,
     required this.status,
     required this.sessions,
+    required this.onShowAll,
   });
+
+  /// Scrolls to the full list of this cycle's sessions.
+  final VoidCallback onShowAll;
 
   final String regimeId;
   final CycleStatus status;
@@ -375,14 +397,34 @@ class _NextSessionCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text('UP NEXT', style: context.t.labelSmall),
+              // "Up next" read as an instruction. It is a description: the
+              // first session in programme order that hasn't been done yet.
+              Text('FIRST UNFINISHED', style: context.t.labelSmall),
               const Spacer(),
               if (status.isDeload)
                 Pill('Deload cycle', color: c.deload, icon: Icons.trending_down),
             ],
           ),
           const SizedBox(height: Space.md),
-          Text(session?.name ?? 'Session', style: context.t.displaySmall),
+          // Tapping the name says "show me the others" — the queue head is a
+          // suggestion, and training out of order is supported on purpose.
+          InkWell(
+            onTap: onShowAll,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    session?.name ?? 'Session',
+                    style: context.t.displaySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                Icon(Icons.unfold_more, size: 18, color: c.textTertiary),
+              ],
+            ),
+          ),
           const SizedBox(height: Space.sm),
           Row(
             children: [
@@ -566,6 +608,7 @@ class _ConsistencyCard extends ConsumerWidget {
 /// than a fight with the app.
 class _AllSessions extends ConsumerWidget {
   const _AllSessions({
+    super.key,
     required this.regimeId,
     required this.status,
     required this.sessions,

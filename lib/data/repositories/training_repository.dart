@@ -979,6 +979,65 @@ class TrainingRepository {
     return workoutId;
   }
 
+  /// The rest target for one exercise in one session, in seconds.
+  ///
+  /// Falls back to the last rest actually taken on that exercise, then to two
+  /// minutes. The timer's doc comment always claimed rest was "captured without
+  /// asking for a single extra tap"; until now nothing wrote it down.
+  Future<int> restTargetFor({
+    required String exerciseId,
+    required String? sessionId,
+  }) async {
+    if (sessionId != null) {
+      final slot = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(sessionId) &
+                t.exerciseId.equals(exerciseId) &
+                t.deletedAt.isNull()))
+          .getSingleOrNull();
+      final target = slot?.restSeconds;
+      if (target != null) return target;
+    }
+
+    final last = await (db.select(db.setLogs).join([
+      innerJoin(db.workoutExercises,
+          db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId)),
+    ])
+          ..where(db.workoutExercises.exerciseId.equals(exerciseId) &
+              db.setLogs.restSeconds.isNotNull() &
+              db.setLogs.deletedAt.isNull())
+          ..orderBy([
+            OrderingTerm(
+                expression: db.setLogs.completedAt, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+
+    return last?.readTable(db.setLogs).restSeconds ?? 120;
+  }
+
+  /// Remembers a rest target against the session slot, so next week opens with
+  /// the number you settled on rather than a flat 120 seconds.
+  Future<void> setRestTarget({
+    required String exerciseId,
+    required String? sessionId,
+    required int seconds,
+  }) async {
+    if (sessionId == null) return;
+    await (db.update(db.sessionExercises)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.exerciseId.equals(exerciseId) &
+              t.deletedAt.isNull()))
+        .write(
+      SessionExercisesCompanion(
+        restSeconds: Value(seconds),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
   /// How many logged sets an exercise carries.
   ///
   /// Used to say what changing a catalog row costs before it is changed: load

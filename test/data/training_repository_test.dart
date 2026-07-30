@@ -707,6 +707,51 @@ void main() {
     expect(await repo.loggedSetCount(entry.exercise.id), 2);
   });
 
+  test('rest is recorded, and its target is remembered per exercise', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final detail = await repo.workoutDetail(id);
+    final entry = detail!.entries.first;
+
+    // Two minutes until something says otherwise.
+    expect(
+      await repo.restTargetFor(
+          exerciseId: entry.exercise.id, sessionId: push1.id),
+      120,
+    );
+
+    await repo.setRestTarget(
+      exerciseId: entry.exercise.id,
+      sessionId: push1.id,
+      seconds: 180,
+    );
+    expect(
+      await repo.restTargetFor(
+          exerciseId: entry.exercise.id, sessionId: push1.id),
+      180,
+      reason: 'a heavy compound should not forget it wants three minutes',
+    );
+
+    // The rest a set actually got is stored with the set.
+    await repo.updateSet(entry.sets.first.id,
+        weight: const Value(60),
+        reps: const Value(5),
+        isDone: const Value(true),
+        restSeconds: const Value(174));
+    final reloaded = await repo.workoutDetail(id);
+    expect(reloaded!.entries.first.sets.first.restSeconds, 174);
+
+    // A second exercise keeps its own number rather than inheriting.
+    final other = detail.entries[1];
+    expect(
+      await repo.restTargetFor(
+          exerciseId: other.exercise.id, sessionId: push1.id),
+      120,
+    );
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
