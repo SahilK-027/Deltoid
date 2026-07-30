@@ -9,6 +9,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/units.dart';
 import '../regime/regime_screen.dart' show promptForText;
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
@@ -321,15 +322,16 @@ class _ExerciseBlock extends StatelessWidget {
 
 /// One logged set. Continuation sets (drop, rest-pause) are indented under the
 /// set they extend, the same way the log screen shows them.
-class _SetLine extends StatelessWidget {
+class _SetLine extends ConsumerWidget {
   const _SetLine({required this.set, required this.exercise});
 
   final SetLog set;
   final Exercise exercise;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final indent = set.setType.isContinuation;
 
     return Padding(
@@ -355,7 +357,7 @@ class _SetLine extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_load(set, exercise), style: context.t.labelLarge),
+                Text(_load(set, exercise, unit), style: context.t.labelLarge),
                 if (set.note != null && set.note!.isNotEmpty)
                   Text(set.note!, style: context.t.labelSmall),
               ],
@@ -370,17 +372,17 @@ class _SetLine extends StatelessWidget {
     );
   }
 
-  static String _load(SetLog set, Exercise exercise) {
+  static String _load(SetLog set, Exercise exercise, WeightUnit unit) {
     final added = set.addedWeight;
     if (exercise.loadMode == LoadMode.bodyweight) return 'Bodyweight';
     if (exercise.loadMode == LoadMode.bodyweightPlus) {
       return added == null || added == 0
           ? 'Bodyweight'
-          : 'BW + ${formatWeight(added)} kg';
+          : 'BW + ${formatWeight(added, unit)} ${unit.label}';
     }
     final weight = set.weight;
     if (weight == null) return '—';
     final perSide = exercise.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight)} kg$perSide';
+    return '${formatWeight(weight, unit)} ${unit.label}$perSide';
   }
 }

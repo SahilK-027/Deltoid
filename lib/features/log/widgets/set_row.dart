@@ -7,6 +7,7 @@ import '../../../data/db/database.dart';
 import '../../../domain/enums.dart';
 import '../../../domain/metrics.dart';
 import '../../../domain/prefill.dart';
+import '../../../domain/units.dart';
 import '../log_screen.dart';
 import 'keypad.dart';
 
@@ -23,6 +24,7 @@ class SetRow extends StatelessWidget {
     required this.set,
     required this.position,
     required this.loadMode,
+    required this.unit,
     required this.ghost,
     required this.editing,
     required this.buffer,
@@ -34,6 +36,7 @@ class SetRow extends StatelessWidget {
   final SetLog set;
   final int position;
   final LoadMode loadMode;
+  final WeightUnit unit;
   final PastSet? ghost;
   final EditTarget? editing;
   final String buffer;
@@ -70,11 +73,12 @@ class SetRow extends StatelessWidget {
           else
             Expanded(
               child: _ValueCell(
+                unit: unit,
                 field: loadMode == LoadMode.bodyweightPlus
                     ? SetField.added
                     : SetField.weight,
                 prefix: loadMode == LoadMode.bodyweightPlus ? 'BW +' : null,
-                suffix: 'kg',
+                suffix: unit.label,
                 value: loadMode == LoadMode.bodyweightPlus
                     ? set.addedWeight
                     : set.weight,
@@ -100,6 +104,7 @@ class SetRow extends StatelessWidget {
           SizedBox(
             width: 78,
             child: _ValueCell(
+              unit: unit,
               field: SetField.reps,
               suffix: 'reps',
               value: set.reps?.toDouble(),
@@ -152,6 +157,7 @@ class SetRow extends StatelessWidget {
 class _ValueCell extends StatefulWidget {
   const _ValueCell({
     required this.field,
+    required this.unit,
     required this.value,
     required this.ghost,
     required this.active,
@@ -162,6 +168,10 @@ class _ValueCell extends StatefulWidget {
   });
 
   final SetField field;
+
+  /// Reps are unitless; weights are stored in kg and shown in this.
+  final WeightUnit unit;
+
   final double? value;
   final double? ghost;
   final bool active;
@@ -202,9 +212,10 @@ class _ValueCellState extends State<_ValueCell> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final display = widget.active ? widget.buffer : _fmt(widget.value);
+    final display =
+        widget.active ? widget.buffer : _fmt(widget.value, widget);
     final hasValue = display.isNotEmpty;
-    final ghostText = _fmt(widget.ghost);
+    final ghostText = _fmt(widget.ghost, widget);
     // A suggestion must never look like a record: the ghost is italic and
     // carries a leading dot, so the difference survives a glance from arm's
     // length with the phone on the floor.
@@ -257,9 +268,12 @@ class _ValueCellState extends State<_ValueCell> {
     );
   }
 
-  static String _fmt(double? v) {
+  static String _fmt(double? v, _ValueCell cell) {
     if (v == null) return '';
-    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+    if (cell.field == SetField.reps) {
+      return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+    }
+    return formatInUnit(v, cell.unit);
   }
 }
 

@@ -328,7 +328,6 @@ class _SessionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
     if (sessions.isEmpty) {
       return AppCard(
         child: Column(
@@ -349,47 +348,108 @@ class _SessionList extends ConsumerWidget {
       );
     }
 
+    // Explicit move controls rather than a drag handle. The list is nested in
+    // the tab's own ListView, and ReorderableDragStartListener is an immediate
+    // vertical drag: it competed with the parent scrollable and lost, so a
+    // normal-speed drag scrolled the page instead of reordering, and there was
+    // no auto-scroll to carry a session past the fold at all. A reorder should
+    // never depend on how fast your thumb moves.
     return AppCard(
       padding: EdgeInsets.zero,
-      child: ReorderableListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        buildDefaultDragHandles: false,
-        itemCount: sessions.length,
-        onReorder: (oldIndex, newIndex) {
-          var target = newIndex;
-          if (target > oldIndex) target -= 1;
-          final ids = sessions.map((s) => s.id).toList();
-          ids.insert(target, ids.removeAt(oldIndex));
-          ref.read(regimeRepositoryProvider).reorderSessions(ids);
-        },
-        itemBuilder: (context, i) {
-          final s = sessions[i];
-          final count = ref.watch(sessionSlotCountProvider(s.id)).valueOrNull;
-          return Column(
-            key: ValueKey(s.id),
+      child: Column(
+        children: [
+          for (var i = 0; i < sessions.length; i++)
+            _SessionRow(
+              session: sessions[i],
+              index: i,
+              total: sessions.length,
+              onMove: (delta) {
+                final ids = sessions.map((s) => s.id).toList();
+                final target = (i + delta).clamp(0, ids.length - 1);
+                if (target == i) return;
+                ids.insert(target, ids.removeAt(i));
+                ref.read(regimeRepositoryProvider).reorderSessions(ids);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionRow extends ConsumerWidget {
+  const _SessionRow({
+    required this.session,
+    required this.index,
+    required this.total,
+    required this.onMove,
+  });
+
+  final Session session;
+  final int index;
+  final int total;
+  final ValueChanged<int> onMove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final count = ref.watch(sessionSlotCountProvider(session.id)).valueOrNull;
+
+    return Column(
+      children: [
+        if (index > 0) Divider(color: c.border, height: 1),
+        ListTile(
+          leading: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (i > 0) Divider(color: c.border, height: 1),
-              ListTile(
-                leading: ReorderableDragStartListener(
-                  index: i,
-                  child: Icon(Icons.drag_indicator, color: c.textTertiary, size: 20),
-                ),
-                title: Text(s.name, style: context.t.titleSmall),
-                subtitle: Text(
-                  count == null ? '' : '$count exercises',
-                  style: context.t.labelSmall,
-                ),
-                trailing: Icon(Icons.chevron_right, color: c.textTertiary, size: 18),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SessionEditorScreen(sessionId: s.id),
-                  ),
-                ),
+              _MoveButton(
+                icon: Icons.keyboard_arrow_up,
+                onTap: index == 0 ? null : () => onMove(-1),
+              ),
+              _MoveButton(
+                icon: Icons.keyboard_arrow_down,
+                onTap: index >= total - 1 ? null : () => onMove(1),
               ),
             ],
-          );
-        },
+          ),
+          title: Text(session.name, style: context.t.titleSmall),
+          subtitle: Text(
+            count == null ? '' : '$count exercises',
+            style: context.t.labelSmall,
+          ),
+          trailing:
+              Icon(Icons.chevron_right, color: c.textTertiary, size: 18),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SessionEditorScreen(sessionId: session.id),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoveButton extends StatelessWidget {
+  const _MoveButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(Radii.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? c.border : c.textSecondary,
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'enums.dart';
-import 'metrics.dart';
+import 'units.dart';
 
 /// One set from a previous performance.
 class PastSet {
@@ -108,6 +108,7 @@ PrefillResult resolvePrefill({
   bool targetIsDeload = false,
   int deloadSetDelta = -1,
   int deloadWeightPct = 80,
+  WeightUnit unit = WeightUnit.kg,
 }) {
   PastPerformance? pick;
   var source = PrefillSource.none;
@@ -157,6 +158,7 @@ PrefillResult resolvePrefill({
           pick.sets,
           setDelta: deloadSetDelta,
           weightPct: deloadWeightPct,
+          unit: unit,
         )
       : pick.sets;
 
@@ -177,6 +179,10 @@ List<PastSet> applyDeload(
   List<PastSet> sets, {
   required int setDelta,
   required int weightPct,
+  /// A scaled load has to be a weight you can actually load on a bar, and
+  /// which weights those are depends on whether the plates are kilos or
+  /// pounds. Storage stays kg either way.
+  WeightUnit unit = WeightUnit.kg,
 }) {
   final warmups = sets.where((s) => s.type == SetType.warmup).toList();
   final working = sets
@@ -187,7 +193,7 @@ List<PastSet> applyDeload(
   final trimmed = working.take(keep).toList();
 
   double? scale(double? w) =>
-      w == null ? null : roundLoad(w * weightPct / 100);
+      w == null ? null : roundLoadIn(w * weightPct / 100, unit);
 
   return [
     ...warmups,

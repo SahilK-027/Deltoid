@@ -10,7 +10,9 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/metrics.dart';
+import '../../domain/units.dart';
 import '../history/history_providers.dart';
+import '../history/history_screen.dart' show formatWeight;
 import '../log/widgets/exercise_sheets.dart';
 
 enum ChartRange { threeMonths, year, all }
@@ -214,14 +216,16 @@ class _RangeChip extends ConsumerWidget {
 }
 
 /// Estimated 1RM over time, one line per session slot.
-class _Chart extends StatelessWidget {
+class _Chart extends ConsumerWidget {
   const _Chart({required this.points});
 
   final List<ProgressPoint> points;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    // The y axis is estimated 1RM in kilograms; only the labels change.
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     if (points.length < 2) {
       // Sized to the message rather than reserving chart height for a chart
       // that isn't there — an empty 200px box reads as a rendering failure.
@@ -331,7 +335,7 @@ class _Chart extends StatelessWidget {
                     getTooltipItems: (spots) => [
                       for (final s in spots)
                         LineTooltipItem(
-                          '${s.y.toStringAsFixed(1)} kg e1RM',
+                          '${formatWeight(s.y, unit)} ${unit.label} e1RM',
                           context.t.labelMedium!.copyWith(color: c.textPrimary),
                         ),
                     ],
@@ -403,15 +407,16 @@ class _Chart extends StatelessWidget {
   }
 }
 
-class _Summary extends StatelessWidget {
+class _Summary extends ConsumerWidget {
   const _Summary({required this.all, required this.windowed});
 
   final List<ProgressPoint> all;
   final List<ProgressPoint> windowed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final real = windowed.where((p) => !p.isDeload).toList();
     final stalled = stalledSessions(real.map((p) => p.best1RM).toList());
 
@@ -439,7 +444,9 @@ class _Summary extends StatelessWidget {
           Expanded(
             child: _Stat(
               label: 'Best e1RM',
-              value: best == null ? '—' : '${best.toStringAsFixed(1)} kg',
+              value: best == null
+                  ? '—'
+                  : '${formatWeight(best, unit)} ${unit.label}',
             ),
           ),
           const SizedBox(width: Space.md),

@@ -9,6 +9,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/units.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
 
@@ -130,17 +131,17 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
 /// *from* a day, and pushing back into one made history a loop you could walk
 /// forever without ever arriving anywhere new. Everything the row could send
 /// you looking for — every set, its type and its note — opens here instead.
-class _PerformanceCard extends StatefulWidget {
+class _PerformanceCard extends ConsumerStatefulWidget {
   const _PerformanceCard({required this.performance, required this.exercise});
 
   final ExercisePerformance performance;
   final Exercise? exercise;
 
   @override
-  State<_PerformanceCard> createState() => _PerformanceCardState();
+  ConsumerState<_PerformanceCard> createState() => _PerformanceCardState();
 }
 
-class _PerformanceCardState extends State<_PerformanceCard> {
+class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
   bool _expanded = false;
 
   @override
@@ -148,6 +149,7 @@ class _PerformanceCardState extends State<_PerformanceCard> {
     final performance = widget.performance;
     final exercise = widget.exercise;
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final date = dateFromDayKey(performance.dayKey);
     final done = performance.sets.where((s) => s.isDone).toList();
     final skipped = performance.skipReason != SkipReason.none;
@@ -204,15 +206,17 @@ class _PerformanceCardState extends State<_PerformanceCard> {
             )
           else ...[
             Text(
-              done.map((s) => _setLabel(s, exercise)).join('   '),
+              done.map((s) => _setLabel(s, exercise, unit)).join('   '),
               style: context.t.labelLarge,
             ),
             if (performance.best1RM != null) ...[
               const SizedBox(height: Space.xs),
               Text(
-                'Best e1RM ${formatWeight(performance.best1RM!)} kg'
+                'Best e1RM ${formatWeight(performance.best1RM!, unit)} '
+                '${unit.label}'
                 '${performance.topSetLoad == null ? '' : '  ·  top set '
-                    '${formatWeight(performance.topSetLoad!)} kg'
+                    '${formatWeight(performance.topSetLoad!, unit)} '
+                    '${unit.label}'
                     '${performance.topSetReps == null ? '' : ' × ${performance.topSetReps}'}'}',
                 style: context.t.labelSmall,
               ),
@@ -235,7 +239,7 @@ class _PerformanceCardState extends State<_PerformanceCard> {
   }
 
   /// `22.5×8`, with the set type appended when it is not a plain working set.
-  static String _setLabel(SetLog set, Exercise? exercise) {
+  static String _setLabel(SetLog set, Exercise? exercise, WeightUnit unit) {
     final reps = set.reps ?? 0;
     final tag = set.setType.shortLabel;
     final suffix = tag.isEmpty ? '' : ' $tag';
@@ -245,33 +249,33 @@ class _PerformanceCardState extends State<_PerformanceCard> {
       final added = set.addedWeight;
       return added == null || added == 0
           ? '$reps$suffix'
-          : '+${formatWeight(added)}×$reps$suffix';
+          : '+${formatWeight(added, unit)}×$reps$suffix';
     }
     final weight = set.weight;
     if (weight == null) return '$reps$suffix';
-    return '${formatWeight(weight)}×$reps$suffix';
+    return '${formatWeight(weight, unit)}×$reps$suffix';
   }
 
   /// Spelled out rather than compressed, for the expanded rows: `22.5 kg × 2`
   /// on a dumbbell is the number you'd read off the rack.
-  static String _loadLabel(SetLog set, Exercise? exercise) {
+  static String _loadLabel(SetLog set, Exercise? exercise, WeightUnit unit) {
     final added = set.addedWeight;
     if (exercise?.loadMode == LoadMode.bodyweight) return 'Bodyweight';
     if (exercise?.loadMode == LoadMode.bodyweightPlus) {
       return added == null || added == 0
           ? 'Bodyweight'
-          : 'BW + ${formatWeight(added)} kg';
+          : 'BW + ${formatWeight(added, unit)} ${unit.label}';
     }
     final weight = set.weight;
     if (weight == null) return '—';
     final perSide = exercise?.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight)} kg$perSide';
+    return '${formatWeight(weight, unit)} ${unit.label}$perSide';
   }
 }
 
 /// One set inside an expanded card: what it was, what it weighed, and anything
 /// written about it at the time.
-class _ExpandedSetLine extends StatelessWidget {
+class _ExpandedSetLine extends ConsumerWidget {
   const _ExpandedSetLine({
     required this.set,
     required this.position,
@@ -283,8 +287,9 @@ class _ExpandedSetLine extends StatelessWidget {
   final Exercise? exercise;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final type = set.setType.shortLabel;
 
     return Padding(
@@ -304,7 +309,7 @@ class _ExpandedSetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _PerformanceCardState._loadLabel(set, exercise),
+                  _PerformanceCardState._loadLabel(set, exercise, unit),
                   style: context.t.labelLarge,
                 ),
                 if (set.note != null && set.note!.isNotEmpty)

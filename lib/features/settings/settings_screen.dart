@@ -11,6 +11,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
+import '../../domain/units.dart';
 
 /// When the last automatic export ran. One fires after every finished
 /// session, but Settings never said so, which made the whole mechanism
@@ -37,6 +38,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final log = ref.watch(bodyweightLogProvider).valueOrNull ?? const [];
     final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final c = context.c;
 
     return Scaffold(
@@ -60,7 +62,8 @@ class SettingsScreen extends ConsumerWidget {
                           Text(
                             log.isEmpty
                                 ? 'Not logged'
-                                : '${_fmt(log.first.weightKg)} kg',
+                                : '${formatInUnit(log.first.weightKg, unit)} '
+                                    '${unit.label}',
                             style: context.t.displaySmall,
                           ),
                           const SizedBox(height: Space.xs),
@@ -114,8 +117,11 @@ class SettingsScreen extends ConsumerWidget {
                                 style: context.t.bodySmall,
                               ),
                             ),
-                            Text('${_fmt(entry.weightKg)} kg',
-                                style: context.t.labelMedium),
+                            Text(
+                              '${formatInUnit(entry.weightKg, unit)} '
+                              '${unit.label}',
+                              style: context.t.labelMedium,
+                            ),
                             const SizedBox(width: Space.sm),
                             Icon(Icons.edit_outlined,
                                 size: 13, color: c.textTertiary),
@@ -174,6 +180,9 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: Space.xxl),
+          const SectionLabel('Units'),
+          const _UnitPicker(),
+          const SizedBox(height: Space.xxl),
           const SectionLabel('Appearance'),
           const _ThemePicker(),
           const SizedBox(height: Space.xxl),
@@ -199,8 +208,9 @@ class SettingsScreen extends ConsumerWidget {
     DateTime? date,
     double? initial,
   }) async {
+    final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final controller = TextEditingController(
-      text: initial == null ? '' : _fmt(initial),
+      text: initial == null ? '' : formatInUnit(initial, unit),
     );
     var day = date ?? DateTime.now();
 
@@ -217,7 +227,7 @@ class SettingsScreen extends ConsumerWidget {
                 autofocus: true,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(suffixText: 'kg'),
+                decoration: InputDecoration(suffixText: unit.label),
                 onSubmitted: (v) => Navigator.of(ctx).pop(double.tryParse(v)),
               ),
               const SizedBox(height: Space.md),
@@ -260,6 +270,8 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (value == null || value <= 0) return;
+    // Typed in whatever this phone shows, stored in kilograms.
+    final kg = unit.toKg(value);
 
     final repo = ref.read(trainingRepositoryProvider);
     // Moving an entry to another date is a delete plus a re-log, since the day
@@ -267,7 +279,7 @@ class SettingsScreen extends ConsumerWidget {
     if (date != null && dayKeyOf(day) != dayKeyOf(date)) {
       await repo.deleteBodyweight(dayKeyOf(date));
     }
-    await repo.logBodyweight(day, value);
+    await repo.logBodyweight(day, kg);
   }
 
   Future<void> _deleteBodyweight(
@@ -375,8 +387,55 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  static String _fmt(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+}
+
+/// Kilograms or pounds.
+///
+/// Display only: every weight is stored in kilograms whatever this says, and
+/// converted at the edges. Storing what was typed would mean a database whose
+/// rows mean different things depending on when they were written, and no way
+/// to tell which is which afterwards. The keypad's ± step follows this too —
+/// 2.5 kg is a pair of plates, and so is 5 lb.
+class _UnitPicker extends ConsumerWidget {
+  const _UnitPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final current = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+
+    return AppCard(
+      padding: const EdgeInsets.all(Space.sm),
+      child: Row(
+        children: [
+          for (final unit in WeightUnit.values)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setWeightUnit(ref.read(databaseProvider), unit),
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  padding: const EdgeInsets.symmetric(vertical: Space.md),
+                  decoration: BoxDecoration(
+                    color: unit == current ? c.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(Radii.sm),
+                  ),
+                  child: Text(
+                    switch (unit) {
+                      WeightUnit.kg => 'Kilograms',
+                      WeightUnit.lb => 'Pounds',
+                    },
+                    textAlign: TextAlign.center,
+                    style: context.t.titleSmall?.copyWith(
+                      color: unit == current ? c.onAccent : c.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ThemePicker extends ConsumerWidget {

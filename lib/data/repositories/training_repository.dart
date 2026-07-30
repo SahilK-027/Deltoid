@@ -5,6 +5,7 @@ import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/prefill.dart';
+import '../../domain/units.dart';
 import '../db/database.dart';
 import '../db/watch.dart';
 
@@ -892,6 +893,7 @@ class TrainingRepository {
           ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
         .get();
 
+    final unit = await weightUnit();
     final workoutId = newId();
     // A backdated session keeps the current clock time: the date is what was
     // forgotten, the hour is unknowable and unimportant.
@@ -916,6 +918,7 @@ class TrainingRepository {
           targetIsDeload: cycle.isDeload,
           deloadSetDelta: slot.deloadSetDelta ?? regime.deloadSetDelta,
           deloadWeightPct: slot.deloadWeightPct ?? regime.deloadWeightPct,
+          unit: unit,
         ),
       ));
     }
@@ -977,6 +980,18 @@ class TrainingRepository {
     });
 
     return workoutId;
+  }
+
+  /// The unit weights are shown in, read straight from settings.
+  ///
+  /// Only deload scaling needs it down here: a suggestion has to land on a
+  /// weight the gym actually has, and which weights those are depends on
+  /// whether the plates are kilos or pounds.
+  Future<WeightUnit> weightUnit() async {
+    final row = await (db.select(db.appSettings)
+          ..where((t) => t.key.equals('units')))
+        .getSingleOrNull();
+    return WeightUnitX.parse(row?.value);
   }
 
   /// The rest target for one exercise in one session, in seconds.
@@ -1278,6 +1293,7 @@ class TrainingRepository {
     required String workoutId,
     required String exerciseId,
   }) async {
+    final unit = await weightUnit();
     final workout = await (db.select(db.workouts)
           ..where((t) => t.id.equals(workoutId)))
         .getSingleOrNull();
@@ -1299,6 +1315,7 @@ class TrainingRepository {
       targetIsDeload: workout.isDeload,
       deloadSetDelta: regime?.deloadSetDelta ?? -1,
       deloadWeightPct: regime?.deloadWeightPct ?? 80,
+      unit: unit,
     );
   }
 

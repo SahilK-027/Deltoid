@@ -19,6 +19,7 @@ import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/prefill.dart';
+import '../../domain/units.dart';
 import 'log_providers.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
@@ -67,6 +68,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// rest a set actually got is measured from it.
   bool _showRestBar = false;
   Timer? _restBarHide;
+
+  /// The display unit for this build. Stored values are always kg.
+  WeightUnit _unit = WeightUnit.kg;
 
   /// Whether the opening exercise's rest target has been fetched yet.
   bool _restTargetLoaded = false;
@@ -211,6 +215,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         const {};
     _prefill = prefill;
     _detail = detail;
+    // Everything below the database speaks the display unit; everything at or
+    // below the repository speaks kilograms.
+    _unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final c = context.c;
 
     // The first page's rest target isn't known until the workout loads.
@@ -321,6 +328,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                               ? detail.entries[index + 1].exercise.name
                               : null,
                           prefill: prefill[entry.exercise.id],
+                          unit: _unit,
                           editing: _editing,
                           buffer: _buffer,
                           onEdit: _focus,
@@ -383,8 +391,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     setState(() {
       _editing = EditTarget(set.id, field);
       _buffer = switch (field) {
-        SetField.weight => _fmt(set.weight),
-        SetField.added => _fmt(set.addedWeight),
+        SetField.weight => _fmtLoadIn(set.weight),
+        SetField.added => _fmtLoadIn(set.addedWeight),
         SetField.reps => set.reps?.toString() ?? '',
       };
     });
@@ -418,9 +426,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
     final (entry, set, setPosition) = located;
     final ghost = _ghostSet(prefill[entry.exercise.id], setPosition);
+    // Ghosts are stored in kg and shown in the display unit.
     final hint = switch (target.field) {
-      SetField.weight => _fmt(ghost?.weight),
-      SetField.added => _fmt(ghost?.addedWeight),
+      SetField.weight => _fmtLoadIn(ghost?.weight),
+      SetField.added => _fmtLoadIn(ghost?.addedWeight),
       SetField.reps => ghost?.reps?.toString() ?? '',
     };
 
@@ -434,8 +443,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     return SetKeypad(
       title:
           '${entry.exercise.name}  ·  Set ${setPosition + 1}  ·  '
-          '${target.field.label}',
+          '${target.field.labelIn(_unit)}',
       field: target.field,
+      unit: _unit,
       value: _buffer,
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
@@ -449,6 +459,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           _buffer,
           key,
           field: target.field,
+          unit: _unit,
           hint: double.tryParse(hint),
         );
         _commit(next, target);
@@ -483,7 +494,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     _pending = null;
 
     final repo = ref.read(trainingRepositoryProvider);
-    final parsed = double.tryParse(pending.value);
+    final typed = double.tryParse(pending.value);
+    // Typed in the display unit, stored in kilograms — always.
+    final parsed = typed == null ? null : _unit.toKg(typed);
 
     switch (pending.target.field) {
       case SetField.weight:
@@ -491,7 +504,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       case SetField.added:
         repo.updateSet(pending.target.setId, addedWeight: Value(parsed));
       case SetField.reps:
-        repo.updateSet(pending.target.setId, reps: Value(parsed?.round()));
+        repo.updateSet(pending.target.setId, reps: Value(typed?.round()));
     }
   }
 
@@ -762,14 +775,14 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  static String _fmt(double? v) {
-    if (v == null) return '';
-    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
-  }
+  /// A stored kg value as the number this phone types in.
+  String _fmtLoadIn(double? kg) =>
+      kg == null ? '' : formatInUnit(kg, _unit);
+
 }
 
 /// Last time's sets as one line: "22.5×8, 22.5×8, 20×7".
-String _summariseSets(PrefillResult prefill, LoadMode mode) {
+String _summariseSets(PrefillResult prefill, LoadMode mode, WeightUnit unit) {
   final parts = <String>[];
   for (final s in prefill.sets) {
     final load = mode == LoadMode.bodyweightPlus ? s.addedWeight : s.weight;
@@ -777,16 +790,13 @@ String _summariseSets(PrefillResult prefill, LoadMode mode) {
     final loadLabel = switch (mode) {
       LoadMode.bodyweight => 'BW',
       LoadMode.bodyweightPlus =>
-        load == null ? 'BW' : 'BW+${_fmtLoad(load)}',
-      _ => load == null ? '—' : _fmtLoad(load),
+        load == null ? 'BW' : 'BW+${formatInUnit(load, unit)}',
+      _ => load == null ? '—' : formatInUnit(load, unit),
     };
     parts.add(reps == null ? loadLabel : '$loadLabel×$reps');
   }
   return parts.join(', ');
 }
-
-String _fmtLoad(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
 
 /// Prefill set aligned to a position in the current exercise, or null when
 /// today has more sets than last time.
@@ -808,6 +818,7 @@ class _ExercisePage extends ConsumerWidget {
     required this.entry,
     required this.nextName,
     required this.prefill,
+    required this.unit,
     required this.editing,
     required this.buffer,
     required this.onEdit,
@@ -822,6 +833,10 @@ class _ExercisePage extends ConsumerWidget {
   final ExerciseEntry entry;
   final String? nextName;
   final PrefillResult? prefill;
+
+  /// Display unit for every weight on this page. Storage is always kg.
+  final WeightUnit unit;
+
   final EditTarget? editing;
   final String buffer;
   final void Function(SetLog, SetField) onEdit;
@@ -872,7 +887,7 @@ class _ExercisePage extends ConsumerWidget {
                   if (prefill?.hasSuggestion ?? false) ...[
                     const SizedBox(height: 2),
                     Text(
-                      _summariseSets(prefill!, entry.exercise.loadMode),
+                      _summariseSets(prefill!, entry.exercise.loadMode, unit),
                       style: context.t.labelMedium?.copyWith(
                         color: c.textSecondary,
                         fontFeatures: tabular,
@@ -924,6 +939,7 @@ class _ExercisePage extends ConsumerWidget {
                     set: entry.sets[i],
                     position: i,
                     loadMode: entry.exercise.loadMode,
+                    unit: unit,
                     ghost: _ghostSet(prefill, i),
                     editing: editing,
                     buffer: buffer,

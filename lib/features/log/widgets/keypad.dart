@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../domain/units.dart';
 
 enum SetField { weight, reps, added }
 
 extension SetFieldX on SetField {
-  String get label => switch (this) {
-        SetField.weight => 'Weight (kg)',
+  String labelIn(WeightUnit unit) => switch (this) {
+        SetField.weight => 'Weight (${unit.label})',
         SetField.reps => 'Reps',
-        SetField.added => 'Added (kg)',
+        SetField.added => 'Added (${unit.label})',
       };
 
   bool get isDecimal => this != SetField.reps;
 
-  double get step => this == SetField.reps ? 1 : 2.5;
+  /// One rep, or one pair of plates — 2.5 kg on a kilo bar, 5 lb on a pound
+  /// one. A 2.5 lb step is not a thing any gym stocks.
+  double stepIn(WeightUnit unit) => this == SetField.reps ? 1 : unit.step;
 }
 
 /// A docked numeric pad instead of the OS keyboard.
@@ -28,6 +31,7 @@ class SetKeypad extends StatelessWidget {
     super.key,
     required this.title,
     required this.field,
+    required this.unit,
     required this.value,
     required this.onKey,
     required this.onNext,
@@ -39,6 +43,7 @@ class SetKeypad extends StatelessWidget {
 
   final String title;
   final SetField field;
+  final WeightUnit unit;
 
   /// Current buffer, shown in the readout.
   final String value;
@@ -121,7 +126,13 @@ class SetKeypad extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: Space.sm),
-              _KeyGrid(field: field, onKey: onKey, onNext: onNext, nextLabel: nextLabel),
+              _KeyGrid(
+                field: field,
+                unit: unit,
+                onKey: onKey,
+                onNext: onNext,
+                nextLabel: nextLabel,
+              ),
             ],
           ),
         ),
@@ -133,19 +144,21 @@ class SetKeypad extends StatelessWidget {
 class _KeyGrid extends StatelessWidget {
   const _KeyGrid({
     required this.field,
+    required this.unit,
     required this.onKey,
     required this.onNext,
     required this.nextLabel,
   });
 
   final SetField field;
+  final WeightUnit unit;
   final ValueChanged<String> onKey;
   final VoidCallback onNext;
   final String nextLabel;
 
   @override
   Widget build(BuildContext context) {
-    final step = field.step;
+    final step = field.stepIn(unit);
     final stepLabel = step == step.roundToDouble()
         ? step.toStringAsFixed(0)
         : step.toStringAsFixed(1);
@@ -264,6 +277,7 @@ String applyKey(
   String buffer,
   String key, {
   required SetField field,
+  WeightUnit unit = WeightUnit.kg,
   double? hint,
 }) {
   switch (key) {
@@ -277,7 +291,8 @@ String applyKey(
       // An empty buffer means "I haven't said anything yet", so step from last
       // time. Once anything is typed the buffer wins — including a typed 0.
       final current = double.tryParse(buffer) ?? (buffer.isEmpty ? hint ?? 0 : 0);
-      final next = key == '+' ? current + field.step : current - field.step;
+      final step = field.stepIn(unit);
+      final next = key == '+' ? current + step : current - step;
       if (next < 0) return '0';
       if (field == SetField.reps) return next.toStringAsFixed(0);
       return next == next.roundToDouble()
