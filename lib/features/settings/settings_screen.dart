@@ -81,21 +81,38 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: Space.lg),
                   Divider(color: c.border, height: 1),
                   const SizedBox(height: Space.md),
+                  // Tap corrects, long-press removes. A weight you cannot fix
+                  // silently rescales every bodyweight lift you ever logged.
                   for (final entry in log.take(6))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat('d MMM yyyy')
-                                  .format(dateFromDayKey(entry.dayKey)),
-                              style: context.t.bodySmall,
+                    InkWell(
+                      onTap: () => _logBodyweight(
+                        context,
+                        ref,
+                        date: dateFromDayKey(entry.dayKey),
+                        initial: entry.weightKg,
+                      ),
+                      onLongPress: () =>
+                          _deleteBodyweight(context, ref, entry.dayKey),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: Space.xs,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                DateFormat('d MMM yyyy')
+                                    .format(dateFromDayKey(entry.dayKey)),
+                                style: context.t.bodySmall,
+                              ),
                             ),
-                          ),
-                          Text('${_fmt(entry.weightKg)} kg',
-                              style: context.t.labelMedium),
-                        ],
+                            Text('${_fmt(entry.weightKg)} kg',
+                                style: context.t.labelMedium),
+                            const SizedBox(width: Space.sm),
+                            Icon(Icons.edit_outlined,
+                                size: 13, color: c.textTertiary),
+                          ],
+                        ),
                       ),
                     ),
                 ],
@@ -151,36 +168,99 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _logBodyweight(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
+  /// [date] and [initial] are set when correcting an existing entry;
+  /// `logBodyweight` upserts by day, so editing is simply a re-log.
+  Future<void> _logBodyweight(
+    BuildContext context,
+    WidgetRef ref, {
+    DateTime? date,
+    double? initial,
+  }) async {
+    final controller = TextEditingController(
+      text: initial == null ? '' : _fmt(initial),
+    );
+    var day = date ?? DateTime.now();
+
     final value = await showDialog<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log bodyweight'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(suffixText: 'kg'),
-          onSubmitted: (v) => Navigator.of(ctx).pop(double.tryParse(v)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(date == null ? 'Log bodyweight' : 'Edit bodyweight'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(suffixText: 'kg'),
+                onSubmitted: (v) => Navigator.of(ctx).pop(double.tryParse(v)),
+              ),
+              const SizedBox(height: Space.md),
+              // Weighing yourself and logging it are rarely the same moment.
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: day,
+                    firstDate: DateTime(2015),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => day = picked);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: Space.sm),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined, size: 14),
+                      const SizedBox(width: Space.sm),
+                      Text(DateFormat('d MMM yyyy').format(day)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(double.tryParse(controller.text)),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(double.tryParse(controller.text)),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
     if (value == null || value <= 0) return;
-    await ref
-        .read(trainingRepositoryProvider)
-        .logBodyweight(DateTime.now(), value);
+
+    final repo = ref.read(trainingRepositoryProvider);
+    // Moving an entry to another date is a delete plus a re-log, since the day
+    // is this table's key.
+    if (date != null && dayKeyOf(day) != dayKeyOf(date)) {
+      await repo.deleteBodyweight(dayKeyOf(date));
+    }
+    await repo.logBodyweight(day, value);
+  }
+
+  Future<void> _deleteBodyweight(
+    BuildContext context,
+    WidgetRef ref,
+    int dayKey,
+  ) async {
+    final ok = await confirmAction(
+      context,
+      title: 'Delete this weight?',
+      message: '${DateFormat('d MMM yyyy').format(dateFromDayKey(dayKey))} '
+          'will no longer be used to score bodyweight lifts.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
+    await ref.read(trainingRepositoryProvider).deleteBodyweight(dayKey);
   }
 
   Future<void> _export(BuildContext context, WidgetRef ref) async {

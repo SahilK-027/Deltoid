@@ -553,10 +553,21 @@ Future<String?> promptForText(
   required String title,
   String? hint,
   String initial = '',
+  int maxLines = 1,
+  /// Notes are the one text this app takes that you must also be able to
+  /// clear, so emptiness has to be a savable answer rather than a disabled
+  /// button.
+  bool allowEmpty = false,
 }) {
   return showDialog<String>(
     context: context,
-    builder: (_) => _TextPromptDialog(title: title, hint: hint, initial: initial),
+    builder: (_) => _TextPromptDialog(
+      title: title,
+      hint: hint,
+      initial: initial,
+      maxLines: maxLines,
+      allowEmpty: allowEmpty,
+    ),
   );
 }
 
@@ -565,11 +576,15 @@ class _TextPromptDialog extends StatefulWidget {
     required this.title,
     required this.hint,
     required this.initial,
+    required this.maxLines,
+    required this.allowEmpty,
   });
 
   final String title;
   final String? hint;
   final String initial;
+  final int maxLines;
+  final bool allowEmpty;
 
   @override
   State<_TextPromptDialog> createState() => _TextPromptDialogState();
@@ -586,7 +601,7 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
 
   void _submit() {
     final value = _controller.text.trim();
-    if (value.isEmpty) return;
+    if (value.isEmpty && !widget.allowEmpty) return;
     Navigator.of(context).pop(value);
   }
 
@@ -597,8 +612,10 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
+        maxLines: widget.maxLines,
         textCapitalization: TextCapitalization.sentences,
-        textInputAction: TextInputAction.done,
+        textInputAction:
+            widget.maxLines > 1 ? TextInputAction.newline : TextInputAction.done,
         decoration: InputDecoration(hintText: widget.hint),
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) => _submit(),
@@ -609,7 +626,9 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _controller.text.trim().isEmpty ? null : _submit,
+          onPressed: _controller.text.trim().isEmpty && !widget.allowEmpty
+              ? null
+              : _submit,
           child: const Text('Save'),
         ),
       ],

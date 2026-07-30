@@ -451,6 +451,76 @@ void main() {
     expect(added.sets.length, prefill.sets.length);
   });
 
+  test('a logged day can be moved to the date it was actually trained',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(id);
+
+    final before = await repo.workoutDetail(id);
+    final monday = DateTime.now().subtract(const Duration(days: 2));
+    await repo.setWorkoutDate(id, monday);
+
+    final after = await repo.workoutDetail(id);
+    expect(after!.workout.dayKey, dayKeyOf(monday));
+    // History pages on startedAt, so it has to follow the day key or a row
+    // sorts by one date and displays another.
+    expect(after.workout.startedAt, lessThan(before!.workout.startedAt));
+    // The session's own duration is untouched by the move.
+    expect(
+      after.workout.endedAt! - after.workout.startedAt,
+      before.workout.endedAt! - before.workout.startedAt,
+    );
+  });
+
+  test('a session can be logged for a past date', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final wednesday = DateTime.now().subtract(const Duration(days: 3));
+
+    final id = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+      at: wednesday,
+    );
+
+    final detail = await repo.workoutDetail(id);
+    expect(detail!.workout.dayKey, dayKeyOf(wednesday));
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(detail.workout.startedAt).day,
+      wednesday.day,
+    );
+  });
+
+  test('workout notes can be written and cleared', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    await repo.setWorkoutNotes(id, '  slept badly, everything felt heavy  ');
+    var detail = await repo.workoutDetail(id);
+    expect(detail!.workout.notes, 'slept badly, everything felt heavy');
+
+    await repo.setWorkoutNotes(id, '   ');
+    detail = await repo.workoutDetail(id);
+    expect(detail!.workout.notes, isNull);
+  });
+
+  test('a bodyweight entry can be corrected and deleted', () async {
+    final day = DateTime.now().subtract(const Duration(days: 1));
+    await repo.logBodyweight(day, 81.4);
+    expect((await repo.bodyweightSeries()).single.weightKg, 81.4);
+
+    // Editing is a re-log: the table is keyed by day.
+    await repo.logBodyweight(day, 79.9);
+    expect(await repo.bodyweightSeries(), hasLength(1));
+    expect((await repo.bodyweightSeries()).single.weightKg, 79.9);
+
+    await repo.deleteBodyweight(dayKeyOf(day));
+    expect(await repo.bodyweightSeries(), isEmpty);
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

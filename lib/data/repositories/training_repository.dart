@@ -681,6 +681,20 @@ class TrainingRepository {
     return [for (final r in rows) (dayKey: r.dayKey, weightKg: r.weightKg)];
   }
 
+  /// A bodyweight entry is an input to every bodyweight and BW+ score, not a
+  /// diary line, so a typo has to be removable rather than permanent.
+  Future<void> deleteBodyweight(int dayKey) async {
+    await (db.update(db.bodyweightLogs)
+          ..where((t) => t.dayKey.equals(dayKey) & t.deletedAt.isNull()))
+        .write(
+      BodyweightLogsCompanion(
+        deletedAt: Value(nowMs()),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
   Future<void> logBodyweight(DateTime date, double kg) async {
     final key = dayKeyOf(date);
     final existing = await (db.select(db.bodyweightLogs)
@@ -775,15 +789,21 @@ class TrainingRepository {
   /// Set rows are pre-created to mirror *last time in this session* — including
   /// its warmup structure — rather than a flat "3 sets". Repeating last week's
   /// shape is the behaviour being carried over from the Notion tables.
+  /// [at] backdates the workout, for writing down a session you forgot to log
+  /// on the day. It never returns a running workout, because a session being
+  /// trained right now is not the one you are backfilling.
   Future<String> startWorkout({
     required String regimeId,
     required String sessionId,
+    DateTime? at,
   }) async {
     // A double tap on "Start" — or a screen that hasn't rebuilt yet — must not
     // open a second parallel log for the same session. Hand back the running
     // one instead; the sets already in it are the ones being asked for.
-    final running = await openWorkout();
-    if (running != null && running.sessionId == sessionId) return running.id;
+    if (at == null) {
+      final running = await openWorkout();
+      if (running != null && running.sessionId == sessionId) return running.id;
+    }
 
     final regime =
         await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
@@ -794,7 +814,12 @@ class TrainingRepository {
         .get();
 
     final workoutId = newId();
-    final now = DateTime.now();
+    // A backdated session keeps the current clock time: the date is what was
+    // forgotten, the hour is unknowable and unimportant.
+    final now = at == null
+        ? DateTime.now()
+        : DateTime(at.year, at.month, at.day, DateTime.now().hour,
+            DateTime.now().minute);
 
     // Prefill is resolved before the transaction so the write stays short.
     final plans = <({SessionExercise slot, PrefillResult prefill})>[];
@@ -820,6 +845,9 @@ class TrainingRepository {
               sessionId: Value(sessionId),
               cycleId: Value(cycle.id),
               dayKey: dayKeyOf(now),
+              // Explicit rather than the column default, so a backdated
+              // session sorts into history where it belongs.
+              startedAt: Value(now.millisecondsSinceEpoch),
               isDeload: Value(cycle.isDeload),
               status: const Value(WorkoutStatus.inProgress),
             ),
@@ -1250,6 +1278,55 @@ class TrainingRepository {
       WorkoutsCompanion(
         status: const Value(WorkoutStatus.abandoned),
         deletedAt: Value(nowMs()),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
+  /// Moves a logged day to another date.
+  ///
+  /// A training log has to let you write down Monday's session on Wednesday,
+  /// and fix a date you got wrong. `startedAt` moves with `dayKey` on purpose:
+  /// the heatmap reads the day key, but history pages on `startedAt`, and a row
+  /// that sorts by one date while displaying another is worse than either.
+  /// The clock time and the session's duration are preserved.
+  Future<void> setWorkoutDate(String workoutId, DateTime date) async {
+    final workout =
+        await (db.select(db.workouts)..where((t) => t.id.equals(workoutId)))
+            .getSingleOrNull();
+    if (workout == null) return;
+
+    final was = DateTime.fromMillisecondsSinceEpoch(workout.startedAt);
+    final moved = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      was.hour,
+      was.minute,
+      was.second,
+    );
+    final shift = moved.millisecondsSinceEpoch - workout.startedAt;
+
+    await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
+      WorkoutsCompanion(
+        dayKey: Value(dayKeyOf(moved)),
+        startedAt: Value(moved.millisecondsSinceEpoch),
+        endedAt: workout.endedAt == null
+            ? const Value.absent()
+            : Value(workout.endedAt! + shift),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
+  /// The context that explains a bad week when you read it back in six months.
+  Future<void> setWorkoutNotes(String workoutId, String? notes) async {
+    final trimmed = notes?.trim();
+    await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
+      WorkoutsCompanion(
+        notes: Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),

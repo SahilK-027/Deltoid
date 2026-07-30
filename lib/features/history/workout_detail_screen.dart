@@ -9,6 +9,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../regime/regime_screen.dart' show promptForText;
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
@@ -54,9 +55,28 @@ class WorkoutDetailScreen extends ConsumerWidget {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
-              if (value == 'delete') _delete(context, ref, detail);
+              switch (value) {
+                case 'date':
+                  _editDate(context, ref, detail);
+                case 'notes':
+                  _editNotes(context, ref, detail);
+                case 'delete':
+                  _delete(context, ref, detail);
+              }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'date',
+                child: Text('Change the date'),
+              ),
+              PopupMenuItem(
+                value: 'notes',
+                child: Text(
+                  workout.notes == null || workout.notes!.isEmpty
+                      ? 'Add a note'
+                      : 'Edit the note',
+                ),
+              ),
               PopupMenuItem(
                 value: 'delete',
                 child: Text(
@@ -75,6 +95,10 @@ class WorkoutDetailScreen extends ConsumerWidget {
           AppCard(
             padding: const EdgeInsets.all(Space.xl),
             highlightColor: workout.isDeload ? c.deload : null,
+            // Tapping the date edits it: forgetting to log Monday until
+            // Wednesday is normal, and a date you cannot correct is a lie the
+            // heatmap repeats forever.
+            onTap: () => _editDate(context, ref, detail),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -84,6 +108,9 @@ class WorkoutDetailScreen extends ConsumerWidget {
                         style: context.t.labelSmall),
                     const Spacer(),
                     if (workout.isDeload) Pill('Deload', color: c.deload),
+                    const SizedBox(width: Space.sm),
+                    Icon(Icons.edit_calendar_outlined,
+                        size: 14, color: c.textTertiary),
                   ],
                 ),
                 const SizedBox(height: Space.sm),
@@ -94,10 +121,33 @@ class WorkoutDetailScreen extends ConsumerWidget {
                   _facts(detail).join('  ·  '),
                   style: context.t.bodyMedium?.copyWith(color: accent),
                 ),
-                if (workout.notes != null && workout.notes!.isNotEmpty) ...[
-                  const SizedBox(height: Space.md),
-                  Text(workout.notes!, style: context.t.bodySmall),
-                ],
+                const SizedBox(height: Space.md),
+                InkWell(
+                  onTap: () => _editNotes(context, ref, detail),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                    child: Row(
+                      children: [
+                        Icon(Icons.sticky_note_2_outlined,
+                            size: 14, color: c.textTertiary),
+                        const SizedBox(width: Space.sm),
+                        Expanded(
+                          child: Text(
+                            workout.notes?.isNotEmpty == true
+                                ? workout.notes!
+                                : 'Add a note — how it felt, what got in the '
+                                    'way',
+                            style: context.t.bodySmall?.copyWith(
+                              color: workout.notes?.isNotEmpty == true
+                                  ? c.textSecondary
+                                  : c.textTertiary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -119,6 +169,47 @@ class WorkoutDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _editDate(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final current = dateFromDayKey(detail.workout.dayKey);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2015),
+      // Training in the future is not a thing; a stray tap on next month is.
+      lastDate: DateTime.now(),
+      helpText: 'When was this trained?',
+    );
+    if (picked == null || !context.mounted) return;
+    if (dayKeyOf(picked) == detail.workout.dayKey) return;
+
+    await ref
+        .read(trainingRepositoryProvider)
+        .setWorkoutDate(detail.workout.id, picked);
+  }
+
+  Future<void> _editNotes(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final text = await promptForText(
+      context,
+      title: 'Session note',
+      initial: detail.workout.notes ?? '',
+      hint: 'Slept badly, everything felt heavy',
+      maxLines: 4,
+      allowEmpty: true,
+    );
+    if (text == null) return;
+    await ref
+        .read(trainingRepositoryProvider)
+        .setWorkoutNotes(detail.workout.id, text);
   }
 
   /// Logging the wrong session, or logging one twice, has to be undoable —

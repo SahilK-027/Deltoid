@@ -56,6 +56,76 @@ Future<void> _startSession(
   }
 }
 
+/// Writes down a session that was trained but never logged.
+///
+/// `dayKey` used to be stamped once from `DateTime.now()` and never again, so
+/// forgetting to log Monday left Wednesday's entry permanently wrong, and
+/// delete-and-redo didn't help because the redo was stamped today too.
+Future<void> _logPastSession(
+  BuildContext context,
+  WidgetRef ref, {
+  required String regimeId,
+  required List<Session> sessions,
+  required bool hasOpenWorkout,
+}) async {
+  if (hasOpenWorkout) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Finish the session you are in first'),
+      ),
+    );
+    return;
+  }
+
+  final sessionId = await showModalBottomSheet<String>(
+    context: context,
+    builder: (sheet) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(Space.lg),
+            child: SectionLabel('Which session did you train?'),
+          ),
+          for (final s in sessions)
+            ListTile(
+              title: Text(s.name),
+              onTap: () => Navigator.of(sheet).pop(s.id),
+            ),
+          const SizedBox(height: Space.md),
+        ],
+      ),
+    ),
+  );
+  if (sessionId == null || !context.mounted) return;
+
+  final now = DateTime.now();
+  final date = await showDatePicker(
+    context: context,
+    initialDate: now.subtract(const Duration(days: 1)),
+    firstDate: DateTime(2015),
+    lastDate: now,
+    helpText: 'When did you train it?',
+  );
+  if (date == null || !context.mounted) return;
+
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final container = ProviderScope.containerOf(context, listen: false);
+  try {
+    final id = await container
+        .read(trainingRepositoryProvider)
+        .startWorkout(regimeId: regimeId, sessionId: sessionId, at: date);
+    await navigator.push(
+      MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Could not open that session: $e')),
+    );
+  }
+}
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -72,6 +142,18 @@ class TodayScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Deltoid'),
         actions: [
+          if (regime != null && sessions.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.post_add_outlined),
+              tooltip: 'Log a past session',
+              onPressed: () => _logPastSession(
+                context,
+                ref,
+                regimeId: regime.id,
+                sessions: sessions,
+                hasOpenWorkout: open != null,
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.of(context).push(
