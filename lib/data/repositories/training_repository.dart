@@ -313,6 +313,32 @@ class TrainingRepository {
     await ensureOpenCycle(regimeId);
   }
 
+  /// Closes the open cycle if every session it still owes has been trained.
+  ///
+  /// Only `completeWorkout` used to close a cycle, so deleting the last
+  /// untrained day of a cycle left it complete-but-open: Today showed
+  /// "UP NEXT: Push 1" over a full row of filled dots until the next workout
+  /// happened to heal it. A cycle should close the moment it is satisfied,
+  /// whatever satisfied it.
+  Future<bool> closeCycleIfSatisfied(String regimeId) async {
+    final sessionIds = await _sessionIds(regimeId);
+    if (sessionIds.isEmpty) return false;
+
+    final cycle = await ensureOpenCycle(regimeId);
+    final done = await _completedSessionIds(cycle.id);
+    if (!sessionIds.every(done.contains)) return false;
+
+    await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
+      CyclesCompanion(
+        completedAt: Value(nowMs()),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+    await ensureOpenCycle(regimeId);
+    return true;
+  }
+
   /// Overrides whether the open cycle is a deload. The suggestion is never
   /// binding.
   Future<void> setCycleDeload(String cycleId, bool isDeload) async {
@@ -331,10 +357,48 @@ class TrainingRepository {
   ///
   /// Feeds both prefill and the progress chart, so it carries session identity
   /// and deload status rather than just numbers.
+  ///
+  /// [sessionId] guarantees the most recent performances *in that session* are
+  /// in the result whatever [limit] is. Without it, fanning one movement across
+  /// many training days pushed a slot left untrained for 30-odd performances
+  /// elsewhere out of the window, and prefill quietly fell back to another
+  /// session — labelled honestly, but not the number you wanted. The
+  /// same-session lookup should have no horizon; the cross-session fallback
+  /// still does.
   Future<List<PastPerformance>> pastPerformances(
     String exerciseId, {
     int limit = 60,
     String? excludeWorkoutId,
+    String? sessionId,
+  }) async {
+    final recent = await _performances(
+      exerciseId,
+      limit: limit,
+      excludeWorkoutId: excludeWorkoutId,
+    );
+    if (sessionId == null) return recent;
+
+    final sameSession = await _performances(
+      exerciseId,
+      limit: 5,
+      excludeWorkoutId: excludeWorkoutId,
+      sessionId: sessionId,
+    );
+
+    final byWorkout = {for (final p in recent) p.workoutId: p};
+    for (final p in sameSession) {
+      byWorkout.putIfAbsent(p.workoutId, () => p);
+    }
+    final merged = byWorkout.values.toList()
+      ..sort((a, b) => b.dayKey.compareTo(a.dayKey));
+    return merged;
+  }
+
+  Future<List<PastPerformance>> _performances(
+    String exerciseId, {
+    required int limit,
+    String? excludeWorkoutId,
+    String? sessionId,
   }) async {
     final q = db.select(db.workoutExercises).join([
       innerJoin(db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
@@ -349,6 +413,9 @@ class TrainingRepository {
 
     if (excludeWorkoutId != null) {
       q.where(db.workouts.id.equals(excludeWorkoutId).not());
+    }
+    if (sessionId != null) {
+      q.where(db.workouts.sessionId.equals(sessionId));
     }
 
     final rows = await q.get();
@@ -378,6 +445,13 @@ class TrainingRepository {
             sessionName: session?.name ?? 'Ad-hoc',
             dayKey: w.dayKey,
             isDeload: w.isDeload,
+            // Sets logged before the exercise was marked skipped did happen:
+            // two sets then a bad shoulder is two real sets. They stay
+            // eligible here *and* are shown under the skip pill in history, so
+            // there is one story rather than two. This used to be decided by
+            // accident — nothing read skipReason, and the empty-sets check did
+            // the filtering.
+            skipReason: we.skipReason,
             sets: [
               for (final s in sets)
                 if (s.isDone)
@@ -487,7 +561,12 @@ class TrainingRepository {
           db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
     ])
           ..addColumns([db.workoutExercises.exerciseId, performed, lastDay])
+          // "2 sessions" has to mean times trained. A slot left blank still
+          // counts — you turned up and the row was there — but one you marked
+          // skipped, with a reason, did not happen.
           ..where(db.workoutExercises.deletedAt.isNull() &
+              db.workoutExercises.skipReason
+                  .equalsValue(SkipReason.none) &
               db.workouts.deletedAt.isNull() &
               db.workouts.status.equalsValue(WorkoutStatus.completed))
           ..groupBy([db.workoutExercises.exerciseId]))
@@ -824,7 +903,11 @@ class TrainingRepository {
     // Prefill is resolved before the transaction so the write stays short.
     final plans = <({SessionExercise slot, PrefillResult prefill})>[];
     for (final slot in slots) {
-      final past = await pastPerformances(slot.exerciseId, limit: 30);
+      final past = await pastPerformances(
+        slot.exerciseId,
+        limit: 30,
+        sessionId: sessionId,
+      );
       plans.add((
         slot: slot,
         prefill: resolvePrefill(
@@ -894,6 +977,36 @@ class TrainingRepository {
     });
 
     return workoutId;
+  }
+
+  /// Who a workout belongs to, looked up by id rather than filtered out of the
+  /// active regime's sessions.
+  ///
+  /// Start a workout, switch regimes, and the resume card used to read
+  /// "Workout" — the session was real, it just wasn't in the list being
+  /// searched. Finishing it advances *its* regime's cycle, not the one on
+  /// screen, so the card has to be able to say which.
+  Future<({String? sessionName, String regimeId, String? regimeName})?>
+      workoutOwner(String workoutId) async {
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId)))
+        .getSingleOrNull();
+    if (workout == null) return null;
+
+    final session = workout.sessionId == null
+        ? null
+        : await (db.select(db.sessions)
+              ..where((t) => t.id.equals(workout.sessionId!)))
+            .getSingleOrNull();
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(workout.regimeId)))
+        .getSingleOrNull();
+
+    return (
+      sessionName: session?.name,
+      regimeId: workout.regimeId,
+      regimeName: regime?.name,
+    );
   }
 
   /// Null once the workout is gone — deleted from history, or discarded from
@@ -1095,6 +1208,7 @@ class TrainingRepository {
     final past = await pastPerformances(
       exerciseId,
       excludeWorkoutId: workoutId,
+      sessionId: workout.sessionId,
     );
 
     return resolvePrefill(

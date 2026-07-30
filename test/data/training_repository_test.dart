@@ -521,6 +521,114 @@ void main() {
     expect(await repo.bodyweightSeries(), isEmpty);
   });
 
+  test('the same-session lookup has no horizon', () async {
+    // Fan one movement across many training days and the slot you care about
+    // can fall out of a fixed candidate window, dropping prefill to another
+    // session — labelled honestly, but not the number you wanted.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final push2 = await sessionNamed('Push 2');
+
+    final firstPush1 =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final detail = await repo.workoutDetail(firstPush1);
+    final exercise = detail!.entries.first.exercise;
+    for (final s in detail.entries.first.sets) {
+      await repo.updateSet(s.id,
+          weight: const Value(42.5), reps: const Value(6), isDone: const Value(true));
+    }
+    await repo.completeWorkout(firstPush1);
+
+    // Bury it under a pile of performances in another session.
+    for (var i = 0; i < 8; i++) {
+      final w = await repo.startWorkout(regimeId: regime.id, sessionId: push2.id);
+      final d = await repo.workoutDetail(w);
+      final entry =
+          d!.entries.firstWhere((e) => e.exercise.id == exercise.id);
+      for (final s in entry.sets) {
+        await repo.updateSet(s.id,
+            weight: const Value(20), reps: const Value(12), isDone: const Value(true));
+      }
+      await repo.completeWorkout(w);
+    }
+
+    // A window of 3 cannot reach the Push 1 performance on recency alone.
+    final candidates = await repo.pastPerformances(
+      exercise.id,
+      limit: 3,
+      sessionId: push1.id,
+    );
+    final prefill =
+        resolvePrefill(candidates: candidates, sessionId: push1.id);
+
+    expect(prefill.source, PrefillSource.sameSession);
+    expect(prefill.sets.first.weight, 42.5);
+  });
+
+  test('a skipped slot is not counted as a session trained', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final detail = await repo.workoutDetail(id);
+    final entry = detail!.entries.first;
+    // Two sets in, then the shoulder says no.
+    await repo.updateSet(entry.sets.first.id,
+        weight: const Value(22.5), reps: const Value(8), isDone: const Value(true));
+    await repo.setSkipReason(entry.workoutExercise.id, SkipReason.injury);
+    await repo.completeWorkout(id);
+
+    final index = await repo.exercisesWithHistory();
+    expect(
+      index.where((e) => e.exercise.id == entry.exercise.id),
+      isEmpty,
+      reason: 'a skipped slot did not happen, so it is not a session trained',
+    );
+
+    // But the sets that were logged before the skip did happen, and stay
+    // visible to everything downstream.
+    final past = await repo.pastPerformances(entry.exercise.id);
+    expect(past.single.skipReason, SkipReason.injury);
+    expect(past.single.sets.single.weight, 22.5);
+  });
+
+  test('deleting the last untrained session closes the cycle', () async {
+    final regime = await activeRegime();
+    final sessions = await (db.select(db.sessions)
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    for (final s in sessions.take(sessions.length - 1)) {
+      final id = await repo.startWorkout(regimeId: regime.id, sessionId: s.id);
+      await repo.completeWorkout(id);
+    }
+
+    final before = await repo.cycleStatus(regime.id);
+    expect(before.cycleIndex, 1);
+    expect(before.isComplete, isFalse);
+
+    // Delete the one day still owed: the cycle is now satisfied.
+    await (db.update(db.sessions)..where((t) => t.id.equals(sessions.last.id)))
+        .write(SessionsCompanion(deletedAt: Value(nowMs())));
+    expect(await repo.closeCycleIfSatisfied(regime.id), isTrue);
+
+    final after = await repo.cycleStatus(regime.id);
+    expect(after.cycleIndex, 2);
+    expect(after.done, 0);
+  });
+
+  test('a running workout can be identified without its regime being active',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final owner = await repo.workoutOwner(id);
+    expect(owner!.sessionName, 'Push 1');
+    expect(owner.regimeId, regime.id);
+    expect(owner.regimeName, regime.name);
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

@@ -151,7 +151,9 @@ class _PerformanceCardState extends State<_PerformanceCard> {
     final date = dateFromDayKey(performance.dayKey);
     final done = performance.sets.where((s) => s.isDone).toList();
     final skipped = performance.skipReason != SkipReason.none;
-    final canExpand = !skipped && done.isNotEmpty;
+    // A skipped slot with sets in it is still a performance worth opening —
+    // those sets happened, and they are what prefill and the chart read.
+    final canExpand = done.isNotEmpty;
 
     return AppCard(
       padding:
@@ -188,15 +190,23 @@ class _PerformanceCardState extends State<_PerformanceCard> {
               ],
             ],
           ),
-          if (!skipped) ...[
-            const SizedBox(height: Space.sm),
-            if (done.isEmpty)
-              Text('Nothing logged', style: context.t.labelSmall)
-            else
-              Text(
-                done.map((s) => _setLabel(s, exercise)).join('   '),
-                style: context.t.labelLarge,
-              ),
+          const SizedBox(height: Space.sm),
+          if (skipped && done.isNotEmpty)
+            Text(
+              'Stopped after ${done.length} '
+              '${done.length == 1 ? 'set' : 'sets'}',
+              style: context.t.labelSmall?.copyWith(color: c.negative),
+            ),
+          if (done.isEmpty)
+            Text(
+              skipped ? 'Not trained' : 'Nothing logged',
+              style: context.t.labelSmall,
+            )
+          else ...[
+            Text(
+              done.map((s) => _setLabel(s, exercise)).join('   '),
+              style: context.t.labelLarge,
+            ),
             if (performance.best1RM != null) ...[
               const SizedBox(height: Space.xs),
               Text(

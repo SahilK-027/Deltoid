@@ -721,14 +721,19 @@ class _Cell extends StatelessWidget {
         child: Text('·', style: context.t.labelMedium?.copyWith(color: c.textTertiary)),
       );
     }
-    if (cell!.skipReason != SkipReason.none) {
+    final skipped = cell!.skipReason != SkipReason.none;
+    final done = cell!.sets.where((s) => s.isDone).toList();
+
+    // A skip with nothing logged is just a skip. A skip with sets behind it is
+    // a short session, and the numbers below are the ones prefill reads — so
+    // the column shows both rather than swallowing the sets.
+    if (skipped && done.isEmpty) {
       return Align(
         alignment: Alignment.centerLeft,
         child: Pill(cell!.skipReason.label, color: c.negative),
       );
     }
 
-    final done = cell!.sets.where((s) => s.isDone).toList();
     if (done.isEmpty) {
       return Align(
         alignment: Alignment.centerLeft,
@@ -765,6 +770,15 @@ class _Cell extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        if (skipped) ...[
+          const SizedBox(height: 2),
+          Text(
+            'then ${cell!.skipReason.label.toLowerCase()}',
+            style: context.t.labelSmall?.copyWith(color: c.negative),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ],
     );
   }

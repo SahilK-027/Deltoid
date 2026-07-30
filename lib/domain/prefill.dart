@@ -35,6 +35,7 @@ class PastPerformance {
     required this.dayKey,
     required this.isDeload,
     required this.sets,
+    this.skipReason = SkipReason.none,
   });
 
   final String workoutId;
@@ -43,6 +44,11 @@ class PastPerformance {
   final int dayKey;
   final bool isDeload;
   final List<PastSet> sets;
+
+  /// Why this performance was cut short, when it was. A skipped slot that
+  /// still holds logged sets is a real performance — the sets happened — and
+  /// history says so next to the reason rather than hiding them.
+  final SkipReason skipReason;
 }
 
 enum PrefillSource {

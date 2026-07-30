@@ -242,23 +242,43 @@ class _NoSessionsState extends ConsumerWidget {
   }
 }
 
+/// The running workout's own session and regime, by id.
+///
+/// Not filtered out of the active regime's sessions: switching regimes with a
+/// workout open left that filter empty, and the card fell back to "Workout".
+final _resumeOwnerProvider = FutureProvider.family<
+    ({String? sessionName, String regimeId, String? regimeName})?,
+    String>((ref, workoutId) {
+  return ref.watch(trainingRepositoryProvider).workoutOwner(workoutId);
+});
+
 /// Shown when a session was started and not finished. Losing an in-progress
 /// log to a locked phone screen would be unforgivable, so resuming is the
 /// loudest thing on the screen.
-class _ResumeCard extends StatelessWidget {
+class _ResumeCard extends ConsumerWidget {
   const _ResumeCard({required this.workout, required this.sessions});
 
   final Workout workout;
   final List<Session> sessions;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
-    final name = sessions
+    final owner = ref.watch(_resumeOwnerProvider(workout.id)).valueOrNull;
+    final activeRegime = ref.watch(activeRegimeProvider).valueOrNull;
+    final name = owner?.sessionName ??
+        sessions
             .where((s) => s.id == workout.sessionId)
             .map((s) => s.name)
             .firstOrNull ??
         'Workout';
+    // Finishing this advances the cycle of the regime it was started under,
+    // which is worth saying when you are looking at a different one.
+    final foreignRegime = owner != null &&
+            activeRegime != null &&
+            owner.regimeId != activeRegime.id
+        ? owner.regimeName
+        : null;
     // Carry the deload identity through the resume path too, or a light week
     // silently looks like a normal one the moment you come back to it.
     final accent = workout.isDeload ? c.deload : c.accent;
@@ -284,6 +304,13 @@ class _ResumeCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.md),
           Text(name, style: context.t.displaySmall),
+          if (foreignRegime != null) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              'in $foreignRegime — finishing it advances that regime',
+              style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+            ),
+          ],
           const SizedBox(height: Space.lg),
           FilledButton(
             style: FilledButton.styleFrom(

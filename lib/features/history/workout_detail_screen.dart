@@ -295,13 +295,24 @@ class _ExerciseBlock extends StatelessWidget {
               Icon(Icons.history, size: 16, color: c.textTertiary),
             ],
           ),
-          if (!skipped) ...[
-            const SizedBox(height: Space.sm),
-            if (done.isEmpty)
-              Text('Nothing logged', style: context.t.labelSmall)
-            else
-              for (final set in done) _SetLine(set: set, exercise: entry.exercise),
-          ],
+          // Sets logged before the skip are shown under it. Hiding them made
+          // history disagree with itself: they survived, they fed prefill and
+          // the progress chart, and only these views pretended otherwise.
+          const SizedBox(height: Space.sm),
+          if (skipped && done.isNotEmpty)
+            Text(
+              'Stopped after ${done.length} '
+              '${done.length == 1 ? 'set' : 'sets'}',
+              style: context.t.labelSmall?.copyWith(color: c.negative),
+            ),
+          if (done.isEmpty)
+            Text(
+              skipped ? 'Not trained' : 'Nothing logged',
+              style: context.t.labelSmall,
+            )
+          else
+            for (final set in done)
+              _SetLine(set: set, exercise: entry.exercise),
         ],
       ),
     );
