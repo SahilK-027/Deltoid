@@ -292,12 +292,214 @@ widget test, and repository integration against a real in-memory SQLite.
 
 ### Planned, roughly in order
 
-1. Drive the audit fixes on a device — see the section below for what is
-   unverified, and reinstall first, because the schema changed.
-2. Supabase sync (above).
-3. iOS verification once Xcode exists.
-4. Per-exercise deload overrides — the columns exist
+1. Drive the last round of fixes on a device. Reinstall first — the schema
+   changed. The emulator marks above predate all of it.
+2. The second-round backlog below, starting with **A1** and **A2**, which are
+   half-finished work rather than old debt.
+3. Supabase sync (above).
+4. iOS verification once Xcode exists.
+5. Per-exercise deload overrides — the columns exist
    (`session_exercises.deload_set_delta` / `deload_weight_pct`), no UI yet.
+
+---
+
+---
+
+## Second-round backlog
+
+Found while fixing the first round, 2026-07-30, by reading the code rather than
+driving it. Numbered `A1…` so they can't be confused with the old set. Same
+convention as before: a finding is deleted when it's fixed, not ticked.
+
+**The first two are mine.** They are gaps in work committed on this branch, not
+pre-existing debt, and they are why this list starts where it does.
+
+### Left half-done by the units change
+
+**A1. Two weight readouts on Progress still say kilograms**
+`progress/progress_screen.dart:307`, `progress/progress_screen.dart:568`
+
+- **Bug** — finding 30 converted the chart tooltip and the "Best e1RM" stat but
+  missed the chart's own **left axis labels** (`value.toStringAsFixed(0)`) and
+  the **top-set column** in the per-session list below it (a local `_fmt` that
+  predates the unit work). In pounds mode the chart plots a line whose axis is
+  labelled in kg while its tooltip says lb — the worst possible version of this
+  bug, because both numbers are on screen at once and neither is marked.
+- **Good UX** — one unit per screen, no exceptions.
+- **Fix** — both through `formatWeight(value, unit)`; `_Chart` and
+  `_PerformanceList` already have or can take a `WidgetRef`. Then grep for
+  `toStringAsFixed` across `features/` — that call is the tell, since the unit
+  helpers never produce one directly.
+
+**A2. `formatWeight` defaults to kilograms, so forgetting the unit is silent**
+`history/history_screen.dart` (`formatWeight`)
+
+- **Bug** — the signature is `formatWeight(double kg, [WeightUnit unit =
+  WeightUnit.kg])`. An optional parameter means every call site that forgets it
+  compiles, runs, and quietly renders pounds as kilograms. That is exactly how
+  **A1** survived the change.
+- **Good UX** — invisible; this is about the next edit not reintroducing A1.
+- **Fix** — make the parameter required and let the analyzer find the stragglers.
+
+### Correctness
+
+**A3. A backdated session lands in today's cycle, whatever its date**
+`repositories/training_repository.dart` (`startWorkout`)
+
+- **Bug** — "log a past session" writes the date but still attaches the workout
+  to `ensureOpenCycle(regimeId)` — the cycle open *now*. Backfilling yesterday
+  is fine, because that is usually the same cycle. Backfilling three weeks ago
+  is not: it counts towards the current cycle and can complete it, so a cycle
+  closes on the strength of work done under a previous one, and the deload
+  counter moves early.
+- **Good UX** — a session logged for a date belongs to the cycle that was open
+  on that date, or to none at all.
+- **Fix** — pick the cycle by date (`cycles` carries `createdAt`/`completedAt`),
+  and when the date predates every cycle, decide deliberately whether it counts
+  at all. Say which cycle it landed in on the confirmation, because this is the
+  kind of thing nobody notices for a month.
+
+**A4. An abandoned backdated log becomes unreachable**
+`repositories/training_repository.dart` (`openWorkout`), `core/providers.dart:116`
+
+- **Bug** — the resume path takes the single newest in-progress workout by
+  `startedAt`. Start a backdated session, leave it unfinished, then start
+  today's: the backdated one is older, so it drops out of the query and there is
+  no screen anywhere that lists it. It stays `inProgress` forever, invisible.
+- **Good UX** — nothing is stranded where the app cannot show it to you.
+- **Fix** — either forbid a second open workout outright (the Today entry point
+  already refuses; the repository does not), or list every in-progress workout
+  when there is more than one. The first is simpler and matches how one person
+  actually trains.
+
+**A5. Merged prefill candidates lose their tie-break**
+`repositories/training_repository.dart` (`pastPerformances`)
+
+- **Bug** — the two queries are merged and re-sorted on `dayKey` alone, while
+  each query ordered by `startedAt`. Two performances of the same exercise on
+  the same day — the same session trained twice, or an ad-hoc repeat — now sit
+  in map insertion order, so prefill can pick the earlier of the two and call it
+  "last time".
+- **Good UX** — "last time" means the most recent one, including within a day.
+- **Fix** — carry `startedAt` on `PastPerformance` and sort on it, which is what
+  both queries already order by. Cheap; it only needs the field.
+
+**A6. Prefill goes stale when history changes under an open log**
+`log/log_providers.dart`
+
+- **Bug** — `exercisePrefillProvider` is keyed by workout and exercise and is
+  invalidated by nothing. Delete a past workout — reachable from History while a
+  session is open — and the ghosts in the running log still show numbers from
+  the day you just deleted. Finding 2 fixed the *added exercise* case; this is
+  the mirror of it.
+- **Good UX** — the suggestion reflects the history that exists now.
+- **Fix** — invalidate on `historyChanges()`, which already exists and already
+  emits for exactly these tables.
+
+### Performance
+
+**A7. Every keystroke rebuilds the whole exercise page**
+`log/log_screen.dart` (`_ExercisePage`, `buffer`)
+
+- **Bug** — finding 19 removed the per-second rebuild and debounced the writes,
+  but the keypad buffer is still passed down as a widget parameter, so each
+  digit rebuilds the page and every `SetRow` on it. Cheaper than it was — no
+  database round trip now — but it is still the largest rebuild in the app
+  happening on the most frequent interaction.
+- **Good UX** — invisible on a Pixel; the reason to care is that this is the one
+  screen used with cold hands and a two-year-old phone.
+- **Fix** — hold the buffer in a `ValueNotifier` and let the active cell listen,
+  so a keystroke repaints one cell instead of a page.
+
+**A8. Prefill's map is rebuilt on every set write**
+`log/log_providers.dart`
+
+- **Bug** — `workoutPrefillProvider` watches `workoutDetailProvider`, which
+  re-emits on every write to `workouts`, `workout_exercises` or `set_logs`. The
+  per-exercise providers cache, so no history is re-walked, but the map is
+  rebuilt and every listener rebuilds with it — on a stream that fires for each
+  set you complete.
+- **Good UX** — as above: invisible until it isn't.
+- **Fix** — watch the *identity* of the exercise list rather than the detail —
+  a `select` on the ids — so the map only rebuilds when the list actually
+  changes.
+
+### Consistency and smaller things
+
+**A9. Rest targets silently do nothing for an added exercise**
+`repositories/training_repository.dart` (`setRestTarget`)
+
+- **Bug** — the target is stored on the `session_exercises` row, so nudging the
+  timer on an exercise added mid-session writes to a row that doesn't exist. The
+  update matches nothing and returns without complaint; next week it is 120s
+  again.
+- **Good UX** — either it remembers or it says it can't.
+- **Fix** — fall back to the last rest actually recorded for that exercise
+  (`restTargetFor` already reads it), or offer to add the exercise to the
+  template when a target is set for one that isn't in it.
+
+**A10. The last-time line and the ghosts say the same thing twice**
+`log/log_screen.dart` (`_summariseSets`)
+
+- **Bug** — not a defect, a judgement to make on a real screen. Finding 20 added
+  "22.5×8, 22.5×8, 20×7" under the caption, and every one of those numbers is
+  also sitting in the rows below as a ghost. On a three-set exercise it is pure
+  duplication; its value is on a six-set one where the shape isn't visible at a
+  glance.
+- **Fix** — decide with the app in your hand: keep it, hide it once any set is
+  logged, or show it only above some number of sets.
+
+**A11. The duplicate-name check ignores archived exercises**
+`log/widgets/exercise_sheets.dart`
+
+- **Bug** — the collision query filters `archived = false`, so creating an
+  exercise named after an archived one passes silently. Un-archive it later and
+  the picker has two identical rows, which is the state finding 28 existed to
+  prevent.
+- **Fix** — check archived rows too and say so ("there's an archived Cable Fly
+  — restore it instead?"), which is the better answer anyway.
+
+**A12. Bodyweight history is a peek, not a list**
+`settings/settings_screen.dart`
+
+- **Bug** — the entry list renders only when there is more than one entry, shows
+  six, and the query behind it is capped at 30. Editing and deleting were added
+  in finding 24, but only for entries inside that window; a typo from two months
+  ago cannot be reached at all.
+- **Fix** — a real bodyweight screen: full paged history, and a chart, given the
+  numbers already exist and already scale every bodyweight lift.
+
+**A13. `RestAlert` gives up permanently on one failure**
+`core/rest_alert.dart`
+
+- **Bug** — any exception sets `_failed` and the tone never plays again for the
+  life of the process. That is right for "no audio plugin in a widget test" and
+  wrong for a transient audio-focus refusal during a phone call, which is a
+  thing that happens in a gym.
+- **Fix** — distinguish "this platform has no audio" from "this attempt failed";
+  retry the second, latch the first. Haptics fire either way, which is why this
+  is minor.
+
+### Deliberately not fixed, so nobody re-opens them
+
+- **Drop and rest-pause sets are still only visually indented.** The column that
+  linked them to the set they extend was dead and was dropped in the last round
+  rather than wired up. Real linking is a feature, not a bug fix.
+- **RPE is gone**, same reasoning.
+- **`_ValueCell` flashes whenever a value appears**, including on first load,
+  not only on ghost adoption. Reads as a hint that the row is live; leave it
+  unless it turns out to be distracting on a device.
+
+### Order to fix
+
+1. **A1, A2** — finish the units change; A2 first, so the analyzer finds A1.
+2. **A3, A4** — backdating's two loose ends, before the feature gets used
+   enough to leave a mess in the cycle history.
+3. **A5, A6** — prefill correctness. Both small.
+4. **A7, A8** — the log screen's remaining rebuild cost, once there is a device
+   to feel it on.
+5. **A9, A11, A13** — small consistency fixes.
+6. **A10, A12** — decide on a real screen; A12 is a feature.
 
 ---
 
