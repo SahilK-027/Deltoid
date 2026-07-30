@@ -80,6 +80,10 @@ class RegimeScreen extends ConsumerWidget {
                   Space.lg, Space.sm, Space.lg, Space.huge),
               children: [
                 _RegimeHeader(regime: regime, status: status),
+                if (status != null) ...[
+                  const SizedBox(height: Space.md),
+                  _CycleControls(status: status, sessions: sessions),
+                ],
                 const SizedBox(height: Space.xxl),
                 SectionLabel(
                   'Sessions · one cycle',
@@ -185,6 +189,137 @@ class _RegimeHeader extends ConsumerWidget {
   }
 }
 
+/// The two cycle overrides, which existed in the repository long before they
+/// existed on screen.
+///
+/// Without "Close this cycle" a session you permanently skip stalls the
+/// programme: the cycle never closes, the cycle index never moves, and the
+/// deload you configured never arrives. Without the deload override the
+/// schedule is binding, which contradicts the one promise this app makes —
+/// it suggests, it never forces. Whether you need a light week is a decision
+/// made in the gym, not six cycles in advance.
+class _CycleControls extends ConsumerWidget {
+  const _CycleControls({required this.status, required this.sessions});
+
+  final CycleStatus status;
+  final List<Session> sessions;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final remaining = status.remainingSessionIds;
+    final canClose = status.done > 0 && remaining.isNotEmpty;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'CYCLE ${status.cycleIndex}',
+                  style: context.t.labelSmall,
+                ),
+              ),
+              Text(
+                '${status.done} of ${status.total} done',
+                style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: canClose
+                      ? () => _closeCycle(context, ref, remaining)
+                      : null,
+                  child: const Text('Close this cycle'),
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _toggleDeload(context, ref),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: status.isDeload ? c.deload : null,
+                  ),
+                  child: Text(
+                    status.isDeload ? 'Not a deload' : 'Make it a deload',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+          Text(
+            canClose
+                ? 'Closing skips what is left and starts the next cycle.'
+                : status.done == 0
+                ? 'Nothing trained yet this cycle.'
+                : 'Every session is done — the next workout opens a new cycle.',
+            style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _nameOf(String sessionId) {
+    for (final s in sessions) {
+      if (s.id == sessionId) return s.name;
+    }
+    return 'A session';
+  }
+
+  Future<void> _closeCycle(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> remaining,
+  ) async {
+    // Name what it costs. "Are you sure" tells you nothing; "Leg 2 won't be
+    // trained this cycle" is the actual decision.
+    final names = remaining.map(_nameOf).toList();
+    final list = names.length == 1
+        ? '${names.single} won\'t be trained this cycle.'
+        : '${names.join(', ')} won\'t be trained this cycle.';
+
+    final ok = await confirmAction(
+      context,
+      title: 'Close cycle ${status.cycleIndex}?',
+      message: '$list\n\nThe next cycle starts from the top, and this one '
+          'counts towards your deload.',
+      confirmLabel: 'Close cycle',
+      destructive: false,
+    );
+    if (!ok) return;
+
+    final regime = ref.read(activeRegimeProvider).valueOrNull;
+    if (regime == null) return;
+    await ref.read(trainingRepositoryProvider).advanceCycle(regime.id);
+  }
+
+  Future<void> _toggleDeload(BuildContext context, WidgetRef ref) async {
+    final next = !status.isDeload;
+    await ref
+        .read(trainingRepositoryProvider)
+        .setCycleDeload(status.cycleId, next);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? 'Cycle ${status.cycleIndex} is a deload — lighter, fewer sets.'
+              : 'Cycle ${status.cycleIndex} is a normal cycle again.',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
+
 class _SessionList extends ConsumerWidget {
   const _SessionList({required this.sessions, required this.regimeId});
 
@@ -193,7 +328,6 @@ class _SessionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
     if (sessions.isEmpty) {
       return AppCard(
         child: Column(
@@ -214,47 +348,108 @@ class _SessionList extends ConsumerWidget {
       );
     }
 
+    // Explicit move controls rather than a drag handle. The list is nested in
+    // the tab's own ListView, and ReorderableDragStartListener is an immediate
+    // vertical drag: it competed with the parent scrollable and lost, so a
+    // normal-speed drag scrolled the page instead of reordering, and there was
+    // no auto-scroll to carry a session past the fold at all. A reorder should
+    // never depend on how fast your thumb moves.
     return AppCard(
       padding: EdgeInsets.zero,
-      child: ReorderableListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        buildDefaultDragHandles: false,
-        itemCount: sessions.length,
-        onReorder: (oldIndex, newIndex) {
-          var target = newIndex;
-          if (target > oldIndex) target -= 1;
-          final ids = sessions.map((s) => s.id).toList();
-          ids.insert(target, ids.removeAt(oldIndex));
-          ref.read(regimeRepositoryProvider).reorderSessions(ids);
-        },
-        itemBuilder: (context, i) {
-          final s = sessions[i];
-          final count = ref.watch(sessionSlotCountProvider(s.id)).valueOrNull;
-          return Column(
-            key: ValueKey(s.id),
+      child: Column(
+        children: [
+          for (var i = 0; i < sessions.length; i++)
+            _SessionRow(
+              session: sessions[i],
+              index: i,
+              total: sessions.length,
+              onMove: (delta) {
+                final ids = sessions.map((s) => s.id).toList();
+                final target = (i + delta).clamp(0, ids.length - 1);
+                if (target == i) return;
+                ids.insert(target, ids.removeAt(i));
+                ref.read(regimeRepositoryProvider).reorderSessions(ids);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionRow extends ConsumerWidget {
+  const _SessionRow({
+    required this.session,
+    required this.index,
+    required this.total,
+    required this.onMove,
+  });
+
+  final Session session;
+  final int index;
+  final int total;
+  final ValueChanged<int> onMove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final count = ref.watch(sessionSlotCountProvider(session.id)).valueOrNull;
+
+    return Column(
+      children: [
+        if (index > 0) Divider(color: c.border, height: 1),
+        ListTile(
+          leading: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (i > 0) Divider(color: c.border, height: 1),
-              ListTile(
-                leading: ReorderableDragStartListener(
-                  index: i,
-                  child: Icon(Icons.drag_indicator, color: c.textTertiary, size: 20),
-                ),
-                title: Text(s.name, style: context.t.titleSmall),
-                subtitle: Text(
-                  count == null ? '' : '$count exercises',
-                  style: context.t.labelSmall,
-                ),
-                trailing: Icon(Icons.chevron_right, color: c.textTertiary, size: 18),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SessionEditorScreen(sessionId: s.id),
-                  ),
-                ),
+              _MoveButton(
+                icon: Icons.keyboard_arrow_up,
+                onTap: index == 0 ? null : () => onMove(-1),
+              ),
+              _MoveButton(
+                icon: Icons.keyboard_arrow_down,
+                onTap: index >= total - 1 ? null : () => onMove(1),
               ),
             ],
-          );
-        },
+          ),
+          title: Text(session.name, style: context.t.titleSmall),
+          subtitle: Text(
+            count == null ? '' : '$count exercises',
+            style: context.t.labelSmall,
+          ),
+          trailing:
+              Icon(Icons.chevron_right, color: c.textTertiary, size: 18),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SessionEditorScreen(sessionId: session.id),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoveButton extends StatelessWidget {
+  const _MoveButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(Radii.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? c.border : c.textSecondary,
+        ),
       ),
     );
   }
@@ -418,10 +613,21 @@ Future<String?> promptForText(
   required String title,
   String? hint,
   String initial = '',
+  int maxLines = 1,
+  /// Notes are the one text this app takes that you must also be able to
+  /// clear, so emptiness has to be a savable answer rather than a disabled
+  /// button.
+  bool allowEmpty = false,
 }) {
   return showDialog<String>(
     context: context,
-    builder: (_) => _TextPromptDialog(title: title, hint: hint, initial: initial),
+    builder: (_) => _TextPromptDialog(
+      title: title,
+      hint: hint,
+      initial: initial,
+      maxLines: maxLines,
+      allowEmpty: allowEmpty,
+    ),
   );
 }
 
@@ -430,11 +636,15 @@ class _TextPromptDialog extends StatefulWidget {
     required this.title,
     required this.hint,
     required this.initial,
+    required this.maxLines,
+    required this.allowEmpty,
   });
 
   final String title;
   final String? hint;
   final String initial;
+  final int maxLines;
+  final bool allowEmpty;
 
   @override
   State<_TextPromptDialog> createState() => _TextPromptDialogState();
@@ -451,7 +661,7 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
 
   void _submit() {
     final value = _controller.text.trim();
-    if (value.isEmpty) return;
+    if (value.isEmpty && !widget.allowEmpty) return;
     Navigator.of(context).pop(value);
   }
 
@@ -462,8 +672,10 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
+        maxLines: widget.maxLines,
         textCapitalization: TextCapitalization.sentences,
-        textInputAction: TextInputAction.done,
+        textInputAction:
+            widget.maxLines > 1 ? TextInputAction.newline : TextInputAction.done,
         decoration: InputDecoration(hintText: widget.hint),
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) => _submit(),
@@ -474,7 +686,9 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _controller.text.trim().isEmpty ? null : _submit,
+          onPressed: _controller.text.trim().isEmpty && !widget.allowEmpty
+              ? null
+              : _submit,
           child: const Text('Save'),
         ),
       ],

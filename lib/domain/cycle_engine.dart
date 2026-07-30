@@ -6,6 +6,7 @@
 /// counted in cycles for the same reason.
 class CycleStatus {
   const CycleStatus({
+    required this.cycleId,
     required this.cycleIndex,
     required this.isDeload,
     required this.sessionIds,
@@ -14,6 +15,10 @@ class CycleStatus {
     required this.deloadEnabled,
     required this.deloadAfterCycles,
   });
+
+  /// The open cycle's row id, so a screen that shows a cycle can also act on
+  /// it: close it early, or override whether it is a deload.
+  final String cycleId;
 
   final int cycleIndex;
   final bool isDeload;
@@ -87,6 +92,7 @@ class CycleStatus {
     int? deloadAfterCycles,
   }) {
     return CycleStatus(
+      cycleId: cycleId,
       cycleIndex: cycleIndex ?? this.cycleIndex,
       isDeload: isDeload ?? this.isDeload,
       sessionIds: sessionIds ?? this.sessionIds,

@@ -8,6 +8,7 @@ import '../data/db/database.dart';
 import '../data/repositories/training_repository.dart';
 import '../data/seed/seeder.dart';
 import '../domain/cycle_engine.dart';
+import '../domain/units.dart';
 
 /// Single database instance for the app's lifetime.
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -76,6 +77,28 @@ final themeModeProvider = StreamProvider<ThemeMode>((ref) {
 Future<void> setThemeMode(AppDatabase db, ThemeMode mode) {
   return db.into(db.appSettings).insertOnConflictUpdate(
         AppSettingsCompanion.insert(key: themeModeKey, value: mode.name),
+      );
+}
+
+const unitsKey = 'units';
+
+/// The unit weights are shown and typed in.
+///
+/// Storage stays kilograms whatever this says — mixed units in the database
+/// would break every historical comparison with no way to tell afterwards
+/// which rows meant what. This is a display setting, applied at the edges.
+final weightUnitProvider = StreamProvider<WeightUnit>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.appSettings)..where((t) => t.key.equals(unitsKey));
+  return query.watch().map(
+        (rows) =>
+            WeightUnitX.parse(rows.isEmpty ? null : rows.first.value),
+      );
+});
+
+Future<void> setWeightUnit(AppDatabase db, WeightUnit unit) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(key: unitsKey, value: unit.name),
       );
 }
 

@@ -9,36 +9,73 @@ final workoutDetailProvider =
   return ref.watch(trainingRepositoryProvider).watchWorkoutDetail(workoutId);
 });
 
+/// Ticks when the shape of history changes — a workout deleted or backdated,
+/// an exercise added or swapped — and deliberately *not* when a set is
+/// written, which happens on every keystroke. Emits immediately so anything
+/// awaiting it resolves on first build rather than on the first edit.
+final historyShapeProvider = StreamProvider<int>((ref) async* {
+  var ticks = 0;
+  yield ticks;
+  await for (final _
+      in ref.watch(trainingRepositoryProvider).historyShapeChanges()) {
+    yield ++ticks;
+  }
+});
+
+/// One exercise's last-time numbers, in the context of one workout.
+///
+/// The unit of resolution is the exercise, not the workout: adding a seventh
+/// movement mid-session must not re-walk history for the six already on screen,
+/// and the six must not be recomputed just because the seventh arrived.
+final exercisePrefillProvider = FutureProvider.family<
+    PrefillResult,
+    ({String workoutId, String exerciseId})>((ref, key) async {
+  // Re-resolve when logged history changes. Deleting a past workout is
+  // reachable from History while a session is open, and without this the
+  // ghosts in the running log keep showing numbers from the day just deleted.
+  // Finding 2 fixed the added-exercise case; this is its mirror.
+  await ref.watch(historyShapeProvider.future);
+
+  return ref.watch(trainingRepositoryProvider).prefillForWorkout(
+        workoutId: key.workoutId,
+        exerciseId: key.exerciseId,
+      );
+});
+
 /// Last-time numbers for every exercise in a workout, keyed by exercise id.
 ///
-/// Resolved once when the log opens rather than per set row — the lookup walks
-/// history and shouldn't run on every keystroke.
+/// Watches the workout rather than being resolved once when the log opens.
+/// Resolving once meant an exercise added or swapped in at 19:40 read "First
+/// time — no previous log" with a year of history behind it, and — because
+/// there was no ghost to adopt — a set typed with only reps was stored against
+/// a null weight.
 final workoutPrefillProvider =
     FutureProvider.family<Map<String, PrefillResult>, String>(
         (ref, workoutId) async {
-  final repo = ref.watch(trainingRepositoryProvider);
-  final db = ref.watch(databaseProvider);
-
-  final detail = await repo.workoutDetail(workoutId);
-  if (detail == null) return {};
-
-  final regime = await (db.select(db.regimes)
-        ..where((t) => t.id.equals(detail.workout.regimeId)))
-      .getSingleOrNull();
+  // Watch the *identity* of the exercise list, not the whole detail. The detail
+  // stream re-emits on every write to workouts, workout_exercises or set_logs —
+  // once per completed set — and rebuilding this map on each of those made
+  // every listener rebuild with it. The ids only change when an exercise is
+  // added, swapped or removed, which is exactly when this map is stale.
+  // Joined into a string on purpose: Dart lists compare by identity, so
+  // selecting a List would rebuild every time regardless and quietly do
+  // nothing at all.
+  final exerciseIds = await ref.watch(
+    workoutDetailProvider(workoutId).selectAsync(
+      (detail) => [
+        for (final e in detail?.entries ?? const []) e.exercise.id,
+      ].join(','),
+    ),
+  );
 
   final out = <String, PrefillResult>{};
-  for (final entry in detail.entries) {
-    final past = await repo.pastPerformances(
-      entry.exercise.id,
-      limit: 30,
-      excludeWorkoutId: workoutId,
-    );
-    out[entry.exercise.id] = resolvePrefill(
-      candidates: past,
-      sessionId: detail.workout.sessionId,
-      targetIsDeload: detail.workout.isDeload,
-      deloadSetDelta: regime?.deloadSetDelta ?? -1,
-      deloadWeightPct: regime?.deloadWeightPct ?? 80,
+  for (final exerciseId in exerciseIds.split(',')) {
+    if (exerciseId.isEmpty) continue;
+    out[exerciseId] = await ref.watch(
+      exercisePrefillProvider((
+        workoutId: workoutId,
+        exerciseId: exerciseId,
+      )).future,
     );
   }
   return out;

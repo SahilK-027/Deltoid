@@ -56,6 +56,98 @@ Future<void> _startSession(
   }
 }
 
+/// Writes down a session that was trained but never logged.
+///
+/// `dayKey` used to be stamped once from `DateTime.now()` and never again, so
+/// forgetting to log Monday left Wednesday's entry permanently wrong, and
+/// delete-and-redo didn't help because the redo was stamped today too.
+Future<void> _logPastSession(
+  BuildContext context,
+  WidgetRef ref, {
+  required String regimeId,
+  required List<Session> sessions,
+  required bool hasOpenWorkout,
+}) async {
+  if (hasOpenWorkout) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Finish the session you are in first'),
+      ),
+    );
+    return;
+  }
+
+  final sessionId = await showModalBottomSheet<String>(
+    context: context,
+    builder: (sheet) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(Space.lg),
+            child: SectionLabel('Which session did you train?'),
+          ),
+          for (final s in sessions)
+            ListTile(
+              title: Text(s.name),
+              onTap: () => Navigator.of(sheet).pop(s.id),
+            ),
+          const SizedBox(height: Space.md),
+        ],
+      ),
+    ),
+  );
+  if (sessionId == null || !context.mounted) return;
+
+  final now = DateTime.now();
+  final date = await showDatePicker(
+    context: context,
+    initialDate: now.subtract(const Duration(days: 1)),
+    firstDate: DateTime(2015),
+    lastDate: now,
+    helpText: 'When did you train it?',
+  );
+  if (date == null || !context.mounted) return;
+
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final container = ProviderScope.containerOf(context, listen: false);
+  final repo = container.read(trainingRepositoryProvider);
+  try {
+    // Which cycle a backfill lands in is decided by its date, not by today, so
+    // say which one. Otherwise it is invisible until a deload arrives early and
+    // nobody knows why.
+    final cycle = await repo.cycleCovering(regimeId, date);
+    final id = await repo.startWorkout(
+      regimeId: regimeId,
+      sessionId: sessionId,
+      at: date,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          cycle == null
+              ? 'Older than this regime — counts towards no cycle'
+              : 'Counts towards cycle ${cycle.cycleIndex}',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    await navigator.push(
+      MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
+    );
+  } on StateError catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Could not open that session: $e')),
+    );
+  }
+}
+
+/// Anchors the "this cycle" list so the card above it can scroll to it.
+final _sessionListKey = GlobalKey();
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -72,6 +164,18 @@ class TodayScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Deltoid'),
         actions: [
+          if (regime != null && sessions.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.post_add_outlined),
+              tooltip: 'Log a past session',
+              onPressed: () => _logPastSession(
+                context,
+                ref,
+                regimeId: regime.id,
+                sessions: sessions,
+                hasOpenWorkout: open != null,
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.of(context).push(
@@ -98,17 +202,32 @@ class TodayScreen extends ConsumerWidget {
                   regimeId: r.id,
                   status: status,
                   sessions: sessions,
+                  onShowAll: () {
+                    final target = _sessionListKey.currentContext;
+                    if (target == null) return;
+                    Scrollable.ensureVisible(
+                      target,
+                      alignment: 0.1,
+                      duration: Motion.base,
+                      curve: Motion.curve,
+                    );
+                  },
                 ),
               const SizedBox(height: Space.xxl),
-              _ConsistencyCard(hasHistory: hasHistory),
-              const SizedBox(height: Space.xxl),
+              // The session list sits above the heatmap on purpose. The card
+              // names the first session not yet done, not an obligation — and
+              // the alternatives have to be visible without scrolling, or the
+              // app reads as though it won't let you train Pull before Push.
               if (status != null)
                 _AllSessions(
+                  key: _sessionListKey,
                   regimeId: r.id,
                   status: status,
                   sessions: sessions,
                   disabled: open != null,
                 ),
+              const SizedBox(height: Space.xxl),
+              _ConsistencyCard(hasHistory: hasHistory),
             ],
           ),
       },
@@ -160,23 +279,43 @@ class _NoSessionsState extends ConsumerWidget {
   }
 }
 
+/// The running workout's own session and regime, by id.
+///
+/// Not filtered out of the active regime's sessions: switching regimes with a
+/// workout open left that filter empty, and the card fell back to "Workout".
+final _resumeOwnerProvider = FutureProvider.family<
+    ({String? sessionName, String regimeId, String? regimeName})?,
+    String>((ref, workoutId) {
+  return ref.watch(trainingRepositoryProvider).workoutOwner(workoutId);
+});
+
 /// Shown when a session was started and not finished. Losing an in-progress
 /// log to a locked phone screen would be unforgivable, so resuming is the
 /// loudest thing on the screen.
-class _ResumeCard extends StatelessWidget {
+class _ResumeCard extends ConsumerWidget {
   const _ResumeCard({required this.workout, required this.sessions});
 
   final Workout workout;
   final List<Session> sessions;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
-    final name = sessions
+    final owner = ref.watch(_resumeOwnerProvider(workout.id)).valueOrNull;
+    final activeRegime = ref.watch(activeRegimeProvider).valueOrNull;
+    final name = owner?.sessionName ??
+        sessions
             .where((s) => s.id == workout.sessionId)
             .map((s) => s.name)
             .firstOrNull ??
         'Workout';
+    // Finishing this advances the cycle of the regime it was started under,
+    // which is worth saying when you are looking at a different one.
+    final foreignRegime = owner != null &&
+            activeRegime != null &&
+            owner.regimeId != activeRegime.id
+        ? owner.regimeName
+        : null;
     // Carry the deload identity through the resume path too, or a light week
     // silently looks like a normal one the moment you come back to it.
     final accent = workout.isDeload ? c.deload : c.accent;
@@ -202,6 +341,13 @@ class _ResumeCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.md),
           Text(name, style: context.t.displaySmall),
+          if (foreignRegime != null) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              'in $foreignRegime — finishing it advances that regime',
+              style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+            ),
+          ],
           const SizedBox(height: Space.lg),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -234,7 +380,11 @@ class _NextSessionCard extends ConsumerWidget {
     required this.regimeId,
     required this.status,
     required this.sessions,
+    required this.onShowAll,
   });
+
+  /// Scrolls to the full list of this cycle's sessions.
+  final VoidCallback onShowAll;
 
   final String regimeId;
   final CycleStatus status;
@@ -266,14 +416,34 @@ class _NextSessionCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text('UP NEXT', style: context.t.labelSmall),
+              // "Up next" read as an instruction. It is a description: the
+              // first session in programme order that hasn't been done yet.
+              Text('FIRST UNFINISHED', style: context.t.labelSmall),
               const Spacer(),
               if (status.isDeload)
                 Pill('Deload cycle', color: c.deload, icon: Icons.trending_down),
             ],
           ),
           const SizedBox(height: Space.md),
-          Text(session?.name ?? 'Session', style: context.t.displaySmall),
+          // Tapping the name says "show me the others" — the queue head is a
+          // suggestion, and training out of order is supported on purpose.
+          InkWell(
+            onTap: onShowAll,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    session?.name ?? 'Session',
+                    style: context.t.displaySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                Icon(Icons.unfold_more, size: 18, color: c.textTertiary),
+              ],
+            ),
+          ),
           const SizedBox(height: Space.sm),
           Row(
             children: [
@@ -457,6 +627,7 @@ class _ConsistencyCard extends ConsumerWidget {
 /// than a fight with the app.
 class _AllSessions extends ConsumerWidget {
   const _AllSessions({
+    super.key,
     required this.regimeId,
     required this.status,
     required this.sessions,

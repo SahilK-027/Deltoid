@@ -27,7 +27,13 @@ class Exercises extends Table with SyncColumns {
   TextColumn get muscle => textEnum<MuscleGroup>()();
   TextColumn get equipment => textEnum<Equipment>()();
   TextColumn get loadMode => textEnum<LoadMode>()();
-  BoolColumn get isUnilateral => boolean().withDefault(const Constant(false))();
+
+  /// The `starterExercises` key this row was seeded from, when it was.
+  ///
+  /// Templates match on this rather than on the name, so renaming "Dips" to
+  /// "Weighted dips" and then applying a template reuses the row instead of
+  /// creating a second one under the old name.
+  TextColumn get starterKey => text().nullable()();
   TextColumn get formVideoUrls =>
       text().map(const StringListConverter()).withDefault(const Constant('[]'))();
   TextColumn get notes => text().nullable()();
@@ -74,6 +80,13 @@ class SessionExercises extends Table with SyncColumns {
   IntColumn get targetRepLow => integer().nullable()();
   IntColumn get targetRepHigh => integer().nullable()();
   TextColumn get notes => text().nullable()();
+
+  /// Rest target for this slot, in seconds.
+  ///
+  /// Per slot rather than global: heavy compounds want three minutes and cable
+  /// work wants sixty seconds, and re-dialling that on every exercise is the
+  /// kind of friction that gets an app closed mid-session.
+  IntColumn get restSeconds => integer().nullable()();
 
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   IntColumn get deloadSetDelta => integer().nullable()();
@@ -141,10 +154,6 @@ class SetLogs extends Table with SyncColumns {
 
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
   RealColumn get addedWeight => real().nullable()();
-  RealColumn get rpe => real().nullable()();
-
-  /// Drop and rest-pause sets hang off the working set they extend.
-  TextColumn get parentSetId => text().nullable()();
 
   IntColumn get restSeconds => integer().nullable()();
   IntColumn get completedAt => integer().nullable()();

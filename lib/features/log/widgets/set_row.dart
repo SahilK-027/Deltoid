@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -5,6 +8,7 @@ import '../../../data/db/database.dart';
 import '../../../domain/enums.dart';
 import '../../../domain/metrics.dart';
 import '../../../domain/prefill.dart';
+import '../../../domain/units.dart';
 import '../log_screen.dart';
 import 'keypad.dart';
 
@@ -21,6 +25,7 @@ class SetRow extends StatelessWidget {
     required this.set,
     required this.position,
     required this.loadMode,
+    required this.unit,
     required this.ghost,
     required this.editing,
     required this.buffer,
@@ -32,9 +37,10 @@ class SetRow extends StatelessWidget {
   final SetLog set;
   final int position;
   final LoadMode loadMode;
+  final WeightUnit unit;
   final PastSet? ghost;
   final EditTarget? editing;
-  final String buffer;
+  final ValueListenable<String> buffer;
   final void Function(SetLog, SetField) onEdit;
   final void Function(SetLog, bool) onToggleDone;
 
@@ -68,11 +74,12 @@ class SetRow extends StatelessWidget {
           else
             Expanded(
               child: _ValueCell(
+                unit: unit,
                 field: loadMode == LoadMode.bodyweightPlus
                     ? SetField.added
                     : SetField.weight,
                 prefix: loadMode == LoadMode.bodyweightPlus ? 'BW +' : null,
-                suffix: 'kg',
+                suffix: unit.label,
                 value: loadMode == LoadMode.bodyweightPlus
                     ? set.addedWeight
                     : set.weight,
@@ -98,6 +105,7 @@ class SetRow extends StatelessWidget {
           SizedBox(
             width: 78,
             child: _ValueCell(
+              unit: unit,
               field: SetField.reps,
               suffix: 'reps',
               value: set.reps?.toDouble(),
@@ -147,9 +155,10 @@ class SetRow extends StatelessWidget {
   }
 }
 
-class _ValueCell extends StatelessWidget {
+class _ValueCell extends StatefulWidget {
   const _ValueCell({
     required this.field,
+    required this.unit,
     required this.value,
     required this.ghost,
     required this.active,
@@ -160,58 +169,120 @@ class _ValueCell extends StatelessWidget {
   });
 
   final SetField field;
+
+  /// Reps are unitless; weights are stored in kg and shown in this.
+  final WeightUnit unit;
+
   final double? value;
   final double? ghost;
   final bool active;
-  final String buffer;
+  final ValueListenable<String> buffer;
   final VoidCallback onTap;
   final String? prefix;
   final String? suffix;
 
   @override
+  State<_ValueCell> createState() => _ValueCellState();
+}
+
+class _ValueCellState extends State<_ValueCell> {
+  /// Brief accent wash after a ghost turns into a real value, so adoption is
+  /// something you see happen rather than something you infer from grey
+  /// becoming white in gym lighting.
+  bool _flash = false;
+  Timer? _flashEnd;
+
+  @override
+  void didUpdateWidget(_ValueCell old) {
+    super.didUpdateWidget(old);
+    if (old.value == null && widget.value != null && !widget.active) {
+      _flashEnd?.cancel();
+      setState(() => _flash = true);
+      _flashEnd = Timer(Motion.slow, () {
+        if (mounted) setState(() => _flash = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _flashEnd?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Only the cell being typed into listens to the keypad buffer, so a
+    // keystroke repaints one cell rather than the page.
+    if (!widget.active) return _build(context, _fmt(widget.value, widget));
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.buffer,
+      builder: (context, buffer, _) => _build(context, buffer),
+    );
+  }
+
+  Widget _build(BuildContext context, String display) {
     final c = context.c;
-    final display = active ? buffer : _fmt(value);
     final hasValue = display.isNotEmpty;
-    final ghostText = _fmt(ghost);
+    final ghostText = _fmt(widget.ghost, widget);
+    // A suggestion must never look like a record: the ghost is italic and
+    // carries a leading dot, so the difference survives a glance from arm's
+    // length with the phone on the floor.
+    final showingGhost = !hasValue && ghostText.isNotEmpty;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: AnimatedContainer(
         duration: Motion.fast,
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: Space.md),
         decoration: BoxDecoration(
-          color: active ? c.accent.withValues(alpha: 0.12) : c.surfaceHigh,
+          color: widget.active
+              ? c.accent.withValues(alpha: 0.12)
+              : (_flash ? c.accent.withValues(alpha: 0.28) : c.surfaceHigh),
           borderRadius: BorderRadius.circular(Radii.sm),
-          border: Border.all(color: active ? c.accent : Colors.transparent),
+          border: Border.all(
+            color: widget.active ? c.accent : Colors.transparent,
+          ),
         ),
         child: Row(
           children: [
-            if (prefix != null) ...[
-              Text(prefix!, style: context.t.labelMedium),
+            if (widget.prefix != null) ...[
+              Text(widget.prefix!, style: context.t.labelMedium),
               const SizedBox(width: 2),
+            ],
+            if (showingGhost) ...[
+              Text(
+                '·',
+                style: context.t.labelLarge?.copyWith(color: c.textTertiary),
+              ),
+              const SizedBox(width: 3),
             ],
             Expanded(
               child: Text(
                 hasValue ? display : (ghostText.isEmpty ? '—' : ghostText),
                 style: context.t.labelLarge?.copyWith(
                   color: hasValue ? c.textPrimary : c.textTertiary,
+                  fontStyle: showingGhost ? FontStyle.italic : FontStyle.normal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.clip,
               ),
             ),
-            if (suffix != null) Text(suffix!, style: context.t.labelSmall),
+            if (widget.suffix != null)
+              Text(widget.suffix!, style: context.t.labelSmall),
           ],
         ),
       ),
     );
   }
 
-  static String _fmt(double? v) {
+  static String _fmt(double? v, _ValueCell cell) {
     if (v == null) return '';
-    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+    if (cell.field == SetField.reps) {
+      return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+    }
+    return formatInUnit(v, cell.unit);
   }
 }
 

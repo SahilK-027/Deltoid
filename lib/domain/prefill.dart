@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'enums.dart';
-import 'metrics.dart';
+import 'units.dart';
 
 /// One set from a previous performance.
 class PastSet {
@@ -35,14 +35,26 @@ class PastPerformance {
     required this.dayKey,
     required this.isDeload,
     required this.sets,
+    this.startedAt = 0,
+    this.skipReason = SkipReason.none,
   });
 
   final String workoutId;
   final String? sessionId;
   final String sessionName;
   final int dayKey;
+
+  /// When the workout began. Ordering on [dayKey] alone is not enough: train
+  /// the same session twice in a day and "last time" has to mean the later of
+  /// the two, not whichever the map happened to hold first.
+  final int startedAt;
   final bool isDeload;
   final List<PastSet> sets;
+
+  /// Why this performance was cut short, when it was. A skipped slot that
+  /// still holds logged sets is a real performance — the sets happened — and
+  /// history says so next to the reason rather than hiding them.
+  final SkipReason skipReason;
 }
 
 enum PrefillSource {
@@ -102,6 +114,7 @@ PrefillResult resolvePrefill({
   bool targetIsDeload = false,
   int deloadSetDelta = -1,
   int deloadWeightPct = 80,
+  WeightUnit unit = WeightUnit.kg,
 }) {
   PastPerformance? pick;
   var source = PrefillSource.none;
@@ -140,11 +153,18 @@ PrefillResult resolvePrefill({
 
   if (pick == null) return const PrefillResult.empty();
 
-  final sets = targetIsDeload
+  // Never scale a light week again. If the only history for this slot is
+  // itself a deload, 80% of 80% is 64% — a deload is 80% of your working
+  // weight, not 80% of the last time you backed off. Reachable as soon as a
+  // deload can be forced two cycles running from the UI.
+  final scale = targetIsDeload && !pick.isDeload;
+
+  final sets = scale
       ? applyDeload(
           pick.sets,
           setDelta: deloadSetDelta,
           weightPct: deloadWeightPct,
+          unit: unit,
         )
       : pick.sets;
 
@@ -152,7 +172,7 @@ PrefillResult resolvePrefill({
     sets: sets,
     source: source,
     reference: pick,
-    deloadApplied: targetIsDeload,
+    deloadApplied: scale,
   );
 }
 
@@ -165,6 +185,10 @@ List<PastSet> applyDeload(
   List<PastSet> sets, {
   required int setDelta,
   required int weightPct,
+  /// A scaled load has to be a weight you can actually load on a bar, and
+  /// which weights those are depends on whether the plates are kilos or
+  /// pounds. Storage stays kg either way.
+  WeightUnit unit = WeightUnit.kg,
 }) {
   final warmups = sets.where((s) => s.type == SetType.warmup).toList();
   final working = sets
@@ -175,7 +199,7 @@ List<PastSet> applyDeload(
   final trimmed = working.take(keep).toList();
 
   double? scale(double? w) =>
-      w == null ? null : roundLoad(w * weightPct / 100);
+      w == null ? null : roundLoadIn(w * weightPct / 100, unit);
 
   return [
     ...warmups,

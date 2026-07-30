@@ -117,9 +117,11 @@ Future<void> showExerciseMenu(
               final replacement = await pickExercise(context, ref);
               navigator.pop();
               if (replacement == null) return;
-              await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
-              await repo.addExerciseToWorkout(
-                entry.workoutExercise.workoutId,
+              // In place: same position, same target sets, set shape from the
+              // replacement's own history. Remove-then-add used to drop it at
+              // the end of the workout.
+              await repo.replaceExerciseInWorkout(
+                entry.workoutExercise.id,
                 replacement.id,
               );
             },
@@ -576,6 +578,33 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     final repo = RegimeRepository(db);
     final notes = _notes.text.trim();
 
+    // Two rows with the same name are indistinguishable in the picker, and the
+    // picker is where you choose what a set gets logged against. Archived rows
+    // count: they are one tap from being restored, and restoring one into a
+    // collision is the state this check exists to prevent.
+    final clash = await (db.select(db.exercises)
+          ..where((t) => t.name.equals(name) & t.deletedAt.isNull()))
+        .get();
+    final duplicates =
+        clash.where((e) => e.id != widget.existing?.id).toList();
+    if (duplicates.isNotEmpty) {
+      if (!mounted) return;
+      final archived = duplicates.every((e) => e.archived);
+      final ok = await confirmAction(
+        context,
+        title: 'There is already a "$name"',
+        message: archived
+            ? 'An archived exercise has this name. Restoring it later would '
+                'leave two you cannot tell apart in the picker — restore that '
+                'one instead?'
+            : 'Two exercises with the same name are impossible to tell apart '
+                'when picking one mid-session. Keep both?',
+        confirmLabel: 'Keep both',
+        destructive: false,
+      );
+      if (!ok) return;
+    }
+
     final id = widget.existing?.id;
     if (id == null) {
       final created = await repo.createExercise(
@@ -589,8 +618,34 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
       return;
     }
 
-    // Editing the catalog row is safe: past logs point at the exercise, but the
-    // numbers they hold are their own snapshot.
+    // Load mode is the one field that is not a label: it decides how every set
+    // ever logged for this movement is read. Flipping "total" to "per
+    // dumbbell" doubles the effective load of all of them, moving e1RM, the
+    // chart, the beat-last-time highlight and every prefill comparison. No
+    // migration — the reinterpretation is the point — but it has to be chosen
+    // knowingly, with the number in front of you.
+    if (_loadMode != widget.existing!.loadMode) {
+      final affected = await ref
+          .read(trainingRepositoryProvider)
+          .loggedSetCount(id);
+      if (affected > 0) {
+        if (!mounted) return;
+        final ok = await confirmAction(
+          context,
+          title: 'Change how this load is read?',
+          message: '$affected logged '
+              '${affected == 1 ? 'set' : 'sets'} will be re-read as '
+              '${_loadModeName(_loadMode)}. Their estimated 1RMs, the progress '
+              'chart and every "beat last time" comparison move with them.',
+          confirmLabel: 'Change it',
+          destructive: false,
+        );
+        if (!ok) return;
+      }
+    }
+
+    // Editing the catalog row is otherwise safe: past logs point at the
+    // exercise, but the numbers they hold are their own snapshot.
     await repo.updateExercise(
       id,
       name: Value(name),
@@ -601,6 +656,13 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     );
     navigator.pop(await _row(db, id));
   }
+
+  static String _loadModeName(LoadMode mode) => switch (mode) {
+        LoadMode.total => 'a total load',
+        LoadMode.perSide => 'per dumbbell',
+        LoadMode.bodyweight => 'bodyweight only',
+        LoadMode.bodyweightPlus => 'bodyweight plus the entered load',
+      };
 
   Future<Exercise> _row(AppDatabase db, String id) =>
       (db.select(db.exercises)..where((t) => t.id.equals(id))).getSingle();

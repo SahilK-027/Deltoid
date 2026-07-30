@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
+import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
@@ -705,15 +707,16 @@ class _DateColumn extends StatelessWidget {
   }
 }
 
-class _Cell extends StatelessWidget {
+class _Cell extends ConsumerWidget {
   const _Cell({required this.cell, required this.exercise});
 
   final HistoryCell? cell;
   final Exercise? exercise;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
     if (cell == null) {
       return Align(
@@ -721,14 +724,19 @@ class _Cell extends StatelessWidget {
         child: Text('·', style: context.t.labelMedium?.copyWith(color: c.textTertiary)),
       );
     }
-    if (cell!.skipReason != SkipReason.none) {
+    final skipped = cell!.skipReason != SkipReason.none;
+    final done = cell!.sets.where((s) => s.isDone).toList();
+
+    // A skip with nothing logged is just a skip. A skip with sets behind it is
+    // a short session, and the numbers below are the ones prefill reads — so
+    // the column shows both rather than swallowing the sets.
+    if (skipped && done.isEmpty) {
       return Align(
         alignment: Alignment.centerLeft,
         child: Pill(cell!.skipReason.label, color: c.negative),
       );
     }
 
-    final done = cell!.sets.where((s) => s.isDone).toList();
     if (done.isEmpty) {
       return Align(
         alignment: Alignment.centerLeft,
@@ -745,8 +753,8 @@ class _Cell extends StatelessWidget {
     final weightLabel = weights.isEmpty
         ? 'BW'
         : weights.length == 1
-            ? formatWeight(weights.first)
-            : weights.map(formatWeight).join('/');
+            ? formatWeight(weights.first, unit)
+            : weights.map((w) => formatWeight(w, unit)).join('/');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -765,6 +773,15 @@ class _Cell extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        if (skipped) ...[
+          const SizedBox(height: 2),
+          Text(
+            'then ${cell!.skipReason.label.toLowerCase()}',
+            style: context.t.labelSmall?.copyWith(color: c.negative),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ],
     );
   }
@@ -772,10 +789,17 @@ class _Cell extends StatelessWidget {
 
 /// Trailing zeros are noise on a gym screen: 22.5 stays 22.5, 60.0 becomes 60.
 ///
-/// Capped at two decimals because this also formats *computed* numbers — an
-/// estimated 1RM is an arbitrary double, and `55.733333333333334 kg` is not a
-/// weight anyone has ever lifted.
-String formatWeight(double v) {
+/// Takes a stored kilogram value and renders it in [unit]. Capped at two
+/// decimals because this also formats *computed* numbers — an estimated 1RM is
+/// an arbitrary double, and `55.733333333333334 kg` is not a weight anyone has
+/// ever lifted.
+///
+/// [unit] is required on purpose. It was optional with a kilogram default for
+/// exactly one commit, and in that commit two call sites forgot it and rendered
+/// pounds as kilograms — next to a tooltip that had it right. An optional unit
+/// makes "wrong" the thing that compiles.
+String formatWeight(double kg, WeightUnit unit) {
+  final v = unit.display(kg);
   if (v == v.roundToDouble()) return v.toStringAsFixed(0);
   final rounded = (v * 100).round() / 100;
   if (rounded == rounded.roundToDouble()) return rounded.toStringAsFixed(0);

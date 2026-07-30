@@ -9,6 +9,8 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/units.dart';
+import '../regime/regime_screen.dart' show promptForText;
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
@@ -54,9 +56,28 @@ class WorkoutDetailScreen extends ConsumerWidget {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (value) {
-              if (value == 'delete') _delete(context, ref, detail);
+              switch (value) {
+                case 'date':
+                  _editDate(context, ref, detail);
+                case 'notes':
+                  _editNotes(context, ref, detail);
+                case 'delete':
+                  _delete(context, ref, detail);
+              }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'date',
+                child: Text('Change the date'),
+              ),
+              PopupMenuItem(
+                value: 'notes',
+                child: Text(
+                  workout.notes == null || workout.notes!.isEmpty
+                      ? 'Add a note'
+                      : 'Edit the note',
+                ),
+              ),
               PopupMenuItem(
                 value: 'delete',
                 child: Text(
@@ -75,6 +96,10 @@ class WorkoutDetailScreen extends ConsumerWidget {
           AppCard(
             padding: const EdgeInsets.all(Space.xl),
             highlightColor: workout.isDeload ? c.deload : null,
+            // Tapping the date edits it: forgetting to log Monday until
+            // Wednesday is normal, and a date you cannot correct is a lie the
+            // heatmap repeats forever.
+            onTap: () => _editDate(context, ref, detail),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -84,6 +109,9 @@ class WorkoutDetailScreen extends ConsumerWidget {
                         style: context.t.labelSmall),
                     const Spacer(),
                     if (workout.isDeload) Pill('Deload', color: c.deload),
+                    const SizedBox(width: Space.sm),
+                    Icon(Icons.edit_calendar_outlined,
+                        size: 14, color: c.textTertiary),
                   ],
                 ),
                 const SizedBox(height: Space.sm),
@@ -94,10 +122,33 @@ class WorkoutDetailScreen extends ConsumerWidget {
                   _facts(detail).join('  ·  '),
                   style: context.t.bodyMedium?.copyWith(color: accent),
                 ),
-                if (workout.notes != null && workout.notes!.isNotEmpty) ...[
-                  const SizedBox(height: Space.md),
-                  Text(workout.notes!, style: context.t.bodySmall),
-                ],
+                const SizedBox(height: Space.md),
+                InkWell(
+                  onTap: () => _editNotes(context, ref, detail),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                    child: Row(
+                      children: [
+                        Icon(Icons.sticky_note_2_outlined,
+                            size: 14, color: c.textTertiary),
+                        const SizedBox(width: Space.sm),
+                        Expanded(
+                          child: Text(
+                            workout.notes?.isNotEmpty == true
+                                ? workout.notes!
+                                : 'Add a note — how it felt, what got in the '
+                                    'way',
+                            style: context.t.bodySmall?.copyWith(
+                              color: workout.notes?.isNotEmpty == true
+                                  ? c.textSecondary
+                                  : c.textTertiary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -119,6 +170,47 @@ class WorkoutDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _editDate(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final current = dateFromDayKey(detail.workout.dayKey);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2015),
+      // Training in the future is not a thing; a stray tap on next month is.
+      lastDate: DateTime.now(),
+      helpText: 'When was this trained?',
+    );
+    if (picked == null || !context.mounted) return;
+    if (dayKeyOf(picked) == detail.workout.dayKey) return;
+
+    await ref
+        .read(trainingRepositoryProvider)
+        .setWorkoutDate(detail.workout.id, picked);
+  }
+
+  Future<void> _editNotes(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final text = await promptForText(
+      context,
+      title: 'Session note',
+      initial: detail.workout.notes ?? '',
+      hint: 'Slept badly, everything felt heavy',
+      maxLines: 4,
+      allowEmpty: true,
+    );
+    if (text == null) return;
+    await ref
+        .read(trainingRepositoryProvider)
+        .setWorkoutNotes(detail.workout.id, text);
   }
 
   /// Logging the wrong session, or logging one twice, has to be undoable —
@@ -204,13 +296,24 @@ class _ExerciseBlock extends StatelessWidget {
               Icon(Icons.history, size: 16, color: c.textTertiary),
             ],
           ),
-          if (!skipped) ...[
-            const SizedBox(height: Space.sm),
-            if (done.isEmpty)
-              Text('Nothing logged', style: context.t.labelSmall)
-            else
-              for (final set in done) _SetLine(set: set, exercise: entry.exercise),
-          ],
+          // Sets logged before the skip are shown under it. Hiding them made
+          // history disagree with itself: they survived, they fed prefill and
+          // the progress chart, and only these views pretended otherwise.
+          const SizedBox(height: Space.sm),
+          if (skipped && done.isNotEmpty)
+            Text(
+              'Stopped after ${done.length} '
+              '${done.length == 1 ? 'set' : 'sets'}',
+              style: context.t.labelSmall?.copyWith(color: c.negative),
+            ),
+          if (done.isEmpty)
+            Text(
+              skipped ? 'Not trained' : 'Nothing logged',
+              style: context.t.labelSmall,
+            )
+          else
+            for (final set in done)
+              _SetLine(set: set, exercise: entry.exercise),
         ],
       ),
     );
@@ -219,15 +322,16 @@ class _ExerciseBlock extends StatelessWidget {
 
 /// One logged set. Continuation sets (drop, rest-pause) are indented under the
 /// set they extend, the same way the log screen shows them.
-class _SetLine extends StatelessWidget {
+class _SetLine extends ConsumerWidget {
   const _SetLine({required this.set, required this.exercise});
 
   final SetLog set;
   final Exercise exercise;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final indent = set.setType.isContinuation;
 
     return Padding(
@@ -253,7 +357,7 @@ class _SetLine extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_load(set, exercise), style: context.t.labelLarge),
+                Text(_load(set, exercise, unit), style: context.t.labelLarge),
                 if (set.note != null && set.note!.isNotEmpty)
                   Text(set.note!, style: context.t.labelSmall),
               ],
@@ -268,17 +372,17 @@ class _SetLine extends StatelessWidget {
     );
   }
 
-  static String _load(SetLog set, Exercise exercise) {
+  static String _load(SetLog set, Exercise exercise, WeightUnit unit) {
     final added = set.addedWeight;
     if (exercise.loadMode == LoadMode.bodyweight) return 'Bodyweight';
     if (exercise.loadMode == LoadMode.bodyweightPlus) {
       return added == null || added == 0
           ? 'Bodyweight'
-          : 'BW + ${formatWeight(added)} kg';
+          : 'BW + ${formatWeight(added, unit)} ${unit.label}';
     }
     final weight = set.weight;
     if (weight == null) return '—';
     final perSide = exercise.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight)} kg$perSide';
+    return '${formatWeight(weight, unit)} ${unit.label}$perSide';
   }
 }

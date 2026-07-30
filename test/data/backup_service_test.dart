@@ -79,7 +79,14 @@ void main() {
     expect(counts['regimes'], 1);
     expect(counts['sessions'], 6);
     expect(counts['workouts'], 1);
-    expect(counts['set_logs'], 3);
+    // Every set row the session created, tombstones included: finishing a
+    // workout marks the untouched blanks deleted rather than removing them, and
+    // a backup that dropped the tombstones would resurrect them on restore.
+    expect(counts['set_logs'], 18);
+    final liveSets = await (db.select(db.setLogs)
+          ..where((t) => t.deletedAt.isNull()))
+        .get();
+    expect(liveSets, hasLength(3));
     expect(counts['bodyweight_logs'], 1);
   });
 

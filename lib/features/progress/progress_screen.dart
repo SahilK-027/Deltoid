@@ -10,7 +10,9 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/metrics.dart';
+import '../../domain/units.dart';
 import '../history/history_providers.dart';
+import '../history/history_screen.dart' show formatWeight;
 import '../log/widgets/exercise_sheets.dart';
 
 enum ChartRange { threeMonths, year, all }
@@ -57,7 +59,12 @@ class ProgressScreen extends ConsumerWidget {
     final fallback = trained != null && trained.isNotEmpty
         ? trained.first.exercise.id
         : (catalog.isEmpty ? null : catalog.first.id);
-    final selectedId = ref.watch(selectedExerciseProvider) ?? fallback;
+    final chosen = ref.watch(selectedExerciseProvider) ?? fallback;
+    // Archiving the selected exercise takes it out of the catalog, and the
+    // header fell back to "Pick one" while a chart went on rendering below it.
+    // Fall back to the default rather than showing a nameless chart.
+    final selectedId =
+        catalog.any((e) => e.id == chosen) ? chosen : fallback;
     final selected = catalog.where((e) => e.id == selectedId).firstOrNull;
 
     return Scaffold(
@@ -209,14 +216,16 @@ class _RangeChip extends ConsumerWidget {
 }
 
 /// Estimated 1RM over time, one line per session slot.
-class _Chart extends StatelessWidget {
+class _Chart extends ConsumerWidget {
   const _Chart({required this.points});
 
   final List<ProgressPoint> points;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    // The y axis is estimated 1RM in kilograms; only the labels change.
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     if (points.length < 2) {
       // Sized to the message rather than reserving chart height for a chart
       // that isn't there — an empty 200px box reads as a rendering failure.
@@ -295,8 +304,12 @@ class _Chart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 38,
+                      // The axis sits inches from the tooltip. One of them
+                      // rendering kilograms while the other says pounds is the
+                      // worst possible version of a units bug: both numbers on
+                      // screen at once, neither labelled.
                       getTitlesWidget: (value, meta) => Text(
-                        value.toStringAsFixed(0),
+                        formatWeight(value, unit),
                         style: context.t.labelSmall,
                       ),
                     ),
@@ -326,7 +339,7 @@ class _Chart extends StatelessWidget {
                     getTooltipItems: (spots) => [
                       for (final s in spots)
                         LineTooltipItem(
-                          '${s.y.toStringAsFixed(1)} kg e1RM',
+                          '${formatWeight(s.y, unit)} ${unit.label} e1RM',
                           context.t.labelMedium!.copyWith(color: c.textPrimary),
                         ),
                     ],
@@ -398,15 +411,16 @@ class _Chart extends StatelessWidget {
   }
 }
 
-class _Summary extends StatelessWidget {
+class _Summary extends ConsumerWidget {
   const _Summary({required this.all, required this.windowed});
 
   final List<ProgressPoint> all;
   final List<ProgressPoint> windowed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final real = windowed.where((p) => !p.isDeload).toList();
     final stalled = stalledSessions(real.map((p) => p.best1RM).toList());
 
@@ -434,7 +448,9 @@ class _Summary extends StatelessWidget {
           Expanded(
             child: _Stat(
               label: 'Best e1RM',
-              value: best == null ? '—' : '${best.toStringAsFixed(1)} kg',
+              value: best == null
+                  ? '—'
+                  : '${formatWeight(best, unit)} ${unit.label}',
             ),
           ),
           const SizedBox(width: Space.md),
@@ -498,14 +514,15 @@ class _Stat extends StatelessWidget {
   }
 }
 
-class _PerformanceList extends StatelessWidget {
+class _PerformanceList extends ConsumerWidget {
   const _PerformanceList({required this.points});
 
   final List<ProgressPoint> points;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -541,7 +558,8 @@ class _PerformanceList extends StatelessWidget {
                     const SizedBox(width: Space.sm),
                   ],
                   Text(
-                    '${_fmt(points[i].topSetLoad)} × ${points[i].topSetReps ?? '—'}',
+                    '${_fmt(points[i].topSetLoad, unit)} × '
+                    '${points[i].topSetReps ?? '—'}',
                     style: context.t.labelLarge,
                   ),
                 ],
@@ -553,8 +571,6 @@ class _PerformanceList extends StatelessWidget {
     );
   }
 
-  static String _fmt(double? v) {
-    if (v == null) return '—';
-    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
-  }
+  static String _fmt(double? kg, WeightUnit unit) =>
+      kg == null ? '—' : formatWeight(kg, unit);
 }

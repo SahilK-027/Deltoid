@@ -11,6 +11,15 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
+import 'bodyweight_screen.dart';
+import '../../domain/units.dart';
+
+/// When the last automatic export ran. One fires after every finished
+/// session, but Settings never said so, which made the whole mechanism
+/// invisible and therefore untrusted.
+final lastBackupProvider = FutureProvider<DateTime?>((ref) {
+  return BackupService(ref.watch(databaseProvider)).lastAutoExportAt();
+});
 
 final bodyweightLogProvider = StreamProvider<List<BodyweightLog>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -29,6 +38,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final log = ref.watch(bodyweightLogProvider).valueOrNull ?? const [];
+    final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final c = context.c;
 
     return Scaffold(
@@ -38,67 +49,40 @@ class SettingsScreen extends ConsumerWidget {
             Space.lg, Space.sm, Space.lg, Space.huge),
         children: [
           const SectionLabel('Bodyweight'),
+          // A summary that opens the real thing. This used to be the whole
+          // feature: six rows off a query capped at 30, which was fine as a
+          // readout and wrong once entries became editable — a typo from two
+          // months ago could not be reached at all.
           AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BodyweightScreen()),
+            ),
+            child: Row(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            log.isEmpty
-                                ? 'Not logged'
-                                : '${_fmt(log.first.weightKg)} kg',
-                            style: context.t.displaySmall,
-                          ),
-                          const SizedBox(height: Space.xs),
-                          Text(
-                            log.isEmpty
-                                ? 'Needed to score bodyweight and BW+ lifts'
-                                : 'Last entry '
-                                    '${DateFormat('d MMM yyyy').format(dateFromDayKey(log.first.dayKey))}',
-                            style: context.t.bodySmall,
-                          ),
-                        ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        log.isEmpty
+                            ? 'Not logged'
+                            : '${formatInUnit(log.first.weightKg, unit)} '
+                                '${unit.label}',
+                        style: context.t.displaySmall,
                       ),
-                    ),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: Space.lg),
+                      const SizedBox(height: Space.xs),
+                      Text(
+                        log.isEmpty
+                            ? 'Needed to score bodyweight and BW+ lifts'
+                            : 'Last entry '
+                                '${DateFormat('d MMM yyyy').format(dateFromDayKey(log.first.dayKey))}'
+                                '  ·  ${log.length} logged',
+                        style: context.t.bodySmall,
                       ),
-                      onPressed: () => _logBodyweight(context, ref),
-                      child: const Text('Log'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                if (log.length > 1) ...[
-                  const SizedBox(height: Space.lg),
-                  Divider(color: c.border, height: 1),
-                  const SizedBox(height: Space.md),
-                  for (final entry in log.take(6))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat('d MMM yyyy')
-                                  .format(dateFromDayKey(entry.dayKey)),
-                              style: context.t.bodySmall,
-                            ),
-                          ),
-                          Text('${_fmt(entry.weightKg)} kg',
-                              style: context.t.labelMedium),
-                        ],
-                      ),
-                    ),
-                ],
+                Icon(Icons.chevron_right, size: 20, color: c.textTertiary),
               ],
             ),
           ),
@@ -130,9 +114,27 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   onTap: () => _restore(context, ref),
                 ),
+                Divider(color: c.border, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: Text(
+                    lastBackup == null
+                        ? 'No automatic backup yet'
+                        : 'Last backup '
+                            '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
+                    style: context.t.bodyMedium,
+                  ),
+                  subtitle: Text(
+                    'Written automatically after each finished session.',
+                    style: context.t.labelSmall,
+                  ),
+                ),
               ],
             ),
           ),
+          const SizedBox(height: Space.xxl),
+          const SectionLabel('Units'),
+          const _UnitPicker(),
           const SizedBox(height: Space.xxl),
           const SectionLabel('Appearance'),
           const _ThemePicker(),
@@ -149,38 +151,6 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _logBodyweight(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final value = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log bodyweight'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(suffixText: 'kg'),
-          onSubmitted: (v) => Navigator.of(ctx).pop(double.tryParse(v)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(double.tryParse(controller.text)),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (value == null || value <= 0) return;
-    await ref
-        .read(trainingRepositoryProvider)
-        .logBodyweight(DateTime.now(), value);
   }
 
   Future<void> _export(BuildContext context, WidgetRef ref) async {
@@ -205,6 +175,19 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _restore(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final service = BackupService(ref.read(databaseProvider));
+
+    // Restoring wipes the database. Doing that with a session open would take
+    // the sets being logged right now with it, and the log screen would go on
+    // writing into rows that no longer exist.
+    final open = await ref.read(trainingRepositoryProvider).openWorkout();
+    if (open != null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Finish or delete the session in progress first'),
+        ),
+      );
+      return;
+    }
 
     final file = await openFile(
       acceptedTypeGroups: const [
@@ -259,8 +242,55 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  static String _fmt(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+}
+
+/// Kilograms or pounds.
+///
+/// Display only: every weight is stored in kilograms whatever this says, and
+/// converted at the edges. Storing what was typed would mean a database whose
+/// rows mean different things depending on when they were written, and no way
+/// to tell which is which afterwards. The keypad's ± step follows this too —
+/// 2.5 kg is a pair of plates, and so is 5 lb.
+class _UnitPicker extends ConsumerWidget {
+  const _UnitPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final current = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+
+    return AppCard(
+      padding: const EdgeInsets.all(Space.sm),
+      child: Row(
+        children: [
+          for (final unit in WeightUnit.values)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setWeightUnit(ref.read(databaseProvider), unit),
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  padding: const EdgeInsets.symmetric(vertical: Space.md),
+                  decoration: BoxDecoration(
+                    color: unit == current ? c.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(Radii.sm),
+                  ),
+                  child: Text(
+                    switch (unit) {
+                      WeightUnit.kg => 'Kilograms',
+                      WeightUnit.lb => 'Pounds',
+                    },
+                    textAlign: TextAlign.center,
+                    style: context.t.titleSmall?.copyWith(
+                      color: unit == current ? c.onAccent : c.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ThemePicker extends ConsumerWidget {

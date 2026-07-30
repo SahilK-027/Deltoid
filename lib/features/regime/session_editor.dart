@@ -54,6 +54,15 @@ class SessionEditorScreen extends ConsumerWidget {
                 );
                 if (!ok) return;
                 await repo.deleteSession(sessionId);
+                // Deleting the last day a cycle was still waiting on satisfies
+                // that cycle. Without this it sat complete-but-open, and Today
+                // read "UP NEXT" over a full row of filled dots.
+                final regimeId = session?.regimeId;
+                if (regimeId != null) {
+                  await ref
+                      .read(trainingRepositoryProvider)
+                      .closeCycleIfSatisfied(regimeId);
+                }
                 navigator.pop();
               }
             },
