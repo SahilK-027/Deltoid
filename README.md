@@ -154,6 +154,15 @@ adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app
   (missing namespace). `file_selector` is used instead — don't swap it back.
 - Regenerate drift code after **any** change to `tables.dart`:
   `dart run build_runner build`.
+- **`schemaVersion` is 1 and there is no `onUpgrade`** (`data/db/database.dart`
+  has `onCreate` and nothing else). A schema change does not migrate an install
+  — it breaks it, and the fix is uninstall and reinstall. Free while the only
+  databases are on test devices, which is still true: the catalog re-seeds
+  itself and no programme is baked in, so a wipe costs one template tap. The
+  first install holding training you care about is when `onUpgrade` has to
+  start existing. Note the version is also stamped into every backup and
+  restore rejects anything newer (`backup/backup_service.dart`), so a bump
+  invalidates old exports unless that path is handled too.
 
 ---
 
@@ -201,9 +210,17 @@ Everything below is built, analyzer-clean and unit-tested where it has logic.
 "Driven on the emulator" marks flows actually exercised end to end by hand;
 the rest render correctly but their happy path has not been clicked through.
 
+**Those marks predate the audit fixes.** Every screen was touched since and
+none of it has been driven again, so treat them as evidence about the design,
+not about the current build. What needs real hardware rather than a test:
+anything with a plugin behind it (the end-of-rest tone and haptics, the
+wakelock, audio ducking against music) and anything whose layout moved (Today,
+the regime screen's cycle controls, the session list, the settings units
+picker).
+
 - **Logging** _(driven on the emulator)_ — one exercise per page, horizontal
   rail, typed sets (warmup / working / backoff / drop / rest-pause / AMRAP),
-  custom gym keypad with ±2.5 and one-tap "Last: 22.5", auto rest timer, per-set
+  custom gym keypad with a one-plate step and one-tap "Last: 22.5", auto rest timer, per-set
   notes, swap / skip-with-reason / move / add exercise mid-session. Resuming an
   interrupted session survives a force-stop.
 
@@ -281,65 +298,6 @@ widget test, and repository integration against a real in-memory SQLite.
 3. iOS verification once Xcode exists.
 4. Per-exercise deload overrides — the columns exist
    (`session_exercises.deload_set_delta` / `deload_weight_pct`), no UI yet.
-
----
-
-## Audit backlog
-
-Everything found by the 2026-07-29 audit is fixed, on branch `audit-backlog`,
-one commit per group. Findings are removed once fixed rather than ticked off,
-so this section is empty on purpose — cite the commits, not the old numbers.
-
-**None of it is verified on a device.** `flutter analyze` is clean and 137 tests
-pass, but the emulator has not been driven since. The parts that need real
-hardware before they can be trusted: the end-of-rest tone and haptics, the
-wakelock, the audio-focus ducking against music, the keypad's scroll-into-view
-behaviour (finding 21 was never reproduced), and every screen whose layout
-changed — Today's reordered body, the regime screen's cycle controls, the
-session list's move buttons, and the settings units picker.
-
-**The schema changed, and there is still no `onUpgrade`.** `set_logs.rpe`,
-`set_logs.parent_set_id` and `exercises.is_unilateral` were dropped;
-`exercises.starter_key` and `session_exercises.rest_seconds` were added.
-`schemaVersion` stays 1, so an existing install does not migrate — **uninstall
-and reinstall on the test device**. The starter catalog re-seeds itself and no
-programme is baked in, so this costs one template tap. Any schema change made
-after an install you care about is the one that has to start writing
-migrations.
-
-What landed, by commit:
-
-- `64e1875` — **14, 15, 16.** End-of-rest haptics and tone on the alarm stream,
-  wakelock while a workout is open, `+2.5` stepping from last time's weight,
-  ghosts italicised and their adoption animated.
-- `ec370cb` — **7, 11, 12.** A deload never scales an already light week, and
-  the two cycle overrides that existed only in the repository — close this
-  cycle, make this cycle a deload — reached the Regime screen.
-- `7ca00c9` — **1, 2.** Swap replaces in place instead of appending, and
-  prefill is resolved per exercise and stays live mid-session.
-- `0675b6a` — **22, 23, 24.** A logged day's date can be changed, a past
-  session can be logged, notes are editable, bodyweight can be dated,
-  corrected and deleted.
-- `8a511c1` — **8, 9, 5, 6, 10.** Skipped-with-sets shows its sets everywhere,
-  the exercise index counts times trained, deleting a session closes a
-  satisfied cycle, the resume card names a cross-regime session, and the
-  same-session prefill lookup lost its horizon.
-- `7783b9a` — **3, 4, 27, 29.** Finished blanks are tombstoned rather than
-  deleted, changing a load mode says how many sets it reinterprets, Progress
-  survives archiving its selection, restore is blocked mid-session and the last
-  backup is visible.
-- `24fa353` — **26, 28.** Dead columns dropped; templates match on the starter
-  key, and duplicate names are warned about.
-- `3eb3dd4` — **13, 17, 18, 19, 20, 21.** Rest is recorded and its target is
-  per exercise, the keypad's key says "Reps?" when that is what it means,
-  writes are debounced and the per-second rebuild is gone, last time's whole
-  set shape is one line, and Today reads as a description rather than an order.
-- `38984f1` — **25, 30.** Session reorder uses explicit move controls, and the
-  app speaks pounds if you want it to.
-
-Two decisions taken during the work, for the record: the dead columns were
-dropped rather than wired up (RPE included), and pound support was built rather
-than skipped.
 
 ---
 
