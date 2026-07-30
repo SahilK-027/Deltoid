@@ -236,6 +236,7 @@ class TrainingRepository {
 
     if (last != null) {
       final status = CycleStatus(
+        cycleId: last.id,
         cycleIndex: last.cycleIndex,
         isDeload: last.isDeload,
         sessionIds: await _sessionIds(regimeId),
@@ -285,6 +286,7 @@ class TrainingRepository {
         await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
     final cycle = await ensureOpenCycle(regimeId);
     return CycleStatus(
+      cycleId: cycle.id,
       cycleIndex: cycle.cycleIndex,
       isDeload: cycle.isDeload,
       sessionIds: await _sessionIds(regimeId),

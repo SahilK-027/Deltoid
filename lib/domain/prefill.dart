@@ -140,7 +140,13 @@ PrefillResult resolvePrefill({
 
   if (pick == null) return const PrefillResult.empty();
 
-  final sets = targetIsDeload
+  // Never scale a light week again. If the only history for this slot is
+  // itself a deload, 80% of 80% is 64% — a deload is 80% of your working
+  // weight, not 80% of the last time you backed off. Reachable as soon as a
+  // deload can be forced two cycles running from the UI.
+  final scale = targetIsDeload && !pick.isDeload;
+
+  final sets = scale
       ? applyDeload(
           pick.sets,
           setDelta: deloadSetDelta,
@@ -152,7 +158,7 @@ PrefillResult resolvePrefill({
     sets: sets,
     source: source,
     reference: pick,
-    deloadApplied: targetIsDeload,
+    deloadApplied: scale,
   );
 }
 

@@ -279,6 +279,75 @@ void main() {
     expect(third.isDeload, isTrue);
   });
 
+  test('closing a cycle early skips what is left and counts towards the deload',
+      () async {
+    // The escape hatch for "I'm not training Leg 2 this round". Without it a
+    // permanently skipped session stalls the programme: the cycle never
+    // closes, the index never moves, and the deload never arrives.
+    final regime = await activeRegime();
+    await (db.update(db.regimes)..where((t) => t.id.equals(regime.id)))
+        .write(const RegimesCompanion(deloadAfterCycles: Value(1)));
+
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final detail = await repo.workoutDetail(id);
+    final set = detail!.entries.first.sets.first;
+    await repo.updateSet(set.id,
+        weight: const Value(20), reps: const Value(8), isDone: const Value(true));
+    await repo.completeWorkout(id);
+
+    final before = await repo.cycleStatus(regime.id);
+    expect(before.cycleIndex, 1);
+    expect(before.remainingSessionIds, isNotEmpty);
+
+    await repo.advanceCycle(regime.id);
+
+    final after = await repo.cycleStatus(regime.id);
+    expect(after.cycleIndex, 2);
+    expect(after.done, 0);
+    // The skipped cycle still counted, so the deload lands on schedule rather
+    // than never.
+    expect(after.isDeload, isTrue);
+  });
+
+  test('a forced deload cycle does not scale an already light week', () async {
+    // 80% of 80% is 64%. Reachable only now that a deload can be forced two
+    // cycles running from the regime screen.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    Future<void> forceDeload() async {
+      final cycle = await repo.ensureOpenCycle(regime.id);
+      await repo.setCycleDeload(cycle.id, true);
+    }
+
+    // The slot's only history is itself a light week.
+    await forceDeload();
+    final first =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final detail = await repo.workoutDetail(first);
+    for (final s in detail!.entries.first.sets) {
+      await repo.updateSet(s.id,
+          weight: const Value(18), reps: const Value(8), isDone: const Value(true));
+    }
+    await repo.completeWorkout(first);
+
+    // A second deload back to back — only reachable because the override
+    // exists, which is exactly why the guard had to land with it.
+    await forceDeload();
+    final exerciseId = detail.entries.first.exercise.id;
+    final past = await repo.pastPerformances(exerciseId);
+    final prefill = resolvePrefill(
+      candidates: past,
+      sessionId: push1.id,
+      targetIsDeload: true,
+    );
+
+    expect(prefill.source, PrefillSource.sameSessionDeload);
+    expect(prefill.deloadApplied, isFalse);
+    expect(prefill.sets.first.weight, 18); // not 14.4
+  });
+
   test('a deload workout prefills fewer sets at a lighter load', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

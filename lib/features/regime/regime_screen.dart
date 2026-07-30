@@ -80,6 +80,10 @@ class RegimeScreen extends ConsumerWidget {
                   Space.lg, Space.sm, Space.lg, Space.huge),
               children: [
                 _RegimeHeader(regime: regime, status: status),
+                if (status != null) ...[
+                  const SizedBox(height: Space.md),
+                  _CycleControls(status: status, sessions: sessions),
+                ],
                 const SizedBox(height: Space.xxl),
                 SectionLabel(
                   'Sessions · one cycle',
@@ -182,6 +186,137 @@ class _RegimeHeader extends ConsumerWidget {
     await ref
         .read(regimeRepositoryProvider)
         .updateRegime(regime.id, name: Value(name));
+  }
+}
+
+/// The two cycle overrides, which existed in the repository long before they
+/// existed on screen.
+///
+/// Without "Close this cycle" a session you permanently skip stalls the
+/// programme: the cycle never closes, the cycle index never moves, and the
+/// deload you configured never arrives. Without the deload override the
+/// schedule is binding, which contradicts the one promise this app makes —
+/// it suggests, it never forces. Whether you need a light week is a decision
+/// made in the gym, not six cycles in advance.
+class _CycleControls extends ConsumerWidget {
+  const _CycleControls({required this.status, required this.sessions});
+
+  final CycleStatus status;
+  final List<Session> sessions;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final remaining = status.remainingSessionIds;
+    final canClose = status.done > 0 && remaining.isNotEmpty;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'CYCLE ${status.cycleIndex}',
+                  style: context.t.labelSmall,
+                ),
+              ),
+              Text(
+                '${status.done} of ${status.total} done',
+                style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: canClose
+                      ? () => _closeCycle(context, ref, remaining)
+                      : null,
+                  child: const Text('Close this cycle'),
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _toggleDeload(context, ref),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: status.isDeload ? c.deload : null,
+                  ),
+                  child: Text(
+                    status.isDeload ? 'Not a deload' : 'Make it a deload',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+          Text(
+            canClose
+                ? 'Closing skips what is left and starts the next cycle.'
+                : status.done == 0
+                ? 'Nothing trained yet this cycle.'
+                : 'Every session is done — the next workout opens a new cycle.',
+            style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _nameOf(String sessionId) {
+    for (final s in sessions) {
+      if (s.id == sessionId) return s.name;
+    }
+    return 'A session';
+  }
+
+  Future<void> _closeCycle(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> remaining,
+  ) async {
+    // Name what it costs. "Are you sure" tells you nothing; "Leg 2 won't be
+    // trained this cycle" is the actual decision.
+    final names = remaining.map(_nameOf).toList();
+    final list = names.length == 1
+        ? '${names.single} won\'t be trained this cycle.'
+        : '${names.join(', ')} won\'t be trained this cycle.';
+
+    final ok = await confirmAction(
+      context,
+      title: 'Close cycle ${status.cycleIndex}?',
+      message: '$list\n\nThe next cycle starts from the top, and this one '
+          'counts towards your deload.',
+      confirmLabel: 'Close cycle',
+      destructive: false,
+    );
+    if (!ok) return;
+
+    final regime = ref.read(activeRegimeProvider).valueOrNull;
+    if (regime == null) return;
+    await ref.read(trainingRepositoryProvider).advanceCycle(regime.id);
+  }
+
+  Future<void> _toggleDeload(BuildContext context, WidgetRef ref) async {
+    final next = !status.isDeload;
+    await ref
+        .read(trainingRepositoryProvider)
+        .setCycleDeload(status.cycleId, next);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? 'Cycle ${status.cycleIndex} is a deload — lighter, fewer sets.'
+              : 'Cycle ${status.cycleIndex} is a normal cycle again.',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 }
 

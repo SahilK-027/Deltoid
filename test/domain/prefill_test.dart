@@ -120,6 +120,32 @@ void main() {
       expect(result.sets.length, 2);
       expect(result.sets.first.weight, 18); // 22.5 * 0.8
     });
+
+    test('never scales a light week again', () {
+      // 80% of 80% is 64%. A deload is a fraction of your working weight, not
+      // of the last time you already backed off — reachable now that a deload
+      // can be forced two cycles running from the regime screen.
+      final result = resolvePrefill(
+        candidates: [
+          perf(
+            'push1',
+            'Push 1',
+            20260715,
+            [working(18, 8), working(18, 8)],
+            isDeload: true,
+          ),
+        ],
+        sessionId: 'push1',
+        targetIsDeload: true,
+        deloadSetDelta: -1,
+        deloadWeightPct: 80,
+      );
+
+      expect(result.source, PrefillSource.sameSessionDeload);
+      expect(result.deloadApplied, isFalse);
+      expect(result.sets.length, 2);
+      expect(result.sets.first.weight, 18);
+    });
   });
 
   group('applyDeload', () {

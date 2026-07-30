@@ -12,6 +12,7 @@ CycleStatus status({
   int deloadAfterCycles = 6,
 }) {
   return CycleStatus(
+    cycleId: 'cycle-$cycleIndex',
     cycleIndex: cycleIndex,
     isDeload: isDeload,
     sessionIds: ppl,
@@ -150,6 +151,7 @@ void main() {
 
   test('an empty regime has no next session and never completes', () {
     const s = CycleStatus(
+      cycleId: 'cycle-1',
       cycleIndex: 1,
       isDeload: false,
       sessionIds: [],
