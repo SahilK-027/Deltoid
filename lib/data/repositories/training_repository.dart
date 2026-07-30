@@ -979,6 +979,29 @@ class TrainingRepository {
     return workoutId;
   }
 
+  /// How many logged sets an exercise carries.
+  ///
+  /// Used to say what changing a catalog row costs before it is changed: load
+  /// mode is an interpretation, so flipping it re-reads every set ever logged
+  /// for that movement.
+  Future<int> loggedSetCount(String exerciseId) async {
+    final count = db.setLogs.id.count();
+    final row = await (db.selectOnly(db.setLogs).join([
+      innerJoin(db.workoutExercises,
+          db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId)),
+      innerJoin(
+          db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
+    ])
+          ..addColumns([count])
+          ..where(db.workoutExercises.exerciseId.equals(exerciseId) &
+              db.setLogs.isDone.equals(true) &
+              db.setLogs.deletedAt.isNull() &
+              db.workoutExercises.deletedAt.isNull() &
+              db.workouts.deletedAt.isNull()))
+        .getSingle();
+    return row.read(count) ?? 0;
+  }
+
   /// Who a workout belongs to, looked up by id rather than filtered out of the
   /// active regime's sessions.
   ///
@@ -1352,15 +1375,27 @@ class TrainingRepository {
 
     await db.transaction(() async {
       // Empty sets would otherwise look like real history full of nulls.
-      await (db.delete(db.setLogs)
+      //
+      // Tombstoned rather than deleted, like every other delete in the app: a
+      // row removed outright has no deleted_at to push, so the first pull from
+      // another device would resurrect it once sync lands. Every read path
+      // already filters deletedAt.
+      await (db.update(db.setLogs)
             ..where((t) =>
                 t.isDone.equals(false) &
+                t.deletedAt.isNull() &
                 t.workoutExerciseId.isInQuery(
                   db.selectOnly(db.workoutExercises)
                     ..addColumns([db.workoutExercises.id])
                     ..where(db.workoutExercises.workoutId.equals(workoutId)),
                 )))
-          .go();
+          .write(
+        SetLogsCompanion(
+          deletedAt: Value(nowMs()),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
 
       await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
         WorkoutsCompanion(

@@ -12,6 +12,13 @@ import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
 
+/// When the last automatic export ran. One fires after every finished
+/// session, but Settings never said so, which made the whole mechanism
+/// invisible and therefore untrusted.
+final lastBackupProvider = FutureProvider<DateTime?>((ref) {
+  return BackupService(ref.watch(databaseProvider)).lastAutoExportAt();
+});
+
 final bodyweightLogProvider = StreamProvider<List<BodyweightLog>>((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.bodyweightLogs)
@@ -29,6 +36,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final log = ref.watch(bodyweightLogProvider).valueOrNull ?? const [];
+    final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
     final c = context.c;
 
     return Scaffold(
@@ -146,6 +154,21 @@ class SettingsScreen extends ConsumerWidget {
                     style: context.t.labelSmall,
                   ),
                   onTap: () => _restore(context, ref),
+                ),
+                Divider(color: c.border, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: Text(
+                    lastBackup == null
+                        ? 'No automatic backup yet'
+                        : 'Last backup '
+                            '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
+                    style: context.t.bodyMedium,
+                  ),
+                  subtitle: Text(
+                    'Written automatically after each finished session.',
+                    style: context.t.labelSmall,
+                  ),
                 ),
               ],
             ),
@@ -285,6 +308,19 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _restore(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final service = BackupService(ref.read(databaseProvider));
+
+    // Restoring wipes the database. Doing that with a session open would take
+    // the sets being logged right now with it, and the log screen would go on
+    // writing into rows that no longer exist.
+    final open = await ref.read(trainingRepositoryProvider).openWorkout();
+    if (open != null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Finish or delete the session in progress first'),
+        ),
+      );
+      return;
+    }
 
     final file = await openFile(
       acceptedTypeGroups: const [

@@ -629,6 +629,54 @@ void main() {
     expect(owner.regimeName, regime.name);
   });
 
+  test('finishing tombstones the untouched sets rather than deleting them',
+      () async {
+    // A row deleted outright has no deleted_at to push, so the first pull from
+    // another device would resurrect it once sync lands.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final detail = await repo.workoutDetail(id);
+    final entry = detail!.entries.first;
+    await repo.updateSet(entry.sets.first.id,
+        weight: const Value(22.5), reps: const Value(8), isDone: const Value(true));
+
+    await repo.completeWorkout(id);
+
+    // The blanks are gone from every read path…
+    final after = await repo.workoutDetail(id);
+    expect(after!.entries.first.sets, hasLength(1));
+
+    // …but the rows are still there, carrying a tombstone to push.
+    final raw = await (db.select(db.setLogs)
+          ..where((t) => t.workoutExerciseId.equals(entry.workoutExercise.id)))
+        .get();
+    expect(raw.length, entry.sets.length);
+    final dropped = raw.where((s) => !s.isDone);
+    expect(dropped, isNotEmpty);
+    for (final s in dropped) {
+      expect(s.deletedAt, isNotNull);
+      expect(s.dirty, isTrue);
+    }
+  });
+
+  test('logged sets are counted before a load mode is reinterpreted', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final detail = await repo.workoutDetail(id);
+    final entry = detail!.entries.first;
+    for (final s in entry.sets.take(2)) {
+      await repo.updateSet(s.id,
+          weight: const Value(22.5), reps: const Value(8), isDone: const Value(true));
+    }
+    await repo.completeWorkout(id);
+
+    expect(await repo.loggedSetCount(entry.exercise.id), 2);
+  });
+
   test('reordering a workout does not touch the session template', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

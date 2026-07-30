@@ -57,7 +57,12 @@ class ProgressScreen extends ConsumerWidget {
     final fallback = trained != null && trained.isNotEmpty
         ? trained.first.exercise.id
         : (catalog.isEmpty ? null : catalog.first.id);
-    final selectedId = ref.watch(selectedExerciseProvider) ?? fallback;
+    final chosen = ref.watch(selectedExerciseProvider) ?? fallback;
+    // Archiving the selected exercise takes it out of the catalog, and the
+    // header fell back to "Pick one" while a chart went on rendering below it.
+    // Fall back to the default rather than showing a nameless chart.
+    final selectedId =
+        catalog.any((e) => e.id == chosen) ? chosen : fallback;
     final selected = catalog.where((e) => e.id == selectedId).firstOrNull;
 
     return Scaffold(

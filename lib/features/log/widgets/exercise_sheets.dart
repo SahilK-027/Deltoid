@@ -591,8 +591,34 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
       return;
     }
 
-    // Editing the catalog row is safe: past logs point at the exercise, but the
-    // numbers they hold are their own snapshot.
+    // Load mode is the one field that is not a label: it decides how every set
+    // ever logged for this movement is read. Flipping "total" to "per
+    // dumbbell" doubles the effective load of all of them, moving e1RM, the
+    // chart, the beat-last-time highlight and every prefill comparison. No
+    // migration — the reinterpretation is the point — but it has to be chosen
+    // knowingly, with the number in front of you.
+    if (_loadMode != widget.existing!.loadMode) {
+      final affected = await ref
+          .read(trainingRepositoryProvider)
+          .loggedSetCount(id);
+      if (affected > 0) {
+        if (!mounted) return;
+        final ok = await confirmAction(
+          context,
+          title: 'Change how this load is read?',
+          message: '$affected logged '
+              '${affected == 1 ? 'set' : 'sets'} will be re-read as '
+              '${_loadModeName(_loadMode)}. Their estimated 1RMs, the progress '
+              'chart and every "beat last time" comparison move with them.',
+          confirmLabel: 'Change it',
+          destructive: false,
+        );
+        if (!ok) return;
+      }
+    }
+
+    // Editing the catalog row is otherwise safe: past logs point at the
+    // exercise, but the numbers they hold are their own snapshot.
     await repo.updateExercise(
       id,
       name: Value(name),
@@ -603,6 +629,13 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     );
     navigator.pop(await _row(db, id));
   }
+
+  static String _loadModeName(LoadMode mode) => switch (mode) {
+        LoadMode.total => 'a total load',
+        LoadMode.perSide => 'per dumbbell',
+        LoadMode.bodyweight => 'bodyweight only',
+        LoadMode.bodyweightPlus => 'bodyweight plus the entered load',
+      };
 
   Future<Exercise> _row(AppDatabase db, String id) =>
       (db.select(db.exercises)..where((t) => t.id.equals(id))).getSingle();

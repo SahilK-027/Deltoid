@@ -187,6 +187,27 @@ class BackupService {
     }
   }
 
+  /// When the most recent automatic export ran, or null if none has.
+  ///
+  /// A backup nobody can see is a backup nobody trusts: Settings offers
+  /// "restore" without ever saying whether there is anything recent behind it.
+  Future<DateTime?> lastAutoExportAt() async {
+    final root = await getApplicationDocumentsDirectory();
+    final dir = Directory('${root.path}/backups');
+    if (!dir.existsSync()) return null;
+
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.json'))
+        .toList();
+    if (files.isEmpty) return null;
+
+    return files
+        .map((f) => f.statSync().modified)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+  }
+
   /// Reads a backup's header without touching the database, so the restore
   /// prompt can say exactly what is about to be written.
   BackupSummary inspect(String json) {
