@@ -1,5 +1,6 @@
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
@@ -1210,6 +1211,65 @@ void main() {
     final status = await repo.cycleStatus(regime.id);
     expect(status.cycleIndex, 1);
     expect(status.completedSessionIds, {push1.id});
+  });
+
+  group('the Today snapshot', () {
+    test('answers the whole screen in one call', () async {
+      final push1 = await sessionNamed('Push 1');
+      await logSession(push1);
+      final open = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: (await sessionNamed('Pull 1')).id,
+      );
+
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+
+      expect(today.regime?.name, ppl.name);
+      expect(today.sessions.map((s) => s.name), contains('Push 1'));
+      expect(today.status?.completedSessionIds, {push1.id});
+      expect(today.openWorkout?.id, open);
+      expect(today.openWorkoutOwner?.sessionName, 'Pull 1');
+      expect(today.hasHistory, isTrue);
+      expect(today.recentCompleted, hasLength(1));
+    });
+
+    test('gives every session an entry, so empty is not "not loaded"',
+        () async {
+      final bare =
+          await RegimeRepository(db).addSession((await activeRegime()).id, 'Bare');
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final names = today.exerciseNamesBySession;
+
+      // Every session is a key; a session with no slots maps to an empty list,
+      // which is what the row reads to offer "add exercises" instead of "start".
+      expect(names.keys.toSet(), today.sessions.map((s) => s.id).toSet());
+      expect(names[(await sessionNamed('Push 1')).id], isNotEmpty);
+      expect(names[bare], isEmpty);
+    });
+
+    test('has no regime, but still a heatmap, on a fresh install', () async {
+      final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(fresh.close);
+      await ensureStarterCatalog(fresh);
+
+      final today = await TrainingRepository(fresh)
+          .todaySnapshot(heatmapFromDayKey: 0);
+
+      expect(today.regime, isNull);
+      expect(today.status, isNull);
+      expect(today.sessions, isEmpty);
+      expect(today.hasHistory, isFalse);
+      expect(today.recentCompleted, isEmpty);
+    });
+
+    test('excludes workouts older than the heatmap window', () async {
+      await logSession(await sessionNamed('Push 1'));
+
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 99999999);
+      // Still history — the flag is "ever", the grid is "recently".
+      expect(today.hasHistory, isTrue);
+      expect(today.recentCompleted, isEmpty);
+    });
   });
 
   test('the table lists sessions from older regimes too', () async {

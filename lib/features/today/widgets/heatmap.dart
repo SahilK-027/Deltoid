@@ -3,7 +3,69 @@ import 'package:intl/intl.dart';
 
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
-import '../heatmap_providers.dart';
+import '../heatmap_data.dart';
+import '../today_providers.dart';
+
+/// One day's colour, shared by the compact grid on Today and the full-history
+/// one behind it so the two can never drift apart.
+Color heatCellColor(
+  BuildContext context,
+  HeatDay? day, {
+  required bool isFuture,
+}) {
+  final c = context.c;
+  if (isFuture) return c.heatEmpty.withValues(alpha: 0.4);
+  if (day == null) return c.heatEmpty;
+  if (day.isDeload) return c.deloadMuted;
+
+  final scale = c.heatScale;
+  final index = (day.workouts - 1).clamp(0, scale.length - 1);
+  // A single session is already a full day's work — start at a mid step so
+  // normal days read as "done", not "barely".
+  return scale[(index + 2).clamp(0, scale.length - 1)];
+}
+
+/// One cell. Square, tooltipped, and told nothing about where it sits.
+class HeatCell extends StatelessWidget {
+  const HeatCell({
+    super.key,
+    required this.date,
+    required this.day,
+    required this.size,
+    required this.isFuture,
+  });
+
+  final DateTime date;
+  final HeatDay? day;
+  final double size;
+  final bool isFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final day = this.day;
+    final stamp = DateFormat('EEE d MMM y').format(date);
+
+    return Tooltip(
+      message: day == null
+          ? stamp
+          : '$stamp · ${day.workouts} session${day.workouts == 1 ? '' : 's'}'
+              '${day.isDeload ? ' · deload' : ''}',
+      waitDuration: const Duration(milliseconds: 400),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: heatCellColor(context, day, isFuture: isFuture),
+          borderRadius: BorderRadius.circular(3),
+          border: day != null && day.isDeload
+              ? Border.all(color: c.deload, width: 1)
+              : null,
+        ),
+      ),
+    );
+  }
+}
 
 /// GitHub-style consistency grid: one column per week, one cell per day.
 ///
@@ -14,7 +76,10 @@ class ConsistencyHeatmap extends StatelessWidget {
   const ConsistencyHeatmap({
     super.key,
     required this.days,
-    this.weeks = 13,
+    // The window the query already fetches. The card under the grid captions
+    // this number in words, and a caption that disagrees with the grid — or
+    // with the rows the query returned — is worse than no caption.
+    this.weeks = heatmapWeeks,
     this.showMonthLabels = true,
   });
 
@@ -24,8 +89,13 @@ class ConsistencyHeatmap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    final today = DateTime.now();
+    // Date arithmetic happens in UTC even though these are local calendar days:
+    // `add(Duration(days: 1))` across a DST boundary lands on 23:00 the previous
+    // day, which would duplicate one column's worth of cells twice a year.
+    // `dayKeyOf` only reads y/m/d, so nothing here cares about the zone.
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final todayKey = dayKeyOf(today);
 
     // Columns run Monday-first, ending with the week containing today.
     final endOfWeek = today.add(Duration(days: 7 - today.weekday));
@@ -36,11 +106,24 @@ class ConsistencyHeatmap extends StatelessWidget {
         const gap = 3.0;
         const labelWidth = 22.0;
         final available = constraints.maxWidth - labelWidth;
+        // Still capped — cells any larger read as a chart rather than a
+        // texture, and every point of cell size costs seven points of height
+        // off the bottom of the screen. 16 rather than 14 so the widest phones
+        // do not leave a margin of empty card to the right of the grid; the
+        // column count does most of that work now.
         final cell =
-            ((available - gap * (weeks - 1)) / weeks).clamp(8.0, 18.0);
+            ((available - gap * (weeks - 1)) / weeks).clamp(8.0, 16.0);
 
         final columns = <Widget>[];
         var lastMonth = -1;
+        // Column a label was last drawn in. A month label is allowed to overrun
+        // its own column — that is what the [OverflowBox] below is for — so two
+        // labels landing two columns apart print over each other. This is how
+        // the grid rendered "MaApr" the day it grew from 13 columns to 18.
+        var lastLabelWeek = -99;
+        // A three-letter month at 11pt needs about 24pt; one column is the cell
+        // plus its gap.
+        final columnsPerLabel = (24 / (cell + gap)).ceil();
 
         for (var w = 0; w < weeks; w++) {
           final cells = <Widget>[];
@@ -49,34 +132,22 @@ class ConsistencyHeatmap extends StatelessWidget {
           for (var d = 0; d < 7; d++) {
             final date = start.add(Duration(days: w * 7 + d));
             final key = dayKeyOf(date);
-            final day = days[key];
-            final isFuture = date.isAfter(today);
 
             if (d == 0 && date.month != lastMonth) {
               lastMonth = date.month;
-              monthLabel = DateFormat('MMM').format(date);
+              if (w - lastLabelWeek >= columnsPerLabel) {
+                lastLabelWeek = w;
+                monthLabel = DateFormat('MMM').format(date);
+              }
             }
 
             cells.add(Padding(
               padding: const EdgeInsets.only(bottom: gap),
-              child: Tooltip(
-                message: day == null
-                    ? DateFormat('EEE d MMM').format(date)
-                    : '${DateFormat('EEE d MMM').format(date)} · '
-                        '${day.workouts} session${day.workouts == 1 ? '' : 's'}'
-                        '${day.isDeload ? ' · deload' : ''}',
-                waitDuration: const Duration(milliseconds: 400),
-                child: Container(
-                  width: cell,
-                  height: cell,
-                  decoration: BoxDecoration(
-                    color: _cellColor(context, day, isFuture),
-                    borderRadius: BorderRadius.circular(3),
-                    border: day != null && day.isDeload
-                        ? Border.all(color: c.deload, width: 1)
-                        : null,
-                  ),
-                ),
+              child: HeatCell(
+                date: date,
+                day: days[key],
+                size: cell,
+                isFuture: key > todayKey,
               ),
             ));
           }
@@ -129,22 +200,9 @@ class ConsistencyHeatmap extends StatelessWidget {
       },
     );
   }
-
-  Color _cellColor(BuildContext context, HeatDay? day, bool isFuture) {
-    final c = context.c;
-    if (isFuture) return c.heatEmpty.withValues(alpha: 0.4);
-    if (day == null) return c.heatEmpty;
-    if (day.isDeload) return c.deloadMuted;
-
-    final scale = c.heatScale;
-    final index = (day.workouts - 1).clamp(0, scale.length - 1);
-    // A single session is already a full day's work — start at a mid step so
-    // normal days read as "done", not "barely".
-    return scale[(index + 2).clamp(0, scale.length - 1)];
-  }
 }
 
-/// Legend explaining the two colour families, shown under the full heatmap.
+/// Legend explaining the two colour families.
 class HeatmapLegend extends StatelessWidget {
   const HeatmapLegend({super.key});
 

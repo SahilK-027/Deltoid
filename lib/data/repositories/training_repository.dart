@@ -23,6 +23,60 @@ class ExerciseEntry {
   final List<SetLog> sets;
 }
 
+/// Everything the Today screen renders, in one value.
+///
+/// Today used to assemble itself out of a dozen independently watched queries
+/// arranged in dependency layers — regime, then its sessions, then the cycle
+/// status, then a slot count per session row. Each layer resolved a frame or
+/// two after the one above it, so an app whose answers were already on disk
+/// still revealed its first screen in stages. Worse, the frame before
+/// `sessions` arrived was indistinguishable from a regime with no sessions in
+/// it, so the "no sessions" empty state flashed at people who had five.
+class TodaySnapshot {
+  const TodaySnapshot({
+    required this.regime,
+    required this.sessions,
+    required this.status,
+    required this.openWorkout,
+    required this.openWorkoutOwner,
+    required this.hasHistory,
+    required this.exerciseNamesBySession,
+    required this.recentCompleted,
+    required this.lastCompleted,
+  });
+
+  final Regime? regime;
+  final List<Session> sessions;
+
+  /// Null only when there is no active regime.
+  final CycleStatus? status;
+
+  final Workout? openWorkout;
+
+  /// The open workout's own session and regime, which are not necessarily the
+  /// active regime's — see [workoutOwner].
+  final ({String? sessionName, String regimeId, String? regimeName})?
+      openWorkoutOwner;
+
+  /// Whether anything has ever been finished — "brand new install" as opposed
+  /// to "regime set up, nothing logged yet".
+  final bool hasHistory;
+
+  /// The most recently finished workout, whatever regime it belonged to.
+  ///
+  /// Not read off the tail of [recentCompleted]: that list is bounded by the
+  /// heatmap window, so coming back after a long layoff would report "nothing
+  /// logged yet" at someone with a year of history.
+  final ({Workout workout, String? sessionName})? lastCompleted;
+
+  /// Exercise names per session id, in slot order. Doubles as the slot count
+  /// that decides whether a session row offers "start" or "add exercises".
+  final Map<String, List<String>> exerciseNamesBySession;
+
+  /// Completed workouts recent enough to appear on the consistency heatmap.
+  final List<Workout> recentCompleted;
+}
+
 class WorkoutDetail {
   const WorkoutDetail({
     required this.workout,
@@ -297,6 +351,150 @@ class TrainingRepository {
       deloadEnabled: regime.deloadEnabled,
       deloadAfterCycles: regime.deloadAfterCycles,
     );
+  }
+
+  /// Loads the whole Today screen in one pass, so it paints at once.
+  ///
+  /// Independent queries go through `Future.wait`; the rest are sequential only
+  /// where they genuinely depend on what came before. Everything is on local
+  /// disk, so the win here is not milliseconds saved — it is that the screen
+  /// has one loading state instead of six, and cannot render a half-answer.
+  ///
+  /// [heatmapFromDayKey] bounds the consistency grid; the caller owns how far
+  /// back it looks.
+  Future<TodaySnapshot> todaySnapshot({required int heatmapFromDayKey}) async {
+    final regimeQuery = db.select(db.regimes)
+      ..where((t) => t.isActive.equals(true) & t.deletedAt.isNull())
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+      ])
+      ..limit(1);
+
+    final openQuery = db.select(db.workouts)
+      ..where((t) =>
+          t.status.equalsValue(WorkoutStatus.inProgress) & t.deletedAt.isNull())
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc)
+      ])
+      ..limit(1);
+
+    // Ordered, so the row that answers `hasHistory` is also the one Today wants
+    // to talk about. Sorted on `dayKey` before `startedAt`: a session backfilled
+    // for last Monday must not outrank one actually trained today just because
+    // it was typed in later.
+    final historyQuery = db.select(db.workouts).join([
+      leftOuterJoin(
+          db.sessions, db.sessions.id.equalsExp(db.workouts.sessionId)),
+    ])
+      ..where(db.workouts.status.equalsValue(WorkoutStatus.completed) &
+          db.workouts.deletedAt.isNull())
+      ..orderBy([
+        OrderingTerm(expression: db.workouts.dayKey, mode: OrderingMode.desc),
+        OrderingTerm(
+            expression: db.workouts.startedAt, mode: OrderingMode.desc),
+      ])
+      ..limit(1);
+
+    final heatQuery = db.select(db.workouts)
+      ..where((t) =>
+          t.dayKey.isBiggerOrEqualValue(heatmapFromDayKey) &
+          t.status.equalsValue(WorkoutStatus.completed) &
+          t.deletedAt.isNull())
+      ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]);
+
+    Future<({String? sessionName, String regimeId, String? regimeName})?>
+        ownerOf(Workout? w) async => w == null ? null : workoutOwner(w.id);
+
+    final (regime, open, history, recent) = await (
+      regimeQuery.getSingleOrNull(),
+      openQuery.getSingleOrNull(),
+      historyQuery.get(),
+      heatQuery.get(),
+    ).wait;
+
+    final last = history.isEmpty
+        ? null
+        : (
+            workout: history.first.readTable(db.workouts),
+            sessionName: history.first.readTableOrNull(db.sessions)?.name,
+          );
+
+    if (regime == null) {
+      return TodaySnapshot(
+        regime: null,
+        sessions: const [],
+        status: null,
+        openWorkout: open,
+        openWorkoutOwner: await ownerOf(open),
+        hasHistory: history.isNotEmpty,
+        lastCompleted: last,
+        exerciseNamesBySession: const {},
+        recentCompleted: recent,
+      );
+    }
+
+
+    final sessions = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regime.id) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    final (status, names, owner) = await (
+      cycleStatus(regime.id),
+      _exerciseNamesBySession(sessions.map((s) => s.id).toList()),
+      ownerOf(open),
+    ).wait;
+
+    return TodaySnapshot(
+      regime: regime,
+      sessions: sessions,
+      status: status,
+      openWorkout: open,
+      openWorkoutOwner: owner,
+      hasHistory: history.isNotEmpty,
+      lastCompleted: last,
+      exerciseNamesBySession: names,
+      recentCompleted: recent,
+    );
+  }
+
+  /// Every completed workout, oldest first, for the full-history heatmap.
+  ///
+  /// Deliberately separate from [todaySnapshot]: Today only ever needs the last
+  /// thirteen weeks, and loading a decade of rows to render three months of grid
+  /// would be a tax paid on every write to any of six tables.
+  Future<List<Workout>> allCompleted() {
+    return (db.select(db.workouts)
+          ..where((t) =>
+              t.status.equalsValue(WorkoutStatus.completed) &
+              t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
+        .get();
+  }
+
+  /// One query for every session's exercise names, rather than one per row.
+  Future<Map<String, List<String>>> _exerciseNamesBySession(
+    List<String> sessionIds,
+  ) async {
+    if (sessionIds.isEmpty) return const {};
+
+    final rows = await (db.select(db.sessionExercises).join([
+      innerJoin(db.exercises,
+          db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
+    ])
+          ..where(db.sessionExercises.sessionId.isIn(sessionIds) &
+              db.sessionExercises.deletedAt.isNull())
+          ..orderBy([OrderingTerm(expression: db.sessionExercises.orderIndex)]))
+        .get();
+
+    // Seeded for every session, so an empty list means "no exercises" rather
+    // than "not loaded" — the distinction the session rows act on.
+    final names = {for (final id in sessionIds) id: <String>[]};
+    for (final row in rows) {
+      final slot = row.readTable(db.sessionExercises);
+      names[slot.sessionId]?.add(row.readTable(db.exercises).name);
+    }
+    return names;
   }
 
   /// Closes the current cycle early. The escape hatch for "I'm skipping leg 2

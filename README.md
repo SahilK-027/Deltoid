@@ -64,6 +64,7 @@ Workout  ──  one Session actually performed, on a day, inside a Cycle
 | Warmups / drops / rest-pause are excluded from progress | `scorePerformance` only counts `working` and `amrap`. Including the rest is how naive logs claim progress that isn't there.                                                                                                                                                          |
 | `estimated1RM` caps reps at 12                          | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison uses `beatsPrevious` instead, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win. |
 | The log screen owns the **horizontal axis**             | It's a `PageView`, one exercise per page. Nothing inside it may use a horizontal gesture.                                                                                                                                                                                            |
+| Today loads through **one** snapshot                     | `todaySnapshot` + `todayProvider`. Adding a per-card provider brings back the staged reveal: a layer of watched queries resolving a frame or two apart, and a frame where "no sessions" is indistinguishable from "sessions haven't loaded". Everything is local — the screen should arrive whole. |
 
 ---
 
@@ -86,7 +87,9 @@ lib/
 
   core/            theme tokens, shared providers, primitives, id generation
                    rest_alert.dart  end-of-rest buzz + tone (audio session)
-                   widgets/ticking.dart  the only per-second rebuild there is
+                   widgets/ticking.dart  every per-second rebuild goes through
+                                         this, wrapping the clock and never the
+                                         screen around it
   features/        today · log · history · progress · regime · settings
 
 assets/
@@ -96,6 +99,19 @@ assets/
 Four tabs: **Today** (next session, heatmap), **History**, **Progress** (one
 exercise, one chart), **Regime** (sessions, exercise catalog, deload config).
 Settings behind the gear on Today.
+
+Today reads top to bottom as one thought: how long since the last session, the
+one session to start, every session in the cycle, then the record. Two rules
+about it, both learned the hard way:
+
+- **Nothing on it is drawn twice.** The cycle used to appear as labelled bars in
+  the hero card *and* as the tappable list below, which pushed the heatmap off
+  the bottom of the screen and needed a scroll-to-anchor to compensate. The
+  session list is the only rendering of cycle progress; the fraction beside
+  "This cycle" is the only summary of it.
+- **The queue head is a description, not an instruction.** The hero names the
+  first session not yet trained. Every other session is one tap away in the list
+  directly beneath it, without scrolling — an out-of-order session is normal.
 
 History has three readings of the same data, because "what did I do" means
 three different things:
@@ -197,6 +213,13 @@ that started it; clearing a flag through that dead ref throws inside `finally`
 and leaves the button disabled forever. Capture
 `ProviderScope.containerOf(context)` before the first await.
 
+**`valueOrNull ?? const []` turns "loading" into "empty".** Today read five
+providers that way. The frame after the regime arrived but before its sessions
+did rendered the "no sessions in this regime" empty state at a regime with six —
+and every card below appeared a frame or two apart, so an app whose data is on
+local disk still looked like it was fetching. Loading and empty are different
+states; a screen with more than one query needs them told apart, or one query.
+
 **`formatWeight` also formats computed numbers.** An estimated 1RM is an
 arbitrary double — `55.733333333333334 kg` shipped to the screen before it was
 capped at two decimals.
@@ -253,8 +276,17 @@ picker).
 - **Progress** _(driven on the emulator)_ — e1RM over time, one line per session
   slot, 3M/1Y/All, stall detection. Deload weeks excluded so a light week isn't
   drawn as a regression.
-- **Consistency heatmap** _(driven on the emulator)_ — auto-filled, deload days
-  distinct, sessions/week.
+- **Consistency heatmap** _(driven on the emulator; the year view is unit-tested
+  only)_ — thirteen weeks on Today, auto-filled, deload days distinct. Tapping it
+  opens every year since the first logged session, one horizontally scrolled grid
+  per year, parked on today.
+
+  The sessions/week figure beside it is **not always a rate**. It was
+  `sessionsInTheLast29Days / 4`, which told a two-day-old install it was training
+  "0.3 / week" — a number produced by dividing by three weeks that had not
+  happened. `domain/consistency.dart` now divides by the weeks it actually has,
+  and reports a plain count below a fortnight of history. Any change here belongs
+  in that file, tested without a database.
 - **Backup** — export / restore / auto-export. Round-trip is unit-tested against
   a second in-memory database, including enum and JSON-list columns. On device,
   only the restore file picker was opened; the share sheet and a real restore

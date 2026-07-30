@@ -16,7 +16,7 @@ class SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: Space.xs,
         right: Space.xs,
-        bottom: Space.sm,
+        bottom: Space.xs,
       ),
       child: Row(
         children: [
@@ -37,6 +37,7 @@ class AppCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(Space.lg),
     this.onTap,
     this.highlightColor,
+    this.fill,
   });
 
   final Widget child;
@@ -47,6 +48,11 @@ class AppCard extends StatelessWidget {
   /// that need to stand out (an unfinished session, a deload).
   final Color? highlightColor;
 
+  /// Replaces the usual surface. Only the one card a screen is *about* should
+  /// use this — a page where three cards are tinted has no focal point, which
+  /// is the state Today was in when every section looked equally important.
+  final Color? fill;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -54,7 +60,7 @@ class AppCard extends StatelessWidget {
       duration: Motion.fast,
       padding: padding,
       decoration: BoxDecoration(
-        color: c.surface,
+        color: fill ?? c.surface,
         borderRadius: BorderRadius.circular(Radii.lg),
         border: Border.all(color: highlightColor ?? c.border),
       ),
@@ -69,6 +75,49 @@ class AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.lg),
         child: content,
       ),
+    );
+  }
+}
+
+/// One number and what it means, stacked. Built for a row of siblings, so the
+/// value sits on a fixed line height and the captions line up across tiles even
+/// when one of them wraps.
+class StatTile extends StatelessWidget {
+  const StatTile({
+    super.key,
+    required this.value,
+    required this.label,
+    this.emphasis,
+  });
+
+  final String value;
+  final String label;
+
+  /// Paints the value. Null leaves it in the primary text colour — only the
+  /// stat a card is arguing for should carry the accent.
+  final Color? emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: context.t.titleLarge?.copyWith(
+            color: emphasis,
+            fontFeatures: tabular,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          label.toUpperCase(),
+          style: context.t.labelSmall,
+          maxLines: 2,
+        ),
+      ],
     );
   }
 }
