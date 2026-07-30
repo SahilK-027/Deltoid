@@ -75,6 +75,18 @@ flutter:
   assets:
     - assets/audio/rest_done.mp3
 
+  # Inter 4.1 (SIL OFL 1.1, see assets/fonts/OFL.txt). Static instances only —
+  # the type scale in lib/core/theme/theme.dart uses w400/w500/w600.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

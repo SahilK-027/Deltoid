@@ -3,10 +3,15 @@ import 'package:flutter/services.dart';
 
 import 'tokens.dart';
 
+/// Bundled in `assets/fonts/` (Inter 4.1, SIL OFL). Declared in pubspec.yaml
+/// with static instances at 400/500/600 — the only weights this scale uses.
+const kFontFamily = 'Inter';
+
 /// Type scale. Numeric styles carry tabular figures so digits never reflow.
 TextTheme _textTheme(DeltoidColors c) {
   TextStyle base(double size, double height, FontWeight w, Color color) =>
       TextStyle(
+        fontFamily: kFontFamily,
         fontSize: size,
         height: height / size,
         fontWeight: w,
@@ -34,6 +39,7 @@ TextTheme _textTheme(DeltoidColors c) {
         .copyWith(fontFeatures: tabular),
     // Section eyebrows — uppercase, tracked out.
     labelSmall: TextStyle(
+      fontFamily: kFontFamily,
       fontSize: 11,
       height: 14 / 11,
       fontWeight: FontWeight.w600,
@@ -51,6 +57,9 @@ ThemeData buildTheme(Brightness brightness) {
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    // Covers the Material widgets that build styles off Typography rather than
+    // off `textTheme` (dialogs, menus, tooltips, text fields).
+    fontFamily: kFontFamily,
     scaffoldBackgroundColor: c.bg,
     canvasColor: c.bg,
     extensions: [c],
