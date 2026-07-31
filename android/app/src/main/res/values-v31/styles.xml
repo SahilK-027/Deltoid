@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ owns the launch window through the SplashScreen API: the
+         windowBackground drawable used below API 31 is ignored, so the same
+         mark and colour are restated here. The system masks the icon to a
+         circle 192dp across on a 288dp canvas, which is what the art is sized
+         to; no animation is declared, so it holds still until Flutter's first
+         frame replaces it. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

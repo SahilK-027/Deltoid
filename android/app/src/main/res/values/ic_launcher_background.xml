@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0A0A0B</color>
+    <!-- `surface` from the app's palette. A near-black tile disappears against a
+         dark wallpaper; this keeps the icon reading as an object. -->
+    <color name="ic_launcher_background">#1F1F1F</color>
 </resources>

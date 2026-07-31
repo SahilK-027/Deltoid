@@ -74,6 +74,10 @@ flutter:
 
   assets:
     - assets/audio/rest_done.mp3
+    # The brand mark, in both inks. Source renders and the Play Store icon live
+    # in design/ and are deliberately not bundled.
+    - assets/brand/mark_white.png
+    - assets/brand/mark_ink.png
 
   # Inter 4.1 (SIL OFL 1.1, see assets/fonts/OFL.txt). Static instances only —
   # a variable font declared under a `weight:` key renders at its default

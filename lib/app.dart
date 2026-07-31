@@ -44,8 +44,8 @@ class _Boot extends ConsumerWidget {
 
     return init.when(
       data: (_) =>
-          today.hasValue ? const AppShell() : const _BootSpinner(),
-      loading: () => const _BootSpinner(),
+          today.hasValue ? const AppShell() : const _BootMark(),
+      loading: () => const _BootMark(),
       error: (e, st) => Scaffold(
         body: Center(
           child: Padding(
@@ -62,17 +62,24 @@ class _Boot extends ConsumerWidget {
   }
 }
 
-class _BootSpinner extends StatelessWidget {
-  const _BootSpinner();
+/// The same mark, at the same size and on the same colour as the launch window
+/// the system just drew. Boot is short and bounded by real work, so a spinner
+/// only advertised that something was slow; holding the mark makes the handoff
+/// from the launch window to Flutter's first frame invisible instead.
+class _BootMark extends StatelessWidget {
+  const _BootMark();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
       body: Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(strokeWidth: 2),
+        // 150dp is what the platform splash draws: 52% of its 288dp canvas,
+        // the widest the mark can be and still clear the 192dp circular mask.
+        child: Image.asset(
+          dark ? 'assets/brand/mark_white.png' : 'assets/brand/mark_ink.png',
+          width: 150,
+          filterQuality: FilterQuality.medium,
         ),
       ),
     );
