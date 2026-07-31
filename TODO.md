@@ -34,7 +34,7 @@ a device before the next starts.
       Forces the pieces the rest reuse: monogram tile (we have no exercise
       photos), value fields with the focused-outline state, `W`/`D` index chips,
       swipe-to-delete, keypad, plate view. Review in two passes — set table and
-      rail, then keypad / plate / rest timer / sheets.
+      rail, then keypad / plate / rest timer / sheets. We can set bar weight per exercise EZ bar, or olympic bar and compute plates as per that: 2.5kg, 5kg, 10kg, 15kg, 20kg, 25kg Olympic weight colour.
 - [ ] **3 · History + workout detail** — the furthest from the language today.
       Date-group headers, identity tiles, expandable exercise rows. Layout only:
       keyset paging and `HistoryCursor` are not touched.
@@ -65,7 +65,7 @@ Two things to preserve through all of it, both easy to lose in a redesign:
 Analyzer-clean and unit-tested where there is logic. "Driven on the emulator"
 marks flows exercised end to end by hand.
 
-**Those marks are stale.** They predate the audit fixes *and* the rebrand;
+**Those marks are stale.** They predate the audit fixes _and_ the rebrand;
 every screen has been touched since and none has been driven again. Treat them
 as evidence about the design, not about the current build. What wants real
 hardware rather than a test: anything with a plugin behind it (the end-of-rest
@@ -118,6 +118,7 @@ layout moved — which, after the rebrand, is everything.
   not happened. `domain/consistency.dart` now divides by the weeks it actually
   has, and reports a plain count below a fortnight of history. Any change here
   belongs in that file, tested without a database.
+
 - **Backup** — export / restore / auto-export. Round-trip is unit-tested against
   a second in-memory database, including enum and JSON-list columns. On device,
   only the restore file picker was opened; the share sheet and a real restore

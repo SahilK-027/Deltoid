@@ -1389,6 +1389,169 @@ void main() {
       expect(after[2].id, sets[1].id);
     });
 
+    test('the + on a group adds a leg to that group, not a new drop set',
+        () async {
+      final (:weId, :sets) = await firstExercise();
+      await repo.setSetType(sets.first.id, SetType.drop);
+
+      // What the `+` under the spine calls. It used to call addSetAfter with
+      // no parent, so every press produced another parentless `drop` row —
+      // a whole new drop set, complete with its own chip and its own `+`.
+      await repo.addDropLeg(weId, headSetId: sets.first.id);
+
+      final after = await setsOf(weId);
+      final legs = after.where((s) => s.parentSetId == sets.first.id).toList();
+      expect(legs.length, 2, reason: 'the conversion leg plus this one');
+      expect(legs.every((s) => s.setType == SetType.drop), isTrue);
+      // Both sit directly under their head, in the order they were added.
+      expect(after.map((s) => s.id).take(3), [
+        sets.first.id,
+        legs.first.id,
+        legs.last.id,
+      ]);
+      expect(
+        after.map((s) => s.setIndex),
+        List.generate(after.length, (i) => i),
+      );
+    });
+
+    test('converting to a drop makes exactly one leg, and re-tapping adds none',
+        () async {
+      final (:weId, :sets) = await firstExercise();
+
+      await repo.setSetType(sets.first.id, SetType.drop);
+      await repo.setSetType(sets.first.id, SetType.drop);
+
+      final after = await setsOf(weId);
+      expect(
+        after.where((s) => s.parentSetId == sets.first.id).length,
+        1,
+        reason: 'the type it already has is not a change',
+      );
+    });
+
+    test('converting back out of a drop takes the empty legs with it', () async {
+      final (:weId, :sets) = await firstExercise();
+      // One set, made a drop, grown to three legs, then changed back. It came
+      // back as four separate working sets — the legs the conversion added for
+      // you are not sets you decided to do.
+      await repo.deleteSets([sets[1].id, sets[2].id]);
+      await repo.setSetType(sets.first.id, SetType.drop);
+      await repo.addDropLeg(weId, headSetId: sets.first.id);
+      await repo.addDropLeg(weId, headSetId: sets.first.id);
+
+      await repo.setSetType(sets.first.id, SetType.working);
+
+      final after = await setsOf(weId);
+      expect(after.map((s) => s.id), [sets.first.id]);
+      expect(after.single.setType, SetType.working);
+    });
+
+    test('converting back out of a drop keeps a leg with numbers in it',
+        () async {
+      final (:weId, :sets) = await firstExercise();
+      await repo.setSetType(sets.first.id, SetType.drop);
+      final leg = (await setsOf(weId))[1];
+      await repo.updateSet(
+        leg.id,
+        weight: const Value(40),
+        reps: const Value(8),
+      );
+
+      await repo.setSetType(sets.first.id, SetType.working);
+
+      final after = await setsOf(weId);
+      final freed = after.firstWhere((s) => s.id == leg.id);
+      // Promoted, not deleted: a leg you logged into is a set you did.
+      expect(freed.parentSetId, isNull);
+      expect(freed.setType, SetType.working);
+      expect(freed.weight, 40);
+      expect(freed.reps, 8);
+    });
+
+    test('a set added after a delete does not reuse a live index', () async {
+      final (:weId, :sets) = await firstExercise();
+      await repo.deleteSets([sets[1].id]);
+
+      // Tombstones never renumber, so counting the survivors handed the new
+      // row an index the last set still held.
+      final id = await repo.addSet(weId);
+
+      final after = await setsOf(weId);
+      expect(after.last.id, id);
+      expect(
+        after.map((s) => s.setIndex).toSet().length,
+        after.length,
+        reason: 'no two live sets share an index',
+      );
+    });
+
+    test('next week opens with the template\'s sets, not just the logged ones',
+        () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+
+      // One set logged out of three, which is what an unticked row leaves
+      // behind: `completeWorkout` tombstones the rest on the way out.
+      final first = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final entry = (await repo.workoutDetail(first))!.entries.first;
+      final programmed = entry.sets.length;
+      await repo.updateSet(
+        entry.sets.first.id,
+        weight: const Value(60),
+        reps: const Value(8),
+        isDone: const Value(true),
+      );
+      await repo.completeWorkout(first);
+
+      final next = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final reopened = (await repo.workoutDetail(next))!.entries.first;
+      expect(reopened.sets.length, programmed);
+    });
+
+    test('next week keeps the drop group, not a row of loose Ds', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+
+      final first = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final entry = (await repo.workoutDetail(first))!.entries.first;
+      final head = entry.sets.first;
+      await repo.setSetType(head.id, SetType.drop);
+      // Log the head and its leg; only ticked sets are mirrored.
+      for (final s in await setsOf(entry.workoutExercise.id)) {
+        await repo.updateSet(
+          s.id,
+          weight: const Value(60),
+          reps: const Value(8),
+          isDone: const Value(true),
+        );
+      }
+      await repo.completeWorkout(first);
+
+      final next = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final reopened = (await repo.workoutDetail(next))!.entries.first;
+      // The head of a drop group is itself a `drop`, so parentage is what
+      // separates a leg from the set it hangs off — not the type.
+      final legs = reopened.sets.where((s) => s.parentSetId != null).toList();
+      expect(legs, hasLength(1));
+      expect(legs.single.setType, SetType.drop);
+      expect(legs.single.parentSetId, reopened.sets.first.id);
+      expect(reopened.sets.first.setType, SetType.drop);
+      expect(reopened.sets.first.parentSetId, isNull);
+    });
+
     test('deleting the head of a group takes its legs with it', () async {
       final (:weId, :sets) = await firstExercise();
       final legA = await repo.addSetAfter(

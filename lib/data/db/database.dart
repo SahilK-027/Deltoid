@@ -31,12 +31,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
+        },
+        onUpgrade: (m, from, to) async {
+          // v2: drop-set legs point at the set they dropped from, instead of
+          // being inferred from sitting next to it.
+          if (from < 2) {
+            await m.addColumn(setLogs, setLogs.parentSetId);
+          }
         },
         beforeOpen: (details) async {
           // Tombstones and cascades depend on referential integrity being real.

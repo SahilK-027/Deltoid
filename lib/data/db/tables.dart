@@ -155,6 +155,15 @@ class SetLogs extends Table with SyncColumns {
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
   RealColumn get addedWeight => real().nullable()();
 
+  /// The head of the drop group this set is a leg of, or null when the set
+  /// stands on its own.
+  ///
+  /// Consecutive `drop` rows used to be treated as one group by position
+  /// alone, which cannot tell "one drop set with two legs" from "two separate
+  /// drop sets that happen to sit next to each other" — converting two sets in
+  /// a row swallowed the second into the first.
+  TextColumn get parentSetId => text().nullable()();
+
   IntColumn get restSeconds => integer().nullable()();
   IntColumn get completedAt => integer().nullable()();
   TextColumn get note => text().nullable()();

@@ -10,6 +10,7 @@ class PastSet {
     this.weight,
     this.reps,
     this.addedWeight,
+    this.isLeg = false,
   });
 
   final SetType type;
@@ -17,11 +18,18 @@ class PastSet {
   final int? reps;
   final double? addedWeight;
 
+  /// Whether this set was a leg of the drop group above it rather than the head
+  /// of one. The type cannot answer that: a drop set's *head* is a `drop` too,
+  /// so mirroring last week's shape by type alone rebuilt a group of legs with
+  /// nothing to be legs of.
+  final bool isLeg;
+
   PastSet copyWith({double? weight, int? reps, double? addedWeight}) => PastSet(
         type: type,
         weight: weight ?? this.weight,
         reps: reps ?? this.reps,
         addedWeight: addedWeight ?? this.addedWeight,
+        isLeg: isLeg,
       );
 }
 

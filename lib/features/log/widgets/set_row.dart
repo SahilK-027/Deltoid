@@ -34,11 +34,7 @@ Color setTypeColour(BuildContext context, SetType type) => switch (type) {
 /// column and a chunk of the width of a field you have to read a number out of
 /// at arm's length.
 class SetTableHeader extends StatelessWidget {
-  const SetTableHeader({
-    super.key,
-    required this.loadMode,
-    required this.unit,
-  });
+  const SetTableHeader({super.key, required this.loadMode, required this.unit});
 
   final LoadMode loadMode;
   final WeightUnit unit;
@@ -47,11 +43,17 @@ class SetTableHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final label = context.t.labelSmall?.copyWith(color: c.textTertiary);
+    // The gutter is the page's, so the SET column starts on the same vertical
+    // as the exercise name above it. The table used to sit in a card, inset a
+    // second time by the card's own padding, and lined up with nothing.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.sm),
+      padding: const EdgeInsets.only(bottom: Space.sm),
       child: Row(
         children: [
-          SizedBox(width: SetRow.indexColumn, child: Text('SET', style: label)),
+          SizedBox(
+            width: SetRow.indexColumn,
+            child: Text('SET', style: label),
+          ),
           const SizedBox(width: Space.sm),
           Expanded(
             child: Text(
@@ -62,12 +64,14 @@ class SetTableHeader extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(width: Space.xs),
-          SizedBox(
-            width: SetRow.repsColumn,
+          const SizedBox(width: Space.sm),
+          // Load and reps are the same width. Reps had a fixed 68 against an
+          // expanding load column, which on a phone made one field twice the
+          // other for no reason a reader could see.
+          Expanded(
             child: Text('REPS', style: label, textAlign: TextAlign.center),
           ),
-          const SizedBox(width: Space.xs),
+          const SizedBox(width: Space.sm),
           SizedBox(
             width: SetRow.doneColumn,
             child: Icon(Icons.check_rounded, size: 14, color: c.textTertiary),
@@ -97,7 +101,6 @@ class SetRow extends StatelessWidget {
   });
 
   static const indexColumn = 34.0;
-  static const repsColumn = 68.0;
   static const doneColumn = 40.0;
   static const fieldHeight = 42.0;
 
@@ -121,21 +124,23 @@ class SetRow extends StatelessWidget {
     final c = context.c;
     final beaten = _beatsGhost();
 
-    // No Dismissible: the log turns pages horizontally, so a sideways drag on a
-    // row cannot also mean "delete". Set actions live behind the index chip.
+    // Swipe-to-delete wraps this from the group above, so the index column
+    // travels with the fields. See [SwipeToDelete].
     //
     // No indent for a drop set either. Indenting shifted every field on the row
     // out of its column, so the table stopped lining up exactly where it is
     // being read fastest — the letter in the index chip carries it instead.
-    return AnimatedContainer(
-      duration: Motion.fast,
-      // Completed rows need to be obvious at a glance down the column, not on
-      // inspection: the whole row steps onto a lighter surface.
-      color: set.isDone ? c.surfaceHigh.withValues(alpha: 0.45) : null,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.lg,
-        vertical: Space.xs,
-      ),
+    // The completed row's wash is painted by the group, not here: it has to
+    // run under the index column too, and painting it inside the row left the
+    // chip sitting in an unwashed notch at the start of every logged set.
+    //
+    // Horizontal padding is the group's, not this row's. Applying it here as
+    // well inset every field a further [Space.lg] from the edge the header had
+    // measured its columns against, so REPS sat off its column, the unit sat
+    // off the load field, and the tick in the header pointed between the
+    // checkbox and the edge of the card.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Space.xs),
       child: Row(
         children: [
           if (loadMode == LoadMode.bodyweight)
@@ -176,9 +181,8 @@ class SetRow extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(width: Space.xs),
-          SizedBox(
-            width: repsColumn,
+          const SizedBox(width: Space.sm),
+          Expanded(
             child: _ValueCell(
               unit: unit,
               field: SetField.reps,
@@ -191,7 +195,7 @@ class SetRow extends StatelessWidget {
               onTap: () => onEdit(set, SetField.reps),
             ),
           ),
-          const SizedBox(width: Space.xs),
+          const SizedBox(width: Space.sm),
           _DoneBox(
             done: set.isDone,
             beaten: beaten,
@@ -226,6 +230,158 @@ class SetRow extends StatelessWidget {
         bodyweightKg: assumedBodyweight,
       ),
       previousReps: g.reps,
+    );
+  }
+}
+
+/// Slides a row left to uncover a delete button.
+///
+/// Not a [Dismissible]: that deletes on release, and a set logged an hour ago
+/// should not be one careless flick from gone. This opens and stays open, so
+/// the delete is a second, deliberate tap — and a tap anywhere else, or a swipe
+/// on another row, closes it again.
+///
+/// Wraps the **whole** row — index column included — and not just the fields.
+/// Wrapped around the fields alone, a swipe slid the weight, the reps and the
+/// checkbox out from under a chip that stayed exactly where it was, which reads
+/// as the table coming apart rather than as one row moving.
+class SwipeToDelete extends StatefulWidget {
+  const SwipeToDelete({
+    super.key,
+    required this.rowId,
+    required this.open,
+    required this.onDelete,
+    required this.child,
+  });
+
+  final String rowId;
+  final ValueNotifier<String?> open;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  @override
+  State<SwipeToDelete> createState() => _SwipeToDeleteState();
+}
+
+class _SwipeToDeleteState extends State<SwipeToDelete> {
+  /// How far the row slides, and the width of the button it brings in with it.
+  /// The done column's width, so the delete lands where the checkbox was.
+  static const _panel = SetRow.doneColumn;
+
+  double _dx = 0;
+  bool _dragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.open.addListener(_onOpenChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.open.removeListener(_onOpenChanged);
+    super.dispose();
+  }
+
+  void _onOpenChanged() {
+    if (widget.open.value == widget.rowId || _dx == 0) return;
+    setState(() => _dx = 0);
+  }
+
+  void _settle(double velocity) {
+    // A flick counts even if it did not travel far: the gesture is over by the
+    // time your thumb has left the screen, and re-dragging to a threshold is
+    // not something anyone does twice.
+    final opening = velocity < -300 || (velocity <= 300 && _dx < -_panel / 2);
+    setState(() {
+      _dragging = false;
+      _dx = opening ? -_panel : 0;
+    });
+    if (opening) {
+      widget.open.value = widget.rowId;
+    } else if (widget.open.value == widget.rowId) {
+      widget.open.value = null;
+    }
+  }
+
+  void _close() {
+    setState(() => _dx = 0);
+    if (widget.open.value == widget.rowId) widget.open.value = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final revealed = _dx < 0;
+
+    return GestureDetector(
+      // Open, the row itself stops taking taps: a thumb landing on a field
+      // that has been slid half a column to the left means "put it back", not
+      // "type into this".
+      onTap: revealed ? _close : null,
+      // Opaque, not the default `deferToChild`. Open, the row under this is
+      // wrapped in an [IgnorePointer] so a stray tap can't type into a field
+      // that has slid half a column sideways — and with nothing beneath it
+      // registering a hit, a `deferToChild` detector never saw the drag either.
+      // The row could be swiped open and then not swiped shut again.
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) => setState(() => _dragging = true),
+      onHorizontalDragUpdate: (d) =>
+          setState(() => _dx = (_dx + d.delta.dx).clamp(-_panel, 0.0)),
+      onHorizontalDragEnd: (d) => _settle(d.velocity.pixelsPerSecond.dx),
+      onHorizontalDragCancel: () => _settle(0),
+      child: Stack(
+        // The button lives past the row's right edge and is clipped away until
+        // the swipe brings it in. Sitting still underneath, it did not read as
+        // part of the row at all: the row left, and a red panel it had been
+        // hiding was simply there.
+        clipBehavior: Clip.hardEdge,
+        children: [
+          AnimatedContainer(
+            // Follows the thumb exactly while dragging; springs back after.
+            duration: _dragging ? Duration.zero : Motion.fast,
+            curve: Motion.curve,
+            transform: Matrix4.translationValues(_dx, 0, 0),
+            child: IgnorePointer(ignoring: revealed, child: widget.child),
+          ),
+          // Offset by the same [_dx] as the row, so the two travel as one
+          // piece. `right: -_panel` parks it exactly one panel past the edge.
+          AnimatedPositioned(
+            duration: _dragging ? Duration.zero : Motion.fast,
+            curve: Motion.curve,
+            top: 0,
+            bottom: 0,
+            right: -_panel - _dx,
+            width: _panel,
+            child: Pressable(
+              onTap: () {
+                _close();
+                widget.onDelete();
+              },
+              child: Center(
+                // The checkbox's geometry, in the checkbox's place at the end
+                // of the row: same 28dp square, same 18dp glyph. A 42dp-tall
+                // slab was the biggest thing in the table and it only ever
+                // appears when you are about to take a row away.
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: c.negative,
+                    borderRadius: BorderRadius.circular(Radii.xs),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -300,18 +456,19 @@ class _ValueCellState extends State<_ValueCell> {
     final c = context.c;
     final hasValue = display.isNotEmpty;
     final ghostText = _fmt(widget.ghost, widget);
-    // A suggestion must never look like a record. The difference is carried by
-    // colour and a leading dot, and it has to survive a glance from arm's
-    // length with the phone on the floor.
+    // A suggestion must never look like a record — but colour alone carries
+    // that, and it always did. The leading dot cost a fifth of a field that
+    // has to hold `102.5` and be read from the floor, and it marked the one
+    // thing on the row you most want to read as a number.
     //
     // It used to be italic as well — but no italic face is bundled, so Skia
     // synthesised a slant by shearing the upright glyphs. Faux oblique on the
     // screen this app is mostly used on was the cheapest-looking thing in it.
-    final showingGhost = !hasValue && ghostText.isNotEmpty;
 
-    // A logged value steps back rather than lighting up: once the row is ticked
-    // it is a record, and the row still to be filled is the one worth looking
-    // at. The tick is what says "done", not the numbers going bold.
+    // A logged set steps back: its numbers are settled, and the row you are
+    // working on has to be the brightest thing in the table. The wash that used
+    // to say "done" ran the width of the card and was the loudest band on the
+    // screen — this and the solid checkbox carry it instead (THEME §6).
     final valueColour = !hasValue
         ? c.textTertiary
         : (widget.done ? c.textSecondary : c.textPrimary);
@@ -327,9 +484,17 @@ class _ValueCellState extends State<_ValueCell> {
           // Focus is an outline on nothing, not a tinted box: the field being
           // typed into should read as open, and a fill plus a border is two
           // signals for one state.
+          // A logged row keeps its boxes. Dropping them collapsed the two
+          // columns into one run of text, so a finished set stopped lining up
+          // with the unfinished ones underneath it.
+          // A finished set goes dull, not black. `surfaceSunken` is very nearly
+          // the page colour, so a logged row read as a hole cut in the table
+          // instead of as work already done.
           color: widget.active
               ? Colors.transparent
-              : (_flash ? c.surfaceHighest : c.surfaceHigh),
+              : (_flash
+                    ? c.surfaceHighest
+                    : (widget.done ? c.surface : c.surfaceHigh)),
           borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
@@ -343,13 +508,6 @@ class _ValueCellState extends State<_ValueCell> {
               Text(
                 widget.prefix!,
                 style: context.t.labelSmall?.copyWith(color: c.textTertiary),
-              ),
-              const SizedBox(width: 3),
-            ],
-            if (showingGhost) ...[
-              Text(
-                '·',
-                style: context.t.labelLarge?.copyWith(color: c.textTertiary),
               ),
               const SizedBox(width: 3),
             ],
@@ -399,6 +557,8 @@ class SetIndexChip extends StatelessWidget {
     final typed = type != SetType.working;
     final colour = setTypeColour(context, type);
 
+    // The chip fills the index column exactly, so on a drop group it covers the
+    // head of the capsule rather than sitting proud of it as a second bulge.
     return Pressable(
       onTap: onTap,
       child: Container(
@@ -406,7 +566,13 @@ class SetIndexChip extends StatelessWidget {
         height: SetRow.indexColumn,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: typed ? colour.withValues(alpha: 0.18) : c.surfaceHigh,
+          // Blended, not translucent. A 18% amber laid over whatever happened
+          // to be behind it picked up the drop capsule's grey and came out a
+          // washed olive — the tint has to be the same colour on the capsule
+          // as off it, and strong enough to read as amber at arm's length.
+          color: typed
+              ? Color.alphaBlend(colour.withValues(alpha: 0.32), c.surfaceHigh)
+              : c.surfaceHigh,
           shape: BoxShape.circle,
         ),
         child: Text(
@@ -466,9 +632,7 @@ class _DoneBox extends StatelessWidget {
             ),
             child: done
                 ? Icon(
-                    beaten
-                        ? Icons.trending_up_rounded
-                        : Icons.check_rounded,
+                    beaten ? Icons.trending_up_rounded : Icons.check_rounded,
                     size: 18,
                     color: c.onAccent,
                   )

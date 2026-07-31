@@ -703,6 +703,7 @@ class TrainingRepository {
                     weight: s.weight,
                     reps: s.reps,
                     addedWeight: s.addedWeight,
+                    isLeg: s.parentSetId != null,
                   ),
             ],
           );
@@ -1217,18 +1218,44 @@ class TrainingRepository {
         // Mirror last time's set structure when there is one; otherwise fall
         // back to plain working sets from the template.
         final shape = prefill.hasSuggestion
-            ? prefill.sets.map((s) => s.type).toList()
-            : List.filled(targetSets, SetType.working);
+            ? [for (final s in prefill.sets) (type: s.type, isLeg: s.isLeg)]
+            : [
+                for (var k = 0; k < targetSets; k++)
+                  (type: SetType.working, isLeg: false),
+              ];
 
+        // The template's set count is a floor, not a suggestion. Last time's
+        // shape is only the sets that were actually *ticked* — finish a session
+        // early, or leave a row filled but unticked, and it is thrown away on
+        // the way out. Mirroring that number blindly meant one short session
+        // permanently shrank the exercise: three sets logged as one, and the
+        // week after opened with a single row and no sign the other two had
+        // ever been programmed.
+        final working = shape
+            .where((s) => s.type == SetType.working && !s.isLeg)
+            .length;
+        for (var pad = working; pad < targetSets; pad++) {
+          shape.add((type: SetType.working, isLeg: false));
+        }
+
+        // Drop legs are attached to the set above them as they are written.
+        // Only the *types* were mirrored, so last week's drop set came back as
+        // a row of unrelated `D`s — each its own group, each with its own
+        // capsule and `+`, none of them a leg of anything.
+        String? head;
         for (var k = 0; k < shape.length; k++) {
+          final id = newId();
+          final isLeg = shape[k].isLeg && head != null;
           await db.into(db.setLogs).insert(
                 SetLogsCompanion.insert(
-                  id: Value(newId()),
+                  id: Value(id),
                   workoutExerciseId: weId,
                   setIndex: k,
-                  setType: Value(shape[k]),
+                  setType: Value(shape[k].type),
+                  parentSetId: Value(isLeg ? head : null),
                 ),
               );
+          if (!isLeg) head = id;
         }
       }
     });
@@ -1485,6 +1512,7 @@ class TrainingRepository {
     Value<bool> isDone = const Value.absent(),
     Value<int?> restSeconds = const Value.absent(),
     Value<String?> note = const Value.absent(),
+    Value<String?> parentSetId = const Value.absent(),
   }) async {
     await (db.update(db.setLogs)..where((t) => t.id.equals(setId))).write(
       SetLogsCompanion(
@@ -1492,6 +1520,7 @@ class TrainingRepository {
         reps: reps,
         addedWeight: addedWeight,
         setType: setType,
+        parentSetId: parentSetId,
         isDone: isDone,
         restSeconds: restSeconds,
         note: note,
@@ -1508,12 +1537,19 @@ class TrainingRepository {
     final existing = await (db.select(db.setLogs)
           ..where((t) => t.workoutExerciseId.equals(workoutExerciseId) & t.deletedAt.isNull()))
         .get();
+    // One past the highest index, not the number of rows. Deletes are
+    // tombstones and nothing renumbers after them, so counting live rows handed
+    // the new set an index another row still held: delete a drop group, press
+    // `+`, and the new set landed in the middle of the table on top of an
+    // existing one, in an order the database could break either way.
+    final next =
+        existing.fold<int>(-1, (m, s) => s.setIndex > m ? s.setIndex : m) + 1;
     final id = newId();
     await db.into(db.setLogs).insert(
           SetLogsCompanion.insert(
             id: Value(id),
             workoutExerciseId: workoutExerciseId,
-            setIndex: existing.length,
+            setIndex: next,
             setType: Value(type),
           ),
         );
@@ -1529,6 +1565,7 @@ class TrainingRepository {
     String workoutExerciseId, {
     required String afterSetId,
     SetType type = SetType.working,
+    String? parentSetId,
   }) async {
     final id = newId();
     await db.transaction(() async {
@@ -1565,10 +1602,109 @@ class TrainingRepository {
               workoutExerciseId: workoutExerciseId,
               setIndex: at + 1,
               setType: Value(type),
+              parentSetId: Value(parentSetId),
             ),
           );
     });
     return id;
+  }
+
+  /// Adds a leg to the end of the drop group headed by [headSetId].
+  ///
+  /// Not `addSetAfter(lastLeg)`: the caller's idea of the last leg comes from
+  /// the frame it was built in, so two quick taps both insert after the same
+  /// row and the legs come out in the order they were not added. The end of
+  /// the group is found inside the transaction instead.
+  Future<String> addDropLeg(
+    String workoutExerciseId, {
+    required String headSetId,
+  }) async {
+    final sets =
+        await (db.select(db.setLogs)
+              ..where(
+                (t) =>
+                    t.workoutExerciseId.equals(workoutExerciseId) &
+                    t.deletedAt.isNull(),
+              )
+              ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+            .get();
+
+    final head = sets.indexWhere((s) => s.id == headSetId);
+    if (head < 0) return '';
+
+    // The end of this group, by parentage — not "the next row that happens to
+    // be a drop", which belonged to whichever set came before it.
+    var tail = head;
+    while (tail + 1 < sets.length && sets[tail + 1].parentSetId == headSetId) {
+      tail++;
+    }
+
+    return addSetAfter(
+      workoutExerciseId,
+      afterSetId: sets[tail].id,
+      type: SetType.drop,
+      parentSetId: headSetId,
+    );
+  }
+
+  /// Changes a set's type, keeping the drop group around it consistent.
+  ///
+  /// The sheet wrote the type and nothing else, which left two shapes the table
+  /// cannot draw: a drop set with no leg to have dropped into, and legs still
+  /// nested under a head that is no longer a drop at all.
+  Future<void> setSetType(String setId, SetType type) async {
+    final set = await (db.select(db.setLogs)
+          ..where((t) => t.id.equals(setId)))
+        .getSingleOrNull();
+    if (set == null || set.setType == type) return;
+
+    await updateSet(setId, setType: Value(type));
+
+    // A leg that is no longer a drop leaves its group, keeping its numbers.
+    if (set.parentSetId != null) {
+      if (type != SetType.drop) {
+        await updateSet(setId, parentSetId: const Value(null));
+      }
+      return;
+    }
+
+    // A drop set is a set you dropped weight inside, so it needs somewhere to
+    // record the drop.
+    if (type == SetType.drop) {
+      await addDropLeg(set.workoutExerciseId, headSetId: setId);
+      return;
+    }
+
+    if (set.setType == SetType.drop) {
+      final legs =
+          await (db.select(db.setLogs)..where(
+                (t) => t.parentSetId.equals(setId) & t.deletedAt.isNull(),
+              ))
+              .get();
+
+      // An empty leg goes with the drop that created it. Promoting them all
+      // turned one set into four: the legs a conversion adds for you are not
+      // sets you decided to do, and undoing the conversion has to undo them
+      // too. A leg with something logged in it is a set you did — that one is
+      // promoted rather than deleted, whatever the head becomes.
+      final empty = [
+        for (final leg in legs)
+          if (leg.weight == null &&
+              leg.addedWeight == null &&
+              leg.reps == null &&
+              !leg.isDone)
+            leg.id,
+      ];
+      await deleteSets(empty);
+
+      for (final leg in legs.where((l) => !empty.contains(l.id))) {
+        await updateSet(
+          leg.id,
+          parentSetId: const Value(null),
+          setType: const Value(SetType.working),
+        );
+      }
+    }
   }
 
   Future<void> deleteSet(String setId) => deleteSets([setId]);

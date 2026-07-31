@@ -61,7 +61,7 @@ class _ExerciseRailState extends State<ExerciseRail> {
   /// keypad's "Next" walks past the end of an exercise on its own.
   void _revealCurrent() {
     if (!_scroll.hasClients) return;
-    const tab = 60.0;
+    const tab = _Tab.slot;
     final target = (widget.current * tab) -
         (_scroll.position.viewportDimension / 2) +
         (tab / 2);
@@ -96,7 +96,9 @@ class _ExerciseRailState extends State<ExerciseRail> {
       child: Row(
         children: [
           Expanded(
-            child: ReorderableListView.builder(
+            child: Stack(
+              children: [
+                ReorderableListView.builder(
               scrollController: _scroll,
               scrollDirection: Axis.horizontal,
               buildDefaultDragHandles: false,
@@ -107,26 +109,54 @@ class _ExerciseRailState extends State<ExerciseRail> {
                 color: Colors.transparent,
                 child: Opacity(opacity: 0.9, child: child),
               ),
-              itemBuilder: (context, i) {
-                final entry = widget.entries[i];
-                final skipped =
-                    entry.workoutExercise.skipReason != SkipReason.none;
-                final total = entry.sets.length;
-                final done = entry.sets.where((s) => s.isDone).length;
-                final complete = total > 0 && done == total && !skipped;
+                  itemBuilder: (context, i) {
+                    final entry = widget.entries[i];
+                    final skipped =
+                        entry.workoutExercise.skipReason != SkipReason.none;
+                    final total = entry.sets.length;
+                    final done = entry.sets.where((s) => s.isDone).length;
+                    final complete = total > 0 && done == total && !skipped;
 
-                return ReorderableDelayedDragStartListener(
-                  key: ValueKey(entry.workoutExercise.id),
-                  index: i,
-                  child: _Tab(
-                    label: monogramFor(entry.exercise.name),
-                    selected: i == widget.current,
-                    complete: complete,
-                    skipped: skipped,
-                    onTap: () => widget.onSelect(i),
+                    return ReorderableDelayedDragStartListener(
+                      key: ValueKey(entry.workoutExercise.id),
+                      index: i,
+                      child: _Tab(
+                        label: monogramFor(entry.exercise.name),
+                        selected: i == widget.current,
+                        complete: complete,
+                        skipped: skipped,
+                        onTap: () => widget.onSelect(i),
+                      ),
+                    );
+                  },
+                ),
+                // Nothing said the rail kept going. A tile cut by a fade at
+                // the edge is the only thing that reads as "there is more
+                // over here" without adding a control to press.
+                //
+                // Narrow and short of opaque. At 32dp running to full `bg` it
+                // stopped reading as an edge and started reading as a drop
+                // shadow under the `+` beside it — a smudge on a flat theme
+                // that has no shadows in it anywhere (THEME §1).
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 18,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            c.bg.withValues(alpha: 0),
+                            c.bg.withValues(alpha: 0.85),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
           Padding(
@@ -151,13 +181,24 @@ class _ExerciseRailState extends State<ExerciseRail> {
 }
 
 /// Two initials from an exercise name: `Barbell Bench Press` → `BB`,
-/// `Pull-up` → `PU`. Two words give one letter each; one word gives its first
-/// two, which is what keeps `Squat` and `Sumo Deadlift` apart.
+/// `Pull-up` → `PU`, `Skullcrusher (EZ)` → `SK`.
+///
+/// A parenthesised qualifier is dropped before anything else — it names the
+/// equipment, not the movement, and `Skullcrusher (EZ)` took its second letter
+/// from the bracket and came out as `S(`. Punctuation goes too, so a stray
+/// hyphen can't become an initial. One word gives its first two letters, which
+/// is what keeps `Squat` apart from `Sumo Deadlift`.
 String monogramFor(String name) {
   final words = name
-      .split(RegExp(r'[\s\-/]+'))
+      .replaceAll(RegExp(r'\([^)]*\)'), ' ')
+      .split(RegExp(r'[^A-Za-z0-9]+'))
       .where((w) => w.isNotEmpty)
       .toList();
+  // A leading number is a measurement, not a name: `45° Cable Rear Delt` is a
+  // cable row, not a `4C`.
+  if (words.length > 1) {
+    words.removeWhere((w) => int.tryParse(w) != null);
+  }
   if (words.isEmpty) return '?';
   if (words.length == 1) {
     final w = words.first;
@@ -183,6 +224,12 @@ class _Tab extends StatelessWidget {
   final bool skipped;
   final VoidCallback onTap;
 
+  /// The tile, and the gap to the next one. Left-aligned inside the slot, so
+  /// the difference between the two is the gap and nothing else — and the
+  /// scroll that keeps the current tab on screen measures in these.
+  static const tile = 48.0;
+  static const slot = tile + Space.sm;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -196,30 +243,40 @@ class _Tab extends StatelessWidget {
       fill = c.surfaceHigh;
       ink = c.textPrimary;
     } else {
-      fill = Colors.transparent;
-      ink = skipped ? c.textTertiary : c.textSecondary;
+      // Inactive tiles carry a dull fill of their own. Transparent ones left
+      // the rail looking like it ended at the last label, so there was no way
+      // to tell more exercises were sitting off the right edge until you
+      // happened to scroll — and a tile half-cut by the edge is the only thing
+      // that says "keep going" without a control to press.
+      fill = c.surfaceHigh.withValues(alpha: 0.5);
+      ink = skipped || complete ? c.textTertiary : c.textSecondary;
     }
 
+    // Left-aligned inside the tab, not centred. A 48dp tile centred in a 60dp
+    // slot starts 6dp inside the rail's padding, so the first tile sat 6dp to
+    // the right of the exercise name under it and of every other thing on the
+    // page — the one edge on this screen you can actually see is not straight.
     return Pressable(
       onTap: onTap,
       child: SizedBox(
-        width: 60,
+        width: slot,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AnimatedContainer(
-              duration: Motion.fast,
-              width: 48,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: fill,
-                borderRadius: BorderRadius.circular(Radii.sm),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Text(
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: Motion.fast,
+                  width: tile,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fill,
+                    borderRadius: BorderRadius.circular(Radii.sm),
+                  ),
+                  child: Text(
                     label,
                     style: context.t.titleMedium?.copyWith(
                       color: ink,
@@ -227,37 +284,45 @@ class _Tab extends StatelessWidget {
                       decoration: skipped ? TextDecoration.lineThrough : null,
                     ),
                   ),
-                  // A finished exercise carries a tick in the corner rather
-                  // than losing its initials to one.
-                  if (complete)
-                    Positioned(
-                      right: -2,
-                      top: -1,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: c.accent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.check_rounded,
-                          size: 11,
-                          color: c.onAccent,
-                        ),
+                ),
+                // Outside the tile, not over the initials. Sitting on top of
+                // them turned `CF` into an unreadable blob, and the letters
+                // are the only thing identifying the exercise.
+                if (complete)
+                  Positioned(
+                    right: -5,
+                    top: -5,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: c.bg, width: 2),
+                      ),
+                      child: Icon(
+                        Icons.check_rounded,
+                        size: 11,
+                        color: c.onAccent,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
             const SizedBox(height: Space.xs),
-            AnimatedContainer(
-              duration: Motion.fast,
-              height: 3,
-              width: selected ? 28 : 0,
-              decoration: BoxDecoration(
-                color: c.accent,
-                borderRadius: BorderRadius.circular(Radii.pill),
+            // Centred under the tile, which is no longer centred in the slot.
+            SizedBox(
+              width: tile,
+              child: Center(
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  height: 3,
+                  width: selected ? 28 : 0,
+                  decoration: BoxDecoration(
+                    color: c.accent,
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                  ),
+                ),
               ),
             ),
           ],

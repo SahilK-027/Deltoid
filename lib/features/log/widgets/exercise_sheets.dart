@@ -156,6 +156,25 @@ Future<void> showExerciseMenu(
             ),
             onTap: () async {
               final navigator = Navigator.of(sheetContext);
+              final logged = entry.sets.where((s) => s.isDone).length;
+              // Only when there is something to lose. Removing an exercise you
+              // have not started is a correction and asking about it is noise;
+              // removing one you have logged four sets into deletes those four
+              // sets, and it was one tap from a sheet with no way back.
+              if (logged > 0) {
+                final sure = await confirmAction(
+                  context,
+                  title: 'Remove ${entry.exercise.name}?',
+                  message:
+                      '$logged logged set${logged == 1 ? '' : 's'} '
+                      '${logged == 1 ? 'is' : 'are'} deleted with it. '
+                      'This cannot be undone.',
+                  confirmLabel: 'Remove',
+                  cancelLabel: 'Keep it',
+                  destructive: true,
+                );
+                if (!sure) return;
+              }
               await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
               navigator.pop();
             },
@@ -217,9 +236,13 @@ Future<void> showSetActions(
                     SetType.drop,
                   ])
                     GestureDetector(
-                      onTap: () {
-                        repo.updateSet(set.id, setType: Value(type));
-                        Navigator.of(sheetContext).pop();
+                      onTap: () async {
+                        final navigator = Navigator.of(sheetContext);
+                        // The group side of the change — the first leg of a new
+                        // drop set, the release of the legs of one that stops
+                        // being a drop — belongs with the write, not here.
+                        await repo.setSetType(set.id, type);
+                        navigator.pop();
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(

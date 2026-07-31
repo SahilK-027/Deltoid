@@ -5107,6 +5107,17 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _parentSetIdMeta = const VerificationMeta(
+    'parentSetId',
+  );
+  @override
+  late final GeneratedColumn<String> parentSetId = GeneratedColumn<String>(
+    'parent_set_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _restSecondsMeta = const VerificationMeta(
     'restSeconds',
   );
@@ -5164,6 +5175,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     weight,
     reps,
     addedWeight,
+    parentSetId,
     restSeconds,
     completedAt,
     note,
@@ -5245,6 +5257,15 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         addedWeight.isAcceptableOrUnknown(
           data['added_weight']!,
           _addedWeightMeta,
+        ),
+      );
+    }
+    if (data.containsKey('parent_set_id')) {
+      context.handle(
+        _parentSetIdMeta,
+        parentSetId.isAcceptableOrUnknown(
+          data['parent_set_id']!,
+          _parentSetIdMeta,
         ),
       );
     }
@@ -5333,6 +5354,10 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         DriftSqlType.double,
         data['${effectivePrefix}added_weight'],
       ),
+      parentSetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_set_id'],
+      ),
       restSeconds: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}rest_seconds'],
@@ -5377,6 +5402,15 @@ class SetLog extends DataClass implements Insertable<SetLog> {
 
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
   final double? addedWeight;
+
+  /// The head of the drop group this set is a leg of, or null when the set
+  /// stands on its own.
+  ///
+  /// Consecutive `drop` rows used to be treated as one group by position
+  /// alone, which cannot tell "one drop set with two legs" from "two separate
+  /// drop sets that happen to sit next to each other" — converting two sets in
+  /// a row swallowed the second into the first.
+  final String? parentSetId;
   final int? restSeconds;
   final int? completedAt;
   final String? note;
@@ -5393,6 +5427,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     this.weight,
     this.reps,
     this.addedWeight,
+    this.parentSetId,
     this.restSeconds,
     this.completedAt,
     this.note,
@@ -5423,6 +5458,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     }
     if (!nullToAbsent || addedWeight != null) {
       map['added_weight'] = Variable<double>(addedWeight);
+    }
+    if (!nullToAbsent || parentSetId != null) {
+      map['parent_set_id'] = Variable<String>(parentSetId);
     }
     if (!nullToAbsent || restSeconds != null) {
       map['rest_seconds'] = Variable<int>(restSeconds);
@@ -5456,6 +5494,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       addedWeight: addedWeight == null && nullToAbsent
           ? const Value.absent()
           : Value(addedWeight),
+      parentSetId: parentSetId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentSetId),
       restSeconds: restSeconds == null && nullToAbsent
           ? const Value.absent()
           : Value(restSeconds),
@@ -5486,6 +5527,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       weight: serializer.fromJson<double?>(json['weight']),
       reps: serializer.fromJson<int?>(json['reps']),
       addedWeight: serializer.fromJson<double?>(json['addedWeight']),
+      parentSetId: serializer.fromJson<String?>(json['parentSetId']),
       restSeconds: serializer.fromJson<int?>(json['restSeconds']),
       completedAt: serializer.fromJson<int?>(json['completedAt']),
       note: serializer.fromJson<String?>(json['note']),
@@ -5509,6 +5551,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       'weight': serializer.toJson<double?>(weight),
       'reps': serializer.toJson<int?>(reps),
       'addedWeight': serializer.toJson<double?>(addedWeight),
+      'parentSetId': serializer.toJson<String?>(parentSetId),
       'restSeconds': serializer.toJson<int?>(restSeconds),
       'completedAt': serializer.toJson<int?>(completedAt),
       'note': serializer.toJson<String?>(note),
@@ -5528,6 +5571,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     Value<double?> weight = const Value.absent(),
     Value<int?> reps = const Value.absent(),
     Value<double?> addedWeight = const Value.absent(),
+    Value<String?> parentSetId = const Value.absent(),
     Value<int?> restSeconds = const Value.absent(),
     Value<int?> completedAt = const Value.absent(),
     Value<String?> note = const Value.absent(),
@@ -5544,6 +5588,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weight: weight.present ? weight.value : this.weight,
     reps: reps.present ? reps.value : this.reps,
     addedWeight: addedWeight.present ? addedWeight.value : this.addedWeight,
+    parentSetId: parentSetId.present ? parentSetId.value : this.parentSetId,
     restSeconds: restSeconds.present ? restSeconds.value : this.restSeconds,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
     note: note.present ? note.value : this.note,
@@ -5566,6 +5611,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       addedWeight: data.addedWeight.present
           ? data.addedWeight.value
           : this.addedWeight,
+      parentSetId: data.parentSetId.present
+          ? data.parentSetId.value
+          : this.parentSetId,
       restSeconds: data.restSeconds.present
           ? data.restSeconds.value
           : this.restSeconds,
@@ -5591,6 +5639,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           ..write('weight: $weight, ')
           ..write('reps: $reps, ')
           ..write('addedWeight: $addedWeight, ')
+          ..write('parentSetId: $parentSetId, ')
           ..write('restSeconds: $restSeconds, ')
           ..write('completedAt: $completedAt, ')
           ..write('note: $note, ')
@@ -5612,6 +5661,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weight,
     reps,
     addedWeight,
+    parentSetId,
     restSeconds,
     completedAt,
     note,
@@ -5632,6 +5682,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           other.weight == this.weight &&
           other.reps == this.reps &&
           other.addedWeight == this.addedWeight &&
+          other.parentSetId == this.parentSetId &&
           other.restSeconds == this.restSeconds &&
           other.completedAt == this.completedAt &&
           other.note == this.note &&
@@ -5650,6 +5701,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
   final Value<double?> weight;
   final Value<int?> reps;
   final Value<double?> addedWeight;
+  final Value<String?> parentSetId;
   final Value<int?> restSeconds;
   final Value<int?> completedAt;
   final Value<String?> note;
@@ -5667,6 +5719,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.weight = const Value.absent(),
     this.reps = const Value.absent(),
     this.addedWeight = const Value.absent(),
+    this.parentSetId = const Value.absent(),
     this.restSeconds = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -5685,6 +5738,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.weight = const Value.absent(),
     this.reps = const Value.absent(),
     this.addedWeight = const Value.absent(),
+    this.parentSetId = const Value.absent(),
     this.restSeconds = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -5704,6 +5758,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Expression<double>? weight,
     Expression<int>? reps,
     Expression<double>? addedWeight,
+    Expression<String>? parentSetId,
     Expression<int>? restSeconds,
     Expression<int>? completedAt,
     Expression<String>? note,
@@ -5722,6 +5777,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       if (weight != null) 'weight': weight,
       if (reps != null) 'reps': reps,
       if (addedWeight != null) 'added_weight': addedWeight,
+      if (parentSetId != null) 'parent_set_id': parentSetId,
       if (restSeconds != null) 'rest_seconds': restSeconds,
       if (completedAt != null) 'completed_at': completedAt,
       if (note != null) 'note': note,
@@ -5742,6 +5798,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Value<double?>? weight,
     Value<int?>? reps,
     Value<double?>? addedWeight,
+    Value<String?>? parentSetId,
     Value<int?>? restSeconds,
     Value<int?>? completedAt,
     Value<String?>? note,
@@ -5760,6 +5817,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       weight: weight ?? this.weight,
       reps: reps ?? this.reps,
       addedWeight: addedWeight ?? this.addedWeight,
+      parentSetId: parentSetId ?? this.parentSetId,
       restSeconds: restSeconds ?? this.restSeconds,
       completedAt: completedAt ?? this.completedAt,
       note: note ?? this.note,
@@ -5806,6 +5864,9 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     if (addedWeight.present) {
       map['added_weight'] = Variable<double>(addedWeight.value);
     }
+    if (parentSetId.present) {
+      map['parent_set_id'] = Variable<String>(parentSetId.value);
+    }
     if (restSeconds.present) {
       map['rest_seconds'] = Variable<int>(restSeconds.value);
     }
@@ -5838,6 +5899,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
           ..write('weight: $weight, ')
           ..write('reps: $reps, ')
           ..write('addedWeight: $addedWeight, ')
+          ..write('parentSetId: $parentSetId, ')
           ..write('restSeconds: $restSeconds, ')
           ..write('completedAt: $completedAt, ')
           ..write('note: $note, ')
@@ -10896,6 +10958,7 @@ typedef $$SetLogsTableCreateCompanionBuilder =
       Value<double?> weight,
       Value<int?> reps,
       Value<double?> addedWeight,
+      Value<String?> parentSetId,
       Value<int?> restSeconds,
       Value<int?> completedAt,
       Value<String?> note,
@@ -10915,6 +10978,7 @@ typedef $$SetLogsTableUpdateCompanionBuilder =
       Value<double?> weight,
       Value<int?> reps,
       Value<double?> addedWeight,
+      Value<String?> parentSetId,
       Value<int?> restSeconds,
       Value<int?> completedAt,
       Value<String?> note,
@@ -11002,6 +11066,11 @@ class $$SetLogsTableFilterComposer
 
   ColumnFilters<double> get addedWeight => $composableBuilder(
     column: $table.addedWeight,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentSetId => $composableBuilder(
+    column: $table.parentSetId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11108,6 +11177,11 @@ class $$SetLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get parentSetId => $composableBuilder(
+    column: $table.parentSetId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => ColumnOrderings(column),
@@ -11193,6 +11267,11 @@ class $$SetLogsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get parentSetId => $composableBuilder(
+    column: $table.parentSetId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => column,
@@ -11272,6 +11351,7 @@ class $$SetLogsTableTableManager
                 Value<double?> weight = const Value.absent(),
                 Value<int?> reps = const Value.absent(),
                 Value<double?> addedWeight = const Value.absent(),
+                Value<String?> parentSetId = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -11289,6 +11369,7 @@ class $$SetLogsTableTableManager
                 weight: weight,
                 reps: reps,
                 addedWeight: addedWeight,
+                parentSetId: parentSetId,
                 restSeconds: restSeconds,
                 completedAt: completedAt,
                 note: note,
@@ -11308,6 +11389,7 @@ class $$SetLogsTableTableManager
                 Value<double?> weight = const Value.absent(),
                 Value<int?> reps = const Value.absent(),
                 Value<double?> addedWeight = const Value.absent(),
+                Value<String?> parentSetId = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
@@ -11325,6 +11407,7 @@ class $$SetLogsTableTableManager
                 weight: weight,
                 reps: reps,
                 addedWeight: addedWeight,
+                parentSetId: parentSetId,
                 restSeconds: restSeconds,
                 completedAt: completedAt,
                 note: note,

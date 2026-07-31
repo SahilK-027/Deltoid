@@ -61,6 +61,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// rebuild in the app, on its most frequent interaction. Only the cell being
   /// typed into and the keypad's own readout listen now.
   final _buffer = ValueNotifier<String>('');
+
+  /// The set row currently swiped open, if any. Shared by every row on the
+  /// screen so that opening one closes the last — two rows sitting open at once
+  /// makes the next tap a guess.
+  final _openSwipe = ValueNotifier<String?>(null);
   Timer? _clock;
   DateTime? _restStartedAt;
   int _restTargetSeconds = 120;
@@ -98,6 +103,14 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   final _pages = PageController();
   int _page = 0;
 
+  /// A page to land on as soon as the workout comes back holding it.
+  ///
+  /// [_goToPage] can only reach a page that exists in the build it runs in, and
+  /// an exercise added a moment ago is not in one yet — the write has been made,
+  /// the watched query has not returned. Adding an exercise therefore landed on
+  /// the last of the *old* pages, which is the one it was already on.
+  int? _wantedPage;
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +135,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     _clock?.cancel();
     _restBarHide?.cancel();
     _buffer.dispose();
+    _openSwipe.dispose();
     // Anything typed in the last 300ms still belongs to the log.
     _flushWrite();
     WakelockPlus.disable().ignore();
@@ -177,7 +191,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// squat and wrong again for a cable fly.
   Future<void> _loadRestTarget(WorkoutDetail detail, int index) async {
     if (index < 0 || index >= detail.entries.length) return;
-    final seconds = await ref.read(trainingRepositoryProvider).restTargetFor(
+    final seconds = await ref
+        .read(trainingRepositoryProvider)
+        .restTargetFor(
           exerciseId: detail.entries[index].exercise.id,
           sessionId: detail.workout.sessionId,
         );
@@ -203,7 +219,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (detail.entries.isEmpty) return;
     final page = _page.clamp(0, detail.entries.length - 1);
     final entry = detail.entries[page];
-    final saved = await ref.read(trainingRepositoryProvider).setRestTarget(
+    final saved = await ref
+        .read(trainingRepositoryProvider)
+        .setRestTarget(
           exerciseId: entry.exercise.id,
           sessionId: detail.workout.sessionId,
           seconds: seconds,
@@ -253,6 +271,17 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final wanted = _wantedPage;
+    if (wanted != null && wanted < detail.entries.length) {
+      _wantedPage = null;
+      // After the frame: the PageView is being built with this exercise in it
+      // right now, and animating to a page that does not exist yet does
+      // nothing at all.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _goToPage(wanted);
+      });
+    }
+
     final cells = _buildCells(detail);
 
     return PopScope(
@@ -288,23 +317,35 @@ class _LogScreenState extends ConsumerState<LogScreen> {
               onBack: () => Navigator.of(context).maybePop(),
               onFinish: () => _finish(detail),
             ),
-            ExerciseRail(
-              entries: detail.entries,
-              current: _page.clamp(0, math.max(0, detail.entries.length - 1)),
-              onSelect: _goToPage,
-              onAdd: () => _addExercise(detail),
-              onReorder: (ids) => ref
-                  .read(trainingRepositoryProvider)
-                  .reorderWorkoutExercises(ids),
-            ),
+            // No rail with nothing in it. An empty workout left a 68dp band of
+            // nothing across the screen with one `+` floating at the far right
+            // of it — a second, orphaned way to do exactly what the button in
+            // the middle of the empty state does.
+            if (detail.entries.isNotEmpty)
+              ExerciseRail(
+                entries: detail.entries,
+                current: _page.clamp(0, detail.entries.length - 1),
+                onSelect: _goToPage,
+                onAdd: () => _addExercise(detail),
+                onReorder: (ids) => ref
+                    .read(trainingRepositoryProvider)
+                    .reorderWorkoutExercises(ids),
+              ),
             Expanded(
               child: detail.entries.isEmpty
+                  // Two words and a full stop, where every other empty state in
+                  // the app says what will appear here and what it costs you.
+                  // The thing worth saying is that adding one here is a change
+                  // to today and not to the programme.
                   ? EmptyState(
-                      icon: Icons.fitness_center,
-                      title: 'No exercises',
-                      message: 'Add one to start logging.',
+                      icon: Icons.fitness_center_rounded,
+                      title: 'Nothing to log yet',
+                      message:
+                          'This session has no exercises in it. Add one and it '
+                          'goes into today only — the template keeps its own '
+                          'list.',
                       action: PrimaryButton(
-                        label: 'Add exercise',
+                        label: 'Add an exercise',
                         onPressed: () => _addExercise(detail),
                       ),
                     )
@@ -326,6 +367,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                           unit: _unit,
                           editing: _editing,
                           buffer: _buffer,
+                          openSwipe: _openSwipe,
                           onEdit: _focus,
                           rowKeyFor: _rowKey,
                           onToggleDone: _toggleDone,
@@ -400,8 +442,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// into view when the keypad takes half the screen.
   final _rowKeys = <String, GlobalKey>{};
 
-  GlobalKey _rowKey(String setId) =>
-      _rowKeys.putIfAbsent(setId, GlobalKey.new);
+  GlobalKey _rowKey(String setId) => _rowKeys.putIfAbsent(setId, GlobalKey.new);
 
   void _focus(SetLog set, SetField field) {
     _flushWrite();
@@ -442,7 +483,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (located == null) return const SizedBox.shrink();
 
     final (entry, set, setPosition) = located;
-    final ghost = _ghostSet(prefill[entry.exercise.id], setPosition);
+    final ghost = _ghostFor(
+      prefill[entry.exercise.id],
+      entry.sets,
+      setPosition,
+    );
     // Ghosts are stored in kg and shown in the display unit.
     final hint = switch (target.field) {
       SetField.weight => _fmtLoadIn(ghost?.weight),
@@ -453,13 +498,15 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     final isLast = cells.isNotEmpty && cells.last == target;
     // The key has to name what it does. On a reps field with nothing typed and
     // no ghost to borrow from, "Done" completes nothing at all.
-    final needsReps = target.field == SetField.reps &&
+    final needsReps =
+        target.field == SetField.reps &&
         (int.tryParse(_buffer.value) ?? 0) <= 0 &&
         ghost?.reps == null;
 
     return SetKeypad(
       title:
-          '${entry.exercise.name}  ·  Set ${setPosition + 1}  ·  '
+          '${entry.exercise.name}  ·  '
+          'Set ${_setLabelAt(entry.sets, setPosition)}  ·  '
           '${target.field.labelIn(_unit)}',
       field: target.field,
       unit: _unit,
@@ -469,8 +516,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       nextLabel: needsReps
           ? 'Reps?'
           : isLast
-              ? 'Done'
-              : 'Next',
+          ? 'Done'
+          : 'Next',
       onKey: (key) {
         final next = applyKey(
           _buffer.value,
@@ -542,8 +589,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       if (reps <= 0) {
         final located = _locate(detail, from.setId);
         if (located != null) {
-          final ghost =
-              _ghostSet(_prefill[located.$1.exercise.id], located.$3);
+          final ghost = _ghostFor(
+            _prefill[located.$1.exercise.id],
+            located.$1.sets,
+            located.$3,
+          );
           if (ghost?.reps != null) {
             reps = ghost!.reps!;
             _commit(reps.toString(), from);
@@ -554,14 +604,22 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
       if (reps > 0) {
         _adoptGhost(from.setId);
-        ref.read(trainingRepositoryProvider).updateSet(
+        // Rest was already being measured; it was simply thrown away. Absent
+        // rather than null when there is none to record: re-ticking a set an
+        // hour later must not erase the rest it was actually given.
+        final rest = _restTakenSeconds();
+        ref
+            .read(trainingRepositoryProvider)
+            .updateSet(
               from.setId,
               isDone: const Value(true),
-              // Rest was already being measured; it was simply thrown away.
-              restSeconds: Value(_restTakenSeconds()),
+              restSeconds: rest == null ? const Value.absent() : Value(rest),
             );
         HapticFeedback.mediumImpact();
-        _startRest();
+        // Not after the last one. The rest bar has nothing to count towards
+        // with the work over, and it sits directly under the button asking you
+        // to finish — the tick path already knew this and this one did not.
+        if (_hasOpenSetsBesides(from.setId)) _startRest();
       } else {
         // Nothing to complete the set with: keep the field, keep the keypad.
         return;
@@ -607,11 +665,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       // one more rep is the normal case and shouldn't need typing.
       _adoptGhost(set.id);
 
-      // A set with nothing in it cannot be ticked. It used to be allowed, and
-      // it wrote a completed set with a null load and null reps — invisible to
-      // the progress chart, useless as next week's prefill, and indistinguish-
-      // able later from a set that genuinely happened. Send the thumb to the
-      // empty field instead of arguing about it.
+      // A set with nothing in it — and nothing coming from last time either —
+      // cannot be ticked. It used to be allowed, and it wrote a completed set
+      // with a null load and null reps: invisible to the progress chart,
+      // useless as next week's prefill, and indistinguishable later from a set
+      // that genuinely happened. Send the thumb to the empty field instead of
+      // arguing about it.
       final empty = _firstEmptyField(set.id);
       if (empty != null) {
         HapticFeedback.selectionClick();
@@ -620,34 +679,72 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         return;
       }
     }
-    ref.read(trainingRepositoryProvider).updateSet(set.id, isDone: Value(done));
-    if (done) {
-      HapticFeedback.mediumImpact();
-      _startRest();
-    }
+    // The same write the keypad's "Next" makes. Ticking the box by hand used to
+    // record no rest at all, so how long a set rested depended on which of two
+    // ways you had marked it done.
+    final rest = done ? _restTakenSeconds() : null;
+    ref
+        .read(trainingRepositoryProvider)
+        .updateSet(
+          set.id,
+          isDone: Value(done),
+          restSeconds: rest == null ? const Value.absent() : Value(rest),
+        );
+    if (!done) return;
+    HapticFeedback.mediumImpact();
+
+    if (_hasOpenSetsBesides(set.id)) _startRest();
+  }
+
+  /// Whether any set other than [setId] is still open.
+  ///
+  /// Rest is the gap before the next set. Tick the last one in the session and
+  /// there is no next set to rest for. The set being completed is excluded by
+  /// id rather than by its flag: the write marking it done is still in flight,
+  /// so it is still open in the snapshot this reads.
+  bool _hasOpenSetsBesides(String setId) {
+    final detail = _detail;
+    if (detail == null) return false;
+    return detail.entries
+        .where((e) => e.workoutExercise.skipReason == SkipReason.none)
+        .expand((e) => e.sets)
+        .any((s) => s.id != setId && !s.isDone);
   }
 
   /// The field standing between this set and being logged, if any.
   ///
   /// Reps are always required. A load is required unless the movement is
   /// bodyweight, where there is nothing to enter.
+  ///
+  /// A blank the ghost is about to fill does not count. This read the row as it
+  /// stood in the last build, but [_adoptGhost] runs immediately before it and
+  /// its writes have not come back yet — so a set with last time's numbers
+  /// waiting for it looked empty, and the first tap on the tick only filled the
+  /// fields and opened the keypad. Logging the same numbers as last week, which
+  /// is the single most common thing to do on this screen, took two taps on the
+  /// same box and looked like the first one had missed.
   SetField? _firstEmptyField(String setId) {
     final detail = _detail;
     if (detail == null) return null;
     final located = _locate(detail, setId);
     if (located == null) return null;
-    final (entry, set, _) = located;
+    final (entry, set, position) = located;
+    final ghost = _ghostFor(_prefill[entry.exercise.id], entry.sets, position);
 
     switch (entry.exercise.loadMode) {
       case LoadMode.bodyweightPlus:
-        if (set.addedWeight == null) return SetField.added;
+        if (set.addedWeight == null && ghost?.addedWeight == null) {
+          return SetField.added;
+        }
       case LoadMode.total:
       case LoadMode.perSide:
-        if (set.weight == null) return SetField.weight;
+        if (set.weight == null && ghost?.weight == null) {
+          return SetField.weight;
+        }
       case LoadMode.bodyweight:
         break;
     }
-    if (set.reps == null) return SetField.reps;
+    if (set.reps == null && ghost?.reps == null) return SetField.reps;
     return null;
   }
 
@@ -663,7 +760,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (located == null) return;
 
     final (entry, set, position) = located;
-    final ghost = _ghostSet(_prefill[entry.exercise.id], position);
+    final ghost = _ghostFor(_prefill[entry.exercise.id], entry.sets, position);
     if (ghost == null) return;
 
     final repo = ref.read(trainingRepositoryProvider);
@@ -689,7 +786,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   void _goToPage(int index) {
     final detail = _detail;
-    if (detail == null) return;
+    // A workout with nothing in it has no page to go to, and `clamp(0, -1)`
+    // throws rather than returning anything. Adding the first exercise to an
+    // empty session went straight through here.
+    if (detail == null || detail.entries.isEmpty) return;
     final target = index.clamp(0, detail.entries.length - 1);
     if (!_pages.hasClients) {
       setState(() => _page = target);
@@ -739,8 +839,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         .read(trainingRepositoryProvider)
         .addExerciseToWorkout(detail.workout.id, exercise.id);
     // Land on the exercise that was just added rather than leaving it
-    // somewhere off the end of the rail.
-    _goToPage(detail.entries.length);
+    // somewhere off the end of the rail — once the build that has it arrives.
+    _wantedPage = detail.entries.length;
   }
 
   Future<void> _finish(WorkoutDetail detail) async {
@@ -782,7 +882,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         final sure = await confirmAction(
           context,
           title: 'Discard this session?',
-          message: '$done logged set${done == 1 ? '' : 's'} '
+          message:
+              '$done logged set${done == 1 ? '' : 's'} '
               '${done == 1 ? 'is' : 'are'} deleted. This cannot be undone.',
           confirmLabel: 'Discard',
           cancelLabel: 'Keep it',
@@ -833,17 +934,42 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       d.entries.expand((e) => e.sets).length;
 
   /// A stored kg value as the number this phone types in.
-  String _fmtLoadIn(double? kg) =>
-      kg == null ? '' : formatInUnit(kg, _unit);
-
+  String _fmtLoadIn(double? kg) => kg == null ? '' : formatInUnit(kg, _unit);
 }
 
 /// Prefill set aligned to a position in the current exercise, or null when
 /// today has more sets than last time.
-PastSet? _ghostSet(PrefillResult? prefill, int index) {
-  if (prefill == null || index >= prefill.sets.length) return null;
-  return prefill.sets[index];
+/// Which past set one of today's rows compares against.
+///
+/// Index for index broke the moment today's shape differed from last time's:
+/// adding a single drop leg pushed every row under it onto the wrong ghost, so
+/// the second working set started suggesting the first leg's dropped weight —
+/// and adopting a blank row wrote that number in. Rows are matched inside their
+/// own class instead: warm-ups against warm-ups, working sets against working
+/// sets, legs against legs. An extra leg now costs that leg its ghost and
+/// nothing else.
+PastSet? _ghostFor(PrefillResult? prefill, List<SetLog> sets, int position) {
+  if (prefill == null || position < 0 || position >= sets.length) return null;
+
+  final want = _ghostClass(sets[position].setType);
+  var rank = 0;
+  for (var i = 0; i < position; i++) {
+    if (_ghostClass(sets[i].setType) == want) rank++;
+  }
+
+  for (final past in prefill.sets) {
+    if (_ghostClass(past.type) != want) continue;
+    if (rank == 0) return past;
+    rank--;
+  }
+  return null;
 }
+
+int _ghostClass(SetType type) => switch (type) {
+  SetType.warmup => 0,
+  _ when type.isContinuation => 2,
+  _ => 1,
+};
 
 /// A single exercise, filling the screen.
 ///
@@ -868,6 +994,7 @@ class _LogTopBar extends StatelessWidget {
 
   final String title;
   final bool isDeload;
+
   /// Epoch milliseconds, UTC — the column's own storage format.
   final int startedAt;
   final int done;
@@ -881,11 +1008,16 @@ class _LogTopBar extends StatelessWidget {
     final complete = total > 0 && done == total;
 
     return HeaderBand(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.gutter, 0),
-        child: Column(
-          children: [
-            Row(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.sm,
+              Space.sm,
+              Space.gutter,
+              0,
+            ),
+            child: Row(
               children: [
                 CircleIconButton(
                   icon: Icons.arrow_back_rounded,
@@ -930,14 +1062,15 @@ class _LogTopBar extends StatelessWidget {
                 ),
                 // Once everything is ticked this is the pinned white button at
                 // the bottom instead, so it doesn't appear in two places.
-                if (!complete)
-                  LinkAction('Finish', onTap: onFinish),
+                if (!complete) LinkAction('Finish', onTap: onFinish),
               ],
             ),
-            const SizedBox(height: Space.md),
-            _ProgressTrack(done: done, total: total),
-          ],
-        ),
+          ),
+          const SizedBox(height: Space.md),
+          // Full-bleed: inside the bar's padding, a finished session stopped a
+          // gutter short at each end and the track never looked full.
+          _ProgressTrack(done: done, total: total),
+        ],
       ),
     );
   }
@@ -983,6 +1116,7 @@ class _ExercisePage extends ConsumerWidget {
     required this.unit,
     required this.editing,
     required this.buffer,
+    required this.openSwipe,
     required this.onEdit,
     required this.rowKeyFor,
     required this.onToggleDone,
@@ -1001,6 +1135,9 @@ class _ExercisePage extends ConsumerWidget {
 
   final EditTarget? editing;
   final ValueListenable<String> buffer;
+
+  /// The one row swiped open across the whole screen.
+  final ValueNotifier<String?> openSwipe;
   final void Function(SetLog, SetField) onEdit;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
@@ -1011,8 +1148,6 @@ class _ExercisePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final skipped = entry.workoutExercise.skipReason != SkipReason.none;
-    final done = entry.sets.where((s) => s.isDone).length;
-    final allDone = entry.sets.isNotEmpty && done == entry.sets.length;
 
     // Warm-ups are not set 1, and a drop run is one set rather than three:
     // counting rows shifted every number away from the programme it came from.
@@ -1094,60 +1229,46 @@ class _ExercisePage extends ConsumerWidget {
             ),
           )
         else ...[
-          AppCard(
-            padding: const EdgeInsets.symmetric(vertical: Space.md),
-            child: Column(
-              children: [
-                SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
-                for (final group in groups)
-                  _SetGroup(
-                    group: group,
-                    entry: entry,
-                    unit: unit,
-                    editing: editing,
-                    buffer: buffer,
-                    onEdit: onEdit,
-                    rowKeyFor: rowKeyFor,
-                    onToggleDone: onToggleDone,
-                  ),
-                // The add button lives in the index column, directly under the
-                // numbers it continues — no label, because a `+` under a
-                // column of set numbers cannot mean anything else. The
-                // `n of m done` line that used to sit here said what the
-                // header already says.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.lg,
-                    Space.sm,
-                    Space.lg,
-                    0,
-                  ),
-                  child: Row(
-                    children: [
-                      Pressable(
-                        onTap: () => ref
-                            .read(trainingRepositoryProvider)
-                            .addSet(entry.workoutExercise.id),
-                        child: Container(
-                          width: SetRow.indexColumn,
-                          height: SetRow.indexColumn,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: c.surfaceHigh,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.add_rounded,
-                            size: 20,
-                            color: c.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+          // No card. The table was inset by the page gutter and then again by
+          // the card's own padding, so the SET column started 32dp in while
+          // the exercise name above it started at 16 — the two things a reader
+          // scans down this screen were on different vertical lines. On the
+          // page it is also one less surface behind a row that already has a
+          // fill of its own per field.
+          Column(
+            children: [
+              SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
+              for (final group in groups)
+                _SetGroup(
+                  group: group,
+                  entry: entry,
+                  unit: unit,
+                  editing: editing,
+                  buffer: buffer,
+                  openSwipe: openSwipe,
+                  onEdit: onEdit,
+                  rowKeyFor: rowKeyFor,
+                  onToggleDone: onToggleDone,
                 ),
-              ],
-            ),
+              // The add button lives in the index column, directly under the
+              // numbers it continues — no label, because a `+` under a
+              // column of set numbers cannot mean anything else. The
+              // `n of m done` line that used to sit here said what the
+              // header already says.
+              Padding(
+                padding: const EdgeInsets.only(top: Space.sm),
+                child: Row(
+                  children: [
+                    _RoundButton(
+                      icon: Icons.add_rounded,
+                      onTap: () => ref
+                          .read(trainingRepositoryProvider)
+                          .addSet(entry.workoutExercise.id),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           if (entry.exercise.notes != null) ...[
             const SizedBox(height: Space.lg),
@@ -1159,19 +1280,6 @@ class _ExercisePage extends ConsumerWidget {
         ],
         if (nextName != null) ...[
           const SizedBox(height: Space.section),
-          // Moving on early is allowed — supersets and busy racks are normal —
-          // but it should never be silent. The rail keeps the count; this says
-          // it in words at the moment you are about to leave.
-          if (!allDone && !skipped && entry.sets.isNotEmpty) ...[
-            Text(
-              '${entry.sets.length - done} set'
-              '${entry.sets.length - done == 1 ? '' : 's'} still open here — '
-              'you can come back to them.',
-              style: context.t.bodySmall?.copyWith(color: c.textTertiary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: Space.md),
-          ],
           // Turning the page works too; this is the discoverable version.
           SecondaryButton(
             label: 'Next: $nextName',
@@ -1229,9 +1337,7 @@ Future<_FinishChoice?> _confirmEarlyFinish(
                   title: e.name,
                   trailing: Text(
                     '${e.done} of ${e.total}',
-                    style: sheet.t.labelLarge?.copyWith(
-                      color: c.textSecondary,
-                    ),
+                    style: sheet.t.labelLarge?.copyWith(color: c.textSecondary),
                   ),
                 ),
             ],
@@ -1278,34 +1384,78 @@ class _SetGroupData {
   final bool isDrop;
 }
 
-/// Splits an exercise's sets into rows-with-a-chip and drop runs.
+/// Splits an exercise's sets into rows-with-a-chip and their drop legs.
+///
+/// A leg is a set whose `parentSetId` names the set above it. Grouping by
+/// adjacency instead — every run of consecutive `drop` rows — could not tell
+/// one drop set with two legs from two drop sets side by side, so converting
+/// two sets in a row merged them into one.
 List<_SetGroupData> _groupSets(List<SetLog> sets) {
+  final at = {for (var i = 0; i < sets.length; i++) sets[i].id: i};
+
+  /// A row that carries a chip of its own.
+  ///
+  /// Adjacency is not part of this. Legs were collected by walking forward from
+  /// the head and stopping at the first row that was not its child, so a leg
+  /// that ended up anywhere else — an orphan whose head was deleted, a leg of a
+  /// leg — was skipped by the loop below *and* by the head that never reached
+  /// it, and vanished from the table while still sitting in the database.
+  bool isHead(SetLog s) {
+    final parent = s.parentSetId;
+    if (parent == null) return true;
+    final i = at[parent];
+    return i == null || sets[i].parentSetId != null;
+  }
+
+  final legsOf = <String, List<int>>{};
+  for (var i = 0; i < sets.length; i++) {
+    if (isHead(sets[i])) continue;
+    legsOf.putIfAbsent(sets[i].parentSetId!, () => <int>[]).add(i);
+  }
+
   final groups = <_SetGroupData>[];
   var counted = 0;
-  var i = 0;
-  while (i < sets.length) {
-    final type = sets[i].setType;
-    if (type == SetType.drop || type == SetType.restPause) {
-      final run = <SetLog>[];
-      final at = <int>[];
-      while (i < sets.length &&
-          (sets[i].setType == SetType.drop ||
-              sets[i].setType == SetType.restPause)) {
-        run.add(sets[i]);
-        at.add(i);
-        i++;
-      }
-      counted++;
-      groups.add(_SetGroupData(run, at, run.first.setType.shortLabel, true));
-      continue;
-    }
-    // Warm-ups are not set 1. Counting them shifts every working set's number
-    // by however many you happened to do.
-    final label = type == SetType.warmup ? 'W' : '${++counted}';
-    groups.add(_SetGroupData([sets[i]], [i], label, false));
-    i++;
+
+  for (var i = 0; i < sets.length; i++) {
+    final set = sets[i];
+    if (!isHead(set)) continue; // collected with its head
+
+    final positions = <int>[i, ...?legsOf[set.id]];
+    final legs = [for (final p in positions) sets[p]];
+
+    final isDrop = set.setType == SetType.drop || legs.length > 1;
+    final label = switch (set.setType) {
+      SetType.warmup => 'W',
+      // A drop is a set you dropped weight inside, so it takes a number of
+      // its own — the reference numbers W, D, 2.
+      SetType.drop => 'D',
+      _ => '',
+    };
+    if (set.setType != SetType.warmup) counted++;
+
+    groups.add(
+      _SetGroupData(
+        legs,
+        positions,
+        label.isEmpty ? '$counted' : label,
+        isDrop,
+      ),
+    );
   }
   return groups;
+}
+
+/// What the chip beside a row prints, from the row's position in the exercise.
+///
+/// The keypad titled itself "Set 4" for the row marked `2` — it counted rows,
+/// which is the one thing warm-ups and drop legs make meaningless.
+String _setLabelAt(List<SetLog> sets, int position) {
+  for (final group in _groupSets(sets)) {
+    final k = group.positions.indexOf(position);
+    if (k < 0) continue;
+    return k == 0 ? group.label : '${group.label} · leg ${k + 1}';
+  }
+  return '${position + 1}';
 }
 
 class _SetGroup extends ConsumerWidget {
@@ -1315,6 +1465,7 @@ class _SetGroup extends ConsumerWidget {
     required this.unit,
     required this.editing,
     required this.buffer,
+    required this.openSwipe,
     required this.onEdit,
     required this.rowKeyFor,
     required this.onToggleDone,
@@ -1325,6 +1476,9 @@ class _SetGroup extends ConsumerWidget {
   final WeightUnit unit;
   final EditTarget? editing;
   final ValueListenable<String> buffer;
+
+  /// The one row swiped open across the whole screen.
+  final ValueNotifier<String?> openSwipe;
   final void Function(SetLog, SetField) onEdit;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
@@ -1337,26 +1491,40 @@ class _SetGroup extends ConsumerWidget {
     final repo = ref.read(trainingRepositoryProvider);
     final last = group.sets.length - 1;
 
+    void addLeg() => repo.addDropLeg(
+      entry.workoutExercise.id,
+      headSetId: group.sets.first.id,
+    );
+
     // One index cell per row, always the same height as the row beside it.
     // The previous version stacked chip / spine / plus in a column of its own
     // and let [IntrinsicHeight] size the group, which stretched the first row
     // taller than the rest and slid every chip out of line with its row.
-    return Padding(
-      padding: const EdgeInsets.only(left: Space.lg),
-      child: Column(
-        children: [
-          for (var k = 0; k < group.sets.length; k++)
-            Row(
+    //
+    // No row wash. A completed set is said by its fields and its checkbox
+    // (THEME §6); a full-width band behind the row was the loudest thing in
+    // the table, and the table is mostly completed rows by the end.
+    return Column(
+      children: [
+        for (var k = 0; k < group.sets.length; k++)
+          // The whole row travels — chip, capsule segment and fields together.
+          // Wrapped around the fields alone this slid the numbers out from
+          // under a chip that stayed put, which reads as the table coming
+          // apart rather than as one row moving aside.
+          SwipeToDelete(
+            rowId: group.sets[k].id,
+            open: openSwipe,
+            onDelete: () => repo.deleteSets(_deleteIds(k)),
+            child: Row(
               children: [
                 _IndexCell(
-                  group: group,
-                  position: k,
-                  // The spine only exists to tie a drop run together.
-                  spine: group.isDrop
-                      ? (k == 0
+                  // The spine only exists to tie a drop run together. A group of
+                  // one head keeps its square foot for the `+` row below it.
+                  spine: !group.isDrop
+                      ? _Spine.none
+                      : (k == 0
                             ? _Spine.top
-                            : (k == last ? _Spine.bottom : _Spine.middle))
-                      : _Spine.none,
+                            : (k == last ? _Spine.bottom : _Spine.middle)),
                   child: switch (k) {
                     0 => SetIndexChip(
                       type: group.sets.first.setType,
@@ -1364,20 +1532,20 @@ class _SetGroup extends ConsumerWidget {
                       done: group.sets.first.isDone,
                       onTap: () => _openActions(context, ref, k),
                     ),
-                    // The `+` rides in the last row's cell, as the reference
-                    // does, rather than claiming a slot of its own and making
-                    // the group a row taller than the sets in it.
-                    _ when group.isDrop && k == last => _RoundButton(
+                    // The `+` rides in the last leg's cell, level with the row
+                    // it continues. Given a row of its own it left a cell-high
+                    // gap under a dot that marked nothing, which on a two-row
+                    // drop set was half the height of the group.
+                    //
+                    // Long-press is that leg's own actions: its cell is spoken
+                    // for, and every other row in this column opens a sheet.
+                    _ when k == last => _RoundButton(
                       icon: Icons.add_rounded,
-                      onTap: () => repo.addSetAfter(
-                        entry.workoutExercise.id,
-                        afterSetId: group.sets.last.id,
-                        type: SetType.drop,
-                      ),
+                      onTap: addLeg,
+                      onLongPress: () => _openActions(context, ref, k),
                     ),
-                    // A leg with no chip still needs a way into its own
-                    // actions — it could not be deleted at all before.
-                    _ => _CellTapTarget(onTap: () => _openActions(context, ref, k)),
+                    // A middle leg's way into its type, note and delete.
+                    _ => _LegMarker(onTap: () => _openActions(context, ref, k)),
                   },
                 ),
                 const SizedBox(width: Space.sm),
@@ -1388,7 +1556,7 @@ class _SetGroup extends ConsumerWidget {
                       set: group.sets[k],
                       loadMode: entry.exercise.loadMode,
                       unit: unit,
-                      ghost: _ghostSet(prefill, group.positions[k]),
+                      ghost: _ghostFor(prefill, entry.sets, group.positions[k]),
                       editing: editing,
                       buffer: buffer,
                       onEdit: onEdit,
@@ -1398,33 +1566,33 @@ class _SetGroup extends ConsumerWidget {
                 ),
               ],
             ),
-          // A one-legged drop group has nowhere to put the `+`, so it gets a
-          // stub on the end of the spine instead.
-          if (group.isDrop && group.sets.length == 1)
-            Row(
-              children: [
-                _IndexCell(
-                  group: group,
-                  position: 1,
-                  spine: _Spine.bottom,
-                  height: 30,
-                  child: _RoundButton(
-                    icon: Icons.add_rounded,
-                    size: 26,
-                    onTap: () => repo.addSetAfter(
-                      entry.workoutExercise.id,
-                      afterSetId: group.sets.last.id,
-                      type: SetType.drop,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-        ],
-      ),
+          ),
+        // A drop set whose last leg has been deleted has no cell to put the `+`
+        // in but still has to offer one, or it can never be a drop set again.
+        // This is the only case that costs a row.
+        if (group.isDrop && group.sets.length == 1)
+          Row(
+            children: [
+              _IndexCell(
+                spine: _Spine.bottom,
+                height: _footHeight,
+                child: _RoundButton(icon: Icons.add_rounded, onTap: addLeg),
+              ),
+            ],
+          ),
+      ],
     );
   }
+
+  /// Shorter than a set row: it holds a button, not a number to read. Exactly
+  /// the button's own diameter, so the capsule's foot closes on its edge.
+  static const _footHeight = SetRow.indexColumn;
+
+  /// Everything deleting row [k] removes. Deleting the head of a drop group
+  /// takes the whole group: its legs are continuations of that set and mean
+  /// nothing without it.
+  List<String> _deleteIds(int k) =>
+      k == 0 ? [for (final s in group.sets) s.id] : [group.sets[k].id];
 
   void _openActions(BuildContext context, WidgetRef ref, int k) {
     showSetActions(
@@ -1435,10 +1603,7 @@ class _SetGroup extends ConsumerWidget {
       // marked `1` used to open a sheet headed "Set 2" whenever a warm-up or
       // a drop sat above it.
       label: k == 0 ? group.label : '${group.label} · leg ${k + 1}',
-      // Deleting the head of a drop group takes the whole group.
-      deleteIds: k == 0
-          ? [for (final s in group.sets) s.id]
-          : [group.sets[k].id],
+      deleteIds: _deleteIds(k),
     );
   }
 }
@@ -1449,80 +1614,121 @@ enum _Spine { none, top, middle, bottom }
 /// cells join into one capsule behind the chip, the legs and the `+`.
 class _IndexCell extends StatelessWidget {
   const _IndexCell({
-    required this.group,
-    required this.position,
     required this.spine,
     required this.child,
-    this.height,
+    this.height = SetRow.rowHeight,
   });
 
-  final _SetGroupData group;
-  final int position;
   final _Spine spine;
   final Widget child;
-
-  /// Defaults to a full row. Only the one-legged group's `+` stub is shorter.
-  final double? height;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    const r = Radius.circular(SetRow.indexColumn / 2);
-    return Container(
+    // The full width of the column, with the chip flat on it. A narrower
+    // capsule with a filled chip proud of it read as beads on a string —
+    // three bulges down the left of the table instead of one run.
+    const spineWidth = SetRow.indexColumn;
+    const r = Radius.circular(spineWidth / 2);
+
+    // The cap stops on the chip's own edge, not on the row's. A row is taller
+    // than the chip in it, so a capsule drawn to the full height of the top row
+    // reached half a chip above the `D` and ended in a rounded shoulder with
+    // nothing under it — the same at the foot, around the `+`. Inset by the
+    // gap between the two and the cap circumscribes the circle exactly.
+    final inset = ((height - SetRow.indexColumn) / 2).clamp(0.0, height / 2);
+
+    return SizedBox(
       width: SetRow.indexColumn,
-      height: height ?? SetRow.rowHeight,
-      alignment: Alignment.center,
-      decoration: spine == _Spine.none
-          ? null
-          : BoxDecoration(
-              color: c.surfaceHigh.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.vertical(
-                top: spine == _Spine.top ? r : Radius.zero,
-                bottom: spine == _Spine.bottom ? r : Radius.zero,
+      height: height,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (spine != _Spine.none)
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: spine == _Spine.top ? inset : 0,
+                  bottom: spine == _Spine.bottom ? inset : 0,
+                ),
+                child: Container(
+                  width: spineWidth,
+                  decoration: BoxDecoration(
+                    color: c.surfaceHighest,
+                    borderRadius: BorderRadius.vertical(
+                      top: spine == _Spine.top ? r : Radius.zero,
+                      bottom: spine == _Spine.bottom ? r : Radius.zero,
+                    ),
+                  ),
+                ),
               ),
             ),
-      child: child,
-    );
-  }
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap, this.size});
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final double? size;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final d = size ?? SetRow.indexColumn;
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        width: d,
-        height: d,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: c.surfaceHigh, shape: BoxShape.circle),
-        child: Icon(icon, size: d * 0.55, color: c.textSecondary),
+          child,
+        ],
       ),
     );
   }
 }
 
-class _CellTapTarget extends StatelessWidget {
-  const _CellTapTarget({required this.onTap});
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({
+    required this.icon,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  /// The width of the index column, so a capsule's foot closes on its edge.
+  static const size = SetRow.indexColumn;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Pressable(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: c.surfaceHigh, shape: BoxShape.circle),
+        child: Icon(icon, size: size * 0.6, color: c.textSecondary),
+      ),
+    );
+  }
+}
+
+/// A drop leg's index cell. The capsule already says the row belongs to the set
+/// above it, so this is only a mark that something is here to press — and, like
+/// every other chip in this column, the way into that row's type, note and
+/// delete.
+class _LegMarker extends StatelessWidget {
+  const _LegMarker({required this.onTap});
 
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final c = context.c;
+    return Pressable(
       onTap: onTap,
-      child: const SizedBox(
+      child: SizedBox(
         width: SetRow.indexColumn,
         height: SetRow.rowHeight,
+        child: Center(
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: c.textTertiary,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1545,8 +1751,6 @@ String _formatElapsed(int startedAtMs) {
   }
   return '$m:${s.toString().padLeft(2, '0')}';
 }
-
-
 
 class _PrefillCaption extends StatelessWidget {
   const _PrefillCaption({required this.prefill});

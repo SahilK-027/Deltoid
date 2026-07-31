@@ -337,18 +337,21 @@ under it, and a load summary pill on the right.
 **Action chips** — the horizontally scrolling chip row described above.
 
 **Set table** — a header row of `label` columns (`Set · Last time · kg · Reps ·
-✓`), then one row per set:
+✓`), then one row per set. **On the page, not in a card**: the index column
+starts on the page gutter, so it shares a vertical with the exercise name, the
+rail above it and everything else on the screen. Load and reps are equal-width
+expanding columns.
 
 | Element | Spec |
 | --- | --- |
-| Index chip | 40dp `surfaceHigh` circle, `valueSm`. **Warm-up shows `W`, drop set shows `D`** — a letter, not a colour, and warm-ups are excluded from the "Set n of m" count. |
-| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary` behind a leading `·` — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. The attribution line ("From Push 2 · 12 Jul") stays in the exercise header, where it belongs to the whole exercise rather than to one row. |
+| Index chip | A circle filling the index column, `valueSm`. **Warm-up shows `W`, drop set shows `D`**, and warm-ups are excluded from the "Set n of m" count. A typed set is tinted with it: `data` for a warm-up, `deload` for a drop — a letter *and* a colour. The tint is **blended into `surfaceHigh`, never translucent**: laid over the drop capsule at 18% it picked up the grey behind it and came out a washed olive. The letter alone put the two rows that are not your working sets in the same grey as the rows that are. |
+| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary`, and nothing else: no dot, no italic — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. The attribution line ("From Push 2 · 12 Jul") stays in the exercise header, where it belongs to the whole exercise rather than to one row. |
 | Value field | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: transparent fill + 2px white outline. |
 | Done | Checkbox as specced. |
-| Completed row | Values and index dim to `textSecondary`; the checkbox goes solid white. The row is *not* struck through or recoloured. |
-| Delete | **Not a swipe here.** The reference swipes a row left to reveal a `negative` panel; this app's log is a `PageView` and the horizontal axis is spoken for (README rule 4). Delete lives in the set sheet behind the index chip, which is also why the chip is a tap target and not just a label. |
+| Completed row | Values and index dim to `textSecondary`, the fields drop from `surfaceHigh` to `surface`, and the checkbox goes solid white. Dull, not black: at `surfaceSunken` a logged row read as a hole cut in the table. The row is *not* struck through, washed, or recoloured. |
+| Delete | **Swipe the row left** to uncover a `negative` delete button, and tap it. The **whole** row travels — index chip, drop-capsule segment and fields as one piece; sliding the fields out from under a chip that stays put reads as the table coming apart. The button is **carried in by the row**, parked one panel past its right edge and clipped until the swipe brings it in — never a static panel uncovered underneath. It is the checkbox's shape in the checkbox's place: 28dp square, radius 4, 18dp glyph, `negative` fill. The swipe is live from anywhere on the row, the index column included, and it drags back shut the way it opened — the swipe reveals, it never deletes on release, because a set logged an hour ago must not be one flick from gone. A tap anywhere else on the row, or a swipe on another one, closes it. The set sheet behind the index chip keeps its delete too: the chip is the way to a *group's* actions, the swipe is the way to *this row's*. The cost is that the page no longer turns from a drag that starts on the table — taken deliberately, because deleting one leg of a drop set otherwise meant hitting a 5dp dot. |
 | Add set | A circular `surfaceHigh` + button in the index column, below the last row. |
-| Drop set | Renders as sub-rows nested under its parent `D` row, each with its own fields and its own `+` in the index column. |
+| Drop set | The group's rows sit on one `surfaceHighest` capsule filling the index column: the `D` chip at its head, a `textTertiary` dot on each middle leg, and the `+` in the **last leg's cell**, level with the row it continues — never a row of its own, which left a cell-high gap under a dot that marked nothing. Every cell in the column opens that row's sheet; on the `+` it is a long-press. The capsule's caps stop on the **chip's** edge, not the row's — a row is taller than the chip in it, and a cap drawn to the row ends in a shoulder with nothing under it. |
 
 **Finish** — when every set is ticked, a white primary button appears pinned at
 the bottom. Before that it is a quiet underlined link in the top bar: finishing

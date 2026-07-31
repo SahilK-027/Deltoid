@@ -24,8 +24,9 @@ The short version, so you don't break it before you get there:
    *optional* templates. Never seed a regime, and never put personal numbers,
    cues or video links in `seed_data.dart` — those are the user's, added
    through the UI.
-4. **The log screen is a `PageView`** — one exercise per page. Nothing inside it
-   may use a horizontal gesture.
+4. **The log screen is a `PageView`** — one exercise per page. The set row is
+   the single exception: swiping one left uncovers its delete. Nothing else
+   inside the log may claim a horizontal gesture.
 5. **History paging is keyset, not offset** (`HistoryCursor` on
    `startedAt` + id). Finishing a session while the list is open must not shift
    the page boundary.
