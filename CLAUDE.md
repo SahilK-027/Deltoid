@@ -36,6 +36,21 @@ The short version, so you don't break it before you get there:
    Extend those tests when changing behaviour.
 8. Regenerate drift code after any edit to `lib/data/db/tables.dart`:
    `dart run build_runner build`.
+9. **Never copy the project to keep an old version around.** No `old-*/`
+   folders, no `*.bak` files, no second checkout, no `git worktree` for
+   "reference". Git already holds every previous state, and a copy is 100 MB of
+   build output that goes stale the moment it is made, gets edited by mistake,
+   and shows up in searches as a second answer to every question. To read the
+   old version of a file, read it out of history:
+
+   ```
+   git show <commit>:lib/features/today/today_screen.dart
+   git log --oneline -- <path>          # find the commit
+   git diff <commit> -- <path>          # what changed since
+   ```
+
+   One of these was found at 99 MB, parked nine commits back, holding a test
+   file two revisions out of date.
 
 Before saying anything is done: `flutter analyze && flutter test`.
 
