@@ -1347,7 +1347,6 @@ class _SetGroup extends ConsumerWidget {
         children: [
           for (var k = 0; k < group.sets.length; k++)
             Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _IndexCell(
                   group: group,
@@ -1461,6 +1460,8 @@ class _IndexCell extends StatelessWidget {
   final int position;
   final _Spine spine;
   final Widget child;
+
+  /// Defaults to a full row. Only the one-legged group's `+` stub is shorter.
   final double? height;
 
   @override
@@ -1469,7 +1470,7 @@ class _IndexCell extends StatelessWidget {
     const r = Radius.circular(SetRow.indexColumn / 2);
     return Container(
       width: SetRow.indexColumn,
-      height: height,
+      height: height ?? SetRow.rowHeight,
       alignment: Alignment.center,
       decoration: spine == _Spine.none
           ? null
@@ -1519,7 +1520,10 @@ class _CellTapTarget extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: const SizedBox(width: SetRow.indexColumn, height: double.infinity),
+      child: const SizedBox(
+        width: SetRow.indexColumn,
+        height: SetRow.rowHeight,
+      ),
     );
   }
 }

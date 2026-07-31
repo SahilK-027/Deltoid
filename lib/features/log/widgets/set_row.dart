@@ -101,6 +101,12 @@ class SetRow extends StatelessWidget {
   static const doneColumn = 40.0;
   static const fieldHeight = 42.0;
 
+  /// A row's full height, fields plus their padding. The index column beside
+  /// it is sized to this so a drop group's capsule lines up with its rows
+  /// without stretching them — `CrossAxisAlignment.stretch` cannot do that job
+  /// inside a scroll view, where the vertical constraint is unbounded.
+  static const rowHeight = fieldHeight + Space.xs * 2;
+
   final SetLog set;
   final LoadMode loadMode;
   final WeightUnit unit;
