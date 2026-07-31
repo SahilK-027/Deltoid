@@ -101,17 +101,43 @@ exercise, one chart), **Regime** (sessions, exercise catalog, deload config).
 Settings behind the gear on Today.
 
 Today reads top to bottom as one thought: how long since the last session, the
-one session to start, every session in the cycle, then the record. Two rules
-about it, both learned the hard way:
+one session to start, then the record. Three rules about it, all learned the
+hard way:
 
-- **Nothing on it is drawn twice.** The cycle used to appear as labelled bars in
-  the hero card *and* as the tappable list below, which pushed the heatmap off
-  the bottom of the screen and needed a scroll-to-anchor to compensate. The
-  session list is the only rendering of cycle progress; the fraction beside
-  "This cycle" is the only summary of it.
+- **Nothing on it is drawn twice.** The cycle has appeared as labelled bars in
+  the hero, as a tappable list under it, and as both at once — which pushed the
+  heatmap off the bottom of the screen and needed a scroll-to-anchor to
+  compensate. The hero's hairline track is the only rendering of cycle progress;
+  the `n of m done` beside the cycle number is the only summary of it.
+- **A cycle is not a week, and Today must not imply it is.** The full session
+  list used to sit under the hero. Six full-width rows on a screen called Today
+  read as "here is your plan for today" — but a cycle advances when the work is
+  done, not when the calendar turns, and the list was the loudest thing making
+  that false promise. It is a sheet now, behind *Train another session*.
 - **The queue head is a description, not an instruction.** The hero names the
-  first session not yet trained. Every other session is one tap away in the list
-  directly beneath it, without scrolling — an out-of-order session is normal.
+  first session not yet trained. Any other session is two taps away — open the
+  sheet, pick it — and it opens with every session marked done / next / neither,
+  because an out-of-order session is normal, not an error.
+
+A session left open for more than 24 hours stops being "in progress" and
+becomes a decision. Two different things get called that, and they are not
+treated the same:
+
+- **Nothing logged in it** — a mis-tap on Start. Swept at launch
+  (`sweepAbandonedWorkouts`), silently, because it blocks every other session
+  behind "finish the one you are in" and there is nothing in it to lose.
+- **Sets logged in it** — trained it, never pressed Finish. Kept. The card says
+  *Left open*, gives the date and the set count instead of a 51-hour stopwatch,
+  and offers **Finish it** (saved to the day it was started, since `dayKey` was
+  stamped at Start) or **Discard**, both behind a confirmation. The app never
+  deletes a real day's work on its own.
+
+Both sheets on Today list session names, so both are titled and subtitled:
+*Start a session* is about now, *Log a past session* is about a day already
+gone. The backfill sheet asks for the day **first** and keeps it on screen while
+you pick — the day is the only thing that makes it different from starting a
+session, and a bare calendar dialog after the fact gave no sign the two
+questions were one answer.
 
 History has three readings of the same data, because "what did I do" means
 three different things:

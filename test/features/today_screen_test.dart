@@ -73,7 +73,7 @@ void main() {
       reason: 'the frame before sessions arrived used to render the empty '
           'state for a regime with six of them',
     );
-    expect(seen.last, contains('CYCLE 1'));
+    expect(seen.last, contains('Cycle 1'));
   });
 
   testWidgets('arrives in one frame, not in layers', (tester) async {
@@ -81,13 +81,14 @@ void main() {
     await pumpToday(tester);
 
     final seen = await frames(tester);
-    final populated = seen.where((f) => f.contains('CYCLE 1'));
+    final populated = seen.where((f) => f.contains('Cycle 1'));
 
-    // The hero and the session list land together — no frame has one without
-    // the other. (The consistency grid may still be below the fold, so a lazy
-    // ListView has not built it yet; the snapshot it reads is the same one.)
+    // The cycle status and the session it names land together — no frame has
+    // one without the other. (The consistency grid may still be below the fold,
+    // so a lazy ListView has not built it yet; the snapshot it reads is the
+    // same one.)
     for (final frame in populated) {
-      expect(frame, contains('THIS CYCLE'));
+      expect(frame, contains('0 of 6 done'));
       expect(frame, contains('Push 1'));
     }
     expect(populated, isNotEmpty);
@@ -170,6 +171,6 @@ void main() {
 
     expect(seen.last, contains('Nothing set up yet'));
     // And it never claimed a regime existed on the way there.
-    expect(seen.where((f) => f.contains('CYCLE 1')), isEmpty);
+    expect(seen.where((f) => f.contains('Cycle 1')), isEmpty);
   });
 }

@@ -57,7 +57,7 @@ class HeatCell extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: heatCellColor(context, day, isFuture: isFuture),
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(4),
           border: day != null && day.isDeload
               ? Border.all(color: c.deload, width: 1)
               : null,
@@ -105,6 +105,12 @@ class ConsistencyHeatmap extends StatelessWidget {
       builder: (context, constraints) {
         const gap = 3.0;
         const labelWidth = 22.0;
+        // The month row and the air under it. The labels used to sit straight
+        // on top of the first cell row, which read as a caption stuck to the
+        // grid rather than a header over it — the weekday column beside it had
+        // breathing room and the months did not.
+        const monthRow = 15.0;
+        const monthGap = 7.0;
         final available = constraints.maxWidth - labelWidth;
         // Still capped — cells any larger read as a chart rather than a
         // texture, and every point of cell size costs seven points of height
@@ -115,7 +121,6 @@ class ConsistencyHeatmap extends StatelessWidget {
             ((available - gap * (weeks - 1)) / weeks).clamp(8.0, 16.0);
 
         final columns = <Widget>[];
-        var lastMonth = -1;
         // Column a label was last drawn in. A month label is allowed to overrun
         // its own column — that is what the [OverflowBox] below is for — so two
         // labels landing two columns apart print over each other. This is how
@@ -133,12 +138,18 @@ class ConsistencyHeatmap extends StatelessWidget {
             final date = start.add(Duration(days: w * 7 + d));
             final key = dayKeyOf(date);
 
-            if (d == 0 && date.month != lastMonth) {
-              lastMonth = date.month;
-              if (w - lastLabelWeek >= columnsPerLabel) {
-                lastLabelWeek = w;
-                monthLabel = DateFormat('MMM').format(date);
-              }
+            // A month is labelled at the column holding its 1st, whatever
+            // weekday that is — not at the first Monday of a new month.
+            //
+            // The old rule labelled the leading column whenever the window
+            // opened mid-month, and that label then blocked the real one: a
+            // grid starting 30 March printed "Mar" over two days of March and
+            // suppressed "Apr" one column later as a collision. The window's
+            // first days are the least interesting thing in it; the month
+            // boundaries are the whole reason for the row.
+            if (date.day == 1 && w - lastLabelWeek >= columnsPerLabel) {
+              lastLabelWeek = w;
+              monthLabel = DateFormat('MMM').format(date);
             }
 
             cells.add(Padding(
@@ -157,9 +168,9 @@ class ConsistencyHeatmap extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (showMonthLabels)
+                if (showMonthLabels) ...[
                   SizedBox(
-                    height: 14,
+                    height: monthRow,
                     width: cell,
                     child: monthLabel.isEmpty
                         ? null
@@ -169,6 +180,8 @@ class ConsistencyHeatmap extends StatelessWidget {
                             child: Text(monthLabel, style: context.t.labelSmall),
                           ),
                   ),
+                  const SizedBox(height: monthGap),
+                ],
                 ...cells,
               ],
             ),
@@ -183,7 +196,8 @@ class ConsistencyHeatmap extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (showMonthLabels) const SizedBox(height: 14),
+                  if (showMonthLabels)
+                    const SizedBox(height: monthRow + monthGap),
                   // Only alternate days are labelled; seven labels would be
                   // noisier than the data.
                   for (final label in ['M', '', 'W', '', 'F', '', 'S'])
