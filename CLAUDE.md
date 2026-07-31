@@ -3,6 +3,16 @@
 **Read [README.md](README.md) before changing anything.** It carries the domain
 model, the invariants, the environment quirks, and the traps already hit.
 
+Two more, each with one job:
+
+- **[THEME.md](THEME.md)** — the design language. Colours, the nine type roles,
+  and the component vocabulary every screen composes from. Read it before
+  touching anything visual, and don't invent a card, row, button or sheet that
+  isn't in it. §0 fences the scope: we share a language with a much larger app,
+  not its feature set.
+- **[TODO.md](TODO.md)** — what is built, what isn't, and the order of the work
+  in flight. Status lives there, never in the README.
+
 The short version, so you don't break it before you get there:
 
 1. **Prefill is scoped to the session, not the exercise.** Push 1 and Push 2
