@@ -323,9 +323,13 @@ inside it may use a horizontal gesture). The language for what's *on* the page:
 **Top bar** — hamburger, elapsed clock in `value` tabular, rest timer icon +
 countdown, then a thin progress track.
 
-**Exercise rail** — 60×84 thumbnails, radius 12, with a 3px underline beneath:
-white for the current exercise, `surfaceHighest` for the rest. A finished
-exercise gets a white circular tick badge on its thumbnail corner.
+**Exercise rail** — the reference uses 60×84 photo thumbnails with a 3px
+underline beneath. This app has no exercise photography and never will (§0), and
+a rail of two-letter monograms takes the same room while saying less than the
+name does, so ours is **text tabs with the same underline**: white under the
+current exercise, `surfaceHighest` under the rest, a tick before a finished one.
+Only the exercises you are *not* on carry a `2/4` count — the current one has
+`Set n of m` in the header directly beneath.
 
 **Header** — exercise name in `section` (max 2 lines), `Set 2 of 4` in `body`
 under it, and a load summary pill on the right.
@@ -338,16 +342,20 @@ under it, and a load summary pill on the right.
 | Element | Spec |
 | --- | --- |
 | Index chip | 40dp `surfaceHigh` circle, `valueSm`. **Warm-up shows `W`, drop set shows `D`** — a letter, not a colour, and warm-ups are excluded from the "Set n of m" count. |
-| Prefill | `body` in `textSecondary`, or `No target` when there is none. Deltoid's session-scoped prefill line goes here, including its "From Push 2 · 12 Jul" attribution. |
+| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary` behind a leading `·` — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. The attribution line ("From Push 2 · 12 Jul") stays in the exercise header, where it belongs to the whole exercise rather than to one row. |
 | Value field | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: transparent fill + 2px white outline. |
 | Done | Checkbox as specced. |
 | Completed row | Values and index dim to `textSecondary`; the checkbox goes solid white. The row is *not* struck through or recoloured. |
-| Delete | Swipe left reveals a full-height `negative` panel flush to the screen edge with a white glyph. No trailing delete button in the row. |
+| Delete | **Not a swipe here.** The reference swipes a row left to reveal a `negative` panel; this app's log is a `PageView` and the horizontal axis is spoken for (README rule 4). Delete lives in the set sheet behind the index chip, which is also why the chip is a tap target and not just a label. |
 | Add set | A circular `surfaceHigh` + button in the index column, below the last row. |
 | Drop set | Renders as sub-rows nested under its parent `D` row, each with its own fields and its own `+` in the index column. |
 
 **Finish** — when every set is ticked, a white primary button appears pinned at
-the bottom. It does not exist before that.
+the bottom. Before that it is a quiet underlined link in the top bar: finishing
+early is legitimate here (a rack gets taken, a session gets cut short) and the
+confirmation names what is unfinished, so the action has to exist — it just
+should not be the loudest thing on screen while there is still work to do. The
+two never show at once.
 
 **Numeric keypad** — `surfaceSunken` bed. Digits are bare white `24sp` glyphs
 with no key background; utility keys (`RIR`, keyboard, ±, backspace) are

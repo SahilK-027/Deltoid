@@ -242,7 +242,6 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     // Everything below the database speaks the display unit; everything at or
     // below the repository speaks kilograms.
     _unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-    final c = context.c;
 
     // The first page's rest target isn't known until the workout loads.
     if (detail != null && !_restTargetLoaded) {
@@ -278,48 +277,17 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      detail.session?.name ?? 'Workout',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (detail.workout.isDeload) ...[
-                    const SizedBox(width: Space.sm),
-                    Pill('Deload', color: c.deload),
-                  ],
-                ],
-              ),
-              // Its own clock, so the session timer advances without the rest
-              // of the screen rebuilding behind it once a second.
-              Ticking(
-                builder: (context) => Text(
-                  '${_elapsed(detail.workout.startedAt)}  ·  '
-                  '${_doneSets(detail)} of ${_totalSets(detail)} sets',
-                  style: context.t.labelMedium,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => _finish(detail),
-              child: Text(
-                'Finish',
-                style: context.t.titleSmall?.copyWith(color: c.accent),
-              ),
-            ),
-            const SizedBox(width: Space.sm),
-          ],
-        ),
         body: Column(
           children: [
+            _LogTopBar(
+              title: detail.session?.name ?? 'Workout',
+              isDeload: detail.workout.isDeload,
+              startedAt: detail.workout.startedAt,
+              done: _doneSets(detail),
+              total: _totalSets(detail),
+              onBack: () => Navigator.of(context).maybePop(),
+              onFinish: () => _finish(detail),
+            ),
             ExerciseRail(
               entries: detail.entries,
               current: _page.clamp(0, math.max(0, detail.entries.length - 1)),
@@ -332,9 +300,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                       icon: Icons.fitness_center,
                       title: 'No exercises',
                       message: 'Add one to start logging.',
-                      action: FilledButton(
+                      action: PrimaryButton(
+                        label: 'Add exercise',
                         onPressed: () => _addExercise(detail),
-                        child: const Text('Add exercise'),
                       ),
                     )
                   : PageView.builder(
@@ -364,6 +332,28 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                       },
                     ),
             ),
+            // Every set ticked: the only thing left to do is end the session,
+            // so it stops being a text action in the corner and becomes the
+            // one white button on the screen. Finishing early is still
+            // possible from the top bar — it just isn't advertised.
+            if (_editing != null ||
+                _totalSets(detail) == 0 ||
+                _doneSets(detail) < _totalSets(detail))
+              const SizedBox.shrink()
+            else
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  Space.md,
+                  Space.gutter,
+                  Space.md,
+                ),
+                child: PrimaryButton(
+                  label: 'Finish session',
+                  onPressed: () => _finish(detail),
+                ),
+              ),
             if (_showRestBar && _restStartedAt != null && _editing == null)
               RestTimerBar(
                 startedAt: _restStartedAt!,
@@ -784,43 +774,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   static int _totalSets(WorkoutDetail d) =>
       d.entries.expand((e) => e.sets).length;
 
-  static String _elapsed(int startedAtMs) {
-    final start = DateTime.fromMillisecondsSinceEpoch(
-      startedAtMs,
-      isUtc: true,
-    ).toLocal();
-    final d = DateTime.now().difference(start);
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) {
-      return '$h:${m.toString().padLeft(2, '0')}:'
-          '${s.toString().padLeft(2, '0')}';
-    }
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
   /// A stored kg value as the number this phone types in.
   String _fmtLoadIn(double? kg) =>
       kg == null ? '' : formatInUnit(kg, _unit);
 
-}
-
-/// Last time's sets as one line: "22.5×8, 22.5×8, 20×7".
-String _summariseSets(PrefillResult prefill, LoadMode mode, WeightUnit unit) {
-  final parts = <String>[];
-  for (final s in prefill.sets) {
-    final load = mode == LoadMode.bodyweightPlus ? s.addedWeight : s.weight;
-    final reps = s.reps;
-    final loadLabel = switch (mode) {
-      LoadMode.bodyweight => 'BW',
-      LoadMode.bodyweightPlus =>
-        load == null ? 'BW' : 'BW+${formatInUnit(load, unit)}',
-      _ => load == null ? '—' : formatInUnit(load, unit),
-    };
-    parts.add(reps == null ? loadLabel : '$loadLabel×$reps');
-  }
-  return parts.join(', ');
 }
 
 /// Prefill set aligned to a position in the current exercise, or null when
@@ -835,6 +792,128 @@ PastSet? _ghostSet(PrefillResult? prefill, int index) {
 /// The session used to be one long vertical stack, which meant scrolling past
 /// finished work to reach the set in front of you. One exercise per page keeps
 /// the thing you are actually doing at a fixed place on screen.
+/// Session name, elapsed clock, and how far through the work you are.
+///
+/// The progress track replaces the `12 of 18 sets` line that used to sit under
+/// the title. It is the same fact, and a bar answers "nearly done?" from across
+/// a gym floor in a way two numbers never did.
+class _LogTopBar extends StatelessWidget {
+  const _LogTopBar({
+    required this.title,
+    required this.isDeload,
+    required this.startedAt,
+    required this.done,
+    required this.total,
+    required this.onBack,
+    required this.onFinish,
+  });
+
+  final String title;
+  final bool isDeload;
+  /// Epoch milliseconds, UTC — the column's own storage format.
+  final int startedAt;
+  final int done;
+  final int total;
+  final VoidCallback onBack;
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final complete = total > 0 && done == total;
+
+    return HeaderBand(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.gutter, 0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                CircleIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onTap: onBack,
+                ),
+                const SizedBox(width: Space.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: context.t.titleMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isDeload) ...[
+                            const SizedBox(width: Space.sm),
+                            Pill('Deload', color: c.deload),
+                          ],
+                        ],
+                      ),
+                      // Its own clock, so the session timer advances without
+                      // the rest of the screen rebuilding behind it once a
+                      // second.
+                      Ticking(
+                        builder: (context) => Text(
+                          _formatElapsed(startedAt),
+                          style: context.t.labelSmall?.copyWith(
+                            color: c.textSecondary,
+                            fontFeatures: tabular,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Once everything is ticked this is the pinned white button at
+                // the bottom instead, so it doesn't appear in two places.
+                if (!complete)
+                  LinkAction('Finish', onTap: onFinish),
+              ],
+            ),
+            const SizedBox(height: Space.md),
+            _ProgressTrack(done: done, total: total),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressTrack extends StatelessWidget {
+  const _ProgressTrack({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final fraction = total == 0 ? 0.0 : done / total;
+    return SizedBox(
+      height: 3,
+      child: LayoutBuilder(
+        builder: (context, box) => Stack(
+          children: [
+            Container(color: c.surfaceHigh),
+            AnimatedContainer(
+              duration: Motion.base,
+              curve: Motion.curve,
+              width: box.maxWidth * fraction,
+              color: c.accent,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ExercisePage extends ConsumerWidget {
   const _ExercisePage({
     super.key,
@@ -877,11 +956,19 @@ class _ExercisePage extends ConsumerWidget {
     final done = entry.sets.where((s) => s.isDone).length;
     final allDone = entry.sets.isNotEmpty && done == entry.sets.length;
 
+    // Warm-ups are not set 1. Counting them shifts every working set's number
+    // by however many you happened to do, so `Set 3 of 4` stops matching the
+    // programme it came from.
+    final counted = entry.sets
+        .where((s) => s.setType != SetType.warmup && !s.setType.isContinuation)
+        .toList();
+    final countedDone = counted.where((s) => s.isDone).length;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
         Space.lg,
-        Space.lg,
-        Space.lg,
+        Space.gutter,
         Space.huge,
       ),
       children: [
@@ -893,46 +980,33 @@ class _ExercisePage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'EXERCISE ${index + 1} OF $total',
-                    style: context.t.labelSmall,
-                  ),
-                  const SizedBox(height: Space.xs),
-                  Text(
                     entry.exercise.name,
-                    style: context.t.titleLarge?.copyWith(
+                    style: context.t.headlineSmall?.copyWith(
                       color: skipped ? c.textTertiary : c.textPrimary,
                       decoration: skipped ? TextDecoration.lineThrough : null,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: Space.xs),
-                  _PrefillCaption(prefill: prefill),
-                  // The shape of last time's work, in one line. Per-set ghosts
-                  // answer "what do I put in this row"; this answers "what did
-                  // I actually do", which is the question the app exists for.
-                  //
-                  // It goes away once the first set is logged. Before set 1 it
-                  // is the whole point; after that every number in it is also
-                  // sitting in the rows below as a ghost, and the top of the
-                  // screen is worth more than a restatement.
-                  if ((prefill?.hasSuggestion ?? false) &&
-                      !entry.sets.any((s) => s.isDone)) ...[
+                  if (!skipped && counted.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      _summariseSets(prefill!, entry.exercise.loadMode, unit),
-                      style: context.t.labelMedium?.copyWith(
+                      'Set ${math.min(countedDone + 1, counted.length)} '
+                      'of ${counted.length}',
+                      style: context.t.bodyMedium?.copyWith(
                         color: c.textSecondary,
-                        fontFeatures: tabular,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
+                  const SizedBox(height: Space.xs),
+                  _PrefillCaption(prefill: prefill),
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.more_horiz),
-              onPressed: () => showExerciseMenu(
+            CircleIconButton(
+              icon: Icons.more_horiz_rounded,
+              tooltip: 'Exercise actions',
+              onTap: () => showExerciseMenu(
                 context,
                 ref,
                 entry,
@@ -943,7 +1017,7 @@ class _ExercisePage extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: Space.lg),
+        const SizedBox(height: Space.xl),
         if (skipped)
           AppCard(
             child: Row(
@@ -964,11 +1038,12 @@ class _ExercisePage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: Space.md),
             child: Column(
               children: [
+                SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
                 for (var i = 0; i < entry.sets.length; i++)
                   SetRow(
                     key: rowKeyFor(entry.sets[i].id),
                     set: entry.sets[i],
-                    position: i,
+                    label: _indexLabel(entry.sets, i),
                     loadMode: entry.exercise.loadMode,
                     unit: unit,
                     ghost: _ghostSet(prefill, i),
@@ -979,6 +1054,11 @@ class _ExercisePage extends ConsumerWidget {
                     onOpenActions: () =>
                         showSetActions(context, ref, entry.sets[i], i),
                   ),
+                // The add button lives in the index column, directly under the
+                // numbers it continues — no label, because a `+` under a
+                // column of set numbers cannot mean anything else. The
+                // `n of m done` line that used to sit here said what the
+                // header already says.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     Space.lg,
@@ -988,23 +1068,24 @@ class _ExercisePage extends ConsumerWidget {
                   ),
                   child: Row(
                     children: [
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Space.sm,
-                          ),
-                          minimumSize: const Size(0, 36),
-                        ),
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add set'),
-                        onPressed: () => ref
+                      Pressable(
+                        onTap: () => ref
                             .read(trainingRepositoryProvider)
                             .addSet(entry.workoutExercise.id),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '$done of ${entry.sets.length} done',
-                        style: context.t.labelSmall,
+                        child: Container(
+                          width: SetRow.indexColumn,
+                          height: SetRow.indexColumn,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: c.surfaceHigh,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: 20,
+                            color: c.textSecondary,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1014,58 +1095,71 @@ class _ExercisePage extends ConsumerWidget {
           ),
           if (entry.exercise.notes != null) ...[
             const SizedBox(height: Space.lg),
-            Text(entry.exercise.notes!, style: context.t.bodySmall),
+            Text(
+              entry.exercise.notes!,
+              style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
+            ),
           ],
         ],
         if (nextName != null) ...[
-          const SizedBox(height: Space.xxl),
+          const SizedBox(height: Space.section),
           // Moving on early is allowed — supersets and busy racks are normal —
           // but it should never be silent. The rail keeps the count; this says
           // it in words at the moment you are about to leave.
           if (!allDone && !skipped && entry.sets.isNotEmpty) ...[
-            Row(
-              children: [
-                Icon(Icons.info_outline, size: 14, color: c.textTertiary),
-                const SizedBox(width: Space.sm),
-                Expanded(
-                  child: Text(
-                    '${entry.sets.length - done} set'
-                    '${entry.sets.length - done == 1 ? '' : 's'} still open '
-                    'here — you can come back to them.',
-                    style: context.t.labelSmall,
-                  ),
-                ),
-              ],
+            Text(
+              '${entry.sets.length - done} set'
+              '${entry.sets.length - done == 1 ? '' : 's'} still open here — '
+              'you can come back to them.',
+              style: context.t.bodySmall?.copyWith(color: c.textTertiary),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: Space.md),
           ],
-          // Turning the page works too; this is the discoverable version, and
-          // it lights up once the exercise is actually finished.
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: allDone || skipped ? c.accent : c.textSecondary,
-              side: BorderSide(color: allDone || skipped ? c.accent : c.border),
-            ),
+          // Turning the page works too; this is the discoverable version.
+          SecondaryButton(
+            label: 'Next: $nextName',
+            icon: Icons.arrow_forward_rounded,
             onPressed: onNextExercise,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    'Next: $nextName',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: Space.sm),
-                const Icon(Icons.arrow_forward, size: 16),
-              ],
-            ),
           ),
         ],
       ],
     );
   }
+}
+
+/// Session length, as `m:ss` or `h:mm:ss`. Top-level because both the screen
+/// and its top bar need it and neither owns the other.
+String _formatElapsed(int startedAtMs) {
+  final start = DateTime.fromMillisecondsSinceEpoch(
+    startedAtMs,
+    isUtc: true,
+  ).toLocal();
+  final d = DateTime.now().difference(start);
+  final h = d.inHours;
+  final m = d.inMinutes % 60;
+  final s = d.inSeconds % 60;
+  if (h > 0) {
+    return '$h:${m.toString().padLeft(2, '0')}:'
+        '${s.toString().padLeft(2, '0')}';
+  }
+  return '$m:${s.toString().padLeft(2, '0')}';
+}
+
+/// What the index chip prints for the set at [i].
+///
+/// Warm-ups and continuation sets are lettered rather than numbered, and they
+/// don't advance the count: `W W 1 2 3` is a warm-up pair followed by three
+/// working sets, and the third one is set 3 whichever way you got there.
+String _indexLabel(List<SetLog> sets, int i) {
+  final type = sets[i].setType;
+  if (type == SetType.warmup || type.isContinuation) return type.shortLabel;
+  var n = 0;
+  for (var k = 0; k <= i; k++) {
+    final t = sets[k].setType;
+    if (t != SetType.warmup && !t.isContinuation) n++;
+  }
+  return '$n';
 }
 
 class _PrefillCaption extends StatelessWidget {

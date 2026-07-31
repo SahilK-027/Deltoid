@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/primitives.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../domain/enums.dart';
 
@@ -9,6 +10,12 @@ import '../../../domain/enums.dart';
 /// With one exercise per page, this is the only thing telling you where you are
 /// and how much is left — it replaces the "scroll and count the cards" job the
 /// vertical list used to do implicitly.
+///
+/// Drawn as tabs with an underline rather than the thumbnails the language
+/// specifies: this app has no exercise photography, and a rail of two-letter
+/// monograms would take the same room while telling you less than the name
+/// does. The underline carries the state that the pill and its accent fill used
+/// to.
 class ExerciseRail extends StatefulWidget {
   const ExerciseRail({
     super.key,
@@ -43,7 +50,7 @@ class _ExerciseRailState extends State<ExerciseRail> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _revealCurrent());
   }
 
-  /// Keeps the active chip on screen when the page changes, including when the
+  /// Keeps the active tab on screen when the page changes, including when the
   /// keypad's "Next" walks past the end of an exercise on its own.
   void _revealCurrent() {
     final key = _keys[widget.current];
@@ -68,22 +75,19 @@ class _ExerciseRailState extends State<ExerciseRail> {
     final c = context.c;
 
     return SizedBox(
-      height: 46,
+      height: 44,
       child: ListView.separated(
         controller: _scroll,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+        padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
         itemCount: widget.entries.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
+        separatorBuilder: (_, _) => const SizedBox(width: Space.lg),
         itemBuilder: (context, i) {
           if (i == widget.entries.length) {
-            return Center(
-              child: _Chip(
-                onTap: widget.onAdd,
-                background: Colors.transparent,
-                border: c.border,
-                child: Icon(Icons.add, size: 18, color: c.textSecondary),
-              ),
+            return _Tab(
+              onTap: widget.onAdd,
+              selected: false,
+              child: Icon(Icons.add_rounded, size: 18, color: c.textSecondary),
             );
           }
 
@@ -95,46 +99,47 @@ class _ExerciseRailState extends State<ExerciseRail> {
           final done = entry.sets.where((s) => s.isDone).length;
           final complete = total > 0 && done == total;
 
-          return Center(
+          return _Tab(
             key: key,
-            child: _Chip(
-              onTap: () => widget.onSelect(i),
-              background: isCurrent ? c.accent : c.surface,
-              border: isCurrent ? c.accent : c.border,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (complete && !isCurrent) ...[
-                    Icon(Icons.check, size: 14, color: c.positive),
-                    const SizedBox(width: Space.xs),
-                  ],
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 130),
-                    child: Text(
-                      entry.exercise.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.t.titleSmall?.copyWith(
-                        color: isCurrent
-                            ? c.onAccent
-                            : (skipped ? c.textTertiary : c.textSecondary),
-                        decoration:
-                            skipped ? TextDecoration.lineThrough : null,
-                      ),
+            onTap: () => widget.onSelect(i),
+            selected: isCurrent,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (complete && !skipped) ...[
+                  Icon(Icons.check_rounded, size: 14, color: c.textSecondary),
+                  const SizedBox(width: Space.xs),
+                ],
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  child: Text(
+                    entry.exercise.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.t.titleMedium?.copyWith(
+                      color: isCurrent
+                          ? c.textPrimary
+                          : (skipped ? c.textTertiary : c.textSecondary),
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      decoration: skipped ? TextDecoration.lineThrough : null,
                     ),
                   ),
-                  if (!skipped && total > 0) ...[
-                    const SizedBox(width: Space.sm),
-                    Text(
-                      '$done/$total',
-                      style: context.t.labelSmall?.copyWith(
-                        color: isCurrent ? c.onAccent : c.textTertiary,
-                        letterSpacing: 0,
-                      ),
+                ),
+                // Only the exercises you are not looking at need their progress
+                // spelled out. The current one has `Set n of m` in the header
+                // directly below, and saying it twice in two lines is the kind
+                // of restatement that makes a screen feel automated.
+                if (!isCurrent && !skipped && total > 0 && !complete) ...[
+                  const SizedBox(width: Space.sm),
+                  Text(
+                    '$done/$total',
+                    style: context.t.labelSmall?.copyWith(
+                      color: c.textTertiary,
+                      letterSpacing: 0,
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           );
         },
@@ -143,35 +148,43 @@ class _ExerciseRailState extends State<ExerciseRail> {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
+/// A tab: content, then a 3px rule under it. White under the exercise you are
+/// on, a grey step under the rest — the same underline the rest of the app uses
+/// to mean "this one".
+class _Tab extends StatelessWidget {
+  const _Tab({
+    super.key,
     required this.child,
     required this.onTap,
-    required this.background,
-    required this.border,
+    required this.selected,
   });
 
   final Widget child;
   final VoidCallback onTap;
-  final Color background;
-  final Color border;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final c = context.c;
+    return Pressable(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: Motion.fast,
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.md,
-          vertical: Space.sm,
-        ),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(Radii.pill),
-          border: Border.all(color: border),
-        ),
-        child: child,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Space.sm),
+            child: child,
+          ),
+          AnimatedContainer(
+            duration: Motion.fast,
+            height: 3,
+            width: selected ? 28 : 16,
+            decoration: BoxDecoration(
+              color: selected ? c.accent : c.surfaceHighest,
+              borderRadius: BorderRadius.circular(Radii.pill),
+            ),
+          ),
+        ],
       ),
     );
   }

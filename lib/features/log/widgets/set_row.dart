@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/primitives.dart';
 import '../../../data/db/database.dart';
 import '../../../domain/enums.dart';
 import '../../../domain/metrics.dart';
@@ -14,7 +15,54 @@ import 'keypad.dart';
 
 export 'keypad.dart' show SetField, SetFieldX, SetKeypad, applyKey;
 
-/// One set: type, load, reps, done.
+/// The column headings above the set table.
+///
+/// The units live here and nowhere else. They used to sit inside every field as
+/// a `kg` / `reps` suffix, which is the same word printed five times down a
+/// column and a chunk of the width of a field you have to read a number out of
+/// at arm's length.
+class SetTableHeader extends StatelessWidget {
+  const SetTableHeader({
+    super.key,
+    required this.loadMode,
+    required this.unit,
+  });
+
+  final LoadMode loadMode;
+  final WeightUnit unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = context.t.labelSmall?.copyWith(color: context.c.textTertiary);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.sm),
+      child: Row(
+        children: [
+          SizedBox(width: SetRow.indexColumn, child: Text('SET', style: label)),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Text(
+              loadMode == LoadMode.bodyweight
+                  ? 'LOAD'
+                  : unit.label.toUpperCase(),
+              style: label,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: Space.sm),
+          SizedBox(
+            width: SetRow.repsColumn,
+            child: Text('REPS', style: label, textAlign: TextAlign.center),
+          ),
+          const SizedBox(width: Space.sm),
+          SizedBox(width: SetRow.doneColumn, child: Text('✓', style: label)),
+        ],
+      ),
+    );
+  }
+}
+
+/// One set: index, load, reps, done.
 ///
 /// Last time's numbers sit in the fields as ghost text rather than in a
 /// separate column — you compare against them at the exact moment you're
@@ -23,7 +71,7 @@ class SetRow extends StatelessWidget {
   const SetRow({
     super.key,
     required this.set,
-    required this.position,
+    required this.label,
     required this.loadMode,
     required this.unit,
     required this.ghost,
@@ -34,8 +82,17 @@ class SetRow extends StatelessWidget {
     required this.onOpenActions,
   });
 
+  static const indexColumn = 40.0;
+  static const repsColumn = 78.0;
+  static const doneColumn = 44.0;
+
   final SetLog set;
-  final int position;
+
+  /// What the index chip prints: a working set's number, or `W` / `D` / `RP`
+  /// for the types that aren't counted. Worked out by the page, which is the
+  /// only thing that can see the other sets.
+  final String label;
+
   final LoadMode loadMode;
   final WeightUnit unit;
   final PastSet? ghost;
@@ -49,26 +106,37 @@ class SetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final beaten = _beatsGhost();
+    // A drop or rest-pause set belongs to the set above it, so it is indented
+    // under it rather than given an index of its own.
+    final nested = set.setType.isContinuation;
 
     // No Dismissible: the log turns pages horizontally, so a sideways drag on a
-    // row cannot also mean "delete". Set actions live behind the type chip.
-    return Container(
-      color: set.isDone ? c.surfaceHigh.withValues(alpha: 0.5) : null,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.lg,
-        vertical: Space.xs,
+    // row cannot also mean "delete". Set actions live behind the index chip.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        Space.lg + (nested ? Space.lg : 0),
+        Space.xs,
+        Space.lg,
+        Space.xs,
       ),
       child: Row(
         children: [
-          _TypeChip(set: set, position: position, onTap: onOpenActions),
+          _IndexChip(
+            label: label,
+            done: set.isDone,
+            nested: nested,
+            onTap: onOpenActions,
+          ),
           const SizedBox(width: Space.md),
           if (loadMode == LoadMode.bodyweight)
             Expanded(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Bodyweight', style: context.t.labelMedium),
+              child: Text(
+                'Bodyweight',
+                textAlign: TextAlign.center,
+                style: context.t.bodyMedium?.copyWith(
+                  color: context.c.textSecondary,
+                ),
               ),
             )
           else
@@ -79,13 +147,13 @@ class SetRow extends StatelessWidget {
                     ? SetField.added
                     : SetField.weight,
                 prefix: loadMode == LoadMode.bodyweightPlus ? 'BW +' : null,
-                suffix: unit.label,
                 value: loadMode == LoadMode.bodyweightPlus
                     ? set.addedWeight
                     : set.weight,
                 ghost: loadMode == LoadMode.bodyweightPlus
                     ? ghost?.addedWeight
                     : ghost?.weight,
+                done: set.isDone,
                 active:
                     editing?.setId == set.id &&
                     editing?.field ==
@@ -103,13 +171,13 @@ class SetRow extends StatelessWidget {
             ),
           const SizedBox(width: Space.sm),
           SizedBox(
-            width: 78,
+            width: repsColumn,
             child: _ValueCell(
               unit: unit,
               field: SetField.reps,
-              suffix: 'reps',
               value: set.reps?.toDouble(),
               ghost: ghost?.reps?.toDouble(),
+              done: set.isDone,
               active:
                   editing?.setId == set.id && editing?.field == SetField.reps,
               buffer: buffer,
@@ -117,9 +185,9 @@ class SetRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: Space.sm),
-          _DoneButton(
+          _DoneBox(
             done: set.isDone,
-            highlight: beaten,
+            beaten: beaten,
             onTap: () => onToggleDone(set, !set.isDone),
           ),
         ],
@@ -161,11 +229,11 @@ class _ValueCell extends StatefulWidget {
     required this.unit,
     required this.value,
     required this.ghost,
+    required this.done,
     required this.active,
     required this.buffer,
     required this.onTap,
     this.prefix,
-    this.suffix,
   });
 
   final SetField field;
@@ -175,20 +243,20 @@ class _ValueCell extends StatefulWidget {
 
   final double? value;
   final double? ghost;
+  final bool done;
   final bool active;
   final ValueListenable<String> buffer;
   final VoidCallback onTap;
   final String? prefix;
-  final String? suffix;
 
   @override
   State<_ValueCell> createState() => _ValueCellState();
 }
 
 class _ValueCellState extends State<_ValueCell> {
-  /// Brief accent wash after a ghost turns into a real value, so adoption is
-  /// something you see happen rather than something you infer from grey
-  /// becoming white in gym lighting.
+  /// Brief wash after a ghost turns into a real value, so adoption is something
+  /// you see happen rather than something you infer from grey becoming white in
+  /// gym lighting.
   bool _flash = false;
   Timer? _flashEnd;
 
@@ -234,26 +302,42 @@ class _ValueCellState extends State<_ValueCell> {
     // screen this app is mostly used on was the cheapest-looking thing in it.
     final showingGhost = !hasValue && ghostText.isNotEmpty;
 
+    // A logged value steps back rather than lighting up: once the row is ticked
+    // it is a record, and the row still to be filled is the one worth looking
+    // at. The tick is what says "done", not the numbers going bold.
+    final valueColour = !hasValue
+        ? c.textTertiary
+        : (widget.done ? c.textSecondary : c.textPrimary);
+
     return GestureDetector(
       onTap: widget.onTap,
       child: AnimatedContainer(
         duration: Motion.fast,
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: Space.md),
+        height: 48,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(
+          // Focus is an outline on nothing, not a tinted box: the field being
+          // typed into should read as open, and a fill plus a border is two
+          // signals for one state.
           color: widget.active
-              ? c.accent.withValues(alpha: 0.12)
-              : (_flash ? c.accent.withValues(alpha: 0.28) : c.surfaceHigh),
+              ? Colors.transparent
+              : (_flash ? c.surfaceHighest : c.surfaceHigh),
           borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
+            width: 2,
           ),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (widget.prefix != null) ...[
-              Text(widget.prefix!, style: context.t.labelMedium),
-              const SizedBox(width: 2),
+              Text(
+                widget.prefix!,
+                style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+              ),
+              const SizedBox(width: 3),
             ],
             if (showingGhost) ...[
               Text(
@@ -262,18 +346,14 @@ class _ValueCellState extends State<_ValueCell> {
               ),
               const SizedBox(width: 3),
             ],
-            Expanded(
+            Flexible(
               child: Text(
                 hasValue ? display : (ghostText.isEmpty ? '—' : ghostText),
-                style: context.t.labelLarge?.copyWith(
-                  color: hasValue ? c.textPrimary : c.textTertiary,
-                ),
+                style: context.t.labelLarge?.copyWith(color: valueColour),
                 maxLines: 1,
                 overflow: TextOverflow.clip,
               ),
             ),
-            if (widget.suffix != null)
-              Text(widget.suffix!, style: context.t.labelSmall),
           ],
         ),
       ),
@@ -289,85 +369,84 @@ class _ValueCellState extends State<_ValueCell> {
   }
 }
 
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({
-    required this.set,
-    required this.position,
+/// The set's number, or its letter. Also the way into the set's own actions —
+/// type, note, delete — because the row has no room for a trailing menu and the
+/// screen has no spare horizontal gesture to give a swipe.
+class _IndexChip extends StatelessWidget {
+  const _IndexChip({
+    required this.label,
+    required this.done,
+    required this.nested,
     required this.onTap,
   });
 
-  final SetLog set;
-  final int position;
+  final String label;
+  final bool done;
+  final bool nested;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final isWorking = set.setType == SetType.working;
-    final color = switch (set.setType) {
-      SetType.warmup => c.textTertiary,
-      SetType.working => c.textSecondary,
-      SetType.backoff => c.textTertiary,
-      SetType.drop => c.deload,
-      SetType.restPause => c.deload,
-      SetType.amrap => c.accent,
-    };
+    final size = nested ? 32.0 : SetRow.indexColumn;
 
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
       child: Container(
-        width: 30,
-        height: 30,
+        width: size,
+        height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isWorking ? Colors.transparent : color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(Radii.sm),
-          border: Border.all(color: isWorking ? c.border : Colors.transparent),
+          color: c.surfaceHigh,
+          shape: BoxShape.circle,
         ),
         child: Text(
-          isWorking ? '${position + 1}' : set.setType.shortLabel,
-          style: context.t.labelMedium?.copyWith(color: color),
+          label,
+          style: context.t.labelLarge?.copyWith(
+            color: done ? c.textTertiary : c.textSecondary,
+            fontSize: nested ? 13 : null,
+          ),
         ),
       ),
     );
   }
 }
 
-class _DoneButton extends StatelessWidget {
-  const _DoneButton({
+class _DoneBox extends StatelessWidget {
+  const _DoneBox({
     required this.done,
-    required this.highlight,
+    required this.beaten,
     required this.onTap,
   });
 
   final bool done;
-  final bool highlight;
+
+  /// Beat the same slot last time. The one place on this row where colour is
+  /// allowed, because it is the only thing here that is a finding rather than
+  /// a record.
+  final bool beaten;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // A beaten set gets the accent; a merely completed one stays quiet, so the
-    // colour still means something.
-    final bg = done
-        ? (highlight ? c.accent : c.positive.withValues(alpha: 0.18))
-        : c.surfaceHigh;
-    final fg = done ? (highlight ? c.onAccent : c.positive) : c.textTertiary;
+    final fill = done ? (beaten ? c.positive : c.accent) : c.surfaceHigh;
 
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
       child: AnimatedContainer(
         duration: Motion.fast,
-        width: 40,
-        height: 40,
+        width: SetRow.doneColumn,
+        height: 48,
         decoration: BoxDecoration(
-          color: bg,
+          color: fill,
           borderRadius: BorderRadius.circular(Radii.sm),
         ),
         child: Icon(
-          highlight && done ? Icons.trending_up : Icons.check,
-          size: 18,
-          color: fg,
+          beaten && done ? Icons.trending_up_rounded : Icons.check_rounded,
+          size: 20,
+          color: done ? c.onAccent : c.textTertiary,
         ),
       ),
     );
