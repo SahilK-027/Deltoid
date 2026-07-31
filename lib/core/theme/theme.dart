@@ -9,10 +9,15 @@ const kFontFamily = 'Inter';
 
 /// The type scale from THEME.md §3. Nine roles, and a screen uses a handful.
 ///
-/// Nothing is larger than [TextTheme.displayLarge] (27, the page title) or
+/// Nothing is larger than [TextTheme.displayLarge] (30, the page title) or
 /// smaller than [TextTheme.labelSmall] (11, nav labels and units). Sizes below
-/// 11 are unreadable at arm's length in a gym; sizes above 27 turn a utility
+/// 11 are unreadable at arm's length in a gym; sizes above 30 turn a utility
 /// screen into a poster.
+///
+/// 30 is the ceiling for a reason, and it is a width one: the page title shares
+/// its row with the header's action buttons, which leaves it ~232pt on a 360pt
+/// phone. `31 JULY 2026` needs about 216 of that at 30sp — the next step up
+/// ellipsizes the date on the narrowest phones this runs on.
 ///
 /// | role in THEME.md | slot here |
 /// | --- | --- |
@@ -47,7 +52,7 @@ TextTheme _textTheme(DeltoidColors c) {
   return TextTheme(
     // pageTitle — uppercased by the widget, never by the caller's string.
     displayLarge:
-        f(27, 32, FontWeight.w800, c.textPrimary, tracking: -0.5),
+        f(30, 36, FontWeight.w800, c.textPrimary, tracking: -0.5),
     // Reserved for the rare full-screen number (a finished-session summary).
     displayMedium:
         f(24, 30, FontWeight.w700, c.textPrimary, tracking: -0.4, figures: true),

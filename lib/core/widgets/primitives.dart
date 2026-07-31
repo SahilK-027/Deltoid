@@ -83,6 +83,14 @@ class _PressableState extends State<Pressable> {
 
 /// The masthead: a small tracked eyebrow over a heavy uppercase title, both
 /// inside the header band. One per screen, and the only uppercase on it.
+///
+/// Eyebrow and title are one block, and the actions sit beside it — the title's
+/// baseline is the header's baseline. The actions were briefly moved up onto
+/// the eyebrow's line to buy the title the full page width; it bought room the
+/// title did not need and left the buttons floating against a 13sp line. A
+/// third line was briefly added *inside* the block, which re-centred the
+/// buttons against three lines and dragged them below the date. Both reverted:
+/// the buttons align to the eyebrow-and-title pair, and nothing else.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
@@ -90,6 +98,7 @@ class PageHeader extends StatelessWidget {
     this.eyebrow,
     this.actions = const [],
     this.below,
+    this.belowGap = Space.md,
   });
 
   final String title;
@@ -102,6 +111,11 @@ class PageHeader extends StatelessWidget {
   /// Anything that belongs to the header rather than the page — a status line,
   /// a tab strip.
   final Widget? below;
+
+  /// The gap above [below]. Smaller when what follows is a line *about* the
+  /// title — a status reads as belonging to the date it sits under only if it
+  /// is nearer to it than to whatever comes next.
+  final double belowGap;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +137,10 @@ class PageHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (eyebrow != null) ...[
-                      Text(eyebrow!.toUpperCase(), style: context.t.labelMedium),
+                      Text(
+                        eyebrow!.toUpperCase(),
+                        style: context.t.labelMedium,
+                      ),
                       const SizedBox(height: Space.xs),
                     ],
                     Text(
@@ -141,10 +158,7 @@ class PageHeader extends StatelessWidget {
               ],
             ],
           ),
-          if (below != null) ...[
-            const SizedBox(height: Space.md),
-            below!,
-          ],
+          if (below != null) ...[SizedBox(height: belowGap), below!],
         ],
       ),
     );
@@ -270,7 +284,9 @@ class SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: Space.sm),
       child: Row(
         children: [
-          Expanded(child: Text(text.toUpperCase(), style: context.t.labelSmall)),
+          Expanded(
+            child: Text(text.toUpperCase(), style: context.t.labelSmall),
+          ),
           ?trailing,
         ],
       ),
@@ -705,7 +721,9 @@ class SegmentedPill<T> extends StatelessWidget {
                 child: Text(
                   segment.label,
                   style: context.t.bodySmall?.copyWith(
-                    color: segment.value == value ? c.onAccent : c.textSecondary,
+                    color: segment.value == value
+                        ? c.onAccent
+                        : c.textSecondary,
                   ),
                 ),
               ),
@@ -752,11 +770,7 @@ class IconTile extends StatelessWidget {
         color: solid ? tint : tint.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(size * 0.3),
       ),
-      child: Icon(
-        icon,
-        size: size * 0.5,
-        color: solid ? Colors.white : tint,
-      ),
+      child: Icon(icon, size: size * 0.5, color: solid ? Colors.white : tint),
     );
   }
 }
@@ -1039,7 +1053,12 @@ Future<bool> confirmAction(
 /// An outlined box explaining what will appear in a region once there is
 /// something to show. Inline — for a whole blank screen, use [EmptyState].
 class EmptyBox extends StatelessWidget {
-  const EmptyBox({super.key, required this.message, this.icon, this.dashed = false});
+  const EmptyBox({
+    super.key,
+    required this.message,
+    this.icon,
+    this.dashed = false,
+  });
 
   final String message;
   final IconData? icon;
@@ -1116,10 +1135,7 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: context.t.bodyMedium,
             ),
-            if (action != null) ...[
-              const SizedBox(height: Space.xxl),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: Space.xxl), action!],
           ],
         ),
       ),

@@ -201,10 +201,10 @@ Future<void> _logPastSession(
 
   final picked =
       await showModalBottomSheet<({String sessionId, DateTime date})>(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheet) => _BackfillSheet(sessions: sessions),
-  );
+        context: context,
+        isScrollControlled: true,
+        builder: (sheet) => _BackfillSheet(sessions: sessions),
+      );
   if (picked == null || !context.mounted) return;
 
   final navigator = Navigator.of(context);
@@ -271,9 +271,11 @@ class _BackfillSheetState extends State<_BackfillSheet> {
 
   String get _label {
     final now = DateTime.now();
-    final days = DateTime(now.year, now.month, now.day)
-        .difference(DateTime(_date.year, _date.month, _date.day))
-        .inDays;
+    final days = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(_date.year, _date.month, _date.day)).inDays;
     final stamp = DateFormat('EEE d MMM').format(_date);
     return switch (days) {
       0 => 'Today  ·  $stamp',
@@ -354,68 +356,82 @@ class TodayScreen extends ConsumerWidget {
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
         (null, _, _) => const SizedBox.shrink(),
-        (_, null, _) => const _NoRegimeState(),
-        (_, final r?, true) => _NoSessionsState(regime: r),
-        (_, final r?, false) => Column(
-            children: [
-              _TodayHeader(
-                actions: [
-                  CircleIconButton(
-                    icon: Icons.edit_calendar_outlined,
-                    tooltip: 'Log a past session',
-                    onTap: () => _logPastSession(
-                      context,
-                      ref,
-                      regimeId: r.id,
-                      sessions: sessions,
-                      hasOpenWorkout: open != null,
-                    ),
+        (_, null, _) => _NoRegimeState(last: today!.lastCompleted),
+        (_, final r?, true) => _NoSessionsState(
+          regime: r,
+          last: today!.lastCompleted,
+        ),
+        // The masthead and the one action are a single band, and the record
+        // scrolls under it. See [_TodayHeader] for why the hero is not a card:
+        // `AppCard` and `HeaderBand` are the same grey, so a card here grouped
+        // nothing — it drew a rounded seam between two identical surfaces,
+        // 16pt below a band it matched exactly. The band is also the answer to
+        // why this block, alone on the screen, had no section header over it:
+        // it is not a section, it is the header.
+        (_, final r?, false) => ListView(
+          padding: const EdgeInsets.only(bottom: Space.huge),
+          children: [
+            _TodayHeader(
+              last: today!.lastCompleted,
+              actions: [
+                CircleIconButton(
+                  icon: Icons.edit_calendar_outlined,
+                  tooltip: 'Log a past session',
+                  onTap: () => _logPastSession(
+                    context,
+                    ref,
+                    regimeId: r.id,
+                    sessions: sessions,
+                    hasOpenWorkout: open != null,
                   ),
-                ],
-                // The question the app is opened with — "am I due?" — sits in
-                // the header, above the card that acts on the answer.
-                below: _RestGap(last: today!.lastCompleted),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.gutter,
-                    Space.lg,
-                    Space.gutter,
-                    Space.huge,
-                  ),
-                  children: [
-                    if (open != null)
-                      _ResumeHero(
-                        workout: open,
-                        owner: today.snapshot.openWorkoutOwner,
-                        doneSets: today.snapshot.openWorkoutDoneSets,
-                        activeRegimeId: r.id,
-                        sessions: sessions,
-                      )
-                    else if (status != null)
-                      _NextUpHero(
-                        regimeId: r.id,
-                        regimeName: r.name,
-                        status: status,
-                        sessions: sessions,
-                        preview: today.snapshot
-                            .exerciseNamesBySession[status.nextSessionId],
-                      ),
-                    const SizedBox(height: Space.section),
-                    _ConsistencyCard(
-                      data: today.heatmap,
-                      hasHistory: today.hasHistory,
-                    ),
-                    if (today.lastCompleted != null) ...[
-                      const SizedBox(height: Space.section),
-                      _LastSessionCard(last: today.lastCompleted!),
-                    ],
-                  ],
                 ),
+              ],
+              // Inside the band, sharing its surface — the header and the
+              // thing you do about it are one statement.
+              belowLabel: open != null ? null : 'Today\'s session',
+              below: open != null
+                  ? _ResumeHero(
+                      workout: open,
+                      owner: today.snapshot.openWorkoutOwner,
+                      doneSets: today.snapshot.openWorkoutDoneSets,
+                      activeRegimeId: r.id,
+                      sessions: sessions,
+                    )
+                  : status == null
+                  ? null
+                  : _NextUpHero(
+                      regimeId: r.id,
+                      regimeName: r.name,
+                      status: status,
+                      sessions: sessions,
+                      preview: today
+                          .snapshot
+                          .exerciseNamesBySession[status.nextSessionId],
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Space.gutter,
+                Space.section,
+                Space.gutter,
+                0,
               ),
-            ],
-          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ConsistencyCard(
+                    data: today.heatmap,
+                    hasHistory: today.hasHistory,
+                  ),
+                  if (today.lastCompleted != null) ...[
+                    const SizedBox(height: Space.section),
+                    _LastSessionCard(last: today.lastCompleted!),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       },
     );
   }
@@ -428,96 +444,98 @@ class TodayScreen extends ConsumerWidget {
 /// and, on a fresh install, left no way to reach Settings, which is where
 /// restoring a backup lives. Settings is always here for that reason; anything
 /// that needs sessions to exist is passed in by the caller.
+///
+/// The title is the date, not the word "Today".
+///
+/// It used to print *when* three times over: the date as an eyebrow, `TODAY` at
+/// 27sp under it, and a status line under that. The middle one is the label the
+/// nav bar already draws under a highlighted icon — the largest type on the
+/// landing screen, carrying nothing. So the date takes the slot it was already
+/// half filling, at the size it deserves: weekday as the eyebrow, `31 JULY`
+/// under it in page-title type.
+///
+/// Split across the two roles rather than set as one string: the weekday is the
+/// eyebrow it always was, and `31 JULY 2026` is the title. One string would run
+/// past the two action buttons sharing the title's row at 27sp/800.
+///
+/// The rest gap stays a quiet line under it. It answers the question the app is
+/// opened with, but it is not the page's name and does not want title type:
+/// `NO SESSIONS YET` at 27sp was the loudest thing on a screen whose whole
+/// message was that nothing had happened yet.
 class _TodayHeader extends StatelessWidget {
-  const _TodayHeader({this.actions = const [], this.below});
+  const _TodayHeader({
+    required this.last,
+    this.actions = const [],
+    this.below,
+    this.belowLabel,
+  });
 
+  final ({Workout workout, String? sessionName})? last;
   final List<Widget> actions;
+
+  /// The session block, on the band's own surface rather than in a card of the
+  /// identical colour. Null in the states that have no session to offer.
   final Widget? below;
+
+  /// The block's own small heading — the thing every other section on this
+  /// screen had and the session did not, which is what made it read as a card
+  /// that had drifted in from somewhere.
+  ///
+  /// Null for a session already running: that block opens with a pulsing
+  /// `IN PROGRESS`, which is the same label doing the same job, and two of them
+  /// stacked is the duplication this heading was added to fix.
+  final String? belowLabel;
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final below = this.below;
     return HeaderBand(
       child: PageHeader(
-        title: 'Today',
-        eyebrow: DateFormat('EEEE d MMMM').format(DateTime.now()),
+        title: DateFormat('d MMMM y').format(now),
+        eyebrow: DateFormat('EEEE').format(now),
+        // Tight to the date: the rest gap is a line about it, not the next
+        // thing on the page.
+        belowGap: Space.xs,
+        below: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _RestGap(last: last),
+            if (below != null) ...[
+              // Air, and a lot of it: this is where the masthead ends and the
+              // thing you are here to do begins. The two share a surface, so
+              // the gap is the only boundary they get.
+              const SizedBox(height: Space.xxl),
+              // Same type as Consistency and Last session below it. The band
+              // is a different surface, not a different rank — a heading that
+              // shrank because of what it happened to sit on would say this
+              // block matters less than the record of it.
+              if (belowLabel != null) SectionHeader(belowLabel!),
+              below,
+            ],
+          ],
+        ),
         actions: [
           ...actions,
           CircleIconButton(
             icon: Icons.settings_outlined,
             tooltip: 'Settings',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
-        below: below,
       ),
     );
   }
 }
 
-/// First launch. The app ships with no programme at all, so this is the one
-/// screen a brand-new install has — it has to offer the way forward, not just
-/// point at another tab.
-class _NoRegimeState extends ConsumerWidget {
-  const _NoRegimeState();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        const _TodayHeader(),
-        Expanded(
-          child: EmptyState(
-            icon: Icons.tune_rounded,
-            title: 'Nothing set up yet',
-            message: 'Build your training split — any number of sessions, in '
-                'any order. One pass through all of them is a cycle.',
-            action: PrimaryButton(
-              label: 'Create a regime',
-              onPressed: () => createRegimeFlow(context, ref),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// A regime exists but has no training days in it, which happens after
-/// "start from scratch". Starting a workout is impossible until this is fixed,
-/// so the fix is the only thing offered.
-class _NoSessionsState extends ConsumerWidget {
-  const _NoSessionsState({required this.regime});
-
-  final Regime regime;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        // No backfill action: there is nothing to log a past session against.
-        const _TodayHeader(),
-        Expanded(
-          child: EmptyState(
-            icon: Icons.playlist_add_rounded,
-            title: 'No sessions in ${regime.name}',
-            message: 'Add the training days that make up one cycle, then fill '
-                'each one with exercises in the Regime tab.',
-            action: PrimaryButton(
-              label: 'Add a session',
-              onPressed: () => addSessionPrompt(context, ref, regime.id),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// How long since the last session. Deliberately no session name — the card at
-/// the bottom of the screen already names it, and saying it twice on one screen
-/// reads as a template that lost track of itself.
+/// How long since the last session, under the date it is counted from.
+///
+/// Deliberately no session name — the card at the bottom of the screen already
+/// names it, and saying it twice on one screen reads as a template that lost
+/// track of itself. At `body` size it can afford the full phrasing; the tint is
+/// the only colour in the band, and it earns it (rule 1: this *is* data).
 class _RestGap extends StatelessWidget {
   const _RestGap({required this.last});
 
@@ -529,18 +547,18 @@ class _RestGap extends StatelessWidget {
     final (icon, text, tint) = switch (last) {
       null => (Icons.flag_outlined, 'No sessions logged yet', c.textSecondary),
       final l => switch (_daysSince(l.workout.dayKey)) {
-          0 => (Icons.check_circle_rounded, 'Trained today', c.positive),
-          1 => (
-              Icons.bedtime_outlined,
-              'Last trained yesterday',
-              c.textSecondary
-            ),
-          final n => (
-              Icons.bedtime_outlined,
-              'Last trained $n days ago',
-              n >= 4 ? c.deload : c.textSecondary,
-            ),
-        },
+        0 => (Icons.check_circle_rounded, 'Trained today', c.positive),
+        1 => (
+          Icons.bedtime_outlined,
+          'Last trained yesterday',
+          c.textSecondary,
+        ),
+        final n => (
+          Icons.bedtime_outlined,
+          'Last trained $n days ago',
+          n >= 4 ? c.deload : c.textSecondary,
+        ),
+      },
     };
 
     return Row(
@@ -563,9 +581,75 @@ class _RestGap extends StatelessWidget {
   /// by a Tuesday morning one is "yesterday", not "0 days ago".
   static int _daysSince(int dayKey) {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day)
-        .difference(dateFromDayKey(dayKey))
-        .inDays;
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(dateFromDayKey(dayKey)).inDays;
+  }
+}
+
+/// First launch. The app ships with no programme at all, so this is the one
+/// screen a brand-new install has — it has to offer the way forward, not just
+/// point at another tab.
+class _NoRegimeState extends ConsumerWidget {
+  const _NoRegimeState({required this.last});
+
+  final ({Workout workout, String? sessionName})? last;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        _TodayHeader(last: last),
+        Expanded(
+          child: EmptyState(
+            icon: Icons.tune_rounded,
+            title: 'Nothing set up yet',
+            message:
+                'Build your training split — any number of sessions, in '
+                'any order. One pass through all of them is a cycle.',
+            action: PrimaryButton(
+              label: 'Create a regime',
+              onPressed: () => createRegimeFlow(context, ref),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A regime exists but has no training days in it, which happens after
+/// "start from scratch". Starting a workout is impossible until this is fixed,
+/// so the fix is the only thing offered.
+class _NoSessionsState extends ConsumerWidget {
+  const _NoSessionsState({required this.regime, required this.last});
+
+  final Regime regime;
+  final ({Workout workout, String? sessionName})? last;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        // No backfill action: there is nothing to log a past session against.
+        _TodayHeader(last: last),
+        Expanded(
+          child: EmptyState(
+            icon: Icons.playlist_add_rounded,
+            title: 'No sessions in ${regime.name}',
+            message:
+                'Add the training days that make up one cycle, then fill '
+                'each one with exercises in the Regime tab.',
+            action: PrimaryButton(
+              label: 'Add a session',
+              onPressed: () => addSessionPrompt(context, ref, regime.id),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -605,7 +689,8 @@ class _ResumeHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final owner = this.owner;
-    final name = owner?.sessionName ??
+    final name =
+        owner?.sessionName ??
         sessions
             .where((s) => s.id == workout.sessionId)
             .map((s) => s.name)
@@ -616,106 +701,99 @@ class _ResumeHero extends ConsumerWidget {
     final foreignRegime = owner != null && owner.regimeId != activeRegimeId
         ? owner.regimeName
         : null;
-    final started =
-        DateTime.fromMillisecondsSinceEpoch(workout.startedAt, isUtc: true)
-            .toLocal();
+    final started = DateTime.fromMillisecondsSinceEpoch(
+      workout.startedAt,
+      isUtc: true,
+    ).toLocal();
     // Past a day this stops being a session in progress and becomes a decision:
     // a stopwatch reading 51 hours is not a useful thing to put on a screen.
     final stale = DateTime.now().difference(started).inHours >= 24;
     final mark = workout.isDeload ? c.deload : c.positive;
 
-    return AppCard(
-      padding: const EdgeInsets.all(Space.lg),
-      fill: c.accentSurface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (stale)
-                Icon(Icons.pause_circle_outline_rounded, size: 14, color: mark)
-              else
-                _LivePulse(color: mark),
-              const SizedBox(width: Space.sm),
-              Expanded(
-                child: Text(
-                  stale ? 'LEFT OPEN' : 'IN PROGRESS',
-                  style: context.t.labelSmall?.copyWith(color: mark),
-                ),
+    // No card, and no accent fill to replace it. This block lives on the header
+    // band (see [_TodayHeader]); what makes it loud is the pulse, the label and
+    // a stopwatch at display size, not a tinted rectangle.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            if (stale)
+              Icon(Icons.pause_circle_outline_rounded, size: 14, color: mark)
+            else
+              _LivePulse(color: mark),
+            const SizedBox(width: Space.sm),
+            Expanded(
+              child: Text(
+                stale ? 'LEFT OPEN' : 'IN PROGRESS',
+                style: context.t.labelSmall?.copyWith(color: mark),
               ),
-              if (workout.isDeload) Pill('Deload', color: c.deload),
+            ),
+            if (workout.isDeload) Pill('Deload', color: c.deload),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        Text(name, style: context.t.headlineSmall, maxLines: 2),
+        const SizedBox(height: Space.xs),
+        // A date does not belong in the value slot the stopwatch uses:
+        // "open since Tue 28 Jul" set at display size overflowed the card on
+        // every phone. Stale sessions say it once, quietly.
+        if (stale)
+          Text(
+            'Started ${DateFormat('EEE d MMM').format(started)}  ·  '
+            '$doneSets set${doneSets == 1 ? '' : 's'} logged',
+            style: context.t.bodyMedium,
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              // The only thing on this card that changes on its own.
+              Ticking(
+                builder: (context) =>
+                    Text(_elapsed(started), style: context.t.displaySmall),
+              ),
+              const SizedBox(width: Space.sm),
+              Text(
+                'since ${DateFormat.jm().format(started)}',
+                style: context.t.bodyMedium,
+              ),
             ],
           ),
-          const SizedBox(height: Space.md),
-          Text(name, style: context.t.headlineSmall, maxLines: 2),
-          const SizedBox(height: Space.xs),
-          // A date does not belong in the value slot the stopwatch uses:
-          // "open since Tue 28 Jul" set at display size overflowed the card on
-          // every phone. Stale sessions say it once, quietly.
-          if (stale)
-            Text(
-              'Started ${DateFormat('EEE d MMM').format(started)}  ·  '
-              '$doneSets set${doneSets == 1 ? '' : 's'} logged',
-              style: context.t.bodyMedium,
-            )
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                // The only thing on this card that changes on its own.
-                Ticking(
-                  builder: (context) => Text(
-                    _elapsed(started),
-                    style: context.t.displaySmall,
-                  ),
-                ),
-                const SizedBox(width: Space.sm),
-                Text(
-                  'since ${DateFormat.jm().format(started)}',
-                  style: context.t.bodyMedium,
-                ),
-              ],
-            ),
-          if (foreignRegime != null) ...[
-            const SizedBox(height: Space.sm),
-            Text(
-              'in $foreignRegime — finishing it advances that regime',
-              style: context.t.bodyMedium,
-            ),
-          ],
-          const SizedBox(height: Space.lg),
-          PrimaryButton(
-            label: stale ? 'Carry on with it' : 'Resume session',
-            icon: Icons.play_arrow_rounded,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => LogScreen(workoutId: workout.id),
-              ),
-            ),
+        if (foreignRegime != null) ...[
+          const SizedBox(height: Space.sm),
+          Text(
+            'in $foreignRegime — finishing it advances that regime',
+            style: context.t.bodyMedium,
           ),
-          // Two ways out, offered only once the session has gone stale. A
-          // running session needs neither: they are one tap deep in the log
-          // screen, and putting them on Today would make quitting as prominent
-          // as training.
-          if (stale) ...[
-            const SizedBox(height: Space.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                LinkAction(
-                  'Finish it',
-                  onTap: () => _finishStale(context, name, started),
-                ),
-                LinkAction(
-                  'Discard',
-                  onTap: () => _discardStale(context, name),
-                ),
-              ],
-            ),
-          ],
         ],
-      ),
+        const SizedBox(height: Space.lg),
+        PrimaryButton(
+          label: stale ? 'Carry on with it' : 'Resume session',
+          icon: Icons.play_arrow_rounded,
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => LogScreen(workoutId: workout.id)),
+          ),
+        ),
+        // Two ways out, offered only once the session has gone stale. A
+        // running session needs neither: they are one tap deep in the log
+        // screen, and putting them on Today would make quitting as prominent
+        // as training.
+        if (stale) ...[
+          const SizedBox(height: Space.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              LinkAction(
+                'Finish it',
+                onTap: () => _finishStale(context, name, started),
+              ),
+              LinkAction('Discard', onTap: () => _discardStale(context, name)),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -734,21 +812,24 @@ class _ResumeHero extends ConsumerWidget {
       message: doneSets == 0
           ? 'It will be saved to $stamp with nothing in it.'
           : 'It will be saved to $stamp with the $doneSets '
-              'set${doneSets == 1 ? '' : 's'} you logged. Sets you never '
-              'ticked off are dropped.',
+                'set${doneSets == 1 ? '' : 's'} you logged. Sets you never '
+                'ticked off are dropped.',
       confirmLabel: 'Finish',
       destructive: false,
     );
     if (!ok || !context.mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final repo = ProviderScope.containerOf(context, listen: false)
-        .read(trainingRepositoryProvider);
+    final repo = ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(trainingRepositoryProvider);
     try {
       await repo.completeWorkout(workout.id);
     } catch (e) {
-      messenger
-          .showSnackBar(SnackBar(content: Text('Could not finish it: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not finish it: $e')),
+      );
     }
   }
 
@@ -759,14 +840,16 @@ class _ResumeHero extends ConsumerWidget {
       message: doneSets == 0
           ? 'Nothing was logged in it, so nothing is lost.'
           : 'The $doneSets set${doneSets == 1 ? '' : 's'} logged in it go with '
-              'it. This cannot be undone.',
+                'it. This cannot be undone.',
       confirmLabel: 'Discard',
     );
     if (!ok || !context.mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final repo = ProviderScope.containerOf(context, listen: false)
-        .read(trainingRepositoryProvider);
+    final repo = ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(trainingRepositoryProvider);
     try {
       await repo.abandonWorkout(workout.id);
     } catch (e) {
@@ -873,133 +956,152 @@ class _NextUpHero extends ConsumerWidget {
     // programme it belongs to.
     final mark = status.isDeload ? c.deload : c.identityFor(regimeId);
 
-    return AppCard(
-      padding: const EdgeInsets.all(Space.lg),
-      fill: c.accentSurface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconTile(
-                status.isDeload
-                    ? Icons.trending_down_rounded
-                    : Icons.bolt_rounded,
-                color: mark,
-                size: 40,
+    // On the header band, not in a card of the band's own colour — see
+    // [_TodayHeader].
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Three bands, each with one job: who this is, where the cycle
+        // stands, what to do. The row used to hold four elements in four type
+        // roles — tile, regime name in `body`, the cycle fraction in
+        // `titleSmall`, and a loose grey deload label floating at the right —
+        // which is why it read as assembled rather than composed.
+        Row(
+          children: [
+            IconTile(
+              status.isDeload
+                  ? Icons.trending_down_rounded
+                  : Icons.bolt_rounded,
+              color: mark,
+              size: 40,
+            ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Text(
+                regimeName,
+                style: context.t.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: Space.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      regimeName,
-                      style: context.t.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: Space.xxs),
-                    // The fraction used to live beside a "This cycle" header
-                    // over the session list. That section is gone; this is the
-                    // only place the cycle is summarised in figures, and the
-                    // track below draws the same thing.
-                    Text(
-                      'Cycle ${status.cycleIndex}  ·  ${status.done} of '
-                      '${status.total} done',
-                      style: context.t.titleSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: Space.sm),
-              _DeloadSignal(status: status),
-            ],
-          ),
-          const SizedBox(height: Space.md),
-          // The cycle's shape in one line. Dense enough to read without
-          // counting, quiet enough not to become a second chart.
-          _CycleTrack(status: status, mark: mark),
-          const SizedBox(height: Space.lg),
+            ),
+            // Only the two loud cases keep a pill up here. "In five cycles"
+            // is not news; it belongs on the meta line under the track.
+            if (status.isDeload)
+              Pill('Deload', color: c.deload, icon: Icons.trending_down)
+            else if (status.deloadAfterThisCycle)
+              Pill('Deload next', color: c.deload, icon: Icons.trending_down),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        // The cycle's shape in one line. Dense enough to read without
+        // counting, quiet enough not to become a second chart.
+        _CycleTrack(status: status, mark: mark),
+        const SizedBox(height: Space.sm),
+        // Everything the cycle needs in words, on one quiet line under the
+        // thing it describes. `1 of 6 done` is gone: six segments above say
+        // it faster than the words can, and rule 6 keeps the graphic when it
+        // does.
+        Text(
+          _cycleNote(status),
+          style: context.t.labelSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: Space.lg),
+        Text(
+          session?.name ?? 'Session',
+          style: context.t.displayMedium,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (preview.isNotEmpty) ...[
+          const SizedBox(height: Space.xs),
+          // One line, not two. This is a glance — "yes, that's the session I
+          // meant" — and the second line it used to wrap onto was the last
+          // 18px above the bottom of a 844pt phone.
           Text(
-            session?.name ?? 'Session',
-            style: context.t.displayMedium,
-            maxLines: 2,
+            preview.take(3).join('  ·  ') +
+                (preview.length > 3 ? '  ·  +${preview.length - 3} more' : ''),
+            style: context.t.bodyMedium,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          if (preview.isNotEmpty) ...[
-            const SizedBox(height: Space.xs),
-            // One line, not two. This is a glance — "yes, that's the session I
-            // meant" — and the second line it used to wrap onto was the last
-            // 18px above the bottom of a 844pt phone.
-            Text(
-              preview.take(3).join('  ·  ') +
-                  (preview.length > 3
-                      ? '  ·  +${preview.length - 3} more'
-                      : ''),
-              style: context.t.bodyMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          if (isEmptySession) ...[
-            const SizedBox(height: Space.sm),
-            Text(
-              'This session has no exercises yet.',
-              style: context.t.bodyMedium,
-            ),
-          ],
-          const SizedBox(height: Space.lg),
-          if (isEmptySession)
-            SecondaryButton(
-              label: 'Add exercises',
-              icon: Icons.add_rounded,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SessionEditorScreen(sessionId: nextId),
-                ),
-              ),
-            )
-          else
-            PrimaryButton(
-              label: 'Start ${session?.name ?? 'session'}',
-              icon: Icons.play_arrow_rounded,
-              onPressed: ref.watch(_startingProvider)
-                  ? null
-                  : () => _startSession(
-                        context,
-                        ref,
-                        regimeId: regimeId,
-                        sessionId: nextId,
-                      ),
-            ),
-          // The hero names the first session not yet trained, which is a
-          // description and not an instruction — training Legs before Pull is
-          // normal. One tap to open the picker, one to start: the same two taps
-          // the old always-on session list cost, without a six-row block
-          // claiming to be a plan for the day.
-          if (sessions.length > 1) ...[
-            const SizedBox(height: Space.sm),
-            Center(
-              child: LinkAction(
-                'Train another session',
-                onTap: ref.watch(_startingProvider)
-                    ? null
-                    : () => _trainAnotherSession(
-                          context,
-                          ref,
-                          regimeId: regimeId,
-                          sessions: sessions,
-                          status: status,
-                        ),
-              ),
-            ),
-          ],
         ],
-      ),
+        if (isEmptySession) ...[
+          const SizedBox(height: Space.sm),
+          Text(
+            'This session has no exercises yet.',
+            style: context.t.bodyMedium,
+          ),
+        ],
+        const SizedBox(height: Space.lg),
+        if (isEmptySession)
+          SecondaryButton(
+            label: 'Add exercises',
+            icon: Icons.add_rounded,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SessionEditorScreen(sessionId: nextId),
+              ),
+            ),
+          )
+        else
+          PrimaryButton(
+            label: 'Start ${session?.name ?? 'session'}',
+            icon: Icons.play_arrow_rounded,
+            onPressed: ref.watch(_startingProvider)
+                ? null
+                : () => _startSession(
+                    context,
+                    ref,
+                    regimeId: regimeId,
+                    sessionId: nextId,
+                  ),
+          ),
+        // The hero names the first session not yet trained, which is a
+        // description and not an instruction — training Legs before Pull is
+        // normal. One tap to open the picker, one to start: the same two taps
+        // the old always-on session list cost, without a six-row block
+        // claiming to be a plan for the day.
+        if (sessions.length > 1) ...[
+          const SizedBox(height: Space.sm),
+          Center(
+            child: LinkAction(
+              'Train another session',
+              onTap: ref.watch(_startingProvider)
+                  ? null
+                  : () => _trainAnotherSession(
+                      context,
+                      ref,
+                      regimeId: regimeId,
+                      sessions: sessions,
+                      status: status,
+                    ),
+            ),
+          ),
+        ],
+      ],
     );
+  }
+
+  /// The cycle in words, under the track that draws it.
+  ///
+  /// Where the deload is, stated once: a light week that arrives unannounced
+  /// looks like a bug in the app, and one two cycles out is worth planning
+  /// around. With the unit, always — a bare "deload in 5" invites the two
+  /// readings this app can least afford to be vague about, days and weeks, and
+  /// a cycle is neither: it advances when the work is done.
+  ///
+  /// Silent about a deload that is already on a pill in the row above, and
+  /// silent when deloads are off for this regime (`cyclesUntilDeload` is -1
+  /// then, and there is nothing to promise).
+  static String _cycleNote(CycleStatus status) {
+    final cycle = 'Cycle ${status.cycleIndex}';
+    if (status.isDeload || status.deloadAfterThisCycle) return cycle;
+    final remaining = status.cyclesUntilDeload;
+    if (remaining <= 0) return cycle;
+    return '$cycle  ·  Deload in $remaining '
+        'cycle${remaining == 1 ? '' : 's'}';
   }
 }
 
@@ -1043,49 +1145,6 @@ class _CycleTrack extends StatelessWidget {
   }
 }
 
-/// Where the deload is, stated once and in the hero rather than as a footnote
-/// under the button. A light week that arrives unannounced looks like a bug in
-/// the app; one that is two cycles away is worth planning around.
-class _DeloadSignal extends StatelessWidget {
-  const _DeloadSignal({required this.status});
-
-  final CycleStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    if (status.isDeload) {
-      return Pill('Deload', color: c.deload, icon: Icons.trending_down);
-    }
-    if (status.deloadAfterThisCycle) {
-      return Pill('Deload next', color: c.deload, icon: Icons.trending_down);
-    }
-    // -1 when deloads are switched off for this regime; nothing to promise.
-    final remaining = status.cyclesUntilDeload;
-    if (remaining <= 0) return const SizedBox.shrink();
-    // With the unit, always. A bare "deload in 5" invites the two readings the
-    // app can least afford to be vague about — days and weeks — and a cycle is
-    // neither: it advances when the work is done.
-    // `flex: 0` is the whole point. A bare [Flexible] defaults to flex 1, which
-    // made this a flex child competing with the [Expanded] column beside it —
-    // the row split its free space in half, this label used a fraction of its
-    // half and left the rest as dead card, and the regime name was ellipsized
-    // to pay for it. At flex 0 it sizes to its words and the column keeps the
-    // remainder; it still shrinks rather than overflows if the words alone
-    // outgrow the row.
-    return Flexible(
-      flex: 0,
-      child: Text(
-        'Deload in $remaining cycle${remaining == 1 ? '' : 's'}',
-        style: context.t.labelSmall,
-        maxLines: 1,
-        softWrap: false,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-}
-
 class _ConsistencyCard extends StatelessWidget {
   const _ConsistencyCard({required this.data, required this.hasHistory});
 
@@ -1105,7 +1164,12 @@ class _ConsistencyCard extends StatelessWidget {
           // The three figures used to be a row of stat tiles inside the card,
           // above the grid. They are one short sentence, and 70pt of card was
           // what pushed the grid — the section's whole point — under the fold.
-          subtitle: hasHistory ? _summary(data.consistency) : null,
+          //
+          // Always a sentence, dashes and all: dropping the line on a fresh
+          // install made this header a different height than the same header
+          // one session later, so the grid under it moved the first time you
+          // finished a workout.
+          subtitle: _summary(data.consistency),
           actionLabel: hasHistory ? 'All time' : null,
           onAction: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const HistoryHeatmapScreen()),
@@ -1116,10 +1180,10 @@ class _ConsistencyCard extends StatelessWidget {
           onTap: !hasHistory
               ? null
               : () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const HistoryHeatmapScreen(),
-                    ),
+                  MaterialPageRoute(
+                    builder: (_) => const HistoryHeatmapScreen(),
                   ),
+                ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1127,11 +1191,12 @@ class _ConsistencyCard extends StatelessWidget {
               // No legend here. It is reference material rather than something
               // you read at a glance, and the screen this card opens carries it
               // in full.
+              // "Nothing logged yet" is what the dashes in the section
+              // subtitle already say; this only adds where it will land.
               if (!hasHistory) ...[
                 const SizedBox(height: Space.md),
                 Text(
-                  'Nothing logged yet. Finish a session and it lands here, '
-                  'and in History.',
+                  'Finish a session and it lands here, and in History.',
                   style: context.t.bodyMedium,
                 ),
               ],
@@ -1142,16 +1207,24 @@ class _ConsistencyCard extends StatelessWidget {
     );
   }
 
-  /// One line where three stat tiles used to be. An em dash rather than a
-  /// fabricated rate — under a fortnight of history there is no honest number
-  /// (see [computeConsistency]).
+  /// One line where three stat tiles used to be, and always three slots wide so
+  /// the header does not change shape as history accumulates. An em dash rather
+  /// than a fabricated rate — under a fortnight of history there is no honest
+  /// number (see [computeConsistency]).
   static String _summary(Consistency c) {
     final perWeek = c.perWeek;
-    final days = c.windowDays;
+    if (c.isEmpty) {
+      return ['— this week', '— per week', 'nothing logged yet'].join('  ·  ');
+    }
     return [
       '${c.thisWeek} this week',
       perWeek == null ? '— per week' : '${perWeek.toStringAsFixed(1)} per week',
-      '${c.sessions} in $days day${days == 1 ? '' : 's'}',
+      // The window is only worth naming once it *is* a window. "1 in 1 day"
+      // was the app dividing by the length of its own history and reporting
+      // the result as a habit.
+      perWeek == null
+          ? '${c.sessions} logged so far'
+          : '${c.sessions} in ${c.windowDays} days',
     ].join('  ·  ');
   }
 }

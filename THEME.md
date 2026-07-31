@@ -140,12 +140,12 @@ Mirror by inverting the neutral ramp, not by tinting:
 ## 3. Type
 
 One family, five roles. Measured cap heights converted to sp and rounded.
-**Minimum 11sp. Maximum 28sp.** Nothing on any screen is bigger than a page
+**Minimum 11sp. Maximum 30sp.** Nothing on any screen is bigger than a page
 title or smaller than a nav label.
 
 | Role | Size / line | Weight | Case | Colour | Used for |
 | --- | --- | --- | --- | --- | --- |
-| `pageTitle` | 27 / 32 | 800 | **UPPERCASE**, tracking −0.5 | primary | The one title in a header band: `TODAY`, `HISTORY` |
+| `pageTitle` | 30 / 36 | 800 | **UPPERCASE**, tracking −0.5 | primary | The one title in a header band: `HISTORY`, `PROGRESS` — or, on the landing screen whose name is already on the nav bar, the date (see §9) |
 | `pageEyebrow` | 13 / 16 | 600 | UPPERCASE, tracking +1.2 | secondary | Date line above a page title |
 | `section` | 20 / 26 | 700 | Sentence | primary | Section headings on the page background |
 | `title` | 16 / 22 | 600 | Sentence | primary | Card titles, list-row titles, exercise names |
@@ -497,6 +497,7 @@ deliberate departures — keep them when implementing.
 | Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: `From Push 2 · 12 Jul` | The entire reason this app exists (README) |
 | Programme identity is a colour + glyph you must pick during creation | Same mark, but auto-assigned on create and changeable later | Identity is worth having; a mandatory question about it is not |
 | Rep targets hidden two taps deep behind a card, placeholder `Optional` | Same sheet, but the card shows the target inline (`4 × 8–10`) so it is readable without opening | The target is the point of the slot |
+| Every screen's masthead prints the screen's name | The **landing** screen prints the date instead — weekday as the eyebrow, `31 JULY` in `pageTitle` under it, and the rest gap as a `body` line beneath | `TODAY` is the label the nav bar already draws under a highlighted icon. Spending the largest type on the screen you open into on a word that adds nothing is what makes a page look filled rather than designed. The date is what that slot is for here. Screens you navigate *to* keep their name — arriving somewhere, you want it confirmed |
 
 ---
 

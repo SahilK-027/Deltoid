@@ -88,7 +88,6 @@ void main() {
     // so a lazy ListView has not built it yet; the snapshot it reads is the
     // same one.)
     for (final frame in populated) {
-      expect(frame, contains('0 of 6 done'));
       expect(frame, contains('Push 1'));
     }
     expect(populated, isNotEmpty);
@@ -175,7 +174,9 @@ void main() {
 
     // The empty state is still this screen: masthead present, and Settings
     // reachable — a fresh install restoring a backup has no other route to it.
-    expect(find.text('TODAY'), findsOneWidget);
+    // The masthead is the date and the rest gap, not the screen's name — on a
+    // fresh install there is nothing to count from, and it says so.
+    expect(find.text('No sessions logged yet'), findsOneWidget);
     expect(
       find.byTooltip('Settings'),
       findsOneWidget,
