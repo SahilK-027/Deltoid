@@ -354,40 +354,27 @@ class TodayScreen extends ConsumerWidget {
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
         (null, _, _) => const SizedBox.shrink(),
-        (_, null, _) => const SafeArea(child: _NoRegimeState()),
-        (_, final r?, true) => SafeArea(child: _NoSessionsState(regime: r)),
+        (_, null, _) => const _NoRegimeState(),
+        (_, final r?, true) => _NoSessionsState(regime: r),
         (_, final r?, false) => Column(
             children: [
-              HeaderBand(
-                child: PageHeader(
-                  title: 'Today',
-                  eyebrow: DateFormat('EEEE d MMMM').format(DateTime.now()),
-                  actions: [
-                    CircleIconButton(
-                      icon: Icons.edit_calendar_outlined,
-                      tooltip: 'Log a past session',
-                      onTap: () => _logPastSession(
-                        context,
-                        ref,
-                        regimeId: r.id,
-                        sessions: sessions,
-                        hasOpenWorkout: open != null,
-                      ),
+              _TodayHeader(
+                actions: [
+                  CircleIconButton(
+                    icon: Icons.edit_calendar_outlined,
+                    tooltip: 'Log a past session',
+                    onTap: () => _logPastSession(
+                      context,
+                      ref,
+                      regimeId: r.id,
+                      sessions: sessions,
+                      hasOpenWorkout: open != null,
                     ),
-                    CircleIconButton(
-                      icon: Icons.settings_outlined,
-                      tooltip: 'Settings',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      ),
-                    ),
-                  ],
-                  // The question the app is opened with — "am I due?" — sits in
-                  // the header, above the card that acts on the answer.
-                  below: _RestGap(last: today!.lastCompleted),
-                ),
+                  ),
+                ],
+                // The question the app is opened with — "am I due?" — sits in
+                // the header, above the card that acts on the answer.
+                below: _RestGap(last: today!.lastCompleted),
               ),
               Expanded(
                 child: ListView(
@@ -434,6 +421,41 @@ class TodayScreen extends ConsumerWidget {
   }
 }
 
+/// The masthead, shared by every state this screen can be in.
+///
+/// The empty states used to skip it and centre a lone card on a blank page,
+/// which read as a different screen than the one the tab bar said you were on —
+/// and, on a fresh install, left no way to reach Settings, which is where
+/// restoring a backup lives. Settings is always here for that reason; anything
+/// that needs sessions to exist is passed in by the caller.
+class _TodayHeader extends StatelessWidget {
+  const _TodayHeader({this.actions = const [], this.below});
+
+  final List<Widget> actions;
+  final Widget? below;
+
+  @override
+  Widget build(BuildContext context) {
+    return HeaderBand(
+      child: PageHeader(
+        title: 'Today',
+        eyebrow: DateFormat('EEEE d MMMM').format(DateTime.now()),
+        actions: [
+          ...actions,
+          CircleIconButton(
+            icon: Icons.settings_outlined,
+            tooltip: 'Settings',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ],
+        below: below,
+      ),
+    );
+  }
+}
+
 /// First launch. The app ships with no programme at all, so this is the one
 /// screen a brand-new install has — it has to offer the way forward, not just
 /// point at another tab.
@@ -442,15 +464,22 @@ class _NoRegimeState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return EmptyState(
-      icon: Icons.tune_rounded,
-      title: 'Nothing set up yet',
-      message: 'Build your training split — any number of sessions, in any '
-          'order. One pass through all of them is a cycle.',
-      action: PrimaryButton(
-        label: 'Create a regime',
-        onPressed: () => createRegimeFlow(context, ref),
-      ),
+    return Column(
+      children: [
+        const _TodayHeader(),
+        Expanded(
+          child: EmptyState(
+            icon: Icons.tune_rounded,
+            title: 'Nothing set up yet',
+            message: 'Build your training split — any number of sessions, in '
+                'any order. One pass through all of them is a cycle.',
+            action: PrimaryButton(
+              label: 'Create a regime',
+              onPressed: () => createRegimeFlow(context, ref),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -465,15 +494,23 @@ class _NoSessionsState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return EmptyState(
-      icon: Icons.playlist_add_rounded,
-      title: 'No sessions in ${regime.name}',
-      message: 'Add the training days that make up one cycle, then fill each '
-          'one with exercises in the Regime tab.',
-      action: PrimaryButton(
-        label: 'Add a session',
-        onPressed: () => addSessionPrompt(context, ref, regime.id),
-      ),
+    return Column(
+      children: [
+        // No backfill action: there is nothing to log a past session against.
+        const _TodayHeader(),
+        Expanded(
+          child: EmptyState(
+            icon: Icons.playlist_add_rounded,
+            title: 'No sessions in ${regime.name}',
+            message: 'Add the training days that make up one cycle, then fill '
+                'each one with exercises in the Regime tab.',
+            action: PrimaryButton(
+              label: 'Add a session',
+              onPressed: () => addSessionPrompt(context, ref, regime.id),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -172,5 +172,15 @@ void main() {
     expect(seen.last, contains('Nothing set up yet'));
     // And it never claimed a regime existed on the way there.
     expect(seen.where((f) => f.contains('Cycle 1')), isEmpty);
+
+    // The empty state is still this screen: masthead present, and Settings
+    // reachable — a fresh install restoring a backup has no other route to it.
+    expect(find.text('TODAY'), findsOneWidget);
+    expect(
+      find.byTooltip('Settings'),
+      findsOneWidget,
+      reason: 'the zero state used to drop the header, stranding first-launch '
+          'users with no way into Settings',
+    );
   });
 }
