@@ -46,7 +46,7 @@ the README's **Non-goals**, then style what we already have.
 
 ---
 
-## 1. The five rules
+## 1. The six rules
 
 Everything below follows from these. When a decision isn't covered, decide by
 these.
@@ -64,6 +64,30 @@ these.
    measurement; a dash is "nothing here yet". Never fabricate a number.
 5. **Every value has a unit, and the unit is smaller than the value.** `87` in
    the value size, `kg` one step down in grey.
+6. **Say it once.** A fact appears in exactly one place on a screen. This is the
+   rule this app breaks most often and the one that costs it the most: Today
+   drew the cycle as labelled bars in the hero *and* as a list underneath *and*
+   as a fraction in a section header — three renderings of one number, which is
+   what pushed the consistency grid off the bottom of the screen.
+
+   When the same fact appears twice, one of the two is **deleted** — not shrunk,
+   not moved somewhere quieter:
+
+   - The screen's subject is named once. A card inside a screen called Today
+     does not also say "today". A row inside a section called Consistency does
+     not repeat "consistency".
+   - A number gets one representation. A bar *or* a count, not both. Where a
+     graphic and a figure say the same thing, the graphic stays only if it says
+     it faster.
+   - A control states its own action once. A row that opens an editor does not
+     need a chevron *and* an "Edit" label *and* a tap hint.
+   - Repetition *down* a list is not duplication: six rows each showing their
+     own set count is a column. Repetition *across levels* is — a total in the
+     header and the same total again in the last row.
+
+   The reason is not tidiness. What survives has to be readable at a glance,
+   mid-set, with a bar in your hands. Every duplicated element is one more thing
+   to read before the screen answers the question it was opened for.
 
 ---
 
