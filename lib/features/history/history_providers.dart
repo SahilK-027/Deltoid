@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 
 /// Rows fetched per page. Enough to fill a phone screen twice over, small
@@ -144,6 +143,11 @@ class ExerciseHistoryNotifier extends AutoDisposeFamilyAsyncNotifier<
   }
 }
 
+/// The totals behind History's masthead.
+final historyOverviewProvider = StreamProvider<HistoryOverview>((ref) {
+  return ref.watch(trainingRepositoryProvider).watchHistoryOverview();
+});
+
 /// Exercises that have actually been trained, most recent first.
 final exercisesWithHistoryProvider =
     StreamProvider<List<ExerciseHistorySummary>>((ref) {
@@ -155,21 +159,3 @@ final workoutDetailProvider =
   return ref.watch(trainingRepositoryProvider).watchWorkoutDetail(workoutId);
 });
 
-/// Sessions with at least one completed workout, most recently trained first.
-/// The tab strip on the side-by-side table.
-final sessionsWithHistoryProvider = StreamProvider<List<Session>>((ref) {
-  return ref.watch(trainingRepositoryProvider).watchSessionsWithHistory();
-});
-
-/// How many date columns the side-by-side table has pulled in. Grows as the
-/// table is scrolled backwards.
-final sessionTableLimitProvider =
-    StateProvider.family<int, String>((ref, sessionId) => 12);
-
-final sessionHistoryProvider =
-    StreamProvider.family<SessionHistory, String>((ref, sessionId) {
-  final limit = ref.watch(sessionTableLimitProvider(sessionId));
-  return ref
-      .watch(trainingRepositoryProvider)
-      .watchSessionHistory(sessionId, limit: limit);
-});

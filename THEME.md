@@ -174,6 +174,12 @@ Page gutter **16**. Card padding **16** (dense rows 12). Gap between a section
 header and its content **12**. Gap between sections **28**. Row height 56–72
 depending on whether it has a subtitle.
 
+Above a page title, **12 only when something small sits on top of it** — an
+eyebrow, or a row of buttons. A title that is itself the first line under the
+status bar takes **24**: at 12, thirty points of uppercase start hard against
+the notch and the header band reads as part of the system bar rather than as
+the top of the page.
+
 **Radius** — cards **20**, buttons and fields **14**, chips and pills **999**,
 identity tiles **30% of tile size**, heat cells **4**.
 

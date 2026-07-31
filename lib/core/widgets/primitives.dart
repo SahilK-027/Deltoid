@@ -99,6 +99,7 @@ class PageHeader extends StatelessWidget {
     this.actions = const [],
     this.below,
     this.belowGap = Space.md,
+    this.topGap = Space.md,
   });
 
   final String title;
@@ -117,12 +118,19 @@ class PageHeader extends StatelessWidget {
   /// is nearer to it than to whatever comes next.
   final double belowGap;
 
+  /// The gap between the status bar and the first line of the header. 12 is
+  /// right when something small sits at the top — an eyebrow, or a row of
+  /// buttons above the header. A page whose title is its first line needs more,
+  /// or 30sp of uppercase starts hard against the notch and the band reads as
+  /// part of the system bar rather than as the page.
+  final double topGap;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         Space.gutter,
-        Space.md,
+        topGap,
         Space.gutter,
         Space.lg,
       ),
@@ -686,11 +694,17 @@ class SegmentedPill<T> extends StatelessWidget {
     required this.segments,
     required this.value,
     required this.onChanged,
+    this.expand = false,
   });
 
   final List<({T value, String label})> segments;
   final T value;
   final ValueChanged<T> onChanged;
+
+  /// Stretch to the width available, segments sharing it equally. For a control
+  /// that governs the whole page under it — a track hugging two short words on
+  /// the left of an otherwise empty band reads as something left over.
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
@@ -703,10 +717,37 @@ class SegmentedPill<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.pill),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: [
           for (final segment in segments)
-            Pressable(
+            if (expand)
+              Expanded(
+                child: Pressable(
+                  onTap: () => onChanged(segment.value),
+                  scale: 0.96,
+                  child: AnimatedContainer(
+                    duration: Motion.base,
+                    curve: Motion.emphasized,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: segment.value == value
+                          ? c.accent
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(Radii.pill),
+                    ),
+                    child: Text(
+                      segment.label,
+                      style: context.t.bodySmall?.copyWith(
+                        color: segment.value == value
+                            ? c.onAccent
+                            : c.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Pressable(
               onTap: () => onChanged(segment.value),
               scale: 0.96,
               child: AnimatedContainer(

@@ -139,8 +139,8 @@ you pick — the day is the only thing that makes it different from starting a
 session, and a bare calendar dialog after the fact gave no sign the two
 questions were one answer.
 
-History has three readings of the same data, because "what did I do" means
-three different things:
+History has two readings of the same data, because "what did I do" means two
+different things:
 
 - **Sessions** — every finished workout, newest first, grouped by month and
   paged as you scroll. Tap a day to see exactly what was logged in it, set by
@@ -150,10 +150,12 @@ three different things:
   its own paged history with the session it belonged to on every row. Rows
   expand in place rather than opening the day they came from — drilling day →
   exercise → day → exercise was a loop with no destination.
-- **Table** — the old Notion layout for one session: exercises down the side,
-  one column per date, pulling in older columns as it scrolls right. Lists
-  every session ever trained, including regimes you have since switched away
-  from.
+
+There were three. The third was the old Notion layout — one session's
+exercises down the side, one column per date — and it was deleted: the feed
+answers "which day" better and the per-exercise history answers "how has this
+moved" better. Re-creating the spreadsheet this app replaced, inside it, is not
+a third reading of history.
 
 Paging is keyset (`startedAt`, then id) rather than offset, so finishing a
 session while scrolling can't push an unread row past the cursor. See

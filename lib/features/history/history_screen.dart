@@ -3,103 +3,119 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
-import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
-import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
-import '../../domain/enums.dart';
 import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
 
-/// Which of the three readings of "history" is on screen.
-enum HistoryView { sessions, exercises, table }
+/// Which reading of "history" is on screen.
+enum HistoryView { sessions, exercises }
 
-final historyViewProvider = StateProvider<HistoryView>((ref) => HistoryView.sessions);
-final selectedHistorySessionProvider = StateProvider<String?>((ref) => null);
+final historyViewProvider =
+    StateProvider<HistoryView>((ref) => HistoryView.sessions);
 
-/// Three ways in, because "what did I do" has three different meanings:
-/// which day (Sessions), which lift (Exercises), and how one session's numbers
-/// have moved week over week (Table — the old Notion layout).
+/// Two ways in, because "what did I do" has two meanings: which day
+/// (Sessions) and which lift (Exercises).
+///
+/// A third once existed — the old Notion table, exercises down the side and one
+/// column per date. It was dropped: the feed answers "which day" better and the
+/// per-exercise history answers "how has this moved" better, and a spreadsheet
+/// re-created inside the app that replaced the spreadsheet is one screen of
+/// horizontally scrolled cells nobody opened.
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(historyViewProvider);
+    final overview = ref.watch(historyOverviewProvider).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.xs, Space.lg, Space.md),
-            child: _ViewSwitcher(
-              value: view,
-              onChanged: (v) => ref.read(historyViewProvider.notifier).state = v,
+          HeaderBand(
+            child: PageHeader(
+              title: 'History',
+              // The band is a full-width surface, so it is composed across its
+              // width: title left, the total right, the control spanning both
+              // underneath. Stacked flush left it left the right half of the
+              // band empty, which is what made it read as unfinished rather
+              // than spare.
+              eyebrow: _span(overview),
+              // Without the eyebrow the title is the first line under the
+              // status bar, and 12 leaves it sitting on the notch (THEME §4).
+              topGap: _span(overview) == null ? Space.xxl : Space.md,
+              belowGap: Space.lg,
+              actions: [_TotalStat(overview: overview)],
+              below: SegmentedPill<HistoryView>(
+                value: view,
+                expand: true,
+                onChanged: (v) =>
+                    ref.read(historyViewProvider.notifier).state = v,
+                segments: const [
+                  (value: HistoryView.sessions, label: 'Sessions'),
+                  (value: HistoryView.exercises, label: 'Exercises'),
+                ],
+              ),
             ),
           ),
           Expanded(
             child: switch (view) {
               HistoryView.sessions => const _WorkoutFeed(),
               HistoryView.exercises => const _ExerciseIndex(),
-              HistoryView.table => const _SessionTable(),
             },
           ),
         ],
       ),
     );
   }
+
+  /// `SINCE MARCH 2024` — but only once there is a span to state. A history one
+  /// day old printed "since July 2026", which is the same dishonesty as the
+  /// sessions-per-week rate that divided by three weeks that hadn't happened.
+  static String? _span(HistoryOverview? overview) {
+    if (overview == null || !overview.spansMonths) return null;
+    final first = dateFromDayKey(overview.firstDayKey!);
+    return 'Since ${DateFormat('MMMM yyyy').format(first)}';
+  }
 }
 
-class _ViewSwitcher extends StatelessWidget {
-  const _ViewSwitcher({required this.value, required this.onChanged});
+/// How much is in here, against the right edge of the band.
+///
+/// One number, not a sentence: sessions, because it is the thing the page is a
+/// list of, and because it stays two or three digits after years of training —
+/// a set total runs to five and turns the header into a wall.
+///
+/// Deliberately not "how long since you trained": that is Today's question, and
+/// Today answers it in the largest type in the app.
+class _TotalStat extends StatelessWidget {
+  const _TotalStat({required this.overview});
 
-  final HistoryView value;
-  final ValueChanged<HistoryView> onChanged;
+  final HistoryOverview? overview;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    return Container(
-      padding: const EdgeInsets.all(Space.xs),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(Radii.md),
-        border: Border.all(color: c.border),
-      ),
-      child: Row(
-        children: [
-          for (final v in HistoryView.values)
-            Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(v),
-                child: AnimatedContainer(
-                  duration: Motion.fast,
-                  padding: const EdgeInsets.symmetric(vertical: Space.sm),
-                  decoration: BoxDecoration(
-                    color: v == value ? c.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(Radii.sm),
-                  ),
-                  child: Text(
-                    switch (v) {
-                      HistoryView.sessions => 'Sessions',
-                      HistoryView.exercises => 'Exercises',
-                      HistoryView.table => 'Table',
-                    },
-                    textAlign: TextAlign.center,
-                    style: context.t.titleSmall?.copyWith(
-                      color: v == value ? c.onAccent : c.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    final total = overview?.sessions;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          // Nothing logged prints a dash, and so does a count that has not
+          // arrived yet — never a 0 that the next frame replaces.
+          total == null || total == 0
+              ? '——'
+              : NumberFormat.decimalPattern().format(total),
+          style: context.t.displaySmall,
+        ),
+        Text(
+          total == 1 ? 'session' : 'sessions',
+          style: context.t.labelSmall,
+        ),
+      ],
     );
   }
 }
@@ -158,7 +174,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
         if (page.isEmpty) {
           return const EmptyState(
             icon: Icons.history_toggle_off,
-            title: 'Nothing logged yet',
+            title: 'Your log starts here',
             message: 'Finish a session and it shows up here — tap any day to '
                 'see exactly what you did.',
           );
@@ -166,23 +182,46 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
 
         final rows = _withMonthHeaders(page.items);
 
+        // No cards and no gutter: the rows run edge to edge under a spoken
+        // date heading, which is what lets a year of training be scanned by
+        // the identity tiles alone (§8).
         return ListView.builder(
           controller: _controller,
-          padding: const EdgeInsets.fromLTRB(
-              Space.lg, 0, Space.lg, Space.huge),
+          padding: const EdgeInsets.only(bottom: Space.huge),
           itemCount: rows.length + 1,
           itemBuilder: (context, i) {
             if (i == rows.length) return _FeedFooter(page: page);
             final row = rows[i];
             return switch (row) {
-              _MonthHeader(:final label) => Padding(
-                  padding: const EdgeInsets.only(
-                      top: Space.lg, bottom: Space.sm, left: Space.xs),
-                  child: Text(label.toUpperCase(), style: context.t.labelSmall),
+              // The count sits on the right of its month, where scanning back
+              // through a year answers "how much did I train that month"
+              // without reading the rows under it.
+              _MonthHeader(:final label, :final count) => Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    Space.gutter,
+                    i == 0 ? Space.lg : Space.section,
+                    Space.gutter,
+                    Space.md,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Text(label, style: context.t.headlineSmall),
+                      ),
+                      Text('$count', style: context.t.bodySmall),
+                    ],
+                  ),
                 ),
-              _SummaryRow(:final summary) => Padding(
-                  padding: const EdgeInsets.only(bottom: Space.sm),
-                  child: _WorkoutCard(summary: summary),
+              // The rule separates one day from the next, so it belongs
+              // between rows — never under the last one in a month, where it
+              // would draw a line under the heading that follows.
+              _SummaryRow(:final summary) => Column(
+                  children: [
+                    if (rows[i - 1] is _SummaryRow)
+                      Divider(height: 1, color: context.c.border),
+                    _WorkoutRow(summary: summary),
+                  ],
                 ),
             };
           },
@@ -192,17 +231,27 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
   }
 
   /// Groups by calendar month, which is how anyone actually looks backwards.
+  ///
+  /// The count on a header is of the rows *loaded* under it. That is honest for
+  /// every month but the oldest one on screen, which paging can still grow —
+  /// and that one is only ever the last header in the list, with more coming
+  /// under it as you scroll.
   static List<_FeedRow> _withMonthHeaders(List<WorkoutSummary> items) {
     final rows = <_FeedRow>[];
+    final counts = <String, int>{};
     var currentMonth = '';
     for (final s in items) {
       final date = dateFromDayKey(s.workout.dayKey);
       final label = DateFormat('MMMM yyyy').format(date);
+      counts[label] = (counts[label] ?? 0) + 1;
       if (label != currentMonth) {
         rows.add(_MonthHeader(label));
         currentMonth = label;
       }
       rows.add(_SummaryRow(s));
+    }
+    for (final row in rows) {
+      if (row is _MonthHeader) row.count = counts[row.label] ?? 0;
     }
     return rows;
   }
@@ -213,8 +262,12 @@ sealed class _FeedRow {
 }
 
 class _MonthHeader extends _FeedRow {
-  const _MonthHeader(this.label);
+  _MonthHeader(this.label);
   final String label;
+
+  /// Filled once the whole page has been walked — a month's total is not known
+  /// at the moment its header is emitted.
+  int count = 0;
 }
 
 class _SummaryRow extends _FeedRow {
@@ -229,6 +282,12 @@ class _FeedFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // "That is everything" only means something to someone who has been
+    // scrolling. On a list that never filled a page it is a caption under a
+    // single row, floating in the empty half of the screen.
+    if (!page.hasMore && page.items.length < historyPageSize) {
+      return const SizedBox(height: Space.xl);
+    }
     if (page.hasMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: Space.xl),
@@ -244,18 +303,20 @@ class _FeedFooter extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Space.xl),
       child: Center(
-        child: Text(
-          '${page.items.length} session${page.items.length == 1 ? '' : 's'} '
-          '· that is everything',
-          style: context.t.labelSmall,
-        ),
+        // No count here: the masthead already carries the total, and a second
+        // one at the bottom of the list is the same fact twice.
+        child: Text('That is everything', style: context.t.bodySmall),
       ),
     );
   }
 }
 
-class _WorkoutCard extends StatelessWidget {
-  const _WorkoutCard({required this.summary});
+/// One trained day. Identity tile, what it was, and what was in it.
+///
+/// The exercise line replaces the exercise *count*: they are the same fact, and
+/// the names are the one that answers "which day was that" (rule 6).
+class _WorkoutRow extends StatelessWidget {
+  const _WorkoutRow({required this.summary});
 
   final WorkoutSummary summary;
 
@@ -263,67 +324,93 @@ class _WorkoutCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final date = dateFromDayKey(summary.workout.dayKey);
-    final accent = summary.workout.isDeload ? c.deload : c.accent;
+    // The mark is the programme's, except on a light week — a deload outranks
+    // whose programme it belongs to, the same way it does on Today.
+    final mark = summary.workout.isDeload
+        ? c.deload
+        : c.identityFor(summary.workout.regimeId);
 
-    final facts = <String>[
-      '${summary.exerciseCount} exercise'
-          '${summary.exerciseCount == 1 ? '' : 's'}',
+    // No programme name: the tile already carries it as colour, and spelled
+    // out it was long enough to push the line into an ellipsis on a phone.
+    // No `0 min` either — a duration under a minute is a clock that never ran,
+    // and printing it as a zero is the bug face rule 4 is about.
+    final minutes = summary.durationMinutes;
+    final meta = <String>[
+      DateFormat('EEE d').format(date),
       '${summary.setCount} set${summary.setCount == 1 ? '' : 's'}',
-      if (summary.durationMinutes != null) '${summary.durationMinutes} min',
+      if (minutes != null && minutes > 0) '$minutes min',
       if (summary.skippedCount > 0) '${summary.skippedCount} skipped',
     ];
 
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-          horizontal: Space.lg, vertical: Space.md),
+    return Pressable(
+      scale: 0.99,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => WorkoutDetailScreen(workoutId: summary.workout.id),
         ),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  DateFormat('d').format(date),
-                  style: context.t.titleLarge?.copyWith(color: accent),
-                ),
-                Text(DateFormat('EEE').format(date), style: context.t.labelSmall),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: Space.gutter, vertical: Space.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconTile(
+              summary.workout.isDeload
+                  ? Icons.trending_down_rounded
+                  : Icons.bolt_rounded,
+              color: mark,
+              size: 44,
             ),
-          ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        summary.sessionName ?? 'Ad-hoc session',
-                        style: context.t.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          summary.sessionName ?? 'Ad-hoc session',
+                          style: context.t.titleMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    if (summary.workout.isDeload) ...[
-                      const SizedBox(width: Space.sm),
-                      Pill('Deload', color: c.deload),
+                      if (summary.workout.isDeload) ...[
+                        const SizedBox(width: Space.sm),
+                        Pill('Deload', color: c.deload),
+                      ],
                     ],
+                  ),
+                  const SizedBox(height: Space.xxs),
+                  Text(
+                    meta.join(' · '),
+                    style: context.t.bodyMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (summary.exerciseNames.isNotEmpty) ...[
+                    const SizedBox(height: Space.xxs),
+                    Text(
+                      summary.exerciseNames.join(' · '),
+                      style: context.t.bodySmall
+                          ?.copyWith(color: c.textTertiary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
-                const SizedBox(height: Space.xs),
-                Text(facts.join('  ·  '), style: context.t.labelSmall),
-              ],
+                ],
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right, size: 18, color: c.textTertiary),
-        ],
+            const SizedBox(width: Space.sm),
+            Padding(
+              padding: const EdgeInsets.only(top: Space.md),
+              child: Icon(Icons.chevron_right_rounded,
+                  size: 20, color: c.textTertiary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -370,12 +457,13 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.md),
+          padding: const EdgeInsets.fromLTRB(
+              Space.gutter, Space.sm, Space.gutter, Space.md),
           child: TextField(
             onChanged: (v) => setState(() => _query = v),
             decoration: InputDecoration(
               hintText: 'Search exercises',
-              prefixIcon: const Icon(Icons.search, size: 20),
+              prefixIcon: Icon(Icons.search, size: 20, color: c.textTertiary),
               filled: true,
               fillColor: c.surfaceHigh,
               border: OutlineInputBorder(
@@ -387,401 +475,27 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
         ),
         Expanded(
           child: ListView.separated(
-            padding:
-                const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.huge),
+            padding: const EdgeInsets.only(bottom: Space.huge),
             itemCount: filtered.length,
-            separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
+            separatorBuilder: (_, _) => Divider(height: 1, color: c.border),
             itemBuilder: (context, i) {
               final e = filtered[i];
-              return AppCard(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: Space.lg, vertical: Space.md),
+              return AppRow(
+                title: e.exercise.name,
+                subtitle: '${e.timesPerformed} session'
+                    '${e.timesPerformed == 1 ? '' : 's'} · last '
+                    '${DateFormat('d MMM yyyy').format(dateFromDayKey(e.lastDayKey))}',
+                chevron: true,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
                         ExerciseHistoryScreen(exerciseId: e.exercise.id),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(e.exercise.name, style: context.t.titleSmall),
-                          const SizedBox(height: Space.xs),
-                          Text(
-                            '${e.timesPerformed} session'
-                            '${e.timesPerformed == 1 ? '' : 's'}  ·  last '
-                            '${DateFormat('d MMM yyyy').format(dateFromDayKey(e.lastDayKey))}',
-                            style: context.t.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 18, color: c.textTertiary),
-                  ],
-                ),
               );
             },
           ),
         ),
-      ],
-    );
-  }
-}
-
-// ── Table ───────────────────────────────────────────────────────────────────
-
-/// The Notion table, made infinite.
-///
-/// Same shape as the spreadsheet this app replaced — exercises down the side,
-/// one column per date — but scrolling right walks backwards through history,
-/// pulling in more columns as it goes.
-class _SessionTable extends ConsumerWidget {
-  const _SessionTable();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Every session that has actually been trained, not just the active
-    // regime's: this is a history view, and switching programmes must not hide
-    // the history of the one before it.
-    final sessions = ref.watch(sessionsWithHistoryProvider).valueOrNull ?? const [];
-
-    // A stored id survives a regime switch and a session delete. Fall back
-    // instead of showing an empty table for a session that isn't on the tabs.
-    final stored = ref.watch(selectedHistorySessionProvider);
-    final selected = sessions.any((s) => s.id == stored)
-        ? stored
-        : (sessions.isEmpty ? null : sessions.first.id);
-
-    if (sessions.isEmpty) {
-      return const EmptyState(
-        icon: Icons.view_column_outlined,
-        title: 'Nothing logged yet',
-        message: 'Finish a session and it gets a column here, newest on the '
-            'left — the old spreadsheet, one session at a time.',
-      );
-    }
-
-    return Column(
-      children: [
-        _SessionTabs(
-          sessions: sessions,
-          selected: selected,
-          onSelect: (id) =>
-              ref.read(selectedHistorySessionProvider.notifier).state = id,
-        ),
-        if (selected != null)
-          Expanded(child: _HistoryTable(sessionId: selected)),
-      ],
-    );
-  }
-}
-
-class _SessionTabs extends StatelessWidget {
-  const _SessionTabs({
-    required this.sessions,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<Session> sessions;
-  final String? selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-        itemCount: sessions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
-        itemBuilder: (context, i) {
-          final s = sessions[i];
-          final isSelected = s.id == selected;
-          return Center(
-            child: GestureDetector(
-              onTap: () => onSelect(s.id),
-              child: AnimatedContainer(
-                duration: Motion.fast,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Space.lg,
-                  vertical: Space.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? c.accent : c.surface,
-                  borderRadius: BorderRadius.circular(Radii.pill),
-                  border: Border.all(
-                    color: isSelected ? c.accent : c.border,
-                  ),
-                ),
-                child: Text(
-                  s.name,
-                  style: context.t.titleSmall?.copyWith(
-                    color: isSelected ? c.onAccent : c.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-const _rowHeight = 62.0;
-const _nameColumnWidth = 132.0;
-const _dataColumnWidth = 104.0;
-
-class _HistoryTable extends ConsumerStatefulWidget {
-  const _HistoryTable({required this.sessionId});
-
-  final String sessionId;
-
-  @override
-  ConsumerState<_HistoryTable> createState() => _HistoryTableState();
-}
-
-class _HistoryTableState extends ConsumerState<_HistoryTable> {
-  final _dates = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _dates.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _dates.removeListener(_onScroll);
-    _dates.dispose();
-    super.dispose();
-  }
-
-  /// Scrolling far enough right pulls in older columns. The table has no
-  /// vertical axis to spare for a "load more" button.
-  void _onScroll() {
-    if (!_dates.hasClients || _dates.position.extentAfter > 400) return;
-    final limit = ref.read(sessionTableLimitProvider(widget.sessionId));
-    final loaded =
-        ref.read(sessionHistoryProvider(widget.sessionId)).valueOrNull;
-    if (loaded == null || loaded.workouts.length < limit) return;
-    ref.read(sessionTableLimitProvider(widget.sessionId).notifier).state =
-        limit + 12;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final history =
-        ref.watch(sessionHistoryProvider(widget.sessionId)).valueOrNull;
-    final c = context.c;
-
-    if (history == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (history.isEmpty) {
-      return const EmptyState(
-        icon: Icons.history_toggle_off,
-        title: 'Nothing logged yet',
-        message: 'Finish this session once and it will show up here, '
-            'newest on the left.',
-      );
-    }
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, 0, Space.huge),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Frozen exercise column — the row labels must stay put while the
-            // dates scroll, or the table is unreadable on a phone.
-            SizedBox(
-              width: _nameColumnWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 44),
-                  for (final id in history.exerciseOrder)
-                    SizedBox(
-                      height: _rowHeight,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          history.exercises[id]?.name ?? '',
-                          style: context.t.bodySmall
-                              ?.copyWith(color: c.textPrimary),
-                          maxLines: 3,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _dates,
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final workout in history.workouts)
-                      _DateColumn(workout: workout, history: history),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DateColumn extends StatelessWidget {
-  const _DateColumn({required this.workout, required this.history});
-
-  final Workout workout;
-  final SessionHistory history;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final date = dateFromDayKey(workout.dayKey);
-
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => WorkoutDetailScreen(workoutId: workout.id),
-        ),
-      ),
-      child: Container(
-        width: _dataColumnWidth,
-        margin: const EdgeInsets.only(right: Space.sm),
-        decoration: BoxDecoration(
-          color: workout.isDeload ? c.deloadMuted.withValues(alpha: 0.35) : null,
-          borderRadius: BorderRadius.circular(Radii.sm),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 44,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    DateFormat('d MMM').format(date),
-                    style: context.t.titleSmall?.copyWith(
-                      color: workout.isDeload ? c.deload : c.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    workout.isDeload
-                        ? 'Deload'
-                        : DateFormat('yyyy').format(date),
-                    style: context.t.labelSmall?.copyWith(
-                      color: workout.isDeload ? c.deload : c.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            for (final exerciseId in history.exerciseOrder)
-              SizedBox(
-                height: _rowHeight,
-                child: _Cell(
-                  cell: history.cells[workout.id]?[exerciseId],
-                  exercise: history.exercises[exerciseId],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Cell extends ConsumerWidget {
-  const _Cell({required this.cell, required this.exercise});
-
-  final HistoryCell? cell;
-  final Exercise? exercise;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
-    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-
-    if (cell == null) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text('·', style: context.t.labelMedium?.copyWith(color: c.textTertiary)),
-      );
-    }
-    final skipped = cell!.skipReason != SkipReason.none;
-    final done = cell!.sets.where((s) => s.isDone).toList();
-
-    // A skip with nothing logged is just a skip. A skip with sets behind it is
-    // a short session, and the numbers below are the ones prefill reads — so
-    // the column shows both rather than swallowing the sets.
-    if (skipped && done.isEmpty) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Pill(cell!.skipReason.label, color: c.negative),
-      );
-    }
-
-    if (done.isEmpty) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text('—', style: context.t.labelMedium),
-      );
-    }
-
-    // Weight first and large, reps beneath — the same reading order as the
-    // Notion table, where the weight column carried the progression.
-    final weights = done
-        .map((s) => s.weight ?? s.addedWeight)
-        .whereType<double>()
-        .toSet();
-    final weightLabel = weights.isEmpty
-        ? 'BW'
-        : weights.length == 1
-            ? formatWeight(weights.first, unit)
-            : weights.map((w) => formatWeight(w, unit)).join('/');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          exercise?.loadMode == LoadMode.bodyweightPlus && weights.isNotEmpty
-              ? 'BW+$weightLabel'
-              : weightLabel,
-          style: context.t.labelLarge,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          done.map((s) => '${s.reps ?? 0}').join(' · '),
-          style: context.t.labelMedium?.copyWith(color: c.textTertiary),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (skipped) ...[
-          const SizedBox(height: 2),
-          Text(
-            'then ${cell!.skipReason.label.toLowerCase()}',
-            style: context.t.labelSmall?.copyWith(color: c.negative),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ],
     );
   }

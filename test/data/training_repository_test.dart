@@ -1034,6 +1034,47 @@ void main() {
     expect(feed.single.durationMinutes, isNotNull);
   });
 
+  test('feed rows list the movements in the order they were done', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final detail = await repo.workoutDetail(id);
+    await repo.completeWorkout(id);
+
+    final row = (await repo.workoutFeed()).single;
+    expect(
+      row.exerciseNames,
+      detail!.entries.map((e) => e.exercise.name).toList(),
+    );
+  });
+
+  test('the history overview counts sessions and spans the days they cover',
+      () async {
+    expect((await repo.historyOverview()).isEmpty, isTrue);
+
+    await writeHistory(3);
+    final overview = await repo.historyOverview();
+
+    expect(overview.sessions, 3);
+    expect(overview.spansMonths, isFalse,
+        reason: 'three consecutive days in January are not a span');
+    expect(overview.firstDayKey, isNotNull);
+    expect(overview.lastDayKey, greaterThan(overview.firstDayKey!));
+
+    // An in-progress session is not history yet, and a deleted day stops being
+    // history — the masthead must not keep counting either.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    expect((await repo.historyOverview()).sessions, 3);
+
+    final newest = (await repo.workoutFeed()).first;
+    await repo.deleteWorkout(newest.workout.id);
+    final after = await repo.historyOverview();
+    expect(after.sessions, 2);
+    expect(after.lastDayKey, lessThan(overview.lastDayKey!));
+  });
+
   test('a session filter narrows the feed to that session', () async {
     await writeHistory(12);
     final push1 = await sessionNamed('Push 1');
@@ -1163,7 +1204,6 @@ void main() {
     expect(await repo.workoutFeed(), isEmpty);
     expect(await repo.workoutDetail(id), isNull);
     expect(await repo.exercisesWithHistory(), isEmpty);
-    expect(await repo.sessionsWithHistory(), isEmpty);
 
     // Prefill must forget it too, or next week suggests numbers from a day
     // that no longer exists.
@@ -1572,17 +1612,4 @@ void main() {
     });
   });
 
-  test('the table lists sessions from older regimes too', () async {
-    final push1 = await sessionNamed('Push 1');
-    await logSession(push1);
-
-    // Switching programmes must not hide what was trained under the old one.
-    await createRegimeFromTemplate(
-      db,
-      regimeTemplates.firstWhere((t) => t.key == 'upper_lower'),
-    );
-
-    final sessions = await repo.sessionsWithHistory();
-    expect(sessions.map((s) => s.id), [push1.id]);
-  });
 }

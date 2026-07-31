@@ -34,7 +34,10 @@ class WorkoutDetailScreen extends ConsumerWidget {
       // Loaded-and-null means the day was deleted, which is reachable: the feed
       // behind this screen can outlive it. Saying so beats a spinner forever.
       return Scaffold(
-        appBar: AppBar(title: const Text('Session')),
+        appBar: AppBar(
+          backgroundColor: c.surface,
+          title: const Text('Session'),
+        ),
         body: async.hasValue
             ? const EmptyState(
                 icon: Icons.delete_outline,
@@ -47,129 +50,155 @@ class WorkoutDetailScreen extends ConsumerWidget {
 
     final workout = detail.workout;
     final date = dateFromDayKey(workout.dayKey);
-    final accent = workout.isDeload ? c.deload : c.accent;
+    final hasNote = workout.notes?.isNotEmpty == true;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(detail.session?.name ?? 'Ad-hoc session'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              switch (value) {
-                case 'date':
-                  _editDate(context, ref, detail);
-                case 'notes':
-                  _editNotes(context, ref, detail);
-                case 'delete':
-                  _delete(context, ref, detail);
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'date',
-                child: Text('Change the date'),
-              ),
-              PopupMenuItem(
-                value: 'notes',
-                child: Text(
-                  workout.notes == null || workout.notes!.isEmpty
-                      ? 'Add a note'
-                      : 'Edit the note',
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text(
-                  'Delete this session',
-                  style: TextStyle(color: c.negative),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-            Space.lg, Space.sm, Space.lg, Space.huge),
+      body: Column(
         children: [
-          AppCard(
-            padding: const EdgeInsets.all(Space.xl),
-            outline: workout.isDeload ? BorderSide(color: c.deload) : null,
-            // Tapping the date edits it: forgetting to log Monday until
-            // Wednesday is normal, and a date you cannot correct is a lie the
-            // heatmap repeats forever.
-            onTap: () => _editDate(context, ref, detail),
+          // The screen is one you navigate *to*, so it keeps its name: the
+          // session, with the day it was as the eyebrow (§9). The old screen
+          // spent a whole card on that date and then repeated the weekday
+          // inside it.
+          HeaderBand(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(DateFormat('EEEE').format(date).toUpperCase(),
-                        style: context.t.labelSmall),
-                    const Spacer(),
-                    if (workout.isDeload) Pill('Deload', color: c.deload),
-                    const SizedBox(width: Space.sm),
-                    Icon(Icons.edit_calendar_outlined,
-                        size: 14, color: c.textTertiary),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      Space.sm, Space.sm, Space.gutter, 0),
+                  child: Row(
+                    children: [
+                      CircleIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        fill: Colors.transparent,
+                        onTap: () => Navigator.of(context).pop(),
+                      ),
+                      const Spacer(),
+                      if (workout.isDeload) Pill('Deload', color: c.deload),
+                      const SizedBox(width: Space.sm),
+                      CircleIconButton(
+                        icon: Icons.more_horiz_rounded,
+                        tooltip: 'Session actions',
+                        onTap: () => _showActions(context, ref, detail),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: Space.sm),
-                Text(DateFormat('d MMMM yyyy').format(date),
-                    style: context.t.displaySmall),
-                const SizedBox(height: Space.md),
-                Text(
-                  _facts(detail).join('  ·  '),
-                  style: context.t.bodyMedium?.copyWith(color: accent),
-                ),
-                const SizedBox(height: Space.md),
-                InkWell(
-                  onTap: () => _editNotes(context, ref, detail),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: Space.xs),
-                    child: Row(
-                      children: [
-                        Icon(Icons.sticky_note_2_outlined,
-                            size: 14, color: c.textTertiary),
-                        const SizedBox(width: Space.sm),
-                        Expanded(
-                          child: Text(
-                            workout.notes?.isNotEmpty == true
-                                ? workout.notes!
-                                : 'Add a note — how it felt, what got in the '
-                                    'way',
-                            style: context.t.bodySmall?.copyWith(
-                              color: workout.notes?.isNotEmpty == true
-                                  ? c.textSecondary
-                                  : c.textTertiary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                PageHeader(
+                  eyebrow: DateFormat('EEEE d MMMM yyyy').format(date),
+                  title: detail.session?.name ?? 'Ad-hoc session',
+                  belowGap: Space.sm,
+                  below: Text(
+                    _facts(detail).join(' · '),
+                    style: context.t.bodyMedium,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: Space.xxl),
-          if (detail.entries.isEmpty)
-            AppCard(
-              child: Text(
-                'This workout was finished without anything logged in it.',
-                style: context.t.bodySmall,
-              ),
-            )
-          else ...[
-            const SectionLabel('What you did'),
-            for (final entry in detail.entries) ...[
-              _ExerciseBlock(entry: entry),
-              const SizedBox(height: Space.sm),
-            ],
-          ],
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: Space.huge),
+              children: [
+                const SizedBox(height: Space.lg),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: Space.gutter),
+                  child: ListCard(
+                    children: [
+                      AppRow(
+                        icon: Icons.sticky_note_2_outlined,
+                        title: hasNote ? 'Note' : 'Add a note',
+                        subtitle: hasNote
+                            ? workout.notes!
+                            : 'How it felt, what got in the way',
+                        onTap: () => _editNotes(context, ref, detail),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: Space.section),
+                if (detail.entries.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: Space.gutter),
+                    child: EmptyBox(
+                      icon: Icons.inbox_outlined,
+                      message: 'This workout was finished without anything '
+                          'logged in it.',
+                    ),
+                  )
+                else ...[
+                  // Count as heading (§7): "6 exercises" says more than the
+                  // word does on its own.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: Space.gutter),
+                    child: SectionHeader(
+                      '${detail.entries.length} exercise'
+                      '${detail.entries.length == 1 ? '' : 's'}',
+                    ),
+                  ),
+                  for (var i = 0; i < detail.entries.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: c.border),
+                    _ExerciseBlock(entry: detail.entries[i]),
+                  ],
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// The three things you can do to a logged day, in a sheet rather than a
+  /// popup menu — a menu anchored to a glyph is the one surface in this app
+  /// that never got a design.
+  Future<void> _showActions(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutDetail detail,
+  ) async {
+    final hasNote = detail.workout.notes?.isNotEmpty == true;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => AppSheet(
+        title: detail.session?.name ?? 'Ad-hoc session',
+        subtitle: DateFormat('d MMMM yyyy')
+            .format(dateFromDayKey(detail.workout.dayKey)),
+        children: [
+          ListCard(
+            children: [
+              AppRow(
+                icon: Icons.edit_calendar_outlined,
+                title: 'Change the date',
+                onTap: () => Navigator.of(sheet).pop('date'),
+              ),
+              AppRow(
+                icon: Icons.sticky_note_2_outlined,
+                title: hasNote ? 'Edit the note' : 'Add a note',
+                onTap: () => Navigator.of(sheet).pop('notes'),
+              ),
+              AppRow(
+                icon: Icons.delete_outline_rounded,
+                title: 'Delete this session',
+                tint: sheet.c.negative,
+                onTap: () => Navigator.of(sheet).pop('delete'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'date':
+        await _editDate(context, ref, detail);
+      case 'notes':
+        await _editNotes(context, ref, detail);
+      case 'delete':
+        await _delete(context, ref, detail);
+    }
   }
 
   Future<void> _editDate(
@@ -263,109 +292,208 @@ class WorkoutDetailScreen extends ConsumerWidget {
   }
 }
 
-class _ExerciseBlock extends StatelessWidget {
+/// One exercise, collapsed to what it came to. Tapping it opens the sets.
+///
+/// Full-bleed, no card: the block is separated from its neighbours by a
+/// hairline, which is what makes a day of six exercises read as one list rather
+/// than six panels (§8).
+class _ExerciseBlock extends ConsumerStatefulWidget {
   const _ExerciseBlock({required this.entry});
 
   final ExerciseEntry entry;
 
   @override
+  ConsumerState<_ExerciseBlock> createState() => _ExerciseBlockState();
+}
+
+class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final entry = widget.entry;
     final done = entry.sets.where((s) => s.isDone).toList();
     final skipped = entry.workoutExercise.skipReason != SkipReason.none;
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-          horizontal: Space.lg, vertical: Space.md),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ExerciseHistoryScreen(exerciseId: entry.exercise.id),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(entry.exercise.name, style: context.t.titleSmall),
-              ),
-              if (skipped)
-                Pill(entry.workoutExercise.skipReason.label, color: c.negative),
-              const SizedBox(width: Space.sm),
-              Icon(Icons.history, size: 16, color: c.textTertiary),
-            ],
-          ),
-          // Sets logged before the skip are shown under it. Hiding them made
-          // history disagree with itself: they survived, they fed prefill and
-          // the progress chart, and only these views pretended otherwise.
-          const SizedBox(height: Space.sm),
-          if (skipped && done.isNotEmpty)
-            Text(
-              'Stopped after ${done.length} '
-              '${done.length == 1 ? 'set' : 'sets'}',
-              style: context.t.labelSmall?.copyWith(color: c.negative),
+    // Sets logged before the skip are kept. Hiding them made history disagree
+    // with itself: they survived, they fed prefill and the progress chart, and
+    // only these views pretended otherwise.
+    final summary = done.isEmpty
+        ? (skipped ? 'Not trained' : 'Nothing logged')
+        : [
+            '${done.length} set${done.length == 1 ? '' : 's'}',
+            _topLoad(done, entry.exercise, unit),
+            if (skipped) 'then stopped',
+          ].join(' · ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Pressable(
+          scale: 0.99,
+          onTap: done.isEmpty ? null : () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Space.gutter, vertical: Space.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.exercise.name,
+                        style: context.t.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: Space.xxs),
+                      Text(
+                        summary,
+                        style: context.t.bodyMedium?.copyWith(
+                          color: skipped && done.isEmpty ? c.negative : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (skipped) ...[
+                  const SizedBox(width: Space.sm),
+                  Pill(entry.workoutExercise.skipReason.label,
+                      color: c.negative),
+                ],
+                if (done.isNotEmpty) ...[
+                  const SizedBox(width: Space.sm),
+                  AnimatedRotation(
+                    turns: _open ? 0.25 : 0,
+                    duration: Motion.base,
+                    curve: Motion.curve,
+                    child: Icon(Icons.chevron_right_rounded,
+                        size: 20, color: c.textTertiary),
+                  ),
+                ],
+              ],
             ),
-          if (done.isEmpty)
-            Text(
-              skipped ? 'Not trained' : 'Nothing logged',
-              style: context.t.labelSmall,
-            )
-          else
-            for (final set in done)
-              _SetLine(set: set, exercise: entry.exercise),
-        ],
-      ),
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Space.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < done.length; i++) ...[
+                  if (i > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 60),
+                      child: Divider(height: 1, color: c.border),
+                    ),
+                  _SetLine(
+                    set: done[i],
+                    exercise: entry.exercise,
+                    index: _workingIndex(done, i),
+                  ),
+                ],
+                const SizedBox(height: Space.sm),
+                Padding(
+                  padding: const EdgeInsets.only(left: Space.gutter),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: LinkAction(
+                      'All ${entry.exercise.name} history',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ExerciseHistoryScreen(exerciseId: entry.exercise.id),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
+  }
+
+  /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
+  /// are excluded — a 20 kg warm-up is not what the day was about.
+  static String _topLoad(List<SetLog> done, Exercise exercise, WeightUnit unit) {
+    // A copy: [done] is the list the rows below are rendered from, and sorting
+    // it in place would shuffle the sets out of the order they were performed.
+    final counted = done.where((s) => s.setType != SetType.warmup).toList();
+    final pool = counted.isEmpty ? [...done] : counted;
+    pool.sort((a, b) => ((b.weight ?? b.addedWeight) ?? 0)
+        .compareTo((a.weight ?? a.addedWeight) ?? 0));
+    return _SetLine._load(pool.first, exercise, unit);
+  }
+
+  /// The number on the chip. Warm-ups and continuations carry a letter instead,
+  /// so they do not consume a working-set number — the same count the log
+  /// screen shows while you are in the session.
+  static int _workingIndex(List<SetLog> done, int i) {
+    var n = 0;
+    for (var j = 0; j <= i; j++) {
+      final t = done[j].setType;
+      if (t != SetType.warmup && !t.isContinuation) n++;
+    }
+    return n;
   }
 }
 
-/// One logged set. Continuation sets (drop, rest-pause) are indented under the
-/// set they extend, the same way the log screen shows them.
+/// One logged set: index chip, then the load and reps as one phrase.
 class _SetLine extends ConsumerWidget {
-  const _SetLine({required this.set, required this.exercise});
+  const _SetLine({
+    required this.set,
+    required this.exercise,
+    required this.index,
+  });
 
   final SetLog set;
   final Exercise exercise;
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-    final indent = set.setType.isContinuation;
+    final short = set.setType.shortLabel;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: indent ? Space.lg : 0,
-        top: Space.xs,
-      ),
+      padding: const EdgeInsets.symmetric(
+          horizontal: Space.gutter, vertical: Space.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
+          Container(
             width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.surfaceHigh,
+              shape: BoxShape.circle,
+            ),
             child: Text(
-              set.setType.shortLabel.isEmpty ? '·' : set.setType.shortLabel,
-              style: context.t.labelSmall?.copyWith(
-                color: set.setType == SetType.working
-                    ? c.textTertiary
-                    : c.textSecondary,
-              ),
+              short.isEmpty ? '$index' : short,
+              style: context.t.bodySmall?.copyWith(color: c.textPrimary),
             ),
           ),
+          const SizedBox(width: Space.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_load(set, exercise, unit), style: context.t.labelLarge),
+                Text(
+                  '${_load(set, exercise, unit)} × ${set.reps ?? 0}',
+                  style: context.t.labelLarge,
+                ),
                 if (set.note != null && set.note!.isNotEmpty)
-                  Text(set.note!, style: context.t.labelSmall),
+                  Text(set.note!, style: context.t.bodySmall),
               ],
             ),
-          ),
-          Text(
-            '${set.reps ?? 0} reps',
-            style: context.t.labelMedium?.copyWith(color: c.textSecondary),
           ),
         ],
       ),

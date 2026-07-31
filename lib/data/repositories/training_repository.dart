@@ -119,11 +119,31 @@ class ProgressPoint {
   final double volume;
 }
 
-class HistoryCell {
-  const HistoryCell({required this.sets, required this.skipReason});
+/// What History's masthead says about itself: how much there is and how far
+/// back it goes. Both null on an empty database — a span is not zero, it is
+/// absent, and the header prints neither rather than inventing a date.
+class HistoryOverview {
+  const HistoryOverview({
+    required this.sessions,
+    required this.firstDayKey,
+    required this.lastDayKey,
+  });
 
-  final List<SetLog> sets;
-  final SkipReason skipReason;
+  final int sessions;
+
+  final int? firstDayKey;
+  final int? lastDayKey;
+
+  /// Whether the history covers more than one calendar month. Below that,
+  /// "since July 2026" is a span dressed up out of a single day.
+  bool get spansMonths {
+    final first = firstDayKey;
+    final last = lastDayKey;
+    if (first == null || last == null) return false;
+    return first ~/ 100 != last ~/ 100;
+  }
+
+  bool get isEmpty => sessions == 0;
 }
 
 /// Where a page of history ended, so the next page can continue from it.
@@ -144,6 +164,7 @@ class WorkoutSummary {
   const WorkoutSummary({
     required this.workout,
     required this.sessionName,
+    required this.exerciseNames,
     required this.exerciseCount,
     required this.setCount,
     required this.skippedCount,
@@ -153,6 +174,10 @@ class WorkoutSummary {
 
   /// Null when the session template has since been deleted.
   final String? sessionName;
+
+  /// In the order they were performed. The history row prints them as one
+  /// ellipsized line: what a day *was* is the movements in it, not a count.
+  final List<String> exerciseNames;
 
   final int exerciseCount;
   final int setCount;
@@ -212,27 +237,6 @@ class ExercisePerformance {
   final double? best1RM;
 
   HistoryCursor get cursor => HistoryCursor(startedAt: startedAt, id: workoutId);
-}
-
-/// One session's history, shaped as a table: exercises down, dates across.
-class SessionHistory {
-  const SessionHistory({
-    required this.workouts,
-    required this.exerciseOrder,
-    required this.exercises,
-    required this.cells,
-  });
-
-  /// Newest first — the column order on screen.
-  final List<Workout> workouts;
-
-  final List<String> exerciseOrder;
-  final Map<String, Exercise> exercises;
-
-  /// workoutId → exerciseId → cell.
-  final Map<String, Map<String, HistoryCell>> cells;
-
-  bool get isEmpty => workouts.isEmpty;
 }
 
 class TrainingRepository {
@@ -758,8 +762,16 @@ class TrainingRepository {
     final sessionNames = {for (final s in sessions) s.id: s.name};
 
     final entries = await (db.select(db.workoutExercises)
-          ..where((t) => t.workoutId.isIn(workoutIds) & t.deletedAt.isNull()))
+          ..where((t) => t.workoutId.isIn(workoutIds) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.orderIndex)]))
         .get();
+
+    final exerciseIds = entries.map((e) => e.exerciseId).toSet().toList();
+    final exercises = exerciseIds.isEmpty
+        ? <Exercise>[]
+        : await (db.select(db.exercises)..where((t) => t.id.isIn(exerciseIds)))
+            .get();
+    final exerciseNames = {for (final e in exercises) e.id: e.name};
 
     final setCounts = <String, int>{};
     if (entries.isNotEmpty) {
@@ -780,11 +792,16 @@ class TrainingRepository {
     return [
       for (final w in workouts)
         () {
-          final mine = entries.where((e) => e.workoutId == w.id);
+          final mine = entries.where((e) => e.workoutId == w.id).toList();
           return WorkoutSummary(
             workout: w,
             sessionName:
                 w.sessionId == null ? null : sessionNames[w.sessionId!],
+            exerciseNames: [
+              for (final e in mine)
+                if (exerciseNames[e.exerciseId] != null)
+                  exerciseNames[e.exerciseId]!,
+            ],
             exerciseCount: mine.length,
             setCount: mine.fold(0, (sum, e) => sum + (setCounts[e.id] ?? 0)),
             skippedCount:
@@ -920,79 +937,6 @@ class TrainingRepository {
           );
         }(),
     ];
-  }
-
-  /// Everything needed to render one session's history side by side.
-  ///
-  /// Rows are the union of every exercise ever done in this session, ordered by
-  /// the most recent workout that contained them, so a swap made three weeks
-  /// ago doesn't scramble the table.
-  Future<SessionHistory> sessionHistory(String sessionId, {int limit = 12}) async {
-    final workouts = await (db.select(db.workouts)
-          ..where((t) =>
-              t.sessionId.equals(sessionId) &
-              t.status.equalsValue(WorkoutStatus.completed) &
-              t.deletedAt.isNull())
-          ..orderBy(_newestFirst)
-          ..limit(limit))
-        .get();
-
-    if (workouts.isEmpty) {
-      return const SessionHistory(
-        workouts: [],
-        exerciseOrder: [],
-        exercises: {},
-        cells: {},
-      );
-    }
-
-    final workoutIds = workouts.map((w) => w.id).toList();
-    final rows = await (db.select(db.workoutExercises).join([
-      innerJoin(db.exercises, db.exercises.id.equalsExp(db.workoutExercises.exerciseId)),
-    ])
-          ..where(db.workoutExercises.workoutId.isIn(workoutIds) &
-              db.workoutExercises.deletedAt.isNull())
-          ..orderBy([OrderingTerm(expression: db.workoutExercises.orderIndex)]))
-        .get();
-
-    final weIds = rows.map((r) => r.readTable(db.workoutExercises).id).toList();
-    final sets = weIds.isEmpty
-        ? <SetLog>[]
-        : await (db.select(db.setLogs)
-              ..where((t) => t.workoutExerciseId.isIn(weIds) & t.deletedAt.isNull())
-              ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
-            .get();
-
-    final setsByWe = <String, List<SetLog>>{};
-    for (final s in sets) {
-      setsByWe.putIfAbsent(s.workoutExerciseId, () => []).add(s);
-    }
-
-    final exercises = <String, Exercise>{};
-    final cells = <String, Map<String, HistoryCell>>{};
-    final order = <String>[];
-
-    // Walk newest first so the freshest layout wins the row order.
-    for (final workout in workouts) {
-      for (final r in rows) {
-        final we = r.readTable(db.workoutExercises);
-        if (we.workoutId != workout.id) continue;
-        final exercise = r.readTable(db.exercises);
-        exercises[exercise.id] = exercise;
-        if (!order.contains(exercise.id)) order.add(exercise.id);
-        cells.putIfAbsent(workout.id, () => {})[exercise.id] = HistoryCell(
-          sets: setsByWe[we.id] ?? const [],
-          skipReason: we.skipReason,
-        );
-      }
-    }
-
-    return SessionHistory(
-      workouts: workouts,
-      exerciseOrder: order,
-      exercises: exercises,
-      cells: cells,
-    );
   }
 
   /// Bodyweight history, used to score bodyweight and BW+ lifts.
@@ -1447,13 +1391,6 @@ class TrainingRepository {
     return db.watchQuery(
       [db.workouts, db.workoutExercises, db.setLogs],
       () => workoutDetail(workoutId),
-    );
-  }
-
-  Stream<SessionHistory> watchSessionHistory(String sessionId, {int limit = 12}) {
-    return db.watchQuery(
-      [db.workouts, db.workoutExercises, db.setLogs],
-      () => sessionHistory(sessionId, limit: limit),
     );
   }
 
@@ -2186,6 +2123,32 @@ class TrainingRepository {
     });
   }
 
+  /// How much history there is, in one row: how many sessions, and the first
+  /// and last day one was trained.
+  ///
+  /// One aggregate rather than a page of rows — the masthead needs the totals
+  /// before the feed has scrolled anywhere near them.
+  Future<HistoryOverview> historyOverview() async {
+    final counted = db.workouts.id.count();
+    final first = db.workouts.dayKey.min();
+    final last = db.workouts.dayKey.max();
+    final row = await (db.selectOnly(db.workouts)
+          ..addColumns([counted, first, last])
+          ..where(db.workouts.deletedAt.isNull() &
+              db.workouts.status.equalsValue(WorkoutStatus.completed)))
+        .getSingle();
+
+    return HistoryOverview(
+      sessions: row.read(counted) ?? 0,
+      firstDayKey: row.read(first),
+      lastDayKey: row.read(last),
+    );
+  }
+
+  Stream<HistoryOverview> watchHistoryOverview() {
+    return db.watchQuery([db.workouts], historyOverview);
+  }
+
   /// Completed workouts logged under a regime. Shown before deleting one, so
   /// "this removes the programme, not the training" is a number rather than a
   /// promise.
@@ -2198,40 +2161,5 @@ class TrainingRepository {
               db.workouts.status.equalsValue(WorkoutStatus.completed)))
         .getSingle();
     return row.read(counted) ?? 0;
-  }
-
-  /// Sessions with at least one completed workout, newest activity first.
-  ///
-  /// Deliberately not "the active regime's sessions": the side-by-side table is
-  /// a history view, and switching regimes must not hide the history of the one
-  /// that came before.
-  Future<List<Session>> sessionsWithHistory() async {
-    final lastTrained = db.workouts.startedAt.max();
-    final rows = await (db.selectOnly(db.workouts)
-          ..addColumns([db.workouts.sessionId, lastTrained])
-          ..where(db.workouts.deletedAt.isNull() &
-              db.workouts.sessionId.isNotNull() &
-              db.workouts.status.equalsValue(WorkoutStatus.completed))
-          ..groupBy([db.workouts.sessionId])
-          ..orderBy([OrderingTerm(expression: lastTrained, mode: OrderingMode.desc)]))
-        .get();
-    if (rows.isEmpty) return const [];
-
-    final ids = [for (final r in rows) r.read(db.workouts.sessionId)!];
-    final sessions =
-        await (db.select(db.sessions)..where((t) => t.id.isIn(ids))).get();
-    final byId = {for (final s in sessions) s.id: s};
-
-    return [
-      for (final id in ids)
-        if (byId[id] != null) byId[id]!,
-    ];
-  }
-
-  Stream<List<Session>> watchSessionsWithHistory() {
-    return db.watchQuery(
-      [db.workouts, db.sessions],
-      sessionsWithHistory,
-    );
   }
 }

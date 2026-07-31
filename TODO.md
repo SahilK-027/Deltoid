@@ -49,9 +49,47 @@ a device before the next starts.
       The keypad lost its title and its readout with it: both captioned what
       the screen behind them already said. Entry is capped by value (1000 for a
       load, 999 reps), not by digit count.
-- [ ] **3 · History + workout detail** — the furthest from the language today.
-      Date-group headers, identity tiles, expandable exercise rows. Layout only:
-      keyset paging and `HistoryCursor` are not touched.
+- [ ] **3 · History + workout detail** — header band + segmented pill for the
+      three views, month headings in `section` on the page background, and the
+      feed rebuilt as full-bleed rows: identity tile in the regime's colour
+      (amber on a deload), session name, a meta line, and the movements as one
+      ellipsized line. Cards are gone from both screens.
+
+      The exercise *count* went with them — the names are the same fact and the
+      useful one, so `WorkoutSummary` now carries `regimeName` and
+      `exerciseNames` instead of the feed inventing a count to print. Keyset
+      paging and `HistoryCursor` untouched.
+
+      Workout detail lost its date card to the header band (weekday + date as
+      the eyebrow, session name as the title, facts as one line under it); the
+      note is a row, the popup menu is a sheet, and exercises are full-bleed
+      rows that expand into set lines — index chip, `60 kg × 8`, inset
+      dividers — with the per-exercise history as an underlined link inside the
+      expansion rather than the whole block being a link somewhere else.
+
+      The Table view is gone (see **Built** → History). Two views left, so the
+      segmented pill carries two segments.
+
+      The masthead is composed across the band's width, not stacked flush
+      left: `HISTORY` on the left, the session total on the right in `value`
+      over a `micro` caption, and the segmented pill spanning both underneath
+      (`SegmentedPill.expand`). Backed by one aggregate, `historyOverview`.
+
+      The total is **sessions**, not sets: after years of training a set count
+      runs to five digits and the header becomes a wall, while the session
+      count stays three and is what the page is a list of. Month headings carry
+      their own count on the right, of the rows loaded under them.
+
+      What the masthead deliberately does *not* say: `SINCE JULY 2026` on a
+      history one day old — the eyebrow appears only once the log crosses a
+      calendar month, the same honesty rule as the sessions-per-week rate — and
+      not how long since you trained, which is Today's question. The
+      end-of-list footer dropped its count and now hides entirely on a list
+      that never filled a page.
+
+      Row meta lost `0 min`, a clock that never ran, and the programme name,
+      which the tile already carries as colour and which ellipsized the line on
+      a phone. `WorkoutSummary.regimeName` went with it.
 - [ ] **4 · Progress + exercise history** — builds the chart language once:
       dashed gridlines, right-hand Y labels, range pill, legend chips, em-dash
       empty state instead of a gridded void. Three screens consume it.
@@ -115,9 +153,13 @@ layout moved — which, after the rebrand, is everything.
 - **Stale sessions** — a workout left open past 24 hours with nothing logged in
   it is abandoned at launch; one with sets in it is kept, and Today offers
   Finish (saved to the day it was started) or Discard.
-- **History** — three views. The Notion table was driven on the emulator; the
-  paged session feed, the day detail and the per-exercise history are
-  unit-tested against a real SQLite database but not clicked through.
+- **History** — two views: the paged session feed and the per-exercise index,
+  both unit-tested against a real SQLite database but not clicked through. The
+  third — the Notion table, exercises down the side and one column per date —
+  was deleted in step 3, along with `sessionHistory`, `SessionHistory` and
+  `HistoryCell`. The feed answers "which day" better and the per-exercise
+  history answers "how has this moved" better; the table was the spreadsheet
+  this app replaced, re-created inside it.
 - **Progress** _(driven on the emulator)_ — e1RM over time, one line per session
   slot, 3M/1Y/All, stall detection. Deload weeks excluded so a light week isn't
   drawn as a regression.
@@ -154,7 +196,7 @@ layout moved — which, after the rebrand, is everything.
   long after the undo snackbar is gone.
 - Light / dark / system theme, adaptive launcher icon.
 
-**167 tests**: prefill rules (including a deload never re-scaling a light week),
+**200 tests**: prefill rules (including a deload never re-scaling a light week),
 cycle/deload timing and closing a cycle early, metrics, unit conversion, keypad
 key handling, backup round-trip, history paging, deleting a workout (including
 the cycle it reopens), swap-in-place, mid-session prefill, date and note
