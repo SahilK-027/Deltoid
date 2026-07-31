@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- `bg` from the app's palette, so the launch window and the first frame
-         Flutter paints are the same colour. -->
-    <color name="launch_background">#F4F4F4</color>
-</resources>

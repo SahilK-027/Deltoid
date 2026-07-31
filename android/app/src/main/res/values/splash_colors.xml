@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- `bg` from the app's palette, so the launch window and the first frame
+         Flutter paints are the same colour.
+
+         Named `splash_background`, not `launch_background`: that name already
+         belongs to the layer-list in drawable/. A value resource and a drawable
+         file sharing a name makes the drawable unresolvable, and the build
+         fails with "resource drawable/launch_background not found" while the
+         file is sitting right there. -->
+    <color name="splash_background">#F4F4F4</color>
+</resources>
