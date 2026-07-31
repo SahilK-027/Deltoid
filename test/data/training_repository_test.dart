@@ -1339,6 +1339,76 @@ void main() {
     });
   });
 
+  group('drop sets', () {
+    /// The first exercise of a fresh Push 1, with its three template sets.
+    Future<({String weId, List<SetLog> sets})> firstExercise() async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final detail = await repo.workoutDetail(id);
+      final entry = detail!.entries.first;
+      return (weId: entry.workoutExercise.id, sets: entry.sets);
+    }
+
+    Future<List<SetLog>> setsOf(String weId) async {
+      final rows =
+          await (db.select(db.setLogs)
+                ..where(
+                  (t) =>
+                      t.workoutExerciseId.equals(weId) & t.deletedAt.isNull(),
+                )
+                ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+              .get();
+      return rows;
+    }
+
+    test('a drop lands next to its own set, not at the end', () async {
+      final (:weId, :sets) = await firstExercise();
+
+      // The `+` on the first set's group. Appending would have put this row
+      // at the bottom of the exercise — which is exactly what it did, and on
+      // screen the new leg appeared under a different group entirely.
+      final id = await repo.addSetAfter(
+        weId,
+        afterSetId: sets.first.id,
+        type: SetType.drop,
+      );
+
+      final after = await setsOf(weId);
+      expect(after.length, sets.length + 1);
+      expect(after[1].id, id, reason: 'the leg belongs directly under its set');
+      expect(after[1].setType, SetType.drop);
+      // And everything below it shuffled down rather than colliding.
+      expect(
+        after.map((s) => s.setIndex),
+        List.generate(after.length, (i) => i),
+      );
+      expect(after[2].id, sets[1].id);
+    });
+
+    test('deleting the head of a group takes its legs with it', () async {
+      final (:weId, :sets) = await firstExercise();
+      final legA = await repo.addSetAfter(
+        weId,
+        afterSetId: sets.first.id,
+        type: SetType.drop,
+      );
+      final legB = await repo.addSetAfter(
+        weId,
+        afterSetId: legA,
+        type: SetType.drop,
+      );
+
+      await repo.deleteSets([sets.first.id, legA, legB]);
+
+      final after = await setsOf(weId);
+      expect(after.map((s) => s.id), [sets[1].id, sets[2].id]);
+    });
+  });
+
   test('the table lists sessions from older regimes too', () async {
     final push1 = await sessionNamed('Push 1');
     await logSession(push1);

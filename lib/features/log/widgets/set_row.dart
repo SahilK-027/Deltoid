@@ -323,9 +323,7 @@ class _ValueCellState extends State<_ValueCell> {
           // signals for one state.
           color: widget.active
               ? Colors.transparent
-              : (_flash
-                    ? c.surfaceHighest
-                    : (widget.done ? Colors.transparent : c.surfaceHigh)),
+              : (_flash ? c.surfaceHighest : c.surfaceHigh),
           borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
@@ -436,22 +434,40 @@ class _DoneBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final fill = done ? (beaten ? c.positive : c.accent) : c.surfaceHigh;
 
+    // An actual checkbox: empty square when open, filled when ticked. It was a
+    // filled grey block with a grey tick already in it, which read as
+    // "completed" on every row and made the real completed state invisible.
     return Pressable(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: Motion.fast,
+      child: SizedBox(
         width: SetRow.doneColumn,
         height: SetRow.fieldHeight,
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(Radii.sm),
-        ),
-        child: Icon(
-          beaten && done ? Icons.trending_up_rounded : Icons.check_rounded,
-          size: 18,
-          color: done ? c.onAccent : c.textTertiary,
+        child: Center(
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: done
+                  ? (beaten ? c.positive : c.accent)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(Radii.xs),
+              border: Border.all(
+                color: done ? Colors.transparent : c.textTertiary,
+                width: 2,
+              ),
+            ),
+            child: done
+                ? Icon(
+                    beaten
+                        ? Icons.trending_up_rounded
+                        : Icons.check_rounded,
+                    size: 18,
+                    color: c.onAccent,
+                  )
+                : null,
+          ),
         ),
       ),
     );

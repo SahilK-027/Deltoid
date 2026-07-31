@@ -175,9 +175,15 @@ Future<void> showExerciseMenu(
 Future<void> showSetActions(
   BuildContext context,
   WidgetRef ref,
-  SetLog set,
-  int position,
-) async {
+  SetLog set, {
+  /// What the row's chip prints — `2`, `W`, `D`. Not the raw position: the
+  /// sheet used to head itself "Set 4" for the row marked `2` whenever
+  /// warm-ups or drop legs sat above it, because it counted rows.
+  required String label,
+
+  /// Everything this delete removes. A drop group's head takes its legs.
+  required List<String> deleteIds,
+}) async {
   final repo = ref.read(trainingRepositoryProvider);
 
   await showModalBottomSheet<void>(
@@ -191,8 +197,7 @@ Future<void> showSetActions(
             Padding(
               padding:
                   const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-              child: Text('Set ${position + 1}',
-                  style: sheetContext.t.titleLarge),
+              child: Text('Set $label', style: sheetContext.t.titleLarge),
             ),
             Padding(
               padding:
@@ -259,12 +264,15 @@ Future<void> showSetActions(
             ListTile(
               leading: Icon(Icons.delete_outline, color: sheetContext.c.negative),
               title: Text(
-                'Delete set',
+                deleteIds.length > 1 ? 'Delete drop set' : 'Delete set',
                 style: TextStyle(color: sheetContext.c.negative),
               ),
+              subtitle: deleteIds.length > 1
+                  ? Text('Removes all ${deleteIds.length} legs')
+                  : null,
               onTap: () async {
                 final navigator = Navigator.of(sheetContext);
-                await repo.deleteSet(set.id);
+                await repo.deleteSets(deleteIds);
                 navigator.pop();
               },
             ),

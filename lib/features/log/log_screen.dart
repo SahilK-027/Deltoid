@@ -1014,13 +1014,15 @@ class _ExercisePage extends ConsumerWidget {
     final done = entry.sets.where((s) => s.isDone).length;
     final allDone = entry.sets.isNotEmpty && done == entry.sets.length;
 
-    // Warm-ups are not set 1. Counting them shifts every working set's number
-    // by however many you happened to do, so `Set 3 of 4` stops matching the
-    // programme it came from.
-    final counted = entry.sets
-        .where((s) => s.setType != SetType.warmup && !s.setType.isContinuation)
+    // Warm-ups are not set 1, and a drop run is one set rather than three:
+    // counting rows shifted every number away from the programme it came from.
+    final groups = _groupSets(entry.sets);
+    final counted = groups
+        .where((g) => g.sets.first.setType != SetType.warmup)
         .toList();
-    final countedDone = counted.where((s) => s.isDone).length;
+    final countedDone = counted
+        .where((g) => g.sets.every((s) => s.isDone))
+        .length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -1097,7 +1099,7 @@ class _ExercisePage extends ConsumerWidget {
             child: Column(
               children: [
                 SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
-                for (final group in _groupSets(entry.sets))
+                for (final group in groups)
                   _SetGroup(
                     group: group,
                     entry: entry,
@@ -1107,10 +1109,6 @@ class _ExercisePage extends ConsumerWidget {
                     onEdit: onEdit,
                     rowKeyFor: rowKeyFor,
                     onToggleDone: onToggleDone,
-                    onAddDrop: () => ref
-                        .read(trainingRepositoryProvider)
-                        .addSet(entry.workoutExercise.id,
-                            type: SetType.drop),
                   ),
                 // The add button lives in the index column, directly under the
                 // numbers it continues — no label, because a `+` under a
@@ -1297,6 +1295,7 @@ List<_SetGroupData> _groupSets(List<SetLog> sets) {
         at.add(i);
         i++;
       }
+      counted++;
       groups.add(_SetGroupData(run, at, run.first.setType.shortLabel, true));
       continue;
     }
@@ -1319,7 +1318,6 @@ class _SetGroup extends ConsumerWidget {
     required this.onEdit,
     required this.rowKeyFor,
     required this.onToggleDone,
-    required this.onAddDrop,
   });
 
   final _SetGroupData group;
@@ -1330,108 +1328,198 @@ class _SetGroup extends ConsumerWidget {
   final void Function(SetLog, SetField) onEdit;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
-  final VoidCallback onAddDrop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
     final prefill = ref
         .watch(workoutPrefillProvider(entry.workoutExercise.workoutId))
         .valueOrNull?[entry.exercise.id];
+    final repo = ref.read(trainingRepositoryProvider);
+    final last = group.sets.length - 1;
 
-    final rows = [
-      for (var k = 0; k < group.sets.length; k++)
-        KeyedSubtree(
-          key: rowKeyFor(group.sets[k].id),
-          child: SetRow(
-            set: group.sets[k],
-            loadMode: entry.exercise.loadMode,
-            unit: unit,
-            ghost: _ghostSet(prefill, group.positions[k]),
-            editing: editing,
-            buffer: buffer,
-            onEdit: onEdit,
-            onToggleDone: onToggleDone,
-          ),
-        ),
-    ];
-
-    final chip = SetIndexChip(
-      type: group.sets.first.setType,
-      label: group.label,
-      done: group.sets.first.isDone,
-      onTap: () => showSetActions(
-        context,
-        ref,
-        group.sets.first,
-        group.positions.first,
-      ),
-    );
-
-    if (!group.isDrop) {
-      return Padding(
-        padding: const EdgeInsets.only(left: Space.lg),
-        child: Row(
-          children: [
-            chip,
-            const SizedBox(width: Space.sm),
-            Expanded(child: rows.single),
-          ],
-        ),
-      );
-    }
-
-    // The drop group: chip, then a spine holding the run together, then the
-    // `+` that extends it. Drawn as a fixed-width column beside the rows so
-    // every field stays in the same place it is in every other row — the
-    // indent this replaces pushed the whole table sideways.
+    // One index cell per row, always the same height as the row beside it.
+    // The previous version stacked chip / spine / plus in a column of its own
+    // and let [IntrinsicHeight] size the group, which stretched the first row
+    // taller than the rest and slid every chip out of line with its row.
     return Padding(
       padding: const EdgeInsets.only(left: Space.lg),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: SetRow.indexColumn,
-              child: Column(
-                children: [
-                  chip,
-                  Expanded(
-                    child: Center(
-                      child: Container(
-                        width: SetRow.indexColumn,
-                        decoration: BoxDecoration(
-                          color: c.surfaceHigh,
-                          borderRadius: BorderRadius.circular(Radii.pill),
-                        ),
+      child: Column(
+        children: [
+          for (var k = 0; k < group.sets.length; k++)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _IndexCell(
+                  group: group,
+                  position: k,
+                  // The spine only exists to tie a drop run together.
+                  spine: group.isDrop
+                      ? (k == 0
+                            ? _Spine.top
+                            : (k == last ? _Spine.bottom : _Spine.middle))
+                      : _Spine.none,
+                  child: switch (k) {
+                    0 => SetIndexChip(
+                      type: group.sets.first.setType,
+                      label: group.label,
+                      done: group.sets.first.isDone,
+                      onTap: () => _openActions(context, ref, k),
+                    ),
+                    // The `+` rides in the last row's cell, as the reference
+                    // does, rather than claiming a slot of its own and making
+                    // the group a row taller than the sets in it.
+                    _ when group.isDrop && k == last => _RoundButton(
+                      icon: Icons.add_rounded,
+                      onTap: () => repo.addSetAfter(
+                        entry.workoutExercise.id,
+                        afterSetId: group.sets.last.id,
+                        type: SetType.drop,
                       ),
                     ),
-                  ),
-                  Pressable(
-                    onTap: onAddDrop,
-                    child: Container(
-                      width: SetRow.indexColumn,
-                      height: SetRow.indexColumn,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: c.surfaceHigh,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: c.textSecondary,
-                      ),
+                    // A leg with no chip still needs a way into its own
+                    // actions — it could not be deleted at all before.
+                    _ => _CellTapTarget(onTap: () => _openActions(context, ref, k)),
+                  },
+                ),
+                const SizedBox(width: Space.sm),
+                Expanded(
+                  child: KeyedSubtree(
+                    key: rowKeyFor(group.sets[k].id),
+                    child: SetRow(
+                      set: group.sets[k],
+                      loadMode: entry.exercise.loadMode,
+                      unit: unit,
+                      ghost: _ghostSet(prefill, group.positions[k]),
+                      editing: editing,
+                      buffer: buffer,
+                      onEdit: onEdit,
+                      onToggleDone: onToggleDone,
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+          // A one-legged drop group has nowhere to put the `+`, so it gets a
+          // stub on the end of the spine instead.
+          if (group.isDrop && group.sets.length == 1)
+            Row(
+              children: [
+                _IndexCell(
+                  group: group,
+                  position: 1,
+                  spine: _Spine.bottom,
+                  height: 30,
+                  child: _RoundButton(
+                    icon: Icons.add_rounded,
+                    size: 26,
+                    onTap: () => repo.addSetAfter(
+                      entry.workoutExercise.id,
+                      afterSetId: group.sets.last.id,
+                      type: SetType.drop,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openActions(BuildContext context, WidgetRef ref, int k) {
+    showSetActions(
+      context,
+      ref,
+      group.sets[k],
+      // The label the chip prints, not the raw position. Tapping the set
+      // marked `1` used to open a sheet headed "Set 2" whenever a warm-up or
+      // a drop sat above it.
+      label: k == 0 ? group.label : '${group.label} · leg ${k + 1}',
+      // Deleting the head of a drop group takes the whole group.
+      deleteIds: k == 0
+          ? [for (final s in group.sets) s.id]
+          : [group.sets[k].id],
+    );
+  }
+}
+
+enum _Spine { none, top, middle, bottom }
+
+/// The fixed-width column down the left of the table. For a drop group the
+/// cells join into one capsule behind the chip, the legs and the `+`.
+class _IndexCell extends StatelessWidget {
+  const _IndexCell({
+    required this.group,
+    required this.position,
+    required this.spine,
+    required this.child,
+    this.height,
+  });
+
+  final _SetGroupData group;
+  final int position;
+  final _Spine spine;
+  final Widget child;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    const r = Radius.circular(SetRow.indexColumn / 2);
+    return Container(
+      width: SetRow.indexColumn,
+      height: height,
+      alignment: Alignment.center,
+      decoration: spine == _Spine.none
+          ? null
+          : BoxDecoration(
+              color: c.surfaceHigh.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.vertical(
+                top: spine == _Spine.top ? r : Radius.zero,
+                bottom: spine == _Spine.bottom ? r : Radius.zero,
               ),
             ),
-            const SizedBox(width: Space.sm),
-            Expanded(child: Column(children: rows)),
-          ],
-        ),
+      child: child,
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, required this.onTap, this.size});
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final double? size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final d = size ?? SetRow.indexColumn;
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        width: d,
+        height: d,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: c.surfaceHigh, shape: BoxShape.circle),
+        child: Icon(icon, size: d * 0.55, color: c.textSecondary),
       ),
+    );
+  }
+}
+
+class _CellTapTarget extends StatelessWidget {
+  const _CellTapTarget({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: const SizedBox(width: SetRow.indexColumn, height: double.infinity),
     );
   }
 }

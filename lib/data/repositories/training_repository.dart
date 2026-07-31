@@ -1520,8 +1520,67 @@ class TrainingRepository {
     return id;
   }
 
-  Future<void> deleteSet(String setId) async {
-    await (db.update(db.setLogs)..where((t) => t.id.equals(setId))).write(
+  /// Inserts a set directly after [afterSetId] rather than at the end.
+  ///
+  /// A drop set's `+` adds a leg to *its* group. [addSet] appends to the
+  /// exercise, so pressing the `+` on the first group put the new row in the
+  /// last one — visibly the wrong place, and silently the wrong set.
+  Future<String> addSetAfter(
+    String workoutExerciseId, {
+    required String afterSetId,
+    SetType type = SetType.working,
+  }) async {
+    final id = newId();
+    await db.transaction(() async {
+      final sets =
+          await (db.select(db.setLogs)
+                ..where(
+                  (t) =>
+                      t.workoutExerciseId.equals(workoutExerciseId) &
+                      t.deletedAt.isNull(),
+                )
+                ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+              .get();
+
+      final at = sets.indexWhere((s) => s.id == afterSetId);
+      if (at < 0) return;
+
+      // Renumber from the back so no two rows hold the same index mid-flight.
+      for (var i = sets.length - 1; i > at; i--) {
+        await (db.update(db.setLogs)..where((t) => t.id.equals(sets[i].id)))
+            .write(
+              SetLogsCompanion(
+                setIndex: Value(i + 1),
+                updatedAt: Value(nowMs()),
+                dirty: const Value(true),
+              ),
+            );
+      }
+
+      await db
+          .into(db.setLogs)
+          .insert(
+            SetLogsCompanion.insert(
+              id: Value(id),
+              workoutExerciseId: workoutExerciseId,
+              setIndex: at + 1,
+              setType: Value(type),
+            ),
+          );
+    });
+    return id;
+  }
+
+  Future<void> deleteSet(String setId) => deleteSets([setId]);
+
+  /// Deletes several sets as one act.
+  ///
+  /// Deleting the head of a drop group takes its legs with it: the legs are
+  /// continuations of that set and mean nothing without it, and leaving them
+  /// behind orphaned a `D` run with no set to have dropped from.
+  Future<void> deleteSets(List<String> setIds) async {
+    if (setIds.isEmpty) return;
+    await (db.update(db.setLogs)..where((t) => t.id.isIn(setIds))).write(
       SetLogsCompanion(
         deletedAt: Value(nowMs()),
         updatedAt: Value(nowMs()),
