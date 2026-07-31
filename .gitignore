@@ -31,6 +31,10 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Not only the root one. `flutter build` also writes android/build/, and
+# android/build/reports/problems/problems-report.html was tracked there — so
+# every build dirtied the working tree with a generated file.
+**/build/
 /coverage/
 
 # Symbolication related
