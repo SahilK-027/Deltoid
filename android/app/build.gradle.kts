@@ -39,6 +39,14 @@ android {
     }
 }
 
+dependencies {
+    // Holds the launch window on screen until Dart says boot is done, so the
+    // mark is drawn once by the OS instead of once by the OS and again by
+    // Flutter. Also back-ports the API 31 splash to older versions, which is
+    // what keeps the two code paths the same size.
+    implementation("androidx.core:core-splashscreen:1.0.1")
+}
+
 flutter {
     source = "../.."
 }
