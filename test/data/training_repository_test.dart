@@ -1213,6 +1213,73 @@ void main() {
     expect(status.completedSessionIds, {push1.id});
   });
 
+  group('sweeping sessions left open', () {
+    /// Backdates the workout row itself: `startWorkout(at:)` moves the day key
+    /// but deliberately keeps the current clock time, and the sweep reads the
+    /// clock.
+    Future<void> backdate(String workoutId, Duration by) async {
+      await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
+          .write(WorkoutsCompanion(
+        startedAt: Value(nowMs() - by.inMilliseconds),
+      ));
+    }
+
+    test('discards one started a day ago with nothing logged in it', () async {
+      final id = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: (await sessionNamed('Push 1')).id,
+      );
+      await backdate(id, const Duration(hours: 30));
+
+      expect(await repo.sweepAbandonedWorkouts(), 1);
+
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      expect(today.openWorkout, isNull,
+          reason: 'a mis-tapped Start blocks every other session behind '
+              '"finish the one you are in" until it goes');
+      // Abandoned, not completed: it never happened, and history must not
+      // claim it did.
+      expect(today.hasHistory, isFalse);
+    });
+
+    test('keeps one with sets logged in it, however old', () async {
+      final id = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: (await sessionNamed('Push 1')).id,
+      );
+      final detail = await repo.workoutDetail(id);
+      await repo.updateSet(
+        detail!.entries.first.sets.first.id,
+        weight: const Value(60),
+        reps: const Value(8),
+        isDone: const Value(true),
+      );
+      await backdate(id, const Duration(days: 4));
+
+      expect(await repo.sweepAbandonedWorkouts(), 0);
+
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      expect(today.openWorkout?.id, id,
+          reason: 'trained it and forgot to press Finish is the common case; '
+              'deleting a real day to save a tap is not a trade the app makes');
+      expect(today.openWorkoutDoneSets, 1);
+    });
+
+    test('leaves a session started an hour ago alone', () async {
+      final id = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: (await sessionNamed('Push 1')).id,
+      );
+      await backdate(id, const Duration(hours: 1));
+
+      expect(await repo.sweepAbandonedWorkouts(), 0);
+      expect(
+        (await repo.todaySnapshot(heatmapFromDayKey: 0)).openWorkout?.id,
+        id,
+      );
+    });
+  });
+
   group('the Today snapshot', () {
     test('answers the whole screen in one call', () async {
       final push1 = await sessionNamed('Push 1');

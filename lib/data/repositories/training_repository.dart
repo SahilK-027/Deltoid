@@ -39,6 +39,7 @@ class TodaySnapshot {
     required this.status,
     required this.openWorkout,
     required this.openWorkoutOwner,
+    required this.openWorkoutDoneSets,
     required this.hasHistory,
     required this.exerciseNamesBySession,
     required this.recentCompleted,
@@ -57,6 +58,12 @@ class TodaySnapshot {
   /// active regime's — see [workoutOwner].
   final ({String? sessionName, String regimeId, String? regimeName})?
       openWorkoutOwner;
+
+  /// Sets actually ticked off in the open workout. Zero for a session started
+  /// and never worked in — the difference between "you left this running" and
+  /// "you mis-tapped Start three days ago", which is the only thing that
+  /// decides whether the app may throw it away on its own.
+  final int openWorkoutDoneSets;
 
   /// Whether anything has ever been finished — "brand new install" as opposed
   /// to "regime set up, nothing logged yet".
@@ -405,6 +412,9 @@ class TrainingRepository {
     Future<({String? sessionName, String regimeId, String? regimeName})?>
         ownerOf(Workout? w) async => w == null ? null : workoutOwner(w.id);
 
+    Future<int> doneOf(Workout? w) async =>
+        w == null ? 0 : doneSetCount(w.id);
+
     final (regime, open, history, recent) = await (
       regimeQuery.getSingleOrNull(),
       openQuery.getSingleOrNull(),
@@ -426,6 +436,7 @@ class TrainingRepository {
         status: null,
         openWorkout: open,
         openWorkoutOwner: await ownerOf(open),
+        openWorkoutDoneSets: await doneOf(open),
         hasHistory: history.isNotEmpty,
         lastCompleted: last,
         exerciseNamesBySession: const {},
@@ -439,10 +450,11 @@ class TrainingRepository {
           ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
         .get();
 
-    final (status, names, owner) = await (
+    final (status, names, owner, doneSets) = await (
       cycleStatus(regime.id),
       _exerciseNamesBySession(sessions.map((s) => s.id).toList()),
       ownerOf(open),
+      doneOf(open),
     ).wait;
 
     return TodaySnapshot(
@@ -451,6 +463,7 @@ class TrainingRepository {
       status: status,
       openWorkout: open,
       openWorkoutOwner: owner,
+      openWorkoutDoneSets: doneSets,
       hasHistory: history.isNotEmpty,
       lastCompleted: last,
       exerciseNamesBySession: names,
@@ -1762,6 +1775,54 @@ class TrainingRepository {
         ),
       );
     }
+  }
+
+  /// Sets ticked off in a workout, ignoring the empty rows [startWorkout]
+  /// creates up front. "Has anything actually been done in here."
+  Future<int> doneSetCount(String workoutId) async {
+    final total = db.setLogs.id.count();
+    final query = db.selectOnly(db.setLogs).join([
+      innerJoin(
+        db.workoutExercises,
+        db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId),
+      ),
+    ])
+      ..addColumns([total])
+      ..where(db.workoutExercises.workoutId.equals(workoutId) &
+          db.workoutExercises.deletedAt.isNull() &
+          db.setLogs.isDone.equals(true) &
+          db.setLogs.deletedAt.isNull());
+    return (await query.getSingle()).read(total) ?? 0;
+  }
+
+  /// Clears out sessions started a day or more ago with nothing logged in them.
+  ///
+  /// A mis-tap on Start writes a workout that then sits on Today forever,
+  /// blocking every other session behind "finish the one you are in". Nothing
+  /// in it is worth keeping, so it goes at launch without asking.
+  ///
+  /// **Only when [doneSetCount] is zero.** A session with real sets in it left
+  /// open overnight is the far more common shape — trained it, never pressed
+  /// Finish — and deleting that would destroy a day's work to save a tap. Those
+  /// stay, and Today offers to finish or discard them explicitly.
+  Future<int> sweepAbandonedWorkouts({
+    Duration olderThan = const Duration(hours: 24),
+  }) async {
+    final cutoff = nowMs() - olderThan.inMilliseconds;
+    final stale = await (db.select(db.workouts)
+          ..where((t) =>
+              t.status.equalsValue(WorkoutStatus.inProgress) &
+              t.deletedAt.isNull() &
+              t.startedAt.isSmallerThanValue(cutoff)))
+        .get();
+
+    var swept = 0;
+    for (final workout in stale) {
+      if (await doneSetCount(workout.id) > 0) continue;
+      await abandonWorkout(workout.id);
+      swept++;
+    }
+    return swept;
   }
 
   Future<void> abandonWorkout(String workoutId) async {

@@ -21,6 +21,10 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final appInitProvider = FutureProvider<void>((ref) async {
   final db = ref.watch(databaseProvider);
   await ensureStarterCatalog(db);
+  // A mis-tapped Start leaves a workout that blocks every other session behind
+  // "finish the one you are in". Only the ones with nothing logged in them go —
+  // see [TrainingRepository.sweepAbandonedWorkouts].
+  await ref.watch(trainingRepositoryProvider).sweepAbandonedWorkouts();
 });
 
 /// The regime being trained. Exactly one row is active at a time, but the query
