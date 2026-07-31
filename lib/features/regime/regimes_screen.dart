@@ -96,7 +96,7 @@ class _RegimeCard extends ConsumerWidget {
     return AppCard(
       padding: const EdgeInsets.symmetric(
           horizontal: Space.lg, vertical: Space.md),
-      highlightColor: active ? c.accent : null,
+      outline: active ? BorderSide(color: c.accent, width: 2) : null,
       onTap: active ? null : () => _activate(context, ref),
       child: Row(
         children: [

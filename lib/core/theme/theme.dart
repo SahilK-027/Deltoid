@@ -4,52 +4,75 @@ import 'package:flutter/services.dart';
 import 'tokens.dart';
 
 /// Bundled in `assets/fonts/` (Inter 4.1, SIL OFL). Declared in pubspec.yaml
-/// with static instances at 400/500/600 — the only weights this scale uses.
+/// with static instances at 400/500/600/700/800.
 const kFontFamily = 'Inter';
 
-/// Type scale. Numeric styles carry tabular figures so digits never reflow.
+/// The type scale from THEME.md §3. Nine roles, and a screen uses a handful.
+///
+/// Nothing is larger than [TextTheme.displayLarge] (27, the page title) or
+/// smaller than [TextTheme.labelSmall] (11, nav labels and units). Sizes below
+/// 11 are unreadable at arm's length in a gym; sizes above 27 turn a utility
+/// screen into a poster.
+///
+/// | role in THEME.md | slot here |
+/// | --- | --- |
+/// | pageTitle | `displayLarge` |
+/// | pageEyebrow | `labelMedium` |
+/// | section | `headlineSmall` |
+/// | title | `titleMedium` |
+/// | body | `bodyMedium` |
+/// | value | `displaySmall` |
+/// | valueSm | `labelLarge` |
+/// | label | `bodySmall` |
+/// | micro | `labelSmall` |
 TextTheme _textTheme(DeltoidColors c) {
-  TextStyle base(double size, double height, FontWeight w, Color color) =>
+  TextStyle f(
+    double size,
+    double height,
+    FontWeight weight,
+    Color color, {
+    double tracking = 0,
+    bool figures = false,
+  }) =>
       TextStyle(
         fontFamily: kFontFamily,
         fontSize: size,
         height: height / size,
-        fontWeight: w,
+        fontWeight: weight,
         color: color,
-        letterSpacing: size >= 28 ? -0.6 : (size >= 20 ? -0.3 : 0),
+        letterSpacing: tracking,
+        fontFeatures: figures ? tabular : null,
       );
 
   return TextTheme(
-    // Big numbers: cycle counters, chart readouts, timers.
-    displaySmall: base(34, 40, FontWeight.w600, c.textPrimary)
-        .copyWith(fontFeatures: tabular),
-    // The one thing a screen is about — the hero session name. Text, not a
-    // number, so no tabular figures: this was missing from the scale entirely
-    // and every `displayMedium` on Today silently fell back to 14pt body.
-    displayMedium: base(30, 36, FontWeight.w600, c.textPrimary),
-    // Screen titles.
-    titleLarge: base(22, 28, FontWeight.w600, c.textPrimary),
-    // Card headers, exercise names.
-    titleMedium: base(17, 22, FontWeight.w600, c.textPrimary),
-    titleSmall: base(15, 20, FontWeight.w600, c.textPrimary),
-    // Body copy.
-    bodyLarge: base(16, 22, FontWeight.w400, c.textPrimary),
-    bodyMedium: base(15, 20, FontWeight.w400, c.textSecondary),
-    bodySmall: base(13, 18, FontWeight.w400, c.textSecondary),
-    // Set-row values.
-    labelLarge: base(17, 22, FontWeight.w500, c.textPrimary)
-        .copyWith(fontFeatures: tabular),
-    labelMedium: base(13, 16, FontWeight.w500, c.textSecondary)
-        .copyWith(fontFeatures: tabular),
-    // Section eyebrows — uppercase, tracked out.
-    labelSmall: TextStyle(
-      fontFamily: kFontFamily,
-      fontSize: 11,
-      height: 14 / 11,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.8,
-      color: c.textTertiary,
-    ),
+    // pageTitle — uppercased by the widget, never by the caller's string.
+    displayLarge:
+        f(27, 32, FontWeight.w800, c.textPrimary, tracking: -0.5),
+    // Reserved for the rare full-screen number (a finished-session summary).
+    displayMedium:
+        f(24, 30, FontWeight.w700, c.textPrimary, tracking: -0.4, figures: true),
+    // value — the number a card is about.
+    displaySmall:
+        f(22, 26, FontWeight.w700, c.textPrimary, tracking: -0.3, figures: true),
+    // section — headings on the page background.
+    headlineSmall: f(20, 26, FontWeight.w700, c.textPrimary, tracking: -0.3),
+    // App bar titles.
+    titleLarge: f(18, 24, FontWeight.w600, c.textPrimary, tracking: -0.2),
+    // title — card titles, row titles, exercise names.
+    titleMedium: f(16, 22, FontWeight.w600, c.textPrimary, tracking: -0.1),
+    titleSmall: f(15, 20, FontWeight.w600, c.textPrimary),
+    // Body copy that carries weight (a sheet's explanation).
+    bodyLarge: f(15, 22, FontWeight.w400, c.textPrimary),
+    // body — subtitles, descriptions, captions.
+    bodyMedium: f(14, 20, FontWeight.w400, c.textSecondary),
+    // label — table headers, chip labels, axis labels.
+    bodySmall: f(13, 16, FontWeight.w500, c.textSecondary),
+    // valueSm — set-row fields, inline stats.
+    labelLarge: f(16, 20, FontWeight.w600, c.textPrimary, figures: true),
+    // pageEyebrow — the date above a page title.
+    labelMedium: f(13, 16, FontWeight.w600, c.textSecondary, tracking: 1.2),
+    // micro — nav labels, units, badge text.
+    labelSmall: f(11, 14, FontWeight.w600, c.textSecondary, tracking: 0.2),
   );
 }
 
@@ -69,52 +92,80 @@ ThemeData buildTheme(Brightness brightness) {
     extensions: [c],
     textTheme: text,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: c.accent,
+      seedColor: c.info,
       brightness: brightness,
     ).copyWith(
       surface: c.surface,
+      onSurface: c.textPrimary,
+      surfaceContainerHighest: c.surfaceHigh,
       primary: c.accent,
       onPrimary: c.onAccent,
+      secondary: c.data,
       error: c.negative,
       outline: c.border,
+      outlineVariant: c.border,
+      shadow: c.shadow,
     ),
-    splashFactory: InkSparkle.splashFactory,
+    // No ink. Every pressable surface scales and dims instead (`Pressable`),
+    // which is one press language rather than two.
+    splashFactory: NoSplash.splashFactory,
+    highlightColor: Colors.transparent,
+    splashColor: Colors.transparent,
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 1),
+    iconTheme: IconThemeData(color: c.textPrimary, size: 20),
     appBarTheme: AppBarTheme(
-      backgroundColor: c.bg,
+      backgroundColor: c.surface,
+      foregroundColor: c.textPrimary,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      centerTitle: false,
+      // Centred, with the back arrow on the left — the reference pattern, and
+      // it keeps a long screen title from colliding with trailing actions.
+      centerTitle: true,
       titleTextStyle: text.titleLarge,
-      iconTheme: IconThemeData(color: c.textSecondary, size: 22),
-      // Let the page background run edge to edge instead of sitting under
-      // Android's default grey scrim.
+      iconTheme: IconThemeData(color: c.textPrimary, size: 22),
+      actionsIconTheme: IconThemeData(color: c.textPrimary, size: 22),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: c.surface,
+        systemNavigationBarColor: Colors.transparent,
         systemNavigationBarIconBrightness:
             isDark ? Brightness.light : Brightness.dark,
-        systemNavigationBarDividerColor: c.border,
+        systemNavigationBarDividerColor: Colors.transparent,
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: c.surface,
       surfaceTintColor: Colors.transparent,
+      modalBarrierColor: Colors.black.withValues(alpha: isDark ? 0.66 : 0.38),
+      elevation: 0,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xxl)),
       ),
       showDragHandle: true,
-      dragHandleColor: c.borderStrong,
+      dragHandleColor: c.surfaceHighest,
+      dragHandleSize: const Size(36, 4),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: c.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.xxl),
+      ),
+      titleTextStyle: text.headlineSmall,
+      contentTextStyle: text.bodyLarge?.copyWith(color: c.textSecondary),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: c.accent,
         foregroundColor: c.onAccent,
-        minimumSize: const Size.fromHeight(52),
+        disabledBackgroundColor: c.surfaceHigh,
+        disabledForegroundColor: c.textTertiary,
+        minimumSize: const Size.fromHeight(54),
         textStyle: text.titleMedium,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.md),
         ),
@@ -122,47 +173,132 @@ ThemeData buildTheme(Brightness brightness) {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: c.textSecondary,
-        textStyle: text.titleSmall,
+        foregroundColor: c.textPrimary,
+        textStyle: text.titleMedium,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.sm),
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: c.textPrimary,
-        minimumSize: const Size.fromHeight(48),
-        side: BorderSide(color: c.border),
-        textStyle: text.titleSmall,
+        backgroundColor: c.surfaceHigh,
+        minimumSize: const Size.fromHeight(54),
+        side: BorderSide.none,
+        textStyle: text.titleMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.md),
         ),
       ),
     ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: c.surfaceHigh,
+      hintStyle: text.bodyMedium?.copyWith(color: c.textTertiary),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.md,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: BorderSide.none,
+      ),
+      // A focused field loses its fill and gains a white outline — the same
+      // move the set-row fields make when the keypad opens.
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: BorderSide(color: c.accent, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        borderSide: BorderSide(color: c.negative, width: 2),
+      ),
+    ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: c.surfaceHigh,
-      contentTextStyle: text.bodyMedium?.copyWith(color: c.textPrimary),
+      backgroundColor: c.surfaceHighest,
+      contentTextStyle: text.bodyLarge?.copyWith(color: c.textPrimary),
+      actionTextColor: c.textPrimary,
       behavior: SnackBarBehavior.floating,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(Space.md),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.md),
       ),
     ),
+    listTileTheme: ListTileThemeData(
+      titleTextStyle: text.titleMedium,
+      subtitleTextStyle: text.bodyMedium,
+      iconColor: c.textPrimary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+      ),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.onAccent : c.textSecondary,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.accent : c.surfaceHighest,
+      ),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.accent : Colors.transparent,
+      ),
+      checkColor: WidgetStatePropertyAll(c.onAccent),
+      side: BorderSide(color: c.textSecondary, width: 2),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.xs),
+      ),
+    ),
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.accent : c.textTertiary,
+      ),
+    ),
+    sliderTheme: SliderThemeData(
+      activeTrackColor: c.accent,
+      inactiveTrackColor: c.surfaceHighest,
+      thumbColor: c.accent,
+      overlayColor: c.accent.withValues(alpha: 0.10),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: c.accent,
+      linearTrackColor: c.surfaceHighest,
+      circularTrackColor: c.surfaceHighest,
+      linearMinHeight: 3,
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: c.textPrimary,
+      unselectedLabelColor: c.textSecondary,
+      labelStyle: text.titleMedium,
+      unselectedLabelStyle: text.titleMedium,
+      indicatorColor: c.accent,
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: c.border,
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(
+        color: c.surfaceHighest,
+        borderRadius: BorderRadius.circular(Radii.sm),
+      ),
+      textStyle: text.bodySmall?.copyWith(color: c.textPrimary),
+    ),
+    // The shell draws its own bar (see `AppShell`); this only covers any
+    // Material NavigationBar that slips through.
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: c.surface,
       surfaceTintColor: Colors.transparent,
       indicatorColor: Colors.transparent,
-      height: 64,
+      height: 62,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(
-          size: 24,
-          color: s.contains(WidgetState.selected) ? c.accent : c.textTertiary,
-        ),
-      ),
-      labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => text.labelSmall!.copyWith(
-          letterSpacing: 0.2,
-          color: s.contains(WidgetState.selected) ? c.accent : c.textTertiary,
-        ),
-      ),
     ),
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {

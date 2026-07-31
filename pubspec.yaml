@@ -76,7 +76,9 @@ flutter:
     - assets/audio/rest_done.mp3
 
   # Inter 4.1 (SIL OFL 1.1, see assets/fonts/OFL.txt). Static instances only —
-  # the type scale in lib/core/theme/theme.dart uses w400/w500/w600.
+  # a variable font declared under a `weight:` key renders at its default
+  # instance on some platforms, so every weight the scale uses is its own file.
+  # Bold/ExtraBold are instanced from the upstream variable font at opsz 14.
   fonts:
     - family: Inter
       fonts:
@@ -86,6 +88,10 @@ flutter:
           weight: 500
         - asset: assets/fonts/Inter-SemiBold.ttf
           weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

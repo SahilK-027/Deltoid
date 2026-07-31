@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../core/theme/tokens.dart';
 import '../history/history_screen.dart';
 import '../progress/progress_screen.dart';
 import '../regime/regime_screen.dart';
@@ -24,33 +26,133 @@ class _AppShellState extends State<AppShell> {
     RegimeScreen(),
   ];
 
+  void _select(int i) {
+    if (i == _index) return;
+    HapticFeedback.selectionClick();
+    setState(() => _index = i);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.bolt_outlined),
-            selectedIcon: Icon(Icons.bolt),
-            label: 'Today',
+      // The page fades and rises a few pixels on each switch. Not a slide: the
+      // tabs are peers, and a horizontal transition would imply an order they
+      // don't have — and the log screen owns the horizontal axis.
+      body: TweenAnimationBuilder<double>(
+        key: ValueKey(_index),
+        tween: Tween(begin: 0, end: 1),
+        duration: Motion.base,
+        curve: Motion.curve,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child:
+              Transform.translate(offset: Offset(0, (1 - t) * 8), child: child),
+        ),
+        child: IndexedStack(index: _index, children: _pages),
+      ),
+      bottomNavigationBar: _NavBar(index: _index, onSelect: _select),
+    );
+  }
+}
+
+const _destinations = [
+  (icon: Icons.today_outlined, active: Icons.today_rounded, label: 'Today'),
+  (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
+  (
+    icon: Icons.insights_outlined,
+    active: Icons.insights_rounded,
+    label: 'Progress'
+  ),
+  (
+    icon: Icons.dashboard_outlined,
+    active: Icons.dashboard_rounded,
+    label: 'Regime'
+  ),
+];
+
+/// The app's own bar rather than Material's.
+///
+/// `NavigationBar` insists on its own indicator geometry, height and label
+/// behaviour. This is the same thing in 60 lines, and it states the live tab
+/// the way the rest of the app states emphasis: **brightness and weight, no
+/// pill and no hue.** A coloured indicator here would be the only chrome in the
+/// app wearing a colour, which is exactly the look we left behind.
+class _NavBar extends StatelessWidget {
+  const _NavBar({required this.index, required this.onSelect});
+
+  final int index;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(top: BorderSide(color: c.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: [
+              for (var i = 0; i < _destinations.length; i++)
+                Expanded(
+                  child: _NavItem(
+                    destination: _destinations[i],
+                    selected: i == index,
+                    onTap: () => onSelect(i),
+                  ),
+                ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.view_column_outlined),
-            selectedIcon: Icon(Icons.view_column),
-            label: 'History',
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ({IconData icon, IconData active, String label}) destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final tint = selected ? c.textPrimary : c.textSecondary;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedScale(
+            scale: selected ? 1.04 : 1,
+            duration: Motion.base,
+            curve: Motion.spring,
+            child: Icon(
+              selected ? destination.active : destination.icon,
+              size: 24,
+              color: tint,
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.show_chart_outlined),
-            selectedIcon: Icon(Icons.show_chart),
-            label: 'Progress',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Regime',
+          const SizedBox(height: Space.xs),
+          AnimatedDefaultTextStyle(
+            duration: Motion.base,
+            style: context.t.labelSmall!.copyWith(
+              color: tint,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+            child: Text(destination.label),
           ),
         ],
       ),

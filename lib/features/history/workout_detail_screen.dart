@@ -95,7 +95,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
         children: [
           AppCard(
             padding: const EdgeInsets.all(Space.xl),
-            highlightColor: workout.isDeload ? c.deload : null,
+            outline: workout.isDeload ? BorderSide(color: c.deload) : null,
             // Tapping the date edits it: forgetting to log Monday until
             // Wednesday is normal, and a date you cannot correct is a lie the
             // heatmap repeats forever.

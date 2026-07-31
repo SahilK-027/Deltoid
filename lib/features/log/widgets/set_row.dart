@@ -225,9 +225,13 @@ class _ValueCellState extends State<_ValueCell> {
     final c = context.c;
     final hasValue = display.isNotEmpty;
     final ghostText = _fmt(widget.ghost, widget);
-    // A suggestion must never look like a record: the ghost is italic and
-    // carries a leading dot, so the difference survives a glance from arm's
+    // A suggestion must never look like a record. The difference is carried by
+    // colour and a leading dot, and it has to survive a glance from arm's
     // length with the phone on the floor.
+    //
+    // It used to be italic as well — but no italic face is bundled, so Skia
+    // synthesised a slant by shearing the upright glyphs. Faux oblique on the
+    // screen this app is mostly used on was the cheapest-looking thing in it.
     final showingGhost = !hasValue && ghostText.isNotEmpty;
 
     return GestureDetector(
@@ -263,7 +267,6 @@ class _ValueCellState extends State<_ValueCell> {
                 hasValue ? display : (ghostText.isEmpty ? '—' : ghostText),
                 style: context.t.labelLarge?.copyWith(
                   color: hasValue ? c.textPrimary : c.textTertiary,
-                  fontStyle: showingGhost ? FontStyle.italic : FontStyle.normal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.clip,
