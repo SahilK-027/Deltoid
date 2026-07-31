@@ -47,3 +47,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Flutter's iOS generated config. The plain `ephemeral/` is the real one; the
+# glob catches the "ephemeral 2" copies file sync leaves behind, which showed
+# up staged once already.
+**/ios/Flutter/ephemeral*/
