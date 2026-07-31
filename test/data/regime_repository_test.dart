@@ -161,4 +161,96 @@ void main() {
     expect(row.name, 'Renamed');
     expect(row.loadMode, LoadMode.perSide);
   });
+
+  group('bar kinds', () {
+    test('the seeded catalog ships knowing which bar each lift uses', () async {
+      final squat = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('back_squat')))
+          .getSingle();
+      final skull = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('skullcrusher')))
+          .getSingle();
+      final fly = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('chest_fly')))
+          .getSingle();
+
+      expect(squat.barKind, BarKind.olympic);
+      expect(skull.barKind, BarKind.ez);
+      expect(fly.barKind, BarKind.none, reason: 'a machine has no bar');
+    });
+
+    test('the v3 backfill gives an upgraded catalog its bars', () async {
+      // What the migration actually finds: every row carrying the column's
+      // default, because the column did not exist when they were written.
+      await db.update(db.exercises).write(
+            const ExercisesCompanion(barKind: Value(BarKind.none)),
+          );
+
+      await backfillSeededBarKinds(db);
+
+      final squat = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('back_squat')))
+          .getSingle();
+      expect(squat.barKind, BarKind.olympic);
+    });
+
+    test('the backfill leaves a bar the user has already chosen alone',
+        () async {
+      final squat = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('back_squat')))
+          .getSingle();
+      // Their gym, their bar: a squat done on the 15kg bar stays on it.
+      await repo.updateExercise(
+        squat.id,
+        barKind: const Value(BarKind.trap),
+      );
+
+      await backfillSeededBarKinds(db);
+
+      final after = await (db.select(db.exercises)
+            ..where((t) => t.id.equals(squat.id)))
+          .getSingle();
+      expect(after.barKind, BarKind.trap);
+    });
+
+    test('an exercise the user made is never touched by the backfill',
+        () async {
+      final id = await repo.createExercise(
+        name: 'Trap Bar Deadlift',
+        muscle: MuscleGroup.back,
+        equipment: Equipment.barbell,
+        loadMode: LoadMode.total,
+      );
+
+      await backfillSeededBarKinds(db);
+
+      final row = await (db.select(db.exercises)..where((t) => t.id.equals(id)))
+          .getSingle();
+      expect(row.barKind, BarKind.none, reason: 'no starterKey, no guess');
+    });
+  
+    test('a bar kind that no longer exists is rewritten, not left to throw',
+        () async {
+      final squat = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('back_squat')))
+          .getSingle();
+      // What a v3 database can hold: `standard` was a real member then. The
+      // enum is stored as its name, so reading this row back with no matching
+      // member throws for the whole table, not just this row.
+      await db.customStatement(
+        "UPDATE exercises SET bar_kind = 'standard' WHERE id = ?",
+        [squat.id],
+      );
+
+      // The v4 step, run as the migration runs it.
+      await db.customStatement(
+        "UPDATE exercises SET bar_kind = 'none' WHERE bar_kind = 'standard'",
+      );
+
+      final after = await (db.select(db.exercises)
+            ..where((t) => t.id.equals(squat.id)))
+          .getSingle();
+      expect(after.barKind, BarKind.none);
+    });
+  });
 }

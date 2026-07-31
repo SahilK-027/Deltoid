@@ -544,18 +544,25 @@ class _RestGap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    // Four states, one verb each, none longer than "Trained today".
+    //
+    // `Last trained 3 days ago` was three words of scaffolding around one
+    // number, and the scaffolding is what the icon beside it is for: a bed
+    // means rest, so the line only has to say how much of it. Counting rest
+    // rather than dating the last session also answers the question actually
+    // being asked — not "when did I train" but "am I due".
+    //
+    // Trained / Rested keeps the two live states parallel: same shape, same
+    // length, one word apart, so the difference between them is the only thing
+    // that has to be read.
     final (icon, text, tint) = switch (last) {
-      null => (Icons.flag_outlined, 'No sessions logged yet', c.textSecondary),
+      null => (Icons.flag_outlined, 'Nothing logged', c.textSecondary),
       final l => switch (_daysSince(l.workout.dayKey)) {
         0 => (Icons.check_circle_rounded, 'Trained today', c.positive),
-        1 => (
-          Icons.bedtime_outlined,
-          'Last trained yesterday',
-          c.textSecondary,
-        ),
+        1 => (Icons.bedtime_outlined, 'Rested 1 day', c.textSecondary),
         final n => (
           Icons.bedtime_outlined,
-          'Last trained $n days ago',
+          'Rested $n days',
           n >= 4 ? c.deload : c.textSecondary,
         ),
       },

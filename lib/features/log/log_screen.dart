@@ -504,13 +504,16 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         ghost?.reps == null;
 
     return SetKeypad(
-      title:
-          '${entry.exercise.name}  ·  '
-          'Set ${_setLabelAt(entry.sets, setPosition)}  ·  '
-          '${target.field.labelIn(_unit)}',
       field: target.field,
       unit: _unit,
       buffer: _buffer,
+      // Only for a load that *is* the bar. On `perSide` the number is one
+      // dumbbell, and on bodyweight-plus it is what hangs off a belt — neither
+      // is a barbell total, so neither gets a plate diagram even if somebody
+      // has named a bar on the exercise.
+      barKg: entry.exercise.loadMode == LoadMode.total
+          ? entry.exercise.barKind.kg
+          : null,
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
       nextLabel: needsReps
@@ -1443,19 +1446,6 @@ List<_SetGroupData> _groupSets(List<SetLog> sets) {
     );
   }
   return groups;
-}
-
-/// What the chip beside a row prints, from the row's position in the exercise.
-///
-/// The keypad titled itself "Set 4" for the row marked `2` — it counted rows,
-/// which is the one thing warm-ups and drop legs make meaningless.
-String _setLabelAt(List<SetLog> sets, int position) {
-  for (final group in _groupSets(sets)) {
-    final k = group.positions.indexOf(position);
-    if (k < 0) continue;
-    return k == 0 ? group.label : '${group.label} · leg ${k + 1}';
-  }
-  return '${position + 1}';
 }
 
 class _SetGroup extends ConsumerWidget {

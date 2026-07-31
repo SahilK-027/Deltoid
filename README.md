@@ -197,15 +197,18 @@ adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app
   (missing namespace). `file_selector` is used instead — don't swap it back.
 - Regenerate drift code after **any** change to `tables.dart`:
   `dart run build_runner build`.
-- **`schemaVersion` is 1 and there is no `onUpgrade`** (`data/db/database.dart`
-  has `onCreate` and nothing else). A schema change does not migrate an install
-  — it breaks it, and the fix is uninstall and reinstall. Free while the only
-  databases are on test devices, which is still true: the catalog re-seeds
-  itself and no programme is baked in, so a wipe costs one template tap. The
-  first install holding training you care about is when `onUpgrade` has to
-  start existing. Note the version is also stamped into every backup and
-  restore rejects anything newer (`backup/backup_service.dart`), so a bump
-  invalidates old exports unless that path is handled too.
+- **`schemaVersion` is 3, and `onUpgrade` is real now** — v2 added
+  `set_logs.parent_set_id`, v3 added `exercises.bar_kind`. A schema change means
+  three edits, not one: the column in `tables.dart`, the `from < n` step in
+  `data/db/database.dart`, and **a default in the backup codec** for that table.
+  The last one is the easy one to miss and the expensive one to get wrong:
+  `Exercise.fromJson` is generated against today's columns and reads every one
+  of them unconditionally, so a file exported before the column existed throws
+  a null cast on restore — with the user's only copy of their history in the
+  file picker. `backup/backup_service.dart` spreads a default map under each
+  restored exercise row for exactly this reason, and
+  `test/data/backup_service_test.dart` restores a payload with the column
+  stripped out to keep it honest.
 
 ---
 
@@ -266,7 +269,16 @@ The design language every screen implements is **[THEME.md](THEME.md)**.
 
 Deliberately absent, and should stay that way: social features, macros /
 nutrition, AI coaching, an exercise GIF library, Apple Health / Google Fit,
-plate calculators, 1RM testing protocols, volume dashboards, a PR feed.
+1RM testing protocols, volume dashboards, a PR feed.
 
 The app should stay small enough to open mid-set and understand at a glance.
 When in doubt, don't add the screen.
+
+**Plate calculators used to be on that list**, and the plate view (THEME §6,
+`domain/plates.dart`) is the one thing taken off it. The reason it does not
+break the rule: it is not a screen and it asks no questions. It appears inside
+the keypad you are already typing a weight into, for a movement that already
+knows its bar, and disappears the moment either is untrue. What was ruled out —
+and stays ruled out — is a plate *screen*: a per-gym plate inventory, a
+"what can I load" solver, or a tool you navigate to rather than one that is
+simply there while you type. `olympicPlatesKg` is a constant for that reason.

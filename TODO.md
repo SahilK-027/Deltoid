@@ -23,18 +23,32 @@ ends analyzer-clean with tests green, in its own commit, and gets looked at on
 a device before the next starts.
 
 - [x] **0 · Foundation** — `tokens` (neutral ramp, white accent, identity and
-      effort palettes), `theme` (nine type roles, capped 11–27sp), `primitives`
+      effort palettes), `theme` (nine type roles, capped 11–30sp), `primitives`
       (header band, list card + row, buttons, chips, segmented pill, sheets,
       bottom-anchored confirm), monochrome nav bar.
 - [x] **1 · Today** — header band, flat hero with the regime's identity mark,
       white primary action. Cycle list dropped, backfill collapsed to one titled
       sheet, stale sessions given Finish / Discard.
-- [ ] **2 · Log** — `log_screen`, `set_row`, `keypad`, `exercise_rail`,
-      `exercise_sheets`, `rest_timer`. ~2,800 lines and the most-used screen.
-      Forces the pieces the rest reuse: monogram tile (we have no exercise
+- [x] **2 · Log** — `log_screen`, `set_row`, `keypad`, `exercise_rail`,
+      `exercise_sheets`, `rest_timer`. Monogram tile (we have no exercise
       photos), value fields with the focused-outline state, `W`/`D` index chips,
-      swipe-to-delete, keypad, plate view. Review in two passes — set table and
-      rail, then keypad / plate / rest timer / sheets. We can set bar weight per exercise EZ bar, or olympic bar and compute plates as per that: 2.5kg, 5kg, 10kg, 15kg, 20kg, 25kg Olympic weight colour.
+      swipe-to-delete, keypad, plate view.
+
+      **Plate view.** `BarKind` per exercise — Olympic 20 / women's 16 / EZ 9 /
+      trap 25 / none, weighed in this gym rather than looked up (schema v4).
+      `domain/plates.dart` holds the maths; the diagram and its one sentence
+      grow in above the keypad's digits while a barbell weight is being typed,
+      in competition plate colours from 25 down to 2.5.
+
+      Three things it deliberately does not do: it never appears for a
+      `perSide` or bodyweight-plus load, it never rounds — a weight the rack
+      cannot make says how much it is short by instead of drawing a bar that
+      lies — and it does nothing in pounds, because the plate set is metric and
+      a pound breakdown off kilo plates is a diagram no gym can load.
+
+      The keypad lost its title and its readout with it: both captioned what
+      the screen behind them already said. Entry is capped by value (1000 for a
+      load, 999 reps), not by digit count.
 - [ ] **3 · History + workout detail** — the furthest from the language today.
       Date-group headers, identity tiles, expandable exercise rows. Layout only:
       keyset paging and `HistoryCursor` are not touched.

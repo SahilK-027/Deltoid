@@ -20,8 +20,25 @@ void main() {
       expect(applyKey('', '.', field: SetField.weight), '0.');
     });
 
-    test('a stuck finger cannot write a six-digit weight', () {
-      expect(applyKey('12345', '6', field: SetField.weight), '12345');
+    test('a load stops at 1000, and stops on the value not the digit count', () {
+      expect(applyKey('100', '0', field: SetField.weight), '1000');
+      // 10000 is over the ceiling, so the keystroke is dropped.
+      expect(applyKey('1000', '0', field: SetField.weight), '1000');
+      // The old rule counted characters and would have refused this for being
+      // six long, though 999.5 is a perfectly ordinary number.
+      expect(applyKey('999.', '5', field: SetField.weight), '999.5');
+      // And it lets nothing over the line by way of a decimal.
+      expect(applyKey('1000.', '5', field: SetField.weight), '1000.');
+    });
+
+    test('reps have their own, tighter ceiling', () {
+      expect(applyKey('99', '9', field: SetField.reps), '999');
+      expect(applyKey('999', '9', field: SetField.reps), '999');
+    });
+
+    test('stepping comes to rest on the ceiling rather than refusing', () {
+      expect(applyKey('999', '+', field: SetField.weight), '1000');
+      expect(applyKey('1000', '+', field: SetField.weight), '1000');
     });
 
     group('+ / − with a typed buffer', () {

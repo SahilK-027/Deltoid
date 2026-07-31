@@ -28,6 +28,11 @@ class Exercises extends Table with SyncColumns {
   TextColumn get equipment => textEnum<Equipment>()();
   TextColumn get loadMode => textEnum<LoadMode>()();
 
+  /// Which bar this is loaded on, for the plate view. `none` — the default —
+  /// means the movement has no bar and gets no plate maths.
+  TextColumn get barKind =>
+      textEnum<BarKind>().withDefault(const Constant('none'))();
+
   /// The `starterExercises` key this row was seeded from, when it was.
   ///
   /// Templates match on this rather than on the name, so renaming "Dips" to

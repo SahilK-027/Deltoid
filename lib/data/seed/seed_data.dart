@@ -14,6 +14,7 @@ class StarterExercise {
     required this.muscle,
     required this.equipment,
     required this.loadMode,
+    this.barKind = BarKind.none,
   });
 
   final String key;
@@ -21,6 +22,13 @@ class StarterExercise {
   final MuscleGroup muscle;
   final Equipment equipment;
   final LoadMode loadMode;
+
+  /// The bar it is usually loaded on, so the plate view works out of the box.
+  ///
+  /// A default, not a fact about the user's gym — every one of these is
+  /// editable, and the two that ship as EZ bars (curls, skullcrushers) are the
+  /// two most likely to be done on a straight bar instead.
+  final BarKind barKind;
 }
 
 /// One exercise slot in a template session.
@@ -66,6 +74,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.chest,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'incline_barbell_bench',
@@ -73,6 +82,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.chest,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'flat_db_bench',
@@ -152,6 +162,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.back,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'db_row',
@@ -182,6 +193,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.shoulders,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'seated_ohp_db',
@@ -226,6 +238,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.biceps,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.ez,
   ),
   StarterExercise(
     key: 'incline_db_curl',
@@ -261,6 +274,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.triceps,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.ez,
   ),
   StarterExercise(
     key: 'overhead_tri_ext',
@@ -275,6 +289,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.forearms,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.ez,
   ),
   StarterExercise(
     key: 'wrist_curl',
@@ -282,6 +297,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.forearms,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.ez,
   ),
 
   // ── Legs ──────────────────────────────────────────────────────────────
@@ -291,6 +307,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.quads,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'front_squat',
@@ -298,6 +315,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.quads,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'leg_press',
@@ -326,6 +344,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.hamstrings,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'rdl',
@@ -333,6 +352,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.hamstrings,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'hamstring_curl',
@@ -347,6 +367,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.glutes,
     equipment: Equipment.barbell,
     loadMode: LoadMode.total,
+    barKind: BarKind.olympic,
   ),
   StarterExercise(
     key: 'standing_calf_raise',

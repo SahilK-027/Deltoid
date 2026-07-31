@@ -4,15 +4,16 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../domain/units.dart';
+import 'plate_view.dart';
 
 enum SetField { weight, reps, added }
 
 extension SetFieldX on SetField {
   String labelIn(WeightUnit unit) => switch (this) {
-        SetField.weight => 'Weight (${unit.label})',
-        SetField.reps => 'Reps',
-        SetField.added => 'Added (${unit.label})',
-      };
+    SetField.weight => 'Weight (${unit.label})',
+    SetField.reps => 'Reps',
+    SetField.added => 'Added (${unit.label})',
+  };
 
   bool get isDecimal => this != SetField.reps;
 
@@ -30,7 +31,6 @@ extension SetFieldX on SetField {
 class SetKeypad extends StatelessWidget {
   const SetKeypad({
     super.key,
-    required this.title,
     required this.field,
     required this.unit,
     required this.buffer,
@@ -40,9 +40,9 @@ class SetKeypad extends StatelessWidget {
     this.hint,
     this.onUseHint,
     this.nextLabel = 'Next',
+    this.barKg,
   });
 
-  final String title;
   final SetField field;
   final WeightUnit unit;
 
@@ -62,6 +62,10 @@ class SetKeypad extends StatelessWidget {
   final VoidCallback? onUseHint;
   final String nextLabel;
 
+  /// Empty bar weight, when this movement is loaded on one. Drives the plate
+  /// view above the digits; null means no bar and no diagram.
+  final double? barKg;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -74,23 +78,37 @@ class SetKeypad extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, Space.sm),
+          padding: const EdgeInsets.fromLTRB(
+            Space.md,
+            Space.md,
+            Space.md,
+            Space.sm,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // The title gets its own full-width row. Sharing a row with the
-              // "Last" chip truncated it to "Weight (k…", which is exactly the
-              // part that tells you which field you are typing into.
+              // No title, and no readout of what is being typed. Both said what
+              // the screen behind them already says: the exercise and set are
+              // in the header, the field is the one outlined in the table, and
+              // the digits land in that field as they are pressed. A keypad
+              // that captions itself is a keypad covering the thing it is
+              // captioning.
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: context.t.labelSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  if (hint != null && onUseHint != null)
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 34),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Space.md,
+                        ),
+                        side: BorderSide(color: c.borderStrong),
+                        foregroundColor: c.textSecondary,
+                      ),
+                      onPressed: onUseHint,
+                      child: Text('Last: $hint'),
                     ),
-                  ),
+                  const Spacer(),
                   SizedBox(
                     height: 28,
                     width: 28,
@@ -103,34 +121,33 @@ class SetKeypad extends StatelessWidget {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  Expanded(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: buffer,
-                      builder: (context, value, _) => Text(
-                        value.isEmpty ? '—' : value,
-                        style: context.t.titleLarge?.copyWith(
-                          fontFeatures: tabular,
-                          color: value.isEmpty ? c.textTertiary : c.textPrimary,
-                        ),
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                  if (hint != null && onUseHint != null)
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        padding: const EdgeInsets.symmetric(horizontal: Space.md),
-                        side: BorderSide(color: c.borderStrong),
-                        foregroundColor: c.textSecondary,
-                      ),
-                      onPressed: onUseHint,
-                      child: Text('Last: $hint'),
-                    ),
-                ],
-              ),
+              // The plate view grows in and collapses to nothing, rather than
+              // sitting in a reserved slot: an empty 60pt band above the digits
+              // on every reps field was paying for the diagram whether or not
+              // there was one to draw. [AnimatedSize] means the keys still do
+              // not *jump* — they slide, once, over 220ms.
+              if (barKg != null && field == SetField.weight)
+                ValueListenableBuilder<String>(
+                  valueListenable: buffer,
+                  builder: (context, value, _) {
+                    final load = plateLoadFor(
+                      buffer: value,
+                      barKg: barKg,
+                      unit: unit,
+                    );
+                    return AnimatedSize(
+                      duration: Motion.base,
+                      curve: Motion.curve,
+                      alignment: Alignment.topCenter,
+                      child: load == null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(top: Space.xs),
+                              child: PlateView(load: load, unit: unit),
+                            ),
+                    );
+                  },
+                ),
               const SizedBox(height: Space.sm),
               _KeyGrid(
                 field: field,
@@ -175,7 +192,11 @@ class _KeyGrid extends StatelessWidget {
           _Key(label: '7', onTap: () => onKey('7')),
           _Key(label: '8', onTap: () => onKey('8')),
           _Key(label: '9', onTap: () => onKey('9')),
-          _Key(icon: Icons.backspace_outlined, onTap: () => onKey('⌫'), muted: true),
+          _Key(
+            icon: Icons.backspace_outlined,
+            onTap: () => onKey('⌫'),
+            muted: true,
+          ),
         ]),
         _row([
           _Key(label: '4', onTap: () => onKey('4')),
@@ -202,16 +223,16 @@ class _KeyGrid extends StatelessWidget {
   }
 
   Widget _row(List<Widget> children) => Padding(
-        padding: const EdgeInsets.only(bottom: Space.sm),
-        child: Row(
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) const SizedBox(width: Space.sm),
-              children[i],
-            ],
-          ],
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: Space.sm),
+    child: Row(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(width: Space.sm),
+          children[i],
+        ],
+      ],
+    ),
+  );
 }
 
 class _Key extends StatelessWidget {
@@ -296,19 +317,36 @@ String applyKey(
     case '-':
       // An empty buffer means "I haven't said anything yet", so step from last
       // time. Once anything is typed the buffer wins — including a typed 0.
-      final current = double.tryParse(buffer) ?? (buffer.isEmpty ? hint ?? 0 : 0);
+      final current =
+          double.tryParse(buffer) ?? (buffer.isEmpty ? hint ?? 0 : 0);
       final step = field.stepIn(unit);
-      final next = key == '+' ? current + step : current - step;
-      if (next < 0) return '0';
+      final raw = key == '+' ? current + step : current - step;
+      if (raw < 0) return '0';
+      // Stepping stops at the ceiling rather than refusing to move: holding `+`
+      // should come to rest on the largest number this field allows, not do
+      // nothing once it gets there.
+      final next = raw > maxEntry(field) ? maxEntry(field) : raw;
       if (field == SetField.reps) return next.toStringAsFixed(0);
       return next == next.roundToDouble()
           ? next.toStringAsFixed(0)
           : next.toStringAsFixed(1);
     default:
-      // Guard against absurd entries rather than letting a stuck finger write
-      // a five-digit weight.
-      if (buffer.replaceAll('.', '').length >= 5) return buffer;
       if (buffer == '0') return key;
-      return buffer + key;
+      final candidate = buffer + key;
+      // A ceiling on the value, not on the digit count. The old rule counted
+      // characters, which let `999.99` through and stopped `1000.5` for being
+      // long rather than for being wrong — and on a bar that reads as the app
+      // refusing a legitimate number.
+      final value = double.tryParse(candidate);
+      if (value == null || value > maxEntry(field)) return buffer;
+      return candidate;
   }
 }
+
+/// The largest number a field will accept.
+///
+/// 1000 for a load: more than anything anyone lifts, and small enough that a
+/// stuck finger cannot write a number that breaks the axis of every chart it
+/// lands in. Reps get their own ceiling — three digits of reps is already a
+/// typo, and sharing the load's limit would let one row claim a thousand.
+double maxEntry(SetField field) => field == SetField.reps ? 999 : 1000;

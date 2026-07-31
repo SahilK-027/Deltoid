@@ -176,7 +176,7 @@ void main() {
     // reachable — a fresh install restoring a backup has no other route to it.
     // The masthead is the date and the rest gap, not the screen's name — on a
     // fresh install there is nothing to count from, and it says so.
-    expect(find.text('No sessions logged yet'), findsOneWidget);
+    expect(find.text('Nothing logged'), findsOneWidget);
     expect(
       find.byTooltip('Settings'),
       findsOneWidget,

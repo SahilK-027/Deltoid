@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/ids.dart';
+import '../../domain/enums.dart';
 import '../db/database.dart';
 import 'seed_data.dart';
 
@@ -26,6 +27,7 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
               muscle: e.muscle,
               equipment: e.equipment,
               loadMode: e.loadMode,
+              barKind: Value(e.barKind),
               starterKey: Value(e.key),
             ),
           );
@@ -94,6 +96,7 @@ Future<String> createRegimeFromTemplate(
               muscle: starter.muscle,
               equipment: starter.equipment,
               loadMode: starter.loadMode,
+              barKind: Value(starter.barKind),
               starterKey: Value(key),
             ),
           );
@@ -132,4 +135,30 @@ Future<String> createRegimeFromTemplate(
   });
 
   return regimeId;
+}
+
+/// Gives the rows we seeded ourselves the bar they are normally loaded on.
+///
+/// Run once, by the v2 → v3 migration. Without it an existing install comes out
+/// of the upgrade with `none` on all thirteen barbell movements — the column's
+/// default, which is right for a *new* column on rows nobody has been asked
+/// about, and useless for a catalog this app wrote itself and already knows the
+/// answer for. The feature would be invisible until every one of them was
+/// edited by hand.
+///
+/// Only touches rows still carrying the `starterKey` they were seeded with, and
+/// only sets a bar where the seed names one. An exercise the user created, or
+/// one whose bar they have already chosen, is theirs — this runs before either
+/// is possible, but it is written to stay true if it is ever run again.
+Future<void> backfillSeededBarKinds(AppDatabase db) async {
+  for (final starter in starterExercises) {
+    if (starter.barKind == BarKind.none) continue;
+    await (db.update(db.exercises)
+          ..where(
+            (t) =>
+                t.starterKey.equals(starter.key) &
+                t.barKind.equalsValue(BarKind.none),
+          ))
+        .write(ExercisesCompanion(barKind: Value(starter.barKind)));
+  }
 }

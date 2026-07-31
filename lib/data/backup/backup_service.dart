@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../domain/enums.dart';
 import '../db/database.dart';
 
 /// Bumped whenever the export shape changes in a way an older build could not
@@ -66,7 +67,14 @@ class BackupService {
       dump: () async => (await db.select(db.exercises).get())
           .map((e) => e.toJson())
           .toList(),
-      insert: (row) => db.into(db.exercises).insert(Exercise.fromJson(row)),
+      // `fromJson` is generated against *today's* columns and reads every one
+      // of them unconditionally, so a file written before a column existed
+      // dies on a null cast — with the user's only copy of their history in
+      // the picker. A default for anything added after v1 keeps old files
+      // restorable; add one here whenever a column is added to this table.
+      insert: (row) => db.into(db.exercises).insert(
+            Exercise.fromJson({'barKind': BarKind.none.name, ...row}),
+          ),
       clear: () => db.delete(db.exercises).go(),
     ),
     _TableCodec(

@@ -10,6 +10,7 @@ import '../../../data/db/database.dart';
 import '../../../data/repositories/regime_repository.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../domain/enums.dart';
+import '../../../domain/units.dart';
 
 /// Full exercise catalog, searchable. Shared by the log screen's swap/add flow
 /// and the regime editor.
@@ -495,7 +496,9 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
   late MuscleGroup _muscle = widget.existing?.muscle ?? MuscleGroup.chest;
   late Equipment _equipment = widget.existing?.equipment ?? Equipment.machine;
   late LoadMode _loadMode = widget.existing?.loadMode ?? LoadMode.total;
+  late BarKind _barKind = widget.existing?.barKind ?? BarKind.none;
   late bool _loadModeTouched = widget.existing != null;
+  late bool _barTouched = widget.existing != null;
 
   @override
   void dispose() {
@@ -504,11 +507,17 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
     super.dispose();
   }
 
-  /// Equipment implies the usual load mode; only stop guessing once the user
-  /// has set it themselves.
+  /// Equipment implies the usual load mode and bar; only stop guessing once the
+  /// user has set them themselves.
   void _setEquipment(Equipment value) {
     setState(() {
       _equipment = value;
+      if (!_barTouched) {
+        // The common bar, not the only one — an EZ-bar curl is two taps from
+        // here, and everything that is not a barbell has no bar at all.
+        _barKind =
+            value == Equipment.barbell ? BarKind.olympic : BarKind.none;
+      }
       if (_loadModeTouched) return;
       _loadMode = switch (value) {
         Equipment.dumbbell => LoadMode.perSide,
@@ -581,6 +590,24 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
                   _loadModeTouched = true;
                 }),
               ),
+              // Only for a total load: the plate view breaks a barbell total
+              // into plates, and there is nothing to break down when the
+              // number means one dumbbell or what is hanging off a belt.
+              if (_loadMode == LoadMode.total) ...[
+                const SizedBox(height: Space.md),
+                _Dropdown<BarKind>(
+                  label: 'Bar',
+                  value: _barKind,
+                  values: BarKind.values,
+                  nameOf: (v) => v == BarKind.none
+                      ? v.label
+                      : '${v.label} · ${formatInUnit(v.kg!, WeightUnit.kg)} kg',
+                  onChanged: (v) => setState(() {
+                    _barKind = v;
+                    _barTouched = true;
+                  }),
+                ),
+              ],
               const SizedBox(height: Space.md),
               TextField(
                 controller: _notes,
@@ -650,6 +677,7 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
         muscle: _muscle,
         equipment: _equipment,
         loadMode: _loadMode,
+        barKind: _barKind,
         notes: notes.isEmpty ? null : notes,
       );
       navigator.pop(await _row(db, created));
@@ -690,6 +718,7 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
       muscle: Value(_muscle),
       equipment: Value(_equipment),
       loadMode: Value(_loadMode),
+      barKind: Value(_barKind),
       notes: Value(notes.isEmpty ? null : notes),
     );
     navigator.pop(await _row(db, id));

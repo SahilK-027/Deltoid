@@ -142,6 +142,49 @@ void main() {
     expect(bodyweight.weightKg, 72.4);
   });
 
+  test('a file written before a column existed still restores', () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+
+    // Exactly what an older export looks like: the column is simply not there.
+    // `Exercise.fromJson` is generated against today's columns and reads every
+    // one of them, so without a default this throws — with the user's only
+    // copy of their history in the file picker.
+    final data = payload['data']! as Map<String, dynamic>;
+    data['exercises'] = (data['exercises']! as List)
+        .cast<Map<String, dynamic>>()
+        .map((row) => {...row}..remove('barKind'))
+        .toList();
+
+    await backup.restore(jsonEncode(payload));
+
+    final restored = await db.select(db.exercises).get();
+    expect(restored, isNotEmpty);
+    expect(
+      restored.every((e) => e.barKind == BarKind.none),
+      isTrue,
+      reason: 'a bar nobody named is no bar, not a guess',
+    );
+  });
+
+  test('the bar a movement is loaded on survives the round trip', () async {
+    await logASession();
+    final bench = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Flat Barbell Bench Press')))
+        .getSingleOrNull();
+    // The seed catalog decides the name; if it changes, take any exercise.
+    final target = bench ?? (await db.select(db.exercises).get()).first;
+    await RegimeRepository(db)
+        .updateExercise(target.id, barKind: const Value(BarKind.ez));
+
+    await backup.restore(jsonEncode(await backup.buildPayload()));
+
+    final after = await (db.select(db.exercises)
+          ..where((t) => t.id.equals(target.id)))
+        .getSingle();
+    expect(after.barKind, BarKind.ez);
+  });
+
   test('a malformed file is rejected before anything is deleted', () async {
     await logASession();
     final before = (await db.select(db.workouts).get()).length;

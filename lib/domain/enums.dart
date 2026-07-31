@@ -18,6 +18,45 @@ enum LoadMode {
 
 enum Equipment { barbell, dumbbell, machine, cable, bodyweight, band, other }
 
+/// The bar a movement is loaded on, and what it weighs empty.
+///
+/// Per exercise rather than per equipment type: curls and skullcrushers are
+/// both "barbell" and are both done on the EZ bar, while the bench in the same
+/// gym is an Olympic bar. A single weight for all barbells would be wrong for
+/// half of them, and being wrong about the bar makes every plate on the screen
+/// wrong.
+///
+/// [BarKind.none] is the default and means "not loaded on a bar" — machines,
+/// cables, dumbbells and every bodyweight movement. It is also the right answer
+/// for a barbell whose weight you have not said yet: no bar weight, no plate
+/// maths, rather than plates computed off a guess.
+enum BarKind { none, olympic, womens, ez, trap }
+
+extension BarKindX on BarKind {
+  /// Empty bar weight in kilograms. Storage is kg everywhere (see
+  /// [WeightUnit]); the display unit converts at the edge.
+  ///
+  /// These are the bars in *this* gym, weighed rather than looked up: the EZ is
+  /// 9kg and the women's bar 16kg, neither of which is the catalogue figure. A
+  /// bar weight that is right in general and wrong here would put a number on
+  /// the screen that no plate can fix.
+  double? get kg => switch (this) {
+        BarKind.none => null,
+        BarKind.olympic => 20,
+        BarKind.womens => 16,
+        BarKind.ez => 9,
+        BarKind.trap => 25,
+      };
+
+  String get label => switch (this) {
+        BarKind.none => 'No bar',
+        BarKind.olympic => 'Olympic bar',
+        BarKind.womens => "Women's bar",
+        BarKind.ez => 'EZ curl bar',
+        BarKind.trap => 'Trap bar',
+      };
+}
+
 /// Turns an enum's `name` into something fit for the UI:
 /// `bodyweightPlus` → `Bodyweight plus`.
 String humanizeEnum(String name) {
