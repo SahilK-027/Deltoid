@@ -149,8 +149,11 @@ Future<void> showExerciseMenu(
             },
           ),
           ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Remove from this workout'),
+            leading: Icon(Icons.delete_outline, color: sheetContext.c.negative),
+            title: Text(
+              'Remove from this workout',
+              style: TextStyle(color: sheetContext.c.negative),
+            ),
             onTap: () async {
               final navigator = Navigator.of(sheetContext);
               await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
@@ -203,7 +206,11 @@ Future<void> showSetActions(
                 spacing: Space.sm,
                 runSpacing: Space.sm,
                 children: [
-                  for (final type in SetType.values)
+                  for (final type in const [
+                    SetType.warmup,
+                    SetType.working,
+                    SetType.drop,
+                  ])
                     GestureDetector(
                       onTap: () {
                         repo.updateSet(set.id, setType: Value(type));

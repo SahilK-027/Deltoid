@@ -15,6 +15,18 @@ import 'keypad.dart';
 
 export 'keypad.dart' show SetField, SetFieldX, SetKeypad, applyKey;
 
+/// The colour a set type is marked in.
+///
+/// Warm-ups and drops are the two types this app actually has, and both are
+/// facts about the set rather than chrome — so they get a hue, and a working
+/// set stays grey. Without this the only difference between a warm-up and a
+/// top set was one letter in the same colour as everything around it.
+Color setTypeColour(BuildContext context, SetType type) => switch (type) {
+  SetType.warmup => context.c.data,
+  SetType.drop || SetType.restPause => context.c.deload,
+  _ => context.c.textSecondary,
+};
+
 /// The column headings above the set table.
 ///
 /// The units live here and nowhere else. They used to sit inside every field as
@@ -33,13 +45,14 @@ class SetTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = context.t.labelSmall?.copyWith(color: context.c.textTertiary);
+    final c = context.c;
+    final label = context.t.labelSmall?.copyWith(color: c.textTertiary);
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.sm),
       child: Row(
         children: [
           SizedBox(width: SetRow.indexColumn, child: Text('SET', style: label)),
-          const SizedBox(width: Space.md),
+          const SizedBox(width: Space.sm),
           Expanded(
             child: Text(
               loadMode == LoadMode.bodyweight
@@ -49,13 +62,16 @@ class SetTableHeader extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(width: Space.sm),
+          const SizedBox(width: Space.xs),
           SizedBox(
             width: SetRow.repsColumn,
             child: Text('REPS', style: label, textAlign: TextAlign.center),
           ),
-          const SizedBox(width: Space.sm),
-          SizedBox(width: SetRow.doneColumn, child: Text('✓', style: label)),
+          const SizedBox(width: Space.xs),
+          SizedBox(
+            width: SetRow.doneColumn,
+            child: Icon(Icons.check_rounded, size: 14, color: c.textTertiary),
+          ),
         ],
       ),
     );
@@ -71,7 +87,6 @@ class SetRow extends StatelessWidget {
   const SetRow({
     super.key,
     required this.set,
-    required this.label,
     required this.loadMode,
     required this.unit,
     required this.ghost,
@@ -79,20 +94,14 @@ class SetRow extends StatelessWidget {
     required this.buffer,
     required this.onEdit,
     required this.onToggleDone,
-    required this.onOpenActions,
   });
 
-  static const indexColumn = 40.0;
-  static const repsColumn = 78.0;
-  static const doneColumn = 44.0;
+  static const indexColumn = 34.0;
+  static const repsColumn = 68.0;
+  static const doneColumn = 40.0;
+  static const fieldHeight = 42.0;
 
   final SetLog set;
-
-  /// What the index chip prints: a working set's number, or `W` / `D` / `RP`
-  /// for the types that aren't counted. Worked out by the page, which is the
-  /// only thing that can see the other sets.
-  final String label;
-
   final LoadMode loadMode;
   final WeightUnit unit;
   final PastSet? ghost;
@@ -101,42 +110,34 @@ class SetRow extends StatelessWidget {
   final void Function(SetLog, SetField) onEdit;
   final void Function(SetLog, bool) onToggleDone;
 
-  /// Opens the per-set sheet: type, note, delete.
-  final VoidCallback onOpenActions;
-
   @override
   Widget build(BuildContext context) {
+    final c = context.c;
     final beaten = _beatsGhost();
-    // A drop or rest-pause set belongs to the set above it, so it is indented
-    // under it rather than given an index of its own.
-    final nested = set.setType.isContinuation;
 
     // No Dismissible: the log turns pages horizontally, so a sideways drag on a
     // row cannot also mean "delete". Set actions live behind the index chip.
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        Space.lg + (nested ? Space.lg : 0),
-        Space.xs,
-        Space.lg,
-        Space.xs,
+    //
+    // No indent for a drop set either. Indenting shifted every field on the row
+    // out of its column, so the table stopped lining up exactly where it is
+    // being read fastest — the letter in the index chip carries it instead.
+    return AnimatedContainer(
+      duration: Motion.fast,
+      // Completed rows need to be obvious at a glance down the column, not on
+      // inspection: the whole row steps onto a lighter surface.
+      color: set.isDone ? c.surfaceHigh.withValues(alpha: 0.45) : null,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.xs,
       ),
       child: Row(
         children: [
-          _IndexChip(
-            label: label,
-            done: set.isDone,
-            nested: nested,
-            onTap: onOpenActions,
-          ),
-          const SizedBox(width: Space.md),
           if (loadMode == LoadMode.bodyweight)
             Expanded(
               child: Text(
                 'Bodyweight',
                 textAlign: TextAlign.center,
-                style: context.t.bodyMedium?.copyWith(
-                  color: context.c.textSecondary,
-                ),
+                style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
               ),
             )
           else
@@ -169,7 +170,7 @@ class SetRow extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(width: Space.sm),
+          const SizedBox(width: Space.xs),
           SizedBox(
             width: repsColumn,
             child: _ValueCell(
@@ -184,7 +185,7 @@ class SetRow extends StatelessWidget {
               onTap: () => onEdit(set, SetField.reps),
             ),
           ),
-          const SizedBox(width: Space.sm),
+          const SizedBox(width: Space.xs),
           _DoneBox(
             done: set.isDone,
             beaten: beaten,
@@ -313,16 +314,18 @@ class _ValueCellState extends State<_ValueCell> {
       onTap: widget.onTap,
       child: AnimatedContainer(
         duration: Motion.fast,
-        height: 48,
+        height: SetRow.fieldHeight,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         decoration: BoxDecoration(
           // Focus is an outline on nothing, not a tinted box: the field being
           // typed into should read as open, and a fill plus a border is two
           // signals for one state.
           color: widget.active
               ? Colors.transparent
-              : (_flash ? c.surfaceHighest : c.surfaceHigh),
+              : (_flash
+                    ? c.surfaceHighest
+                    : (widget.done ? Colors.transparent : c.surfaceHigh)),
           borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
@@ -372,39 +375,41 @@ class _ValueCellState extends State<_ValueCell> {
 /// The set's number, or its letter. Also the way into the set's own actions —
 /// type, note, delete — because the row has no room for a trailing menu and the
 /// screen has no spare horizontal gesture to give a swipe.
-class _IndexChip extends StatelessWidget {
-  const _IndexChip({
+class SetIndexChip extends StatelessWidget {
+  const SetIndexChip({
+    super.key,
+    required this.type,
     required this.label,
     required this.done,
-    required this.nested,
     required this.onTap,
   });
 
+  final SetType type;
   final String label;
   final bool done;
-  final bool nested;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final size = nested ? 32.0 : SetRow.indexColumn;
+    final typed = type != SetType.working;
+    final colour = setTypeColour(context, type);
 
     return Pressable(
       onTap: onTap,
       child: Container(
-        width: size,
-        height: size,
+        width: SetRow.indexColumn,
+        height: SetRow.indexColumn,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: c.surfaceHigh,
+          color: typed ? colour.withValues(alpha: 0.18) : c.surfaceHigh,
           shape: BoxShape.circle,
         ),
         child: Text(
           label,
-          style: context.t.labelLarge?.copyWith(
-            color: done ? c.textTertiary : c.textSecondary,
-            fontSize: nested ? 13 : null,
+          style: context.t.bodySmall?.copyWith(
+            color: typed ? colour : (done ? c.textTertiary : c.textSecondary),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -438,14 +443,14 @@ class _DoneBox extends StatelessWidget {
       child: AnimatedContainer(
         duration: Motion.fast,
         width: SetRow.doneColumn,
-        height: 48,
+        height: SetRow.fieldHeight,
         decoration: BoxDecoration(
           color: fill,
           borderRadius: BorderRadius.circular(Radii.sm),
         ),
         child: Icon(
           beaten && done ? Icons.trending_up_rounded : Icons.check_rounded,
-          size: 20,
+          size: 18,
           color: done ? c.onAccent : c.textTertiary,
         ),
       ),

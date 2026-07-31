@@ -293,6 +293,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
               current: _page.clamp(0, math.max(0, detail.entries.length - 1)),
               onSelect: _goToPage,
               onAdd: () => _addExercise(detail),
+              onReorder: (ids) => ref
+                  .read(trainingRepositoryProvider)
+                  .reorderWorkoutExercises(ids),
             ),
             Expanded(
               child: detail.entries.isEmpty
@@ -599,12 +602,53 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   // ── Mutations ─────────────────────────────────────────────────────────
 
   void _toggleDone(SetLog set, bool done) {
-    if (done) _adoptGhost(set.id);
+    if (done) {
+      // Last time's numbers fill the blanks first: same weight as last week,
+      // one more rep is the normal case and shouldn't need typing.
+      _adoptGhost(set.id);
+
+      // A set with nothing in it cannot be ticked. It used to be allowed, and
+      // it wrote a completed set with a null load and null reps — invisible to
+      // the progress chart, useless as next week's prefill, and indistinguish-
+      // able later from a set that genuinely happened. Send the thumb to the
+      // empty field instead of arguing about it.
+      final empty = _firstEmptyField(set.id);
+      if (empty != null) {
+        HapticFeedback.selectionClick();
+        final located = _locate(_detail!, set.id);
+        if (located != null) _focus(located.$2, empty);
+        return;
+      }
+    }
     ref.read(trainingRepositoryProvider).updateSet(set.id, isDone: Value(done));
     if (done) {
       HapticFeedback.mediumImpact();
       _startRest();
     }
+  }
+
+  /// The field standing between this set and being logged, if any.
+  ///
+  /// Reps are always required. A load is required unless the movement is
+  /// bodyweight, where there is nothing to enter.
+  SetField? _firstEmptyField(String setId) {
+    final detail = _detail;
+    if (detail == null) return null;
+    final located = _locate(detail, setId);
+    if (located == null) return null;
+    final (entry, set, _) = located;
+
+    switch (entry.exercise.loadMode) {
+      case LoadMode.bodyweightPlus:
+        if (set.addedWeight == null) return SetField.added;
+      case LoadMode.total:
+      case LoadMode.perSide:
+        if (set.weight == null) return SetField.weight;
+      case LoadMode.bodyweight:
+        break;
+    }
+    if (set.reps == null) return SetField.reps;
+    return null;
   }
 
   /// Completes a set's blanks from last time's numbers.
@@ -724,19 +768,31 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     // whatever is left blank never happened as far as next week is concerned.
     final unfinished = _unfinished(detail);
     if (unfinished.isNotEmpty) {
-      final total = _totalSets(detail);
-      final ok = await confirmAction(
+      final outcome = await _confirmEarlyFinish(
         context,
-        title: 'Finish with sets left?',
-        message: '$done of $total sets logged.\n\n'
-            '${unfinished.map((e) => '· $e').join('\n')}\n\n'
-            'The empty sets are discarded — the session is saved with exactly '
-            'what you did.',
-        confirmLabel: 'Finish anyway',
-        cancelLabel: 'Keep logging',
-        destructive: false,
+        done: done,
+        total: _totalSets(detail),
+        unfinished: unfinished,
       );
-      if (!ok) return;
+      if (outcome == null || outcome == _FinishChoice.keepLogging) return;
+      if (outcome == _FinishChoice.discard) {
+        // Asked twice, because this is the one door in the app that throws
+        // work away, and the sets behind it are already logged.
+        if (!mounted) return;
+        final sure = await confirmAction(
+          context,
+          title: 'Discard this session?',
+          message: '$done logged set${done == 1 ? '' : 's'} '
+              '${done == 1 ? 'is' : 'are'} deleted. This cannot be undone.',
+          confirmLabel: 'Discard',
+          cancelLabel: 'Keep it',
+          destructive: true,
+        );
+        if (!sure) return;
+        await repo.abandonWorkout(detail.workout.id);
+        navigator.pop();
+        return;
+      }
     }
 
     await repo.completeWorkout(detail.workout.id);
@@ -759,14 +815,16 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// Exercises with sets still open, named and counted. Skipped ones are
   /// deliberately absent: a skip is a decision already recorded, not an
   /// omission to be nagged about.
-  static List<String> _unfinished(WorkoutDetail d) {
-    final out = <String>[];
+  static List<({String name, int done, int total})> _unfinished(
+    WorkoutDetail d,
+  ) {
+    final out = <({String name, int done, int total})>[];
     for (final entry in d.entries) {
       if (entry.workoutExercise.skipReason != SkipReason.none) continue;
       final total = entry.sets.length;
       final done = entry.sets.where((s) => s.isDone).length;
       if (total == 0 || done == total) continue;
-      out.add('${entry.exercise.name} — $done of $total sets');
+      out.add((name: entry.exercise.name, done: done, total: total));
     }
     return out;
   }
@@ -1039,20 +1097,20 @@ class _ExercisePage extends ConsumerWidget {
             child: Column(
               children: [
                 SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
-                for (var i = 0; i < entry.sets.length; i++)
-                  SetRow(
-                    key: rowKeyFor(entry.sets[i].id),
-                    set: entry.sets[i],
-                    label: _indexLabel(entry.sets, i),
-                    loadMode: entry.exercise.loadMode,
+                for (final group in _groupSets(entry.sets))
+                  _SetGroup(
+                    group: group,
+                    entry: entry,
                     unit: unit,
-                    ghost: _ghostSet(prefill, i),
                     editing: editing,
                     buffer: buffer,
                     onEdit: onEdit,
+                    rowKeyFor: rowKeyFor,
                     onToggleDone: onToggleDone,
-                    onOpenActions: () =>
-                        showSetActions(context, ref, entry.sets[i], i),
+                    onAddDrop: () => ref
+                        .read(trainingRepositoryProvider)
+                        .addSet(entry.workoutExercise.id,
+                            type: SetType.drop),
                   ),
                 // The add button lives in the index column, directly under the
                 // numbers it continues — no label, because a `+` under a
@@ -1128,6 +1186,256 @@ class _ExercisePage extends ConsumerWidget {
   }
 }
 
+enum _FinishChoice { finish, discard, keepLogging }
+
+/// What to do about a session with sets still open.
+///
+/// This was a two-button confirm built out of a paragraph of text: the counts,
+/// the exercise list and the caveat all ran together in one message, and the
+/// only ways out were "Finish anyway" and "Keep logging". There was no way to
+/// throw the session away from here at all — you had to un-tick every set to
+/// get the "nothing logged" prompt that offered it.
+Future<_FinishChoice?> _confirmEarlyFinish(
+  BuildContext context, {
+  required int done,
+  required int total,
+  required List<({String name, int done, int total})> unfinished,
+}) {
+  return showModalBottomSheet<_FinishChoice>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheet) {
+      final c = sheet.c;
+      return AppSheet(
+        title: 'Finish with sets left?',
+        subtitle: '$done of $total sets logged',
+        footer: Column(
+          children: [
+            PrimaryButton(
+              label: 'Finish session',
+              onPressed: () => Navigator.of(sheet).pop(_FinishChoice.finish),
+            ),
+            const SizedBox(height: Space.sm),
+            SecondaryButton(
+              label: 'Keep logging',
+              onPressed: () =>
+                  Navigator.of(sheet).pop(_FinishChoice.keepLogging),
+            ),
+          ],
+        ),
+        children: [
+          ListCard(
+            children: [
+              for (final e in unfinished)
+                AppRow(
+                  title: e.name,
+                  trailing: Text(
+                    '${e.done} of ${e.total}',
+                    style: sheet.t.labelLarge?.copyWith(
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: Space.lg),
+          Text(
+            'The empty sets are discarded — the session is saved with exactly '
+            'what you did.',
+            style: sheet.t.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+          const SizedBox(height: Space.lg),
+          Center(
+            child: Pressable(
+              onTap: () => Navigator.of(sheet).pop(_FinishChoice.discard),
+              child: Padding(
+                padding: const EdgeInsets.all(Space.sm),
+                child: Text(
+                  'Discard this session',
+                  style: sheet.t.titleMedium?.copyWith(color: c.negative),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// A run of rows that share one index chip.
+///
+/// A plain set is a group of one. Consecutive drop sets are a group of several:
+/// they belong to the set above them, so they get a single `D` chip with a
+/// spine running down beside them and a `+` at its foot to add another.
+class _SetGroupData {
+  const _SetGroupData(this.sets, this.positions, this.label, this.isDrop);
+
+  final List<SetLog> sets;
+
+  /// Each set's index in the exercise, needed to line a row up with its ghost.
+  final List<int> positions;
+
+  final String label;
+  final bool isDrop;
+}
+
+/// Splits an exercise's sets into rows-with-a-chip and drop runs.
+List<_SetGroupData> _groupSets(List<SetLog> sets) {
+  final groups = <_SetGroupData>[];
+  var counted = 0;
+  var i = 0;
+  while (i < sets.length) {
+    final type = sets[i].setType;
+    if (type == SetType.drop || type == SetType.restPause) {
+      final run = <SetLog>[];
+      final at = <int>[];
+      while (i < sets.length &&
+          (sets[i].setType == SetType.drop ||
+              sets[i].setType == SetType.restPause)) {
+        run.add(sets[i]);
+        at.add(i);
+        i++;
+      }
+      groups.add(_SetGroupData(run, at, run.first.setType.shortLabel, true));
+      continue;
+    }
+    // Warm-ups are not set 1. Counting them shifts every working set's number
+    // by however many you happened to do.
+    final label = type == SetType.warmup ? 'W' : '${++counted}';
+    groups.add(_SetGroupData([sets[i]], [i], label, false));
+    i++;
+  }
+  return groups;
+}
+
+class _SetGroup extends ConsumerWidget {
+  const _SetGroup({
+    required this.group,
+    required this.entry,
+    required this.unit,
+    required this.editing,
+    required this.buffer,
+    required this.onEdit,
+    required this.rowKeyFor,
+    required this.onToggleDone,
+    required this.onAddDrop,
+  });
+
+  final _SetGroupData group;
+  final ExerciseEntry entry;
+  final WeightUnit unit;
+  final EditTarget? editing;
+  final ValueListenable<String> buffer;
+  final void Function(SetLog, SetField) onEdit;
+  final GlobalKey Function(String setId) rowKeyFor;
+  final void Function(SetLog, bool) onToggleDone;
+  final VoidCallback onAddDrop;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final prefill = ref
+        .watch(workoutPrefillProvider(entry.workoutExercise.workoutId))
+        .valueOrNull?[entry.exercise.id];
+
+    final rows = [
+      for (var k = 0; k < group.sets.length; k++)
+        KeyedSubtree(
+          key: rowKeyFor(group.sets[k].id),
+          child: SetRow(
+            set: group.sets[k],
+            loadMode: entry.exercise.loadMode,
+            unit: unit,
+            ghost: _ghostSet(prefill, group.positions[k]),
+            editing: editing,
+            buffer: buffer,
+            onEdit: onEdit,
+            onToggleDone: onToggleDone,
+          ),
+        ),
+    ];
+
+    final chip = SetIndexChip(
+      type: group.sets.first.setType,
+      label: group.label,
+      done: group.sets.first.isDone,
+      onTap: () => showSetActions(
+        context,
+        ref,
+        group.sets.first,
+        group.positions.first,
+      ),
+    );
+
+    if (!group.isDrop) {
+      return Padding(
+        padding: const EdgeInsets.only(left: Space.lg),
+        child: Row(
+          children: [
+            chip,
+            const SizedBox(width: Space.sm),
+            Expanded(child: rows.single),
+          ],
+        ),
+      );
+    }
+
+    // The drop group: chip, then a spine holding the run together, then the
+    // `+` that extends it. Drawn as a fixed-width column beside the rows so
+    // every field stays in the same place it is in every other row — the
+    // indent this replaces pushed the whole table sideways.
+    return Padding(
+      padding: const EdgeInsets.only(left: Space.lg),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: SetRow.indexColumn,
+              child: Column(
+                children: [
+                  chip,
+                  Expanded(
+                    child: Center(
+                      child: Container(
+                        width: SetRow.indexColumn,
+                        decoration: BoxDecoration(
+                          color: c.surfaceHigh,
+                          borderRadius: BorderRadius.circular(Radii.pill),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Pressable(
+                    onTap: onAddDrop,
+                    child: Container(
+                      width: SetRow.indexColumn,
+                      height: SetRow.indexColumn,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: c.surfaceHigh,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.add_rounded,
+                        size: 18,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: Space.sm),
+            Expanded(child: Column(children: rows)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Session length, as `m:ss` or `h:mm:ss`. Top-level because both the screen
 /// and its top bar need it and neither owns the other.
 String _formatElapsed(int startedAtMs) {
@@ -1146,21 +1454,7 @@ String _formatElapsed(int startedAtMs) {
   return '$m:${s.toString().padLeft(2, '0')}';
 }
 
-/// What the index chip prints for the set at [i].
-///
-/// Warm-ups and continuation sets are lettered rather than numbered, and they
-/// don't advance the count: `W W 1 2 3` is a warm-up pair followed by three
-/// working sets, and the third one is set 3 whichever way you got there.
-String _indexLabel(List<SetLog> sets, int i) {
-  final type = sets[i].setType;
-  if (type == SetType.warmup || type.isContinuation) return type.shortLabel;
-  var n = 0;
-  for (var k = 0; k <= i; k++) {
-    final t = sets[k].setType;
-    if (t != SetType.warmup && !t.isContinuation) n++;
-  }
-  return '$n';
-}
+
 
 class _PrefillCaption extends StatelessWidget {
   const _PrefillCaption({required this.prefill});
