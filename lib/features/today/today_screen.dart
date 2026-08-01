@@ -389,11 +389,22 @@ class TodayScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-              // Inside the band, sharing its surface — the header and the
-              // thing you do about it are one statement.
-              belowLabel: open != null ? null : 'Today\'s session',
-              below: open != null
-                  ? _ResumeHero(
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  Space.lg,
+                  Space.gutter,
+                  Space.huge,
+                ),
+                children: [
+                  // The session is the page's first *section*, not part of the
+                  // masthead. The band ends at the line about when you last
+                  // trained; everything you can act on is content under it,
+                  // with its own heading like every other block here.
+                  if (open != null)
+                    _ResumeHero(
                       workout: open,
                       owner: today.snapshot.openWorkoutOwner,
                       doneSets: today.snapshot.openWorkoutDoneSets,
@@ -403,9 +414,9 @@ class TodayScreen extends ConsumerWidget {
                       activeRegimeName: r.name,
                       sessions: sessions,
                     )
-                  : status == null
-                  ? null
-                  : _NextUpHero(
+                  else if (status != null) ...[
+                    const SectionHeader("Today's session"),
+                    _NextUpHero(
                       regimeId: r.id,
                       regimeName: r.name,
                       status: status,
@@ -414,16 +425,8 @@ class TodayScreen extends ConsumerWidget {
                           .snapshot
                           .exerciseNamesBySession[status.nextSessionId],
                     ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  Space.gutter,
-                  Space.section,
-                  Space.gutter,
-                  Space.huge,
-                ),
-                children: [
+                  ],
+                  const SizedBox(height: Space.section),
                   _ConsistencyCard(
                     data: today.heatmap,
                     hasHistory: today.hasHistory,
@@ -465,33 +468,14 @@ class TodayScreen extends ConsumerWidget {
 /// `NO SESSIONS YET` at 27sp was the loudest thing on a screen whose whole
 /// message was that nothing had happened yet.
 class _TodayHeader extends StatelessWidget {
-  const _TodayHeader({
-    required this.last,
-    this.actions = const [],
-    this.below,
-    this.belowLabel,
-  });
+  const _TodayHeader({required this.last, this.actions = const []});
 
   final ({Workout workout, String? sessionName})? last;
   final List<Widget> actions;
 
-  /// The session block, on the band's own surface rather than in a card of the
-  /// identical colour. Null in the states that have no session to offer.
-  final Widget? below;
-
-  /// The block's own small heading — the thing every other section on this
-  /// screen had and the session did not, which is what made it read as a card
-  /// that had drifted in from somewhere.
-  ///
-  /// Null for a session already running: that block opens with a pulsing
-  /// `IN PROGRESS`, which is the same label doing the same job, and two of them
-  /// stacked is the duplication this heading was added to fix.
-  final String? belowLabel;
-
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final below = this.below;
     return HeaderBand(
       child: PageHeader(
         // The screen names itself, like every other destination. It used to be
@@ -505,24 +489,12 @@ class _TodayHeader extends StatelessWidget {
         // Tight to the date: the rest gap is a line about it, not the next
         // thing on the page.
         belowGap: Space.xs,
-        below: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _RestGap(last: last),
-            if (below != null) ...[
-              // Air, and a lot of it: this is where the masthead ends and the
-              // thing you are here to do begins. The two share a surface, so
-              // the gap is the only boundary they get.
-              const SizedBox(height: Space.xxl),
-              // Same type as Consistency and Last session below it. The band
-              // is a different surface, not a different rank — a heading that
-              // shrank because of what it happened to sit on would say this
-              // block matters less than the record of it.
-              if (belowLabel != null) SectionHeader(belowLabel!),
-              below,
-            ],
-          ],
-        ),
+        // The band is the masthead and nothing else — name, date, and when you
+        // last trained. The session used to live in here too, sharing the
+        // band's surface, which made the header half the screen tall and left
+        // the first real section starting somewhere down the page with no
+        // boundary to mark it.
+        below: _RestGap(last: last),
         // The cog went with the rename: Settings is a destination on the nav
         // bar now, and a screen reachable two ways is a screen you have to
         // decide about twice.

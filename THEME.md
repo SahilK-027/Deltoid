@@ -367,10 +367,15 @@ once the other way round and both were wrong:
   only one whose masthead never says where you are. The date is the eyebrow
   above it, which is the slot it always half-occupied.
 
-**The band does not scroll.** A masthead that slides away takes the screen's
-one primary action with it — on Workouts that is the session and the button
-that starts it, which is the reason the screen exists. Pin the band, scroll the
-record underneath.
+**The band does not scroll**, and it holds *only* the masthead: the screen's
+name, its eyebrow, and at most one quiet line about the state of things (on
+Workouts, when you last trained). Everything you can act on is a section under
+it, with its own heading, on the page background.
+
+A block put inside the band shares the band's surface, so it has no boundary of
+its own — Workouts had the session in there and the header ran half the screen
+with the first real section beginning somewhere in the middle of it, unmarked.
+Pin the band, scroll the content.
 
 ### The metric screen
 
