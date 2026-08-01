@@ -50,10 +50,37 @@ a device before the next starts.
       listing only years with something in them. A year at a time is legible
       and two of them are compared by switching; everything at once never was.
 
-- [ ] **5 · Regime cluster** — regime screen, session editor, catalog, setup.
-      Day tabs, count-as-heading, targets card + editor sheet, catalog picker
-      with search and filter chips. Creation stays in sheets: no wizard.
-      The exercise's own screen gets the General / Overrides split (THEME §5).
+- [ ] **5 · Regime cluster** — built, **not yet driven on the device.**
+
+      The Regime tab is the programme editor: day tabs under a band that names
+      the regime, the day's exercises under a count heading, and Rename /
+      Re-order / Delete as chips. `session_editor.dart` is gone — a training
+      day was a context you switch, not a screen you push into.
+
+      An exercise block is two tap targets, each stating one action: the name
+      opens the slot's own screen, the targets card (`4 × 8–10`) opens the
+      target sheet. The slot screen carries the **General / Overrides** split.
+      Overrides are that day's — targets, note, and the per-slot deload whose
+      columns had existed since the first migration with no way to set them.
+      `prefillForWorkout` read the regime's figures whatever the slot said, so
+      an exercise added mid-session deloaded differently from the same exercise
+      at the door; it reads the slot first now, as `startWorkout` does.
+
+
+      Cycle controls left the page for a sheet behind one status line; the
+      regime's own settings (name, deload, day order, catalog, other regimes)
+      sit behind the sliders button. The catalog and the picker are the same
+      thing built the same way now — search, muscle chips, full-bleed rows —
+      and archiving moved into the exercise's sheet, off eighty rows.
+
+      Creation is choice cards in a sheet, and naming is a sheet rather than a
+      dialog. No wizard.
+
+      Two deviations from THEME §7, both deliberate: **no `⋮` on an exercise
+      block**, because everything it would hold is one tap away on the slot
+      screen and the block already has two targets; and **the targets card is
+      one line, not a set table**, because a slot holds one rep range and four
+      identical rows would draw per-set targets this app cannot store.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion once the
       list primitives exist. Settings has its masthead already (step 4 made it
       a tab); what is left is bodyweight coming up out of it to one tap, and
@@ -92,8 +119,9 @@ the wakelock, audio ducking, and the share sheet.
 - **Session summary** — the screen a workout finishes on: volume, sets, time,
   the session note, a recap, and the offer to keep today's changes to the
   programme (`domain/session_diff.dart` → `applySessionChanges`).
-- **Cycles + deload**, **stale-session sweep**, **multiple regimes**, **regime
-  editor**, **exercise catalog** (archive, never delete).
+- **Cycles + deload** (regime-wide, and per slot), **stale-session sweep**,
+  **multiple regimes**, **programme editor**, **exercise catalog** (archive,
+  never delete).
 - **History** — paged session feed + per-exercise index. The Notion-style table
   was deleted in step 3.
 - **Progress** — e1RM over time, one line per session slot, stall detection,
@@ -104,7 +132,7 @@ the wakelock, audio ducking, and the share sheet.
   logged through the UI, because it is behind a settings cog.
 - Light / dark / system theme, adaptive launcher icon.
 
-**220 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**226 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, and repository integration against real in-memory SQLite.
@@ -117,8 +145,6 @@ budget, and repository integration against real in-memory SQLite.
   carries the sync columns, so it is additive: no migration.
 - **iOS** — needs Xcode. Nothing iOS-specific is known broken, and nothing is
   verified.
-- **Per-exercise deload overrides** — columns exist
-  (`session_exercises.deload_set_delta` / `deload_weight_pct`), no UI.
 
 ---
 
