@@ -57,9 +57,11 @@ a device before the next starts.
       Re-order / Delete as chips. `session_editor.dart` is gone — a training
       day was a context you switch, not a screen you push into.
 
-      An exercise block is two tap targets, each stating one action: the name
-      opens the slot's own screen, the targets card (`4 × 8–10`) opens the
-      target sheet. The slot screen carries the **General / Overrides** split.
+      An exercise is **one row** — name, muscle, target on the right — opening
+      its own screen. It was a block with a muscle pill and a targets card
+      under it, three stacked things and 130pt per exercise, and six of those
+      is a wall rather than a day you can read. The slot screen carries the
+      **General / Overrides** split.
       Overrides are that day's — targets, note, and the per-slot deload whose
       columns had existed since the first migration with no way to set them.
       `prefillForWorkout` read the regime's figures whatever the slot said, so
@@ -76,11 +78,23 @@ a device before the next starts.
       Creation is choice cards in a sheet, and naming is a sheet rather than a
       dialog. No wizard.
 
-      Two deviations from THEME §7, both deliberate: **no `⋮` on an exercise
-      block**, because everything it would hold is one tap away on the slot
-      screen and the block already has two targets; and **the targets card is
-      one line, not a set table**, because a slot holds one rep range and four
-      identical rows would draw per-set targets this app cannot store.
+      Three deviations from THEME §7, all deliberate: **no `⋮` on an exercise
+      row**, because everything it would hold is one tap away on the slot
+      screen; **no targets card**, because the figure reads fine as the row's
+      trailing value and the card existed only to be a second tap target; and
+      **the target editor is not a set table**, because a slot holds one rep
+      range and four identical rows would draw per-set targets this app cannot
+      store.
+
+      **Driven, and the device found two things.** The day tabs asked for an
+      infinite width — a stretching column inside a horizontal scroll — and the
+      Regime tab rendered as nothing at all behind one `BoxConstraints forces
+      an infinite width` and a hundred `RenderBox was not laid out`. And the
+      screen had no masthead until it had data, so a first launch opened on a
+      bare empty state with nothing saying which tab you were in.
+      `regime_screen_test.dart` now pumps all four states against a real
+      database, because both were invisible to the analyzer and to every other
+      test.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion once the
       list primitives exist. Settings has its masthead already (step 4 made it
       a tab); what is left is bodyweight coming up out of it to one tap, and
@@ -132,7 +146,7 @@ the wakelock, audio ducking, and the share sheet.
   logged through the UI, because it is behind a settings cog.
 - Light / dark / system theme, adaptive launcher icon.
 
-**226 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**232 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, and repository integration against real in-memory SQLite.

@@ -73,17 +73,30 @@ class _RegimeScreenState extends ConsumerState<RegimeScreen> {
     final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
     final status = ref.watch(cycleStatusProvider).valueOrNull;
 
+    // The masthead is the screen, not a decoration on top of its content: a
+    // first launch used to open on a bare empty state with nothing saying which
+    // tab you were standing in — the one screen in the app whose header
+    // appeared only once it had data.
     if (regime == null) {
       return Scaffold(
-        body: EmptyState(
-          icon: Icons.tune,
-          title: 'No regime yet',
-          message: 'Build your own split, or start from a template and edit it '
-              'into shape.',
-          action: PrimaryButton(
-            label: 'Create regime',
-            onPressed: () => createRegimeFlow(context, ref),
-          ),
+        body: Column(
+          children: [
+            const HeaderBand(
+              child: PageHeader(title: 'Regime', topGap: Space.xxl),
+            ),
+            Expanded(
+              child: EmptyState(
+                icon: Icons.tune,
+                title: 'No regime yet',
+                message: 'Build your own split, or start from a template and '
+                    'edit it into shape.',
+                action: PrimaryButton(
+                  label: 'Create regime',
+                  onPressed: () => createRegimeFlow(context, ref),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -320,8 +333,9 @@ class _DayBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.only(bottom: Space.huge),
       children: [
-        // Chips, not an overflow menu: these are the things you actually do to
-        // a training day, and a menu hides three of them behind a glyph.
+        // Two chips, not three. `Delete day` was the loudest thing on a page
+        // about what you train, and it sits at the foot now with the other
+        // destructive rows in this cluster.
         SizedBox(
           height: 60,
           child: ListView(
@@ -341,12 +355,6 @@ class _DayBody extends ConsumerWidget {
                 onTap: slots.length < 2
                     ? null
                     : () => _reorder(context, ref, slots),
-              ),
-              const SizedBox(width: Space.sm),
-              AppChip(
-                label: 'Delete day',
-                icon: Icons.delete_outline_rounded,
-                onTap: () => _delete(context, ref),
               ),
             ],
           ),
@@ -375,12 +383,30 @@ class _DayBody extends ConsumerWidget {
         else
           for (var i = 0; i < slots.length; i++) ...[
             if (i > 0) Divider(height: 1, color: c.border),
-            _SlotBlock(
+            _SlotRow(
               sessionId: session.id,
               slot: slots[i].slot,
               exercise: slots[i].exercise,
             ),
           ],
+        const SizedBox(height: Space.section),
+        // Where every destructive action in this cluster lives: at the foot of
+        // the thing it destroys, quiet, after everything you actually came for.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+          child: ListCard(
+            inset: Space.lg,
+            children: [
+              AppRow(
+                icon: Icons.delete_outline_rounded,
+                title: 'Delete ${session.name}',
+                subtitle: 'Logged workouts stay in History',
+                tint: c.negative,
+                onTap: () => _delete(context, ref),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -444,14 +470,17 @@ class _DayBody extends ConsumerWidget {
   }
 }
 
-/// One exercise in a day: what it is, and what it is for.
+/// One exercise in a day: one row, name over what it is, target on the right.
 ///
-/// Two tap targets, each stating one action (rule 6). The name opens the
-/// exercise's own screen, where the catalog facts and this day's overrides are
-/// split; the targets card opens the target editor, because the target is the
-/// point of the slot and burying it behind a screen is what §9 calls out.
-class _SlotBlock extends ConsumerWidget {
-  const _SlotBlock({
+/// It was a block — name, a muscle pill, and a card under it holding the target
+/// — which is three stacked things per exercise and about 130pt of height. Six
+/// of those is not a training day you can read, it is a wall, and the card's
+/// only job was to be a second tap target for the target sheet. The sheet is
+/// one row down on the slot screen, which is where the rest of this slot's
+/// settings already live; the figure stays visible here, which is all §9 asked
+/// for.
+class _SlotRow extends StatelessWidget {
+  const _SlotRow({
     required this.sessionId,
     required this.slot,
     required this.exercise,
@@ -462,78 +491,31 @@ class _SlotBlock extends ConsumerWidget {
   final Exercise exercise;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
+  Widget build(BuildContext context) {
+    final overridden =
+        slot.deloadSetDelta != null || slot.deloadWeightPct != null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          Space.gutter, Space.md, Space.gutter, Space.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return AppRow(
+      title: exercise.name,
+      // Text, not a pill: a chip per row down a list is a column of chips, and
+      // the muscle is a fact about the row rather than a state of it.
+      subtitle: overridden
+          ? '${exercise.muscle.label} · own deload'
+          : exercise.muscle.label,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Pressable(
-            scale: 0.99,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SessionSlotScreen(
-                  sessionId: sessionId,
-                  slotId: slot.id,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        exercise.name,
-                        style: context.t.titleMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: Space.xs),
-                      Row(
-                        children: [
-                          Pill(exercise.muscle.label),
-                          if (slot.deloadSetDelta != null ||
-                              slot.deloadWeightPct != null) ...[
-                            const SizedBox(width: Space.xs),
-                            Pill('Own deload', color: c.deload),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: Space.sm),
-                Icon(Icons.chevron_right_rounded,
-                    size: 20, color: c.textTertiary),
-              ],
-            ),
-          ),
-          const SizedBox(height: Space.md),
-          AppCard(
-            radius: Radii.lg,
-            padding: const EdgeInsets.symmetric(
-                horizontal: Space.lg, vertical: Space.md),
-            onTap: () => showTargetEditor(context, ref, slot, exercise),
-            child: Row(
-              children: [
-                Text(targetLabel(slot), style: context.t.labelLarge),
-                const SizedBox(width: Space.xs),
-                Text(
-                  slot.targetRepLow == null ? '' : 'reps',
-                  style: context.t.bodyMedium,
-                ),
-                const Spacer(),
-                Icon(Icons.chevron_right_rounded,
-                    size: 18, color: c.textTertiary),
-              ],
-            ),
-          ),
+          Text(targetLabel(slot), style: context.t.labelLarge),
+          const SizedBox(width: Space.sm),
+          Icon(Icons.chevron_right_rounded,
+              size: 20, color: context.c.textTertiary),
         ],
+      ),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              SessionSlotScreen(sessionId: sessionId, slotId: slot.id),
+        ),
       ),
     );
   }
