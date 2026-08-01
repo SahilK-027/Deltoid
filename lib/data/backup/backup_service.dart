@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -34,17 +35,27 @@ class ImportResult {
 /// a row from JSON needs the generated `fromJson` for its data class — the
 /// generic `map()` reads database rows, not serialised ones, and would quietly
 /// mangle enum and converter columns.
-class _TableCodec {
+class _TableCodec<T extends Insertable<dynamic>> {
   const _TableCodec({
     required this.name,
     required this.dump,
-    required this.insert,
+    required this.table,
+    required this.parse,
     required this.clear,
   });
 
   final String name;
   final Future<List<Map<String, dynamic>>> Function() dump;
-  final Future<void> Function(Map<String, dynamic> row) insert;
+
+  /// The table itself, so a restore can insert a whole file in batches rather
+  /// than a row at a time. 120k round trips through the platform channel took
+  /// minutes on a phone with the screen frozen, which reads as a crash and got
+  /// backups abandoned halfway.
+  final TableInfo<Table, dynamic> table;
+
+  /// JSON row → something `Batch.insertAll` can write.
+  final T Function(Map<String, dynamic> row) parse;
+
   final Future<void> Function() clear;
 }
 
@@ -72,23 +83,24 @@ class BackupService {
       // dies on a null cast — with the user's only copy of their history in
       // the picker. A default for anything added after v1 keeps old files
       // restorable; add one here whenever a column is added to this table.
-      insert: (row) => db.into(db.exercises).insert(
-            Exercise.fromJson({'barKind': BarKind.none.name, ...row}),
-          ),
+      table: db.exercises,
+      parse: (row) => Exercise.fromJson({'barKind': BarKind.none.name, ...row}),
       clear: () => db.delete(db.exercises).go(),
     ),
     _TableCodec(
       name: 'regimes',
       dump: () async =>
           (await db.select(db.regimes).get()).map((e) => e.toJson()).toList(),
-      insert: (row) => db.into(db.regimes).insert(Regime.fromJson(row)),
+      table: db.regimes,
+      parse: Regime.fromJson,
       clear: () => db.delete(db.regimes).go(),
     ),
     _TableCodec(
       name: 'sessions',
       dump: () async =>
           (await db.select(db.sessions).get()).map((e) => e.toJson()).toList(),
-      insert: (row) => db.into(db.sessions).insert(Session.fromJson(row)),
+      table: db.sessions,
+      parse: Session.fromJson,
       clear: () => db.delete(db.sessions).go(),
     ),
     _TableCodec(
@@ -96,22 +108,24 @@ class BackupService {
       dump: () async => (await db.select(db.sessionExercises).get())
           .map((e) => e.toJson())
           .toList(),
-      insert: (row) =>
-          db.into(db.sessionExercises).insert(SessionExercise.fromJson(row)),
+      table: db.sessionExercises,
+      parse: SessionExercise.fromJson,
       clear: () => db.delete(db.sessionExercises).go(),
     ),
     _TableCodec(
       name: 'cycles',
       dump: () async =>
           (await db.select(db.cycles).get()).map((e) => e.toJson()).toList(),
-      insert: (row) => db.into(db.cycles).insert(Cycle.fromJson(row)),
+      table: db.cycles,
+      parse: Cycle.fromJson,
       clear: () => db.delete(db.cycles).go(),
     ),
     _TableCodec(
       name: 'workouts',
       dump: () async =>
           (await db.select(db.workouts).get()).map((e) => e.toJson()).toList(),
-      insert: (row) => db.into(db.workouts).insert(Workout.fromJson(row)),
+      table: db.workouts,
+      parse: Workout.fromJson,
       clear: () => db.delete(db.workouts).go(),
     ),
     _TableCodec(
@@ -119,15 +133,16 @@ class BackupService {
       dump: () async => (await db.select(db.workoutExercises).get())
           .map((e) => e.toJson())
           .toList(),
-      insert: (row) =>
-          db.into(db.workoutExercises).insert(WorkoutExercise.fromJson(row)),
+      table: db.workoutExercises,
+      parse: WorkoutExercise.fromJson,
       clear: () => db.delete(db.workoutExercises).go(),
     ),
     _TableCodec(
       name: 'set_logs',
       dump: () async =>
           (await db.select(db.setLogs).get()).map((e) => e.toJson()).toList(),
-      insert: (row) => db.into(db.setLogs).insert(SetLog.fromJson(row)),
+      table: db.setLogs,
+      parse: SetLog.fromJson,
       clear: () => db.delete(db.setLogs).go(),
     ),
     _TableCodec(
@@ -135,8 +150,8 @@ class BackupService {
       dump: () async => (await db.select(db.bodyweightLogs).get())
           .map((e) => e.toJson())
           .toList(),
-      insert: (row) =>
-          db.into(db.bodyweightLogs).insert(BodyweightLog.fromJson(row)),
+      table: db.bodyweightLogs,
+      parse: BodyweightLog.fromJson,
       clear: () => db.delete(db.bodyweightLogs).go(),
     ),
   ];
@@ -160,12 +175,28 @@ class BackupService {
     };
   }
 
-  /// Writes a timestamped JSON file to temp storage, ready for the share sheet.
+  /// Where backups live: a `Deltoid` folder the user can actually open.
+  ///
+  /// Temp storage was fine for handing a file to the share sheet and useless
+  /// for everything else — the file was gone by the next boot, and a backup you
+  /// cannot find in a file manager is one you have to take on faith. External
+  /// app storage is visible over USB and to any file browser, and needs no
+  /// permission on any Android version this app supports.
+  Future<Directory> backupDirectory() async {
+    final root = await getExternalStorageDirectory() ??
+        await getApplicationDocumentsDirectory();
+    final dir = Directory('${root.path}/Deltoid');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
+  }
+
+  /// Writes a timestamped JSON file into [backupDirectory], ready for the share
+  /// sheet — and still there afterwards, whether it was shared or not.
   Future<File> exportToFile() async {
     final payload = await buildPayload();
-    final dir = await getTemporaryDirectory();
+    final dir = await backupDirectory();
     final name =
-        'deltoid-${DateFormat('yyyy-MM-dd').format(DateTime.now())}.json';
+        'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
     final file = File('${dir.path}/$name');
     await file
         .writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
@@ -175,8 +206,7 @@ class BackupService {
   /// Keeps the last [keep] automatic exports in app storage, so a phone that
   /// dies between manual backups still has something recent to lose least from.
   Future<void> autoExport({int keep = 4}) async {
-    final root = await getApplicationDocumentsDirectory();
-    final dir = Directory('${root.path}/backups');
+    final dir = Directory('${(await backupDirectory()).path}/auto');
     if (!dir.existsSync()) dir.createSync(recursive: true);
 
     final payload = await buildPayload();
@@ -200,8 +230,7 @@ class BackupService {
   /// A backup nobody can see is a backup nobody trusts: Settings offers
   /// "restore" without ever saying whether there is anything recent behind it.
   Future<DateTime?> lastAutoExportAt() async {
-    final root = await getApplicationDocumentsDirectory();
-    final dir = Directory('${root.path}/backups');
+    final dir = Directory('${(await backupDirectory()).path}/auto');
     if (!dir.existsSync()) return null;
 
     final files = dir
@@ -261,7 +290,17 @@ class BackupService {
   ///
   /// The whole restore runs in one transaction, so a malformed file leaves the
   /// existing database untouched instead of half-erased.
-  Future<ImportResult> restore(String json) async {
+  /// Replaces the database with a backup's contents.
+  ///
+  /// [onProgress] is called with the table being written and how many rows have
+  /// landed so far. A restore of a long history is thousands of rows and the
+  /// screen has to say so — silence for a minute is indistinguishable from a
+  /// hang, and the natural response to a hung restore is to kill the app
+  /// halfway through it.
+  Future<ImportResult> restore(
+    String json, {
+    void Function(String table, int rowsWritten)? onProgress,
+  }) async {
     final summary = inspect(json);
     final payload = jsonDecode(json) as Map<String, dynamic>;
     final data = Map<String, dynamic>.from(payload['data'] as Map);
@@ -275,10 +314,20 @@ class BackupService {
       }
       for (final codec in _codecs) {
         final rows = data[codec.name];
-        if (rows is! List) continue;
-        for (final row in rows) {
-          await codec.insert(Map<String, dynamic>.from(row as Map));
-          written++;
+        if (rows is! List || rows.isEmpty) continue;
+
+        // In chunks, not one statement per row: a year of training is ~40k
+        // rows and a decade is ten times that. Chunked rather than one giant
+        // batch so a huge file does not hold every parsed row in memory at
+        // once alongside the JSON it came from.
+        const chunk = 500;
+        for (var i = 0; i < rows.length; i += chunk) {
+          final slice = rows.skip(i).take(chunk).map(
+                (row) => codec.parse(Map<String, dynamic>.from(row as Map)),
+              );
+          await db.batch((b) => b.insertAll(codec.table, slice.toList()));
+          written += slice.length;
+          onProgress?.call(codec.name, written);
         }
       }
     });

@@ -32,6 +32,32 @@ void main() {
     expect(await db.select(db.setLogs).get(), isNotEmpty);
   });
 
+  test('a file bigger than one batch restores whole, and reports progress',
+      () async {
+    // The importer writes in chunks of 500. A file with more rows than that in
+    // one table is the case that would break silently if the chunking were
+    // off by one — and the only case that takes long enough on a phone to need
+    // the progress callback that stops it looking hung.
+    final json = jsonEncode(buildSeedPayload(years: 2, seed: 3));
+    final counts = <String, int>{};
+
+    final result = await BackupService(db).restore(
+      json,
+      onProgress: (table, rows) => counts[table] = rows,
+    );
+
+    expect(counts, isNotEmpty, reason: 'progress was never reported');
+    expect(counts.values.last, result.rowsWritten);
+
+    final sets = await db.select(db.setLogs).get();
+    expect(sets.length, greaterThan(500));
+    expect(
+      (jsonDecode(json) as Map)['counts']['set_logs'],
+      sets.length,
+      reason: 'a chunk went missing',
+    );
+  });
+
   test('the data it writes is the shape the app reads', () async {
     await BackupService(db).restore(
       jsonEncode(buildSeedPayload(years: 1, seed: 7)),

@@ -1,4 +1,6 @@
 import 'package:drift/drift.dart' hide Column, Table;
+import 'dart:async';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -175,6 +177,11 @@ class SettingsScreen extends ConsumerWidget {
     final box = context.findRenderObject() as RenderBox?;
     try {
       final file = await BackupService(ref.read(databaseProvider)).exportToFile();
+      // The file is kept whether or not the share sheet is used, so say where
+      // it went — a backup you cannot find later is one you have to trust.
+      messenger.showSnackBar(
+        SnackBar(content: Text('Saved to ${file.parent.path}')),
+      );
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path)],
@@ -206,11 +213,13 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
 
-    final file = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Deltoid backup', extensions: ['json']),
-      ],
-    );
+    // No type filter. Android resolves `extensions: ['json']` to a MIME type,
+    // and a .json file arriving from Downloads, a share sheet or a cloud
+    // provider is as often `application/octet-stream` or `text/plain` — so the
+    // filter greys out the very file the user came to pick, with no way to say
+    // why. Anything that is not a backup is caught by `inspect` below and
+    // named as such.
+    final file = await openFile();
     if (file == null) return;
 
     final BackupSummary summary;
@@ -249,13 +258,51 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
+    // A decade of training is a hundred thousand rows. Without something on
+    // screen the app looks hung, and a hung restore gets killed halfway.
+    final progress = ValueNotifier<String>('Starting…');
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context);
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Restoring'),
+          content: ValueListenableBuilder<String>(
+            valueListenable: progress,
+            builder: (context, text, _) => Row(
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: Space.lg),
+                Expanded(child: Text(text)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
+
     try {
-      final result = await service.restore(contents);
+      final result = await service.restore(
+        contents,
+        onProgress: (table, rows) =>
+            progress.value = '$rows rows · ${table.replaceAll('_', ' ')}',
+      );
+      navigator.pop();
       messenger.showSnackBar(
         SnackBar(content: Text('Restored ${result.rowsWritten} rows')),
       );
     } catch (e) {
+      navigator.pop();
       messenger.showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+    } finally {
+      progress.dispose();
     }
   }
 
