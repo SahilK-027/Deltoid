@@ -237,6 +237,24 @@ a device before the next starts.
       heatmap and the rate makes it a dashboard, which is the thing §1 exists to
       stop.
 
+      **The chart never enters the infinite list.** History's masthead and pill
+      sit outside the scroll view and the keyset-paged feed under `Sessions` is
+      untouched. The `Exercises` segment is the catalog — forty rows, finite,
+      searchable — and tapping one pushes `ExerciseHistoryScreen`, which is
+      where the chart goes: at the head of that exercise's own performances,
+      newest first. Finite list, short by construction.
+
+      The chart **scrolls away** with those performances rather than pinning.
+      It is a summary, not a control, and pinned it costs half a phone screen
+      while you are reading the sets under it. The range pill travels with it.
+
+      Two things the move improves rather than merely relocates: Progress's
+      "one line per session slot" is self-evident on a per-exercise screen —
+      bench in Push 1 and bench in Push 2 as two lines is the app's thesis
+      *drawn* instead of explained — and the exercise picker the Progress tab
+      opens with is deleted, because the `Exercises` index is that picker done
+      properly.
+
       **The chart language, built once**: dashed gridlines, right-hand Y labels,
       range pill, legend chips, em-dash empty state instead of a gridded void.
       Two screens consume it now rather than three, which is the point of doing
