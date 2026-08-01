@@ -40,6 +40,8 @@ class TodaySnapshot {
     required this.openWorkout,
     required this.openWorkoutOwner,
     required this.openWorkoutDoneSets,
+    required this.openWorkoutTotalSets,
+    required this.openWorkoutExerciseNames,
     required this.hasHistory,
     required this.exerciseNamesBySession,
     required this.recentCompleted,
@@ -64,6 +66,17 @@ class TodaySnapshot {
   /// "you mis-tapped Start three days ago", which is the only thing that
   /// decides whether the app may throw it away on its own.
   final int openWorkoutDoneSets;
+
+  /// Every set row in the open workout, done or not — the denominator Today
+  /// puts beside [openWorkoutDoneSets].
+  final int openWorkoutTotalSets;
+
+  /// Exercise names in the open workout, in slot order.
+  ///
+  /// Read off `workoutExercises`, **not** off the session template: the log is
+  /// a snapshot taken at Start, so an exercise swapped out of the programme
+  /// since then is still in the session you are standing in.
+  final List<String> openWorkoutExerciseNames;
 
   /// Whether anything has ever been finished — "brand new install" as opposed
   /// to "regime set up, nothing logged yet".
@@ -419,6 +432,12 @@ class TrainingRepository {
     Future<int> doneOf(Workout? w) async =>
         w == null ? 0 : doneSetCount(w.id);
 
+    Future<int> totalOf(Workout? w) async =>
+        w == null ? 0 : setCount(w.id);
+
+    Future<List<String>> namesOf(Workout? w) async =>
+        w == null ? const <String>[] : workoutExerciseNames(w.id);
+
     final (regime, open, history, recent) = await (
       regimeQuery.getSingleOrNull(),
       openQuery.getSingleOrNull(),
@@ -441,6 +460,8 @@ class TrainingRepository {
         openWorkout: open,
         openWorkoutOwner: await ownerOf(open),
         openWorkoutDoneSets: await doneOf(open),
+        openWorkoutTotalSets: await totalOf(open),
+        openWorkoutExerciseNames: await namesOf(open),
         hasHistory: history.isNotEmpty,
         lastCompleted: last,
         exerciseNamesBySession: const {},
@@ -454,11 +475,13 @@ class TrainingRepository {
           ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
         .get();
 
-    final (status, names, owner, doneSets) = await (
+    final (status, names, owner, doneSets, totalSets, openNames) = await (
       cycleStatus(regime.id),
       _exerciseNamesBySession(sessions.map((s) => s.id).toList()),
       ownerOf(open),
       doneOf(open),
+      totalOf(open),
+      namesOf(open),
     ).wait;
 
     return TodaySnapshot(
@@ -468,6 +491,8 @@ class TrainingRepository {
       openWorkout: open,
       openWorkoutOwner: owner,
       openWorkoutDoneSets: doneSets,
+      openWorkoutTotalSets: totalSets,
+      openWorkoutExerciseNames: openNames,
       hasHistory: history.isNotEmpty,
       lastCompleted: last,
       exerciseNamesBySession: names,
@@ -1925,6 +1950,40 @@ class TrainingRepository {
           db.setLogs.isDone.equals(true) &
           db.setLogs.deletedAt.isNull());
     return (await query.getSingle()).read(total) ?? 0;
+  }
+
+  /// Every set row in the workout, ticked or not. The denominator to
+  /// [doneSetCount] — "4 of 12" rather than a count with nothing to weigh it
+  /// against.
+  Future<int> setCount(String workoutId) async {
+    final total = db.setLogs.id.count();
+    final query = db.selectOnly(db.setLogs).join([
+      innerJoin(
+        db.workoutExercises,
+        db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId),
+      ),
+    ])
+      ..addColumns([total])
+      ..where(db.workoutExercises.workoutId.equals(workoutId) &
+          db.workoutExercises.deletedAt.isNull() &
+          db.setLogs.deletedAt.isNull());
+    return (await query.getSingle()).read(total) ?? 0;
+  }
+
+  /// The workout's own exercise names, in slot order.
+  ///
+  /// Off `workoutExercises`, not the session template it was copied from — see
+  /// [TodaySnapshot.openWorkoutExerciseNames].
+  Future<List<String>> workoutExerciseNames(String workoutId) async {
+    final rows = await (db.select(db.workoutExercises).join([
+      innerJoin(db.exercises,
+          db.exercises.id.equalsExp(db.workoutExercises.exerciseId)),
+    ])
+          ..where(db.workoutExercises.workoutId.equals(workoutId) &
+              db.workoutExercises.deletedAt.isNull())
+          ..orderBy([OrderingTerm(expression: db.workoutExercises.orderIndex)]))
+        .get();
+    return [for (final r in rows) r.readTable(db.exercises).name];
   }
 
   /// Clears out sessions started a day or more ago with nothing logged in them.

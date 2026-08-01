@@ -394,7 +394,10 @@ class TodayScreen extends ConsumerWidget {
                       workout: open,
                       owner: today.snapshot.openWorkoutOwner,
                       doneSets: today.snapshot.openWorkoutDoneSets,
+                      totalSets: today.snapshot.openWorkoutTotalSets,
+                      preview: today.snapshot.openWorkoutExerciseNames,
                       activeRegimeId: r.id,
+                      activeRegimeName: r.name,
                       sessions: sessions,
                     )
                   : status == null
@@ -673,7 +676,10 @@ class _ResumeHero extends ConsumerWidget {
     required this.workout,
     required this.owner,
     required this.doneSets,
+    required this.totalSets,
+    required this.preview,
     required this.activeRegimeId,
+    required this.activeRegimeName,
     required this.sessions,
   });
 
@@ -689,7 +695,17 @@ class _ResumeHero extends ConsumerWidget {
   /// work in it worth deciding about.
   final int doneSets;
 
+  /// Every set in the log, ticked or not. Zero for a session whose exercises
+  /// carry no set rows yet, which is why the count is only drawn when it is
+  /// positive — "0 of 0 sets" says nothing.
+  final int totalSets;
+
+  /// The running workout's own exercises, in order — off the log, not the
+  /// template it was copied from.
+  final List<String> preview;
+
   final String activeRegimeId;
+  final String activeRegimeName;
   final List<Session> sessions;
 
   @override
@@ -715,14 +731,51 @@ class _ResumeHero extends ConsumerWidget {
     // Past a day this stops being a session in progress and becomes a decision:
     // a stopwatch reading 51 hours is not a useful thing to put on a screen.
     final stale = DateTime.now().difference(started).inHours >= 24;
-    final mark = workout.isDeload ? c.deload : c.positive;
+    final ownerRegimeId = owner?.regimeId ?? activeRegimeId;
+    final mark = workout.isDeload
+        ? c.deload
+        : c.identityFor(ownerRegimeId);
 
     // No card, and no accent fill to replace it. This block lives on the header
     // band (see [_TodayHeader]); what makes it loud is the pulse, the label and
     // a stopwatch at display size, not a tinted rectangle.
+    //
+    // Same skeleton as [_NextUpHero], deliberately: identity row, a status
+    // line, the session name at display size, the exercise preview, then the
+    // one action. Only the middle band differs — the cycle track answers
+    // "which session next", which is not a question a session in progress has.
+    // Everything else it used to drop (the regime's identity mark, the
+    // exercise list, the section's own type scale) was true the whole time and
+    // is worth keeping, so that starting a session no longer redraws the
+    // screen out from under you.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            IconTile(
+              workout.isDeload
+                  ? Icons.trending_down_rounded
+                  : Icons.bolt_rounded,
+              color: mark,
+              size: 40,
+            ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Text(
+                owner?.regimeName ?? activeRegimeName,
+                style: context.t.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (workout.isDeload)
+              Pill('Deload', color: c.deload, icon: Icons.trending_down),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        // The band that stands where the cycle track does: what state this is
+        // in on the left, how far through it you are on the right.
         Row(
           children: [
             if (stale)
@@ -736,19 +789,37 @@ class _ResumeHero extends ConsumerWidget {
                 style: context.t.labelSmall?.copyWith(color: mark),
               ),
             ),
-            if (workout.isDeload) Pill('Deload', color: c.deload),
+            if (totalSets > 0)
+              Text(
+                '$doneSets of $totalSets sets',
+                style: context.t.labelSmall,
+              ),
           ],
         ),
+        const SizedBox(height: Space.lg),
+        Text(
+          name,
+          style: context.t.displayMedium,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (preview.isNotEmpty) ...[
+          const SizedBox(height: Space.xs),
+          Text(
+            preview.take(3).join('  ·  ') +
+                (preview.length > 3 ? '  ·  +${preview.length - 3} more' : ''),
+            style: context.t.bodyMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
         const SizedBox(height: Space.md),
-        Text(name, style: context.t.headlineSmall, maxLines: 2),
-        const SizedBox(height: Space.xs),
         // A date does not belong in the value slot the stopwatch uses:
         // "open since Tue 28 Jul" set at display size overflowed the card on
         // every phone. Stale sessions say it once, quietly.
         if (stale)
           Text(
-            'Started ${DateFormat('EEE d MMM').format(started)}  ·  '
-            '$doneSets set${doneSets == 1 ? '' : 's'} logged',
+            'Started ${DateFormat('EEE d MMM').format(started)}',
             style: context.t.bodyMedium,
           )
         else
@@ -771,7 +842,7 @@ class _ResumeHero extends ConsumerWidget {
         if (foreignRegime != null) ...[
           const SizedBox(height: Space.sm),
           Text(
-            'in $foreignRegime — finishing it advances that regime',
+            'finishing it advances $foreignRegime, not $activeRegimeName',
             style: context.t.bodyMedium,
           ),
         ],

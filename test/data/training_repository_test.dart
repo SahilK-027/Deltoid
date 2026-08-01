@@ -1340,6 +1340,33 @@ void main() {
       expect(today.recentCompleted, hasLength(1));
     });
 
+    test('describes the open workout off the log, not the template', () async {
+      final pull1 = await sessionNamed('Pull 1');
+      final open = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: pull1.id,
+      );
+      final detail = await repo.workoutDetail(open);
+      await repo.updateSet(
+        detail!.entries.first.sets.first.id,
+        weight: const Value(60),
+        reps: const Value(8),
+        isDone: const Value(true),
+      );
+
+      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+
+      expect(today.openWorkoutDoneSets, 1);
+      expect(today.openWorkoutTotalSets,
+          greaterThan(today.openWorkoutDoneSets),
+          reason: 'the denominator counts every set row, ticked or not');
+      expect(
+        today.openWorkoutExerciseNames,
+        detail.entries.map((e) => e.exercise.name),
+        reason: 'in slot order, off the workout it was snapshotted into',
+      );
+    });
+
     test('gives every session an entry, so empty is not "not loaded"',
         () async {
       final bare =
