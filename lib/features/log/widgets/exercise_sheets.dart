@@ -467,11 +467,17 @@ Future<SkipReason?> _pickSkipReason(BuildContext context) {
   );
 }
 
-/// Searchable exercise picker.
+/// The catalog picker: search, muscle chips, one row per movement.
+///
+/// The same sheet mid-session and in the programme editor, because it answers
+/// the same question in both — which of my movements is this. It keeps its own
+/// header rather than using `AppSheet`, since the list under the chips has to
+/// scroll inside a bounded height while the search and the chips stay put.
 Future<Exercise?> pickExercise(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<Exercise>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: false,
     builder: (_) => const _ExercisePicker(),
   );
 }
@@ -486,37 +492,91 @@ class _ExercisePicker extends ConsumerStatefulWidget {
 class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
   String _query = '';
 
+  /// Null is `All`. Chips filter, the field searches, and they compose: `Chest`
+  /// plus "press" is a shorter list than either on its own.
+  MuscleGroup? _muscle;
+
   @override
   Widget build(BuildContext context) {
+    final c = context.c;
     final all = ref.watch(exerciseCatalogProvider).valueOrNull ?? const [];
     final q = _query.trim().toLowerCase();
-    final filtered = q.isEmpty
-        ? all
-        : all.where((e) => e.name.toLowerCase().contains(q)).toList();
+    final filtered = all
+        .where((e) =>
+            (_muscle == null || e.muscle == _muscle) &&
+            (q.isEmpty || e.name.toLowerCase().contains(q)))
+        .toList();
+
+    // Only the muscles something is filed under, in `MuscleGroup` order so a
+    // chip holds its place as the catalog grows.
+    final present = [
+      for (final m in MuscleGroup.values)
+        if (all.any((e) => e.muscle == m)) m,
+    ];
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75,
+        height: MediaQuery.of(context).size.height * 0.8,
         child: Column(
           children: [
+            const SheetHeader(title: 'Exercises'),
             Padding(
-              padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.md),
+              padding: const EdgeInsets.fromLTRB(
+                  Space.gutter, Space.md, Space.gutter, Space.md),
               child: TextField(
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
+                style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
+                cursorColor: c.textPrimary,
                 decoration: InputDecoration(
                   hintText: 'Search exercises',
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  hintStyle:
+                      context.t.bodyLarge?.copyWith(color: c.textTertiary),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      size: 20, color: c.textTertiary),
                   filled: true,
-                  fillColor: context.c.surfaceHigh,
+                  fillColor: c.surfaceHigh,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(Radii.md),
                     borderSide: BorderSide.none,
                   ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(Radii.md),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(Radii.md),
+                    borderSide: BorderSide(color: c.textPrimary, width: 2),
+                  ),
                 ),
               ),
             ),
+            if (present.length > 1)
+              SizedBox(
+                height: 52,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(
+                      Space.gutter, 0, Space.gutter, Space.md),
+                  children: [
+                    AppChip(
+                      label: 'All',
+                      selected: _muscle == null,
+                      onTap: () => setState(() => _muscle = null),
+                    ),
+                    for (final m in present) ...[
+                      const SizedBox(width: Space.sm),
+                      AppChip(
+                        label: m.label,
+                        selected: _muscle == m,
+                        onTap: () =>
+                            setState(() => _muscle = _muscle == m ? null : m),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             Expanded(
               child: filtered.isEmpty && q.isEmpty
                   ? const EmptyState(
@@ -531,23 +591,17 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                       itemCount: filtered.length + (q.isEmpty ? 0 : 1),
                       itemBuilder: (context, i) {
                         if (i == filtered.length) {
-                          return ListTile(
-                            leading: Icon(Icons.add, color: context.c.accent),
-                            title: Text(
-                              'Create "${_query.trim()}"',
-                              style: context.t.titleSmall
-                                  ?.copyWith(color: context.c.accent),
-                            ),
+                          return AppRow(
+                            icon: Icons.add_rounded,
+                            title: 'Create "${_query.trim()}"',
                             onTap: () => _create(context, ref, _query.trim()),
                           );
                         }
                         final e = filtered[i];
-                        return ListTile(
-                          title: Text(e.name),
-                          subtitle: Text(
-                            '${e.muscle.label} · ${e.equipment.label}',
-                            style: context.t.labelSmall,
-                          ),
+                        return AppRow(
+                          title: e.name,
+                          subtitle:
+                              '${e.muscle.label} · ${e.equipment.label}',
                           onTap: () => Navigator.of(context).pop(e),
                         );
                       },
@@ -639,20 +693,24 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    final existing = widget.existing;
+
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.existing == null ? 'New exercise' : 'Edit exercise',
-                style: context.t.titleLarge,
-              ),
-              const SizedBox(height: Space.lg),
+      // The one sheet in the app that wore its own header — a bare title, its
+      // own insets, and a Material button at the bottom — while every other
+      // one used `AppSheet`. Same form, in the app's sheet.
+      child: AppSheet(
+        title: existing == null ? 'New exercise' : 'Edit exercise',
+        // Identifies, or it is not there (§5): on a new one there is nothing
+        // to name yet, and the title already says which question is being
+        // asked.
+        subtitle: existing?.name,
+        footer: PrimaryButton(
+          label: existing == null ? 'Create' : 'Save',
+          onPressed: _save,
+        ),
+        children: [
               TextField(
                 controller: _name,
                 textCapitalization: TextCapitalization.words,
@@ -730,16 +788,35 @@ class _ExerciseFormSheetState extends ConsumerState<_ExerciseFormSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: Space.xl),
-              FilledButton(
-                onPressed: _save,
-                child: Text(widget.existing == null ? 'Create' : 'Save'),
-              ),
-            ],
-          ),
-        ),
+          // Archive rather than delete: past workouts point at this row, and
+          // history with a hole in it is worse than a catalog with one extra
+          // entry. It lives here rather than on the catalog row because it is
+          // a thing you do to an exercise, and this sheet is the exercise —
+          // and because a per-row archive button put a control on eighty rows
+          // to be used twice a year.
+          if (existing != null) ...[
+            const SizedBox(height: Space.lg),
+            SecondaryButton(
+              label: existing.archived
+                  ? 'Restore to the catalog'
+                  : 'Archive this exercise',
+              icon: existing.archived
+                  ? Icons.unarchive_outlined
+                  : Icons.archive_outlined,
+              onPressed: () => _setArchived(existing, !existing.archived),
+            ),
+          ],
+        ],
       ),
     );
+  }
+
+  Future<void> _setArchived(Exercise exercise, bool archived) async {
+    final navigator = Navigator.of(context);
+    await RegimeRepository(
+      ref.read(databaseProvider),
+    ).updateExercise(exercise.id, archived: Value(archived));
+    navigator.pop();
   }
 
   Future<void> _save() async {
