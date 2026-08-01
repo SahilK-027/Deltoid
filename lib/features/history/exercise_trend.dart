@@ -51,23 +51,61 @@ extension ExerciseMetricX on ExerciseMetric {
 final exerciseMetricProvider =
     StateProvider<ExerciseMetric>((ref) => ExerciseMetric.e1rm);
 
-enum ChartRange { threeMonths, year, all }
+/// The rolling windows, and then a calendar year you pick.
+///
+/// `All` is gone. On a long history it drew every session this app has ever
+/// recorded into a phone's width, which is unreadable at any zoom worth using —
+/// and the question it answered ("how have I done over years") is better asked
+/// one year at a time, where the shape of a year is legible and two of them can
+/// be compared by switching.
+enum ChartRange { week, month, threeMonths, year }
 
 extension ChartRangeX on ChartRange {
   String get label => switch (this) {
+        ChartRange.week => '1W',
+        ChartRange.month => '1M',
         ChartRange.threeMonths => '3M',
         ChartRange.year => '1Y',
-        ChartRange.all => 'All',
       };
 
-  int? get days => switch (this) {
+  int get days => switch (this) {
+        ChartRange.week => 7,
+        ChartRange.month => 30,
         ChartRange.threeMonths => 90,
         ChartRange.year => 365,
-        ChartRange.all => null,
       };
 }
 
-final chartRangeProvider = StateProvider<ChartRange>((ref) => ChartRange.year);
+/// What the chart is showing: a window ending today, or one calendar year.
+class TrendWindow {
+  const TrendWindow.rolling(this.range) : year = null;
+  const TrendWindow.calendar(this.year) : range = null;
+
+  /// Set when the window rolls back from today.
+  final ChartRange? range;
+
+  /// Set when the window is a whole calendar year.
+  final int? year;
+
+  bool contains(int dayKey) {
+    final y = year;
+    if (y != null) return dayKey ~/ 10000 == y;
+    return dayKey >=
+        dayKeyOf(DateTime.now().subtract(Duration(days: range!.days)));
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrendWindow && other.range == range && other.year == year;
+
+  @override
+  int get hashCode => Object.hash(range, year);
+}
+
+final chartRangeProvider =
+    StateProvider<TrendWindow>((ref) => const TrendWindow.rolling(
+          ChartRange.year,
+        ));
 
 final exerciseProgressProvider =
     StreamProvider.family<List<ProgressPoint>, String>((ref, exerciseId) {
@@ -85,28 +123,45 @@ class ExerciseTrend extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final all = ref.watch(exerciseProgressProvider(exerciseId)).valueOrNull;
-    final range = ref.watch(chartRangeProvider);
+    final window = ref.watch(chartRangeProvider);
     final metric = ref.watch(exerciseMetricProvider);
 
     // Nothing at all is the history screen's own empty state, not a chart's.
     if (all == null || all.isEmpty) return const SizedBox.shrink();
 
-    final cutoff = range.days == null
-        ? null
-        : dayKeyOf(DateTime.now().subtract(Duration(days: range.days!)));
-    final points =
-        cutoff == null ? all : all.where((p) => p.dayKey >= cutoff).toList();
+    final points = all.where((p) => window.contains(p.dayKey)).toList();
+
+    // Only years there is something to look at. A picker offering 2019 to a
+    // log that starts in 2024 is a list of empty charts.
+    final years = {for (final p in all) p.dayKey ~/ 10000}.toList()
+      ..sort((a, b) => b.compareTo(a));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            for (final r in ChartRange.values) ...[
-              _RangeChip(range: r, selected: r == range),
-              const SizedBox(width: Space.sm),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final r in ChartRange.values) ...[
+                _RangeChip(
+                  label: r.label,
+                  selected: window.range == r,
+                  onTap: () => ref.read(chartRangeProvider.notifier).state =
+                      TrendWindow.rolling(r),
+                ),
+                const SizedBox(width: Space.sm),
+              ],
+              // The year picker takes the slot `All` had. Same place, a better
+              // question: not "everything at once" but "which one".
+              _RangeChip(
+                label: '${window.year ?? years.first}',
+                selected: window.year != null,
+                caret: true,
+                onTap: () => _pickYear(context, ref, years),
+              ),
             ],
-          ],
+          ),
         ),
         const SizedBox(height: Space.lg),
         _Chart(points: points, metric: metric),
@@ -117,18 +172,56 @@ class ExerciseTrend extends ConsumerWidget {
   }
 }
 
-class _RangeChip extends ConsumerWidget {
-  const _RangeChip({required this.range, required this.selected});
+/// Which year to look at, when a rolling window is not the question.
+Future<void> _pickYear(
+  BuildContext context,
+  WidgetRef ref,
+  List<int> years,
+) async {
+  final current = ref.read(chartRangeProvider).year;
+  final picked = await showModalBottomSheet<int>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    builder: (sheet) => AppSheet(
+      title: 'Which year?',
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        for (final year in years)
+          AppRow(
+            icon: year == current
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_unchecked_rounded,
+            title: '$year',
+            onTap: () => Navigator.of(sheet).pop(year),
+          ),
+      ],
+    ),
+  );
+  if (picked == null) return;
+  ref.read(chartRangeProvider.notifier).state = TrendWindow.calendar(picked);
+}
 
-  final ChartRange range;
+class _RangeChip extends StatelessWidget {
+  const _RangeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.caret = false,
+  });
+
+  final String label;
   final bool selected;
+  final VoidCallback onTap;
+  final bool caret;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return AppChip(
-      label: range.label,
+      label: label,
       selected: selected,
-      onTap: () => ref.read(chartRangeProvider.notifier).state = range,
+      caret: caret,
+      onTap: onTap,
     );
   }
 }
