@@ -862,6 +862,11 @@ class _UnderlineTabsState extends State<UnderlineTabs> {
     final c = context.c;
     return SizedBox(
       height: 48,
+      // Full width, or the strip is only as wide as the tabs in it — and a
+      // `Column` centres a child narrower than itself, so a regime with one day
+      // put `Legs` and `Add day +` in the middle of the band while a regime
+      // with six had them against the gutter like everything else.
+      width: double.infinity,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: Space.gutter),

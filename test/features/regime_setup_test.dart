@@ -2,6 +2,7 @@ import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/primitives.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/features/regime/regime_setup.dart';
 import 'package:drift/native.dart';
@@ -20,7 +21,7 @@ void main() {
 
   tearDown(() => db.close());
 
-  Future<void> pumpHost(WidgetTester tester) async {
+  Future<void> pumpHost(WidgetTester tester, {bool activate = true}) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
@@ -30,7 +31,8 @@ void main() {
             builder: (context, ref, _) => Scaffold(
               body: Center(
                 child: ElevatedButton(
-                  onPressed: () => createRegimeFlow(context, ref),
+                  onPressed: () =>
+                      createRegimeFlow(context, ref, activate: activate),
                   child: const Text('Create'),
                 ),
               ),
@@ -101,5 +103,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(await db.select(db.regimes).get(), isEmpty);
+  });
+
+  testWidgets('creating without activating leaves you on the old regime',
+      (tester) async {
+    // The whole point of a shelf of programmes: building next month's split
+    // must not abandon the one you are mid-cycle on.
+    final first = await RegimeRepository(db).createRegime('Current');
+    await pumpHost(tester, activate: false);
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Push / Pull / Legs · 6 day'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final regimes = await db.select(db.regimes).get();
+    expect(regimes, hasLength(2));
+    expect(regimes.where((r) => r.isActive).single.id, first);
   });
 }

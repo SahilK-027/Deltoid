@@ -69,12 +69,32 @@ class RegimesScreen extends ConsumerWidget {
                         child: PrimaryButton(
                           label: 'New regime',
                           icon: Icons.add_rounded,
-                          onPressed: () => createRegimeFlow(context, ref),
+                          onPressed: () => _create(context, ref),
                         ),
                       ),
                     ),
                   ],
                 ),
+    );
+  }
+
+  /// Builds a regime without switching to it, and says so in the one place a
+  /// consequence like that belongs: an offer to switch, rather than a switch
+  /// you have to undo.
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final id = await createRegimeFlow(context, ref, activate: false);
+    if (id == null) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Added — you are still training the old one'),
+        action: SnackBarAction(
+          label: 'Train it',
+          onPressed: () =>
+              ref.read(regimeRepositoryProvider).setActiveRegime(id),
+        ),
+      ),
     );
   }
 }

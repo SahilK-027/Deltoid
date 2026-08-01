@@ -14,7 +14,18 @@ import 'regime_screen.dart';
 /// The templates are starting points, not the app's opinion — every session and
 /// slot they write is an ordinary row the user can rename, reorder or delete.
 /// Returns the new regime's id, or null if the user backed out.
-Future<String?> createRegimeFlow(BuildContext context, WidgetRef ref) async {
+///
+/// [activate] is what makes a shelf of programmes possible. Creating one used
+/// to switch to it, always, so building next month's split meant abandoning the
+/// one you are mid-cycle on — there was no way to have three and choose. From
+/// the Regimes screen it now creates and stays put, and switching is the tap it
+/// always was; from an empty app it activates, because there is nothing to
+/// leave.
+Future<String?> createRegimeFlow(
+  BuildContext context,
+  WidgetRef ref, {
+  bool activate = true,
+}) async {
   final template = await showModalBottomSheet<RegimeTemplate>(
     context: context,
     isScrollControlled: true,
@@ -38,9 +49,15 @@ Future<String?> createRegimeFlow(BuildContext context, WidgetRef ref) async {
   if (template.isBlank) {
     return RegimeRepository(db).createRegime(
       trimmed.isEmpty ? 'My regime' : trimmed,
+      activate: activate,
     );
   }
-  return createRegimeFromTemplate(db, template, name: trimmed);
+  return createRegimeFromTemplate(
+    db,
+    template,
+    name: trimmed,
+    activate: activate,
+  );
 }
 
 /// Choice cards (THEME §7): the one genuinely branching decision this app has
