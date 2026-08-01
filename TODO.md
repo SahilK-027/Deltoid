@@ -37,15 +37,40 @@ a device before the next starts.
       3. **Rename.** `Workouts · Regime · History · Settings`. Settings is a
          destination with a masthead, and Today's cog is gone with it.
 
-      **Not yet driven on a device.**
+      **Driven, and the device found four things**, all fixed: the chart's Y
+      bounds came from the data so the axis labelled `1197.5` and wrapped onto
+      two lines, and X ticks were raw days so a year rendered `Jul Jun Jun Jul`
+      — both snap to round steps and calendar units now, with edge labels
+      dropped. Deload weeks are out of the chart entirely: an e1RM taken off
+      80% of your working weight is a number about the programme, not about
+      you. Markers vanish past ~40 points and the chart takes pinch-to-zoom,
+      because `All` on a long history was unreadable at any zoom.
+
+      **`All` is gone**, replaced by `1W · 1M · 3M · 1Y` and a year picker
+      listing only years with something in them. A year at a time is legible
+      and two of them are compared by switching; everything at once never was.
 
 - [ ] **5 · Regime cluster** — regime screen, session editor, catalog, setup.
       Day tabs, count-as-heading, targets card + editor sheet, catalog picker
       with search and filter chips. Creation stays in sheets: no wizard.
       The exercise's own screen gets the General / Overrides split (THEME §5).
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion once the
-      list primitives exist. Settings is a tab by now, so it gets a masthead,
-      and bodyweight comes up out of it to one tap.
+      list primitives exist. Settings has its masthead already (step 4 made it
+      a tab); what is left is bodyweight coming up out of it to one tap, and
+      the list layouts.
+
+      **The all-time heatmap is done**, out of order, because thirty years of
+      seeded data made it unusable: it was eleven thousand widgets — a
+      `Tooltip` per day inside a `ListView` that builds its children eagerly —
+      and it scrolled like a slideshow. A year is one `CustomPaint` now, years
+      build lazily, and tapping a day replaces 366 tooltips with one readout
+      line.
+
+      It also fits the width instead of scrolling sideways, since a year you
+      drag through is not a year at a glance. The ramp went with it: one tone
+      for a day you trained (a single session is a full day's work and used to
+      render darkest), solid amber for a deload rather than an outline, and the
+      month strip under the grid with the weekday column dropped.
 - [ ] **7 · Reconciliation** — light theme on every screen (only checked at
       token level), empty states, motion, and THEME corrected where the build
       taught us something the audit didn't.
