@@ -3,10 +3,47 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/prefill.dart';
+import '../../domain/session_diff.dart';
 
 final workoutDetailProvider =
     StreamProvider.family<WorkoutDetail?, String>((ref, workoutId) {
   return ref.watch(trainingRepositoryProvider).watchWorkoutDetail(workoutId);
+});
+
+/// Every bodyweight ever logged, for the maths that needs it.
+///
+/// A pull-up's volume is bodyweight × reps; without this series a session of
+/// nothing but bodyweight work totals zero, which is not a light session, it is
+/// an unanswered question.
+final bodyweightSeriesProvider =
+    FutureProvider<List<({int dayKey, double weightKg})>>((ref) {
+  return ref.watch(trainingRepositoryProvider).bodyweightSeries();
+});
+
+/// What today did that its session template doesn't know about — added
+/// movements, dropped ones, a different running order.
+///
+/// Empty for an ad-hoc workout with no session behind it, and empty for the
+/// common case of a day trained as written, which is what keeps the summary
+/// screen quiet when there is nothing to ask about.
+final sessionChangesProvider =
+    FutureProvider.family<List<SessionChange>, String>((ref, workoutId) async {
+  final detail = await ref.watch(workoutDetailProvider(workoutId).future);
+  final sessionId = detail?.workout.sessionId;
+  if (detail == null || sessionId == null) return const [];
+
+  final template =
+      await ref.watch(trainingRepositoryProvider).sessionTemplate(sessionId);
+
+  return diffSession(
+    template: template,
+    // Everything on the workout, skips included: a skip is a decision about one
+    // day, not a request to drop the movement from the programme.
+    logged: [
+      for (final e in detail.entries)
+        (exerciseId: e.exercise.id, name: e.exercise.name),
+    ],
+  );
 });
 
 /// Ticks when the shape of history changes — a workout deleted or backdated,

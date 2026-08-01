@@ -6,6 +6,7 @@ import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/prefill.dart';
+import 'package:deltoid/domain/session_diff.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
 void main() {
   late AppDatabase db;
   late TrainingRepository repo;
+  late RegimeRepository regimes;
 
   setUpAll(() {
     // One test opens a second database to stand in for a fresh install.
@@ -26,6 +28,7 @@ void main() {
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     repo = TrainingRepository(db);
+    regimes = RegimeRepository(db);
     await ensureStarterCatalog(db);
     await createRegimeFromTemplate(db, ppl);
   });
@@ -628,6 +631,161 @@ void main() {
     await repo.setWorkoutNotes(id, '   ');
     detail = await repo.workoutDetail(id);
     expect(detail!.workout.notes, isNull);
+  });
+
+  test("an exercise's note for the day never reaches the catalog", () async {
+    // The third note level: the catalog's cue is permanent, a set's note is one
+    // row, and this one belongs to this exercise on this day only. Writing it
+    // through the workout's snapshot row is what keeps a bad session out of
+    // every future one.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final entry = (await repo.workoutDetail(id))!.entries.first;
+    expect(entry.workoutExercise.notes, isNull,
+        reason: 'a fresh workout row starts with no note of its own');
+    final cue = entry.exercise.notes;
+
+    await repo.setWorkoutExerciseNotes(
+      entry.workoutExercise.id,
+      '  shoulder felt off  ',
+    );
+    var after = (await repo.workoutDetail(id))!.entries.first;
+    expect(after.workoutExercise.notes, 'shoulder felt off');
+    expect(after.exercise.notes, cue);
+
+    await repo.setWorkoutExerciseNotes(entry.workoutExercise.id, '  ');
+    after = (await repo.workoutDetail(id))!.entries.first;
+    expect(after.workoutExercise.notes, isNull);
+  });
+
+  group('making today permanent', () {
+    // Improvising mid-session changes today only — that is invariant 2 and the
+    // reason a workout is a snapshot. These write the *template*, and only the
+    // parts the summary screen ticked.
+
+    Future<List<String>> slotNames(String sessionId) async {
+      final refs = await repo.sessionTemplate(sessionId);
+      return [for (final r in refs) r.name];
+    }
+
+    test('an added exercise joins the session, at the end', () async {
+      final push1 = await sessionNamed('Push 1');
+      final before = await slotNames(push1.id);
+      final extra = await (db.select(db.exercises)
+            ..where((t) => t.name.isNotIn(before))
+            ..limit(1))
+          .getSingle();
+
+      await repo.applySessionChanges(
+        sessionId: push1.id,
+        changes: [
+          SessionChange(
+            kind: SessionChangeKind.added,
+            exerciseIds: [extra.id],
+            label: 'Add ${extra.name}',
+          ),
+        ],
+      );
+
+      expect(await slotNames(push1.id), [...before, extra.name]);
+    });
+
+    test('re-adding a movement revives its old slot, targets and all', () async {
+      final push1 = await sessionNamed('Push 1');
+      final slots = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(push1.id))
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      final victim = slots.first;
+      await regimes.updateSessionExercise(victim.id, targetSets: const Value(7));
+      await regimes.removeSessionExercise(victim.id);
+
+      await repo.applySessionChanges(
+        sessionId: push1.id,
+        changes: [
+          SessionChange(
+            kind: SessionChangeKind.added,
+            exerciseIds: [victim.exerciseId],
+            label: 'Add it back',
+          ),
+        ],
+      );
+
+      final live = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(push1.id) &
+                t.exerciseId.equals(victim.exerciseId) &
+                t.deletedAt.isNull()))
+          .get();
+      expect(live, hasLength(1), reason: 'no second row for the same movement');
+      expect(live.single.targetSets, 7);
+    });
+
+    test('the order applied is today order, with untrained slots after it',
+        () async {
+      final push1 = await sessionNamed('Push 1');
+      final before = await repo.sessionTemplate(push1.id);
+      expect(before.length, greaterThan(2));
+
+      // Today ran the last two first and never reached the rest.
+      final reordered = [before.last.exerciseId, before[before.length - 2].exerciseId];
+
+      await repo.applySessionChanges(
+        sessionId: push1.id,
+        changes: [
+          SessionChange(
+            kind: SessionChangeKind.reordered,
+            exerciseIds: reordered,
+            label: "Keep today's order",
+          ),
+        ],
+      );
+
+      final after = await repo.sessionTemplate(push1.id);
+      expect([for (final r in after.take(2)) r.exerciseId], reordered);
+      expect(after.length, before.length, reason: 'nothing was dropped');
+    });
+
+    test('a change that was not ticked is not applied', () async {
+      final push1 = await sessionNamed('Push 1');
+      final before = await slotNames(push1.id);
+
+      await repo.applySessionChanges(sessionId: push1.id, changes: const []);
+
+      expect(await slotNames(push1.id), before);
+    });
+
+    test('editing the template leaves logged workouts alone', () async {
+      // Invariant 2, the one this feature is closest to breaking.
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      final logged = [
+        for (final e in (await repo.workoutDetail(id))!.entries) e.exercise.name,
+      ];
+
+      final slots = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(push1.id) & t.deletedAt.isNull()))
+          .get();
+      await repo.applySessionChanges(
+        sessionId: push1.id,
+        changes: [
+          SessionChange(
+            kind: SessionChangeKind.removed,
+            exerciseIds: [slots.first.exerciseId],
+            label: 'Remove it',
+          ),
+        ],
+      );
+
+      final after = [
+        for (final e in (await repo.workoutDetail(id))!.entries) e.exercise.name,
+      ];
+      expect(after, logged);
+    });
   });
 
   test('a bodyweight entry can be corrected and deleted', () async {

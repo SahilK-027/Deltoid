@@ -41,6 +41,73 @@ void main() {
     });
   });
 
+  group('sessionVolume', () {
+    List<({LoadMode mode, List<ScoredSet> sets})> one(
+      LoadMode mode,
+      List<ScoredSet> sets,
+    ) =>
+        [(mode: mode, sets: sets)];
+
+    test('a bodyweight session is not a session of nothing', () {
+      // The bug: volume read `weight` off the row, which is null on every
+      // bodyweight set, so a day of chins and dips reported 0 kg moved.
+      final volume = sessionVolume(
+        bodyweightKg: 72,
+        exercises: one(LoadMode.bodyweight, const [
+          ScoredSet(type: SetType.working, reps: 8),
+          ScoredSet(type: SetType.working, reps: 6),
+        ]),
+      );
+      expect(volume, 72 * 14);
+    });
+
+    test('dumbbells count both of them', () {
+      expect(
+        sessionVolume(
+          exercises: one(LoadMode.perSide, const [
+            ScoredSet(type: SetType.working, weight: 22.5, reps: 10),
+          ]),
+        ),
+        450,
+      );
+    });
+
+    test('bodyweight-plus adds the belt to the body', () {
+      expect(
+        sessionVolume(
+          bodyweightKg: 72,
+          exercises: one(LoadMode.bodyweightPlus, const [
+            ScoredSet(type: SetType.working, addedWeight: 10, reps: 5),
+          ]),
+        ),
+        410,
+      );
+    });
+
+    test('warm-ups count — this is work done, not a progression score', () {
+      expect(
+        sessionVolume(
+          exercises: one(LoadMode.total, const [
+            ScoredSet(type: SetType.warmup, weight: 40, reps: 10),
+            ScoredSet(type: SetType.working, weight: 60, reps: 5),
+          ]),
+        ),
+        700,
+      );
+    });
+
+    test('with no bodyweight ever logged it is zero, for the caller to dash', () {
+      expect(
+        sessionVolume(
+          exercises: one(LoadMode.bodyweight, const [
+            ScoredSet(type: SetType.working, reps: 8),
+          ]),
+        ),
+        0,
+      );
+    });
+  });
+
   group('estimated1RM', () {
     test('matches Epley', () {
       expect(estimated1RM(load: 100, reps: 6), closeTo(120, 1e-9));

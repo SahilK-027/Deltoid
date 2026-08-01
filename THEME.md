@@ -59,7 +59,7 @@ these.
 2. **Depth is surface colour, not decoration.** Two greys and a hairline. No
    card borders, no drop shadows, no gradients, no glows.
 3. **One primary action per screen, and it is white.** Everything else is a grey
-   pill or an underlined text link.
+   pill or a quiet text link.
 4. **Zero states print dashes, not zeros.** `—— kg`, `-- sets`. A real 0 is a
    measurement; a dash is "nothing here yet". Never fabricate a number.
 5. **Every value has a unit, and the unit is smaller than the value.** `87` in
@@ -201,7 +201,7 @@ ripple, which on charcoal is either invisible or a grey smear.
 | **Primary** | Full-width, height 54, radius 14, `accent` fill, `onAccent` label at `title` weight 600. One per screen. Pinned to the bottom when it ends a flow ("Complete Workout"). |
 | **Secondary** | Same metrics, `surfaceHigh` fill, primary label, no border. |
 | **Destructive** | `negative` fill, white label. Only inside a confirmation, never on a page. |
-| **Text link** | Label in `title` size, **underlined**, primary colour — not accent-coloured. This is the "See all / Collapse / See 215 more" affordance. |
+| **Text link** | Label in `title` size, primary colour, **no underline**, followed by an 18dp chevron. This is the "See all / Collapse / See 215 more" affordance. A rule under a word is the one decoration that has to be perfectly consistent to read as anything but a mistake, and it never was — so there are none. |
 | **Circular icon** | 40dp `surfaceHigh` circle, white glyph at 18. Used for add / close / refresh. |
 | **Compact pill** | Height 36, radius 999, `surfaceHigh`, `label` text. "Edit", "Change". |
 
@@ -238,7 +238,7 @@ saved workout), never for decoration. Trailing chevron `textTertiary` at 18.
 ### Section header
 
 `section` type on the page background — no card, no uppercase. Optional trailing
-**underlined text link**, vertically centred with the title. 12 below it.
+**text link**, vertically centred with the title. 12 below it.
 
 ### Toggles, radios, checkboxes
 
@@ -251,13 +251,54 @@ saved workout), never for decoration. Trailing chevron `textTertiary` at 18.
 
 ### Sheets (the default for any choice)
 
-`surface`, top radius 24, drag handle 36×4 `#4A4A4A`. Header row: **✕ on the
-left, bold `title` centred**, full-width hairline under it. Then rows.
+`surface`, top radius 24, drag handle 36×4 `#4A4A4A`. Header row: **bold `title`
+centred, ✕ on the right** in a 48 tap target, full-width hairline under it.
+Then rows.
 
-Every sheet is titled *and* subtitled. Two sheets that both list session names
-are indistinguishable without one line saying which question is being asked.
+The ✕ is on the right, not the left, and bigger than a row's glyph: it is the
+only control on the sheet that is not one of the choices, and on the left it
+read as the first item in the list. It sits on the **title's line**, not
+centred in the title-and-subtitle block — it closes the sheet, and a two-line
+header dragged it down beside a subtitle it has nothing to do with.
+
+The handle is ours, not the framework's: `showDragHandle: false` on every sheet
+that uses `AppSheet`, which draws the bar itself, 8 down from the top. The
+title then sits in equal air: 16 above it, 16 below, then the hairline.
+Material's handle reserves a 48pt interactive box and left an inch of empty
+charcoal over every title.
+
+The subtitle **identifies, or it is not there**. One short `body` line naming
+*which* thing is being edited — the date under a session name, the exercise
+under `Set 2` — and it never wraps. It is not a place to state scope or explain
+the sheet: "This workout only" under a title that is already an exercise name
+says nothing the rows underneath don't say better, and it is exactly the
+duplication rule 6 exists to stop. A sheet whose title already names the thing
+goes without one — and so does a sheet opened from a screen that is *already*
+about that thing: the set sheet does not need "Back Squat" under it when the
+exercise's name is the biggest text on the page behind it. Two sheets that both list session names are indistinguishable without one
+line saying which question is being asked.
+
+Rows in a sheet are **full-bleed `AppRow`s, never a `ListCard`** — a card inside
+a sheet is a panel inside a panel, and the sheet's gutter then insets rows that
+already carry their own padding. **No rules between them**: a sheet is one short
+list with a hairline already under its header, and a line under every row turned
+five choices into five boxes. Row padding is the separation. Hairlines stay
+where a list is long enough to lose your place in — inside a `ListCard` on a
+page, not in a sheet.
 
 A picker sheet lists options as `title` + `body` description + trailing radio.
+
+**Notes are capped.** 500 characters for a session's or an exercise's, 200 for
+a set's — a set note is rendered inside a table row and anything longer than a
+phrase pushes the table apart. The counter reads `120 / 500` in `label`, and
+turns `negative` on the last character.
+
+**Text entry lives in a sheet, not a dialog.** Every note in the app — the
+day's, an exercise's on that day, a set's — opens `promptForNote`: sheet header,
+one `surfaceSunken` field, one white Save, riding above the keyboard. A centred
+alert lands in the middle of the screen while the row that summoned it sits at
+the bottom, and it fights the keyboard for the same space. Dialogs are for
+*names*: one line, no scrolling, nothing to lose.
 
 ### Dialogs (confirmations)
 
@@ -351,7 +392,7 @@ expanding columns.
 | Element | Spec |
 | --- | --- |
 | Index chip | A circle filling the index column, `valueSm`. **Warm-up shows `W`, drop set shows `D`**, and warm-ups are excluded from the "Set n of m" count. A typed set is tinted with it: `data` for a warm-up, `deload` for a drop — a letter *and* a colour. The tint is **blended into `surfaceHigh`, never translucent**: laid over the drop capsule at 18% it picked up the grey behind it and came out a washed olive. The letter alone put the two rows that are not your working sets in the same grey as the rows that are. |
-| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary`, and nothing else: no dot, no italic — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. The attribution line ("From Push 2 · 12 Jul") stays in the exercise header, where it belongs to the whole exercise rather than to one row. |
+| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary`, and nothing else: no dot, no italic — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. Where the ghosts came from is not a caption in the header — that was the info sheet's line printed twice — it is the `Last logged` row behind the exercise's ⓘ, with an amber dot on the button whenever they were borrowed from another session. |
 | Value field | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: transparent fill + 2px white outline. |
 | Done | Checkbox as specced. |
 | Completed row | Values and index dim to `textSecondary`, the fields drop from `surfaceHigh` to `surface`, and the checkbox goes solid white. Dull, not black: at `surfaceSunken` a logged row read as a hole cut in the table. The row is *not* struck through, washed, or recoloured. |
@@ -360,7 +401,7 @@ expanding columns.
 | Drop set | The group's rows sit on one `surfaceHighest` capsule filling the index column: the `D` chip at its head, a `textTertiary` dot on each middle leg, and the `+` in the **last leg's cell**, level with the row it continues — never a row of its own, which left a cell-high gap under a dot that marked nothing. Every cell in the column opens that row's sheet; on the `+` it is a long-press. The capsule's caps stop on the **chip's** edge, not the row's — a row is taller than the chip in it, and a cap drawn to the row ends in a shoulder with nothing under it. |
 
 **Finish** — when every set is ticked, a white primary button appears pinned at
-the bottom. Before that it is a quiet underlined link in the top bar: finishing
+the bottom. Before that it is a quiet link in the top bar: finishing
 early is legitimate here (a rack gets taken, a session gets cut short) and the
 confirmation names what is unfinished, so the action has to exist — it just
 should not be the loudest thing on screen while there is still work to do. The
@@ -415,7 +456,7 @@ The closest thing to our Regime screen, and the pattern is worth taking whole:
   with a caret. Chips, not an overflow menu: these are the three things you
   actually do to a training day.
 - **Count as heading** — the exercise section is headed `7 Exercises`, not
-  "Exercises". The number is the useful part. Trailing underlined link
+  "Exercises". The number is the useful part. Trailing text link
   `Add exercises`.
 - **Exercise block** — thumbnail, name in `title`, muscle chips underneath, `⋮`
   overflow on the right; below it, the targets. Blocks are separated by
@@ -500,7 +541,7 @@ deliberate departures — keep them when implementing.
 | Muscle chips hard-clip mid-word at the screen edge | Fade the overflow edge | Clipping looks like a layout bug; a fade looks like a scroll |
 | Warm-up-only exercise reads `Set 0 of 0` | `Warm-up only`, and the count appears when a working set does | A zero pair is a bug face |
 | No deload concept | Deload is `deload` amber everywhere it touches — cycle, heatmap, resume card, history row | It is the one thing our cycle model has that theirs doesn't; it must be legible at a glance |
-| Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: `From Push 2 · 12 Jul` | The entire reason this app exists (README) |
+| Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: amber dot on the ⓘ, the session and date inside it | The entire reason this app exists (README) |
 | Programme identity is a colour + glyph you must pick during creation | Same mark, but auto-assigned on create and changeable later | Identity is worth having; a mandatory question about it is not |
 | Rep targets hidden two taps deep behind a card, placeholder `Optional` | Same sheet, but the card shows the target inline (`4 × 8–10`) so it is readable without opening | The target is the point of the slot |
 | Every screen's masthead prints the screen's name | The **landing** screen prints the date instead — weekday as the eyebrow, `31 JULY` in `pageTitle` under it, and the rest gap as a `body` line beneath | `TODAY` is the label the nav bar already draws under a highlighted icon. Spending the largest type on the screen you open into on a word that adds nothing is what makes a page look filled rather than designed. The date is what that slot is for here. Screens you navigate *to* keep their name — arriving somewhere, you want it confirmed |
@@ -513,7 +554,7 @@ deliberate departures — keep them when implementing.
 | --- | --- |
 | `lib/core/theme/tokens.dart` | Replace the blue-tinted greys with the neutral ramp; `accent` becomes white/black; add `info`; drop the shadow token and `Shadows` helpers. |
 | `lib/core/theme/theme.dart` | Rebuild the type scale to §3; `FilledButton` white; remove `dialogTheme` centring in favour of the bottom-anchored confirm; switch/checkbox/radio themes per §5. |
-| `lib/core/widgets/primitives.dart` | `AppCard` loses its border and shadow; `SectionHeader` action becomes an underlined link; add `ListCard` + `AppRow`, `SegmentedPill`, `FilterChip`, `ConfirmSheet`; `Pill` stays for status only. |
+| `lib/core/widgets/primitives.dart` | `AppCard` loses its border and shadow; `SectionHeader` action becomes a text link; add `ListCard` + `AppRow`, `SegmentedPill`, `FilterChip`, `ConfirmSheet`; `Pill` stays for status only. |
 | `lib/features/shell/app_shell.dart` | Drop the accent pill behind the active tab; white/grey weight shift instead. |
 | Today | Header band, monochrome hero, white Start button, dashes in the consistency line when there is no honest rate. |
 | Log | Set-row spec in §6 — `W`/`D` index letters, swipe-to-delete, focused-field outline, pinned finish button. |

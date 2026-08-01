@@ -5,6 +5,7 @@ import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/prefill.dart';
+import '../../domain/session_diff.dart';
 import '../../domain/units.dart';
 import '../db/database.dart';
 import '../db/watch.dart';
@@ -512,6 +513,148 @@ class TrainingRepository {
               t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
         .get();
+  }
+
+  /// The session template as the diff wants it: exercise id and name, in order.
+  Future<List<ExerciseRef>> sessionTemplate(String sessionId) async {
+    final rows = await (db.select(db.sessionExercises).join([
+      innerJoin(db.exercises,
+          db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
+    ])
+          ..where(db.sessionExercises.sessionId.equals(sessionId) &
+              db.sessionExercises.deletedAt.isNull())
+          ..orderBy([OrderingTerm(expression: db.sessionExercises.orderIndex)]))
+        .get();
+    return [
+      for (final r in rows)
+        (
+          exerciseId: r.readTable(db.sessionExercises).exerciseId,
+          name: r.readTable(db.exercises).name,
+        ),
+    ];
+  }
+
+  /// Writes today's improvisation back into the programme — only the parts of
+  /// it that were ticked.
+  ///
+  /// Everything here touches `session_exercises` and nothing else. Past
+  /// workouts are snapshots and stay exactly as they were logged (invariant 2);
+  /// this changes what *next* week opens with.
+  ///
+  /// Prefill is unaffected in the way that matters: a slot added here inherits
+  /// the session's own history for that movement, which is empty until today,
+  /// so next week borrows from today's log through the normal path rather than
+  /// being handed numbers by this write.
+  Future<void> applySessionChanges({
+    required String sessionId,
+    required List<SessionChange> changes,
+  }) async {
+    if (changes.isEmpty) return;
+
+    await db.transaction(() async {
+      for (final change in changes) {
+        switch (change.kind) {
+          case SessionChangeKind.added:
+            for (final exerciseId in change.exerciseIds) {
+              // A slot removed weeks ago is tombstoned, not gone. Re-adding the
+              // movement revives that row rather than inserting a second one,
+              // so its set target and rep range come back with it.
+              final buried = await (db.select(db.sessionExercises)
+                    ..where((t) =>
+                        t.sessionId.equals(sessionId) &
+                        t.exerciseId.equals(exerciseId) &
+                        t.deletedAt.isNotNull())
+                    ..limit(1))
+                  .getSingleOrNull();
+              if (buried != null) {
+                await (db.update(db.sessionExercises)
+                      ..where((t) => t.id.equals(buried.id)))
+                    .write(
+                  SessionExercisesCompanion(
+                    deletedAt: const Value(null),
+                    updatedAt: Value(nowMs()),
+                    dirty: const Value(true),
+                  ),
+                );
+                continue;
+              }
+              final live = await (db.select(db.sessionExercises)
+                    ..where((t) =>
+                        t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
+                  .get();
+              await db.into(db.sessionExercises).insert(
+                    SessionExercisesCompanion.insert(
+                      id: Value(newId()),
+                      sessionId: sessionId,
+                      exerciseId: exerciseId,
+                      orderIndex: live.length,
+                    ),
+                  );
+            }
+
+          case SessionChangeKind.removed:
+            for (final exerciseId in change.exerciseIds) {
+              await (db.update(db.sessionExercises)
+                    ..where((t) =>
+                        t.sessionId.equals(sessionId) &
+                        t.exerciseId.equals(exerciseId) &
+                        t.deletedAt.isNull()))
+                  .write(
+                SessionExercisesCompanion(
+                  deletedAt: Value(nowMs()),
+                  updatedAt: Value(nowMs()),
+                  dirty: const Value(true),
+                ),
+              );
+            }
+
+          case SessionChangeKind.reordered:
+            // Applied last by the caller's ordering below, so it sees whatever
+            // the adds and removes left behind.
+            break;
+        }
+      }
+
+      // Order is resolved once, at the end, against the slots that actually
+      // exist now. Doing it inside the loop would write positions for rows that
+      // a later change deletes.
+      final reordering = changes
+          .where((c) => c.kind == SessionChangeKind.reordered)
+          .toList();
+      final reorder = reordering.isEmpty ? null : reordering.first;
+      if (reorder != null) {
+        final live = await (db.select(db.sessionExercises)
+              ..where(
+                  (t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+            .get();
+
+        // Today's order first, then anything the workout never touched, kept in
+        // its existing relative order — a slot you skipped is not a slot you
+        // asked to move to the end.
+        final wanted = <SessionExercise>[];
+        for (final exerciseId in reorder.exerciseIds) {
+          final slot =
+              live.where((s) => s.exerciseId == exerciseId).firstOrNull;
+          if (slot != null && !wanted.contains(slot)) wanted.add(slot);
+        }
+        for (final slot in live) {
+          if (!wanted.contains(slot)) wanted.add(slot);
+        }
+
+        for (var i = 0; i < wanted.length; i++) {
+          await (db.update(db.sessionExercises)
+                ..where((t) => t.id.equals(wanted[i].id)))
+              .write(
+            SessionExercisesCompanion(
+              orderIndex: Value(i),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+        }
+      }
+    });
   }
 
   /// One query for every session's exercise names, rather than one per row.
@@ -1709,6 +1852,28 @@ class TrainingRepository {
         .write(
       WorkoutExercisesCompanion(
         skipReason: Value(reason),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
+  /// This exercise, on this day. The third and narrowest of the three notes.
+  ///
+  /// `exercises.notes` is the permanent cue and `set_logs.note` is one set;
+  /// this one is "shoulder felt off on incline today" and belongs to the
+  /// workout's snapshot row. Writing it must never reach the catalog or the
+  /// template — the row is a copy for exactly this reason.
+  Future<void> setWorkoutExerciseNotes(
+    String workoutExerciseId,
+    String? notes,
+  ) async {
+    final trimmed = notes?.trim();
+    await (db.update(db.workoutExercises)
+          ..where((t) => t.id.equals(workoutExerciseId)))
+        .write(
+      WorkoutExercisesCompanion(
+        notes: Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),

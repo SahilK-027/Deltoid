@@ -6,10 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/rest_alert.dart';
 import '../../core/theme/tokens.dart';
@@ -22,6 +20,7 @@ import '../../domain/enums.dart';
 import '../../domain/prefill.dart';
 import '../../domain/units.dart';
 import 'log_providers.dart';
+import 'session_summary_screen.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
 import 'widgets/rest_timer.dart';
@@ -908,7 +907,14 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       BackupService(ref.read(databaseProvider)).autoExport().catchError((_) {}),
     );
 
-    navigator.pop();
+    // Replaces the log rather than sitting on top of it: the session is closed,
+    // and back from the summary belongs to Today, not to a set table that can
+    // no longer be edited. Done on the summary is the same single pop.
+    navigator.pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => SessionSummaryScreen(workoutId: detail.workout.id),
+      ),
+    );
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -1196,11 +1202,19 @@ class _ExercisePage extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: Space.xs),
-                  _PrefillCaption(prefill: prefill),
                 ],
               ),
             ),
+            // Where today's numbers came from lives behind here now, in one
+            // sentence with the rest of the exercise's facts. The dot is on
+            // when they were borrowed from another session — that is the one
+            // case you must not miss, because the ghosts in the table are then
+            // somebody else's day.
+            _InfoButton(
+              flagged: prefill?.source == PrefillSource.otherSession,
+              onTap: () => showExerciseInfo(context, ref, entry, prefill),
+            ),
+            const SizedBox(width: Space.sm),
             CircleIconButton(
               icon: Icons.more_horiz_rounded,
               tooltip: 'Exercise actions',
@@ -1280,6 +1294,26 @@ class _ExercisePage extends ConsumerWidget {
               style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
             ),
           ],
+          // Today's note, written from the exercise menu. Kept visually
+          // separate from the cue above: the cue is always true, this is only
+          // true of this session.
+          if (entry.workoutExercise.notes != null) ...[
+            const SizedBox(height: Space.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.sticky_note_2_outlined,
+                    size: 16, color: c.textTertiary),
+                const SizedBox(width: Space.sm),
+                Expanded(
+                  child: Text(
+                    entry.workoutExercise.notes!,
+                    style: context.t.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
         if (nextName != null) ...[
           const SizedBox(height: Space.section),
@@ -1313,6 +1347,8 @@ Future<_FinishChoice?> _confirmEarlyFinish(
   return showModalBottomSheet<_FinishChoice>(
     context: context,
     isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
     builder: (sheet) {
       final c = sheet.c;
       return AppSheet(
@@ -1589,10 +1625,11 @@ class _SetGroup extends ConsumerWidget {
       context,
       ref,
       group.sets[k],
-      // The label the chip prints, not the raw position. Tapping the set
+      // The number the chip prints, not the raw position. Tapping the set
       // marked `1` used to open a sheet headed "Set 2" whenever a warm-up or
-      // a drop sat above it.
-      label: k == 0 ? group.label : '${group.label} · leg ${k + 1}',
+      // a drop sat above it. The sheet names the type itself.
+      label: group.label,
+      leg: k == 0 ? null : k + 1,
       deleteIds: _deleteIds(k),
     );
   }
@@ -1742,51 +1779,48 @@ String _formatElapsed(int startedAtMs) {
   return '$m:${s.toString().padLeft(2, '0')}';
 }
 
-class _PrefillCaption extends StatelessWidget {
-  const _PrefillCaption({required this.prefill});
+/// The ⓘ, with a dot on it when the numbers in the table were borrowed.
+///
+/// The header used to carry a caption instead — `Last time · 12 Jul`, or
+/// `Borrowed from Push 2 · 3 Aug` in amber. It said what the info sheet already
+/// says, on the screen with the least room for a second line, so it moved
+/// inside. What could not move is the *warning*: numbers prefilled from another
+/// session are the one case where ignoring where they came from means chasing
+/// somebody else's day, so the button wears a dot and the sheet spells it out.
+class _InfoButton extends StatelessWidget {
+  const _InfoButton({required this.flagged, required this.onTap});
 
-  final PrefillResult? prefill;
+  final bool flagged;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final p = prefill;
-    if (p == null || !p.hasSuggestion) {
-      return Text('First time — no previous log', style: context.t.labelSmall);
-    }
-
-    final ref = p.reference!;
-    final date = DateFormat('d MMM').format(dateFromDayKey(ref.dayKey));
-
-    final (text, color) = switch (p.source) {
-      PrefillSource.sameSession => ('Last time · $date', c.textTertiary),
-      PrefillSource.sameSessionDeload => (
-        'Last time · $date · deload week',
-        c.deload,
-      ),
-      PrefillSource.otherSession => (
-        'From ${ref.sessionName} · $date',
-        c.deload,
-      ),
-      PrefillSource.none => ('', c.textTertiary),
-    };
-
-    return Row(
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Flexible(
-          child: Text(
-            text,
-            style: context.t.labelSmall?.copyWith(color: color),
-            overflow: TextOverflow.ellipsis,
-          ),
+        CircleIconButton(
+          icon: Icons.info_outline_rounded,
+          tooltip:
+              flagged ? 'Borrowed from another session' : 'About this exercise',
+          onTap: onTap,
         ),
-        if (p.deloadApplied) ...[
-          const SizedBox(width: Space.sm),
-          Text(
-            '· scaled',
-            style: context.t.labelSmall?.copyWith(color: c.deload),
+        if (flagged)
+          Positioned(
+            right: 1,
+            top: 1,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: c.deload,
+                shape: BoxShape.circle,
+                // Ringed in the button's own fill, so it reads as a badge on
+                // the control rather than as part of the glyph.
+                border: Border.all(color: c.surfaceHigh, width: 2),
+              ),
+            ),
           ),
-        ],
       ],
     );
   }

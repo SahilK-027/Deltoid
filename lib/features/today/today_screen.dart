@@ -143,9 +143,11 @@ Future<void> _trainAnotherSession(
   final chosen = await showModalBottomSheet<Session>(
     context: context,
     isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
     builder: (sheet) => AppSheet(
       title: 'Start a session',
-      subtitle: 'Cycle ${status.cycleIndex} — train them in any order',
+      subtitle: 'Cycle ${status.cycleIndex}',
       children: [
         for (final s in sessions)
           _SessionPickRow(
@@ -289,7 +291,6 @@ class _BackfillSheetState extends State<_BackfillSheet> {
     final c = context.c;
     return AppSheet(
       title: 'Log a past session',
-      subtitle: 'Set the day, then pick what you did',
       children: [
         Pressable(
           onTap: _pickDate,

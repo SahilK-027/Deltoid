@@ -30,8 +30,10 @@ this app exists.
 1. Most recent **completed, non-deload** workout **with the same `sessionId`**.
 2. Failing that, a **deload** performance of the same session (still this slot's
    progression).
-3. Only then borrow from another session — and the UI must say so out loud
-   ("From Push 2 · 12 Jul").
+3. Only then borrow from another session — and the UI must say so out loud.
+   It says it on the exercise's ⓘ: an amber dot on the button whenever the
+   numbers are borrowed, and a sentence inside naming the session and date
+   they came from. The channel may change; the disclosure may not.
 
 Never "simplify" this to a plain most-recent lookup.
 

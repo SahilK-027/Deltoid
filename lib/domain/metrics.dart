@@ -153,6 +153,39 @@ PerformanceScore scorePerformance({
   );
 }
 
+/// Total load moved in one session, in kg.
+///
+/// Every completed set counts, warm-ups and drop legs included — this is a
+/// "what did the day come to" figure, not a progression score, and the work of
+/// a warm-up is still work you did. [scorePerformance] is the strict one.
+///
+/// Goes through [effectiveLoad], which is the whole point: a dumbbell entered
+/// as 22.5 is 45kg moving and a chin-up is bodyweight × reps. Reading `weight`
+/// off the row instead reported `0 kg` for a session of chins and dips, where
+/// `weight` is null on every set.
+///
+/// Bodyweight sets contribute nothing when [bodyweightKg] is null, because it
+/// is unknown rather than zero. A caller that gets 0 back should say so with a
+/// dash, not print a total that quietly dropped half the session.
+double sessionVolume({
+  required List<({LoadMode mode, List<ScoredSet> sets})> exercises,
+  double? bodyweightKg,
+}) {
+  var total = 0.0;
+  for (final e in exercises) {
+    for (final s in e.sets) {
+      final load = effectiveLoad(
+        mode: e.mode,
+        weight: s.weight,
+        addedWeight: s.addedWeight,
+        bodyweightKg: bodyweightKg,
+      );
+      total += (load ?? 0) * (s.reps ?? 0);
+    }
+  }
+  return total;
+}
+
 /// Bodyweight on a given day, linearly interpolated between the surrounding
 /// entries. Without this, weighing yourself twice a month would leave most
 /// pull-up sets unscoreable.

@@ -1,8 +1,10 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/ids.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/primitives.dart';
@@ -10,6 +12,7 @@ import '../../../data/db/database.dart';
 import '../../../data/repositories/regime_repository.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../domain/enums.dart';
+import '../../../domain/prefill.dart';
 import '../../../domain/units.dart';
 
 /// Full exercise catalog, searchable. Shared by the log screen's swap/add flow
@@ -21,6 +24,136 @@ final exerciseCatalogProvider = StreamProvider<List<Exercise>>((ref) {
     ..orderBy([(t) => OrderingTerm(expression: t.name)]);
   return query.watch();
 });
+
+/// What this exercise *is*, as opposed to what you can do to it.
+///
+/// Opened from the ⓘ beside the ⋯. It exists because the header had grown a
+/// running commentary — a line under the exercise's name saying where today's
+/// ghost values came from, or "First time — no previous log" when there was
+/// nothing to say. That line is load-bearing when it names a session ("From
+/// Push 2 · 12 Jul" is the one rule this app exists for), and pure noise when
+/// it announces an absence, so the absence moved in here with the rest of the
+/// facts that are true but not urgent mid-set.
+Future<void> showExerciseInfo(
+  BuildContext context,
+  WidgetRef ref,
+  ExerciseEntry entry,
+  PrefillResult? prefill,
+) async {
+  final exercise = entry.exercise;
+  final videos = exercise.formVideoUrls;
+  final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+  final bar = exercise.barKind;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
+    builder: (sheetContext) => AppSheet(
+      title: exercise.name,
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        if (exercise.notes != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Space.lg, Space.md, Space.lg, Space.sm),
+            child: Text(exercise.notes!, style: sheetContext.t.bodyMedium),
+          ),
+        // Borrowed is a warning, not a fact, and it is the reason the ⓘ wears
+        // a dot — so this row wears the same dot in the same amber. The colour
+        // carries meaning here (rule 1: hue is data), and the meaning is "these
+        // numbers are not this session's".
+        if (prefill?.source == PrefillSource.otherSession)
+          // One row, one sentence. The explanation was a second paragraph
+          // hanging under it on its own insets, in its own size, saying in
+          // three lines what the row can say in one.
+          AppRow(
+            icon: Icons.call_split_rounded,
+            title: 'Borrowed from ${prefill!.reference!.sessionName}',
+            subtitle: 'First time here — '
+                '${DateFormat('d MMM').format(dateFromDayKey(prefill.reference!.dayKey))}'
+                "'s numbers, until you log your own",
+            tint: sheetContext.c.deload,
+            trailing: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: sheetContext.c.deload,
+                shape: BoxShape.circle,
+              ),
+            ),
+          )
+        else
+          AppRow(
+            icon: Icons.history_rounded,
+            title: 'Last logged',
+            subtitle: _prefillBlurb(prefill),
+          ),
+        AppRow(
+          icon: Icons.fitness_center_rounded,
+          title: '${exercise.muscle.label} · ${exercise.equipment.label}',
+          subtitle: _loadBlurb(exercise.loadMode),
+        ),
+        if (bar != BarKind.none)
+          AppRow(
+            icon: Icons.straighten_rounded,
+            title: bar.label,
+            subtitle: '${formatInUnit(bar.kg!, unit)} ${unit.label} empty',
+          ),
+        if (entry.workoutExercise.notes != null)
+          AppRow(
+            icon: Icons.sticky_note_2_outlined,
+            title: "Today's note",
+            subtitle: entry.workoutExercise.notes,
+          ),
+        for (var i = 0; i < videos.length; i++)
+          AppRow(
+            icon: Icons.play_circle_outline,
+            title: videos.length == 1 ? 'Form video' : 'Form video ${i + 1}',
+            subtitle: videos[i],
+            onTap: () => launchUrl(
+              Uri.parse(videos[i]),
+              mode: LaunchMode.externalApplication,
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// What the number you type into this exercise means.
+String _loadBlurb(LoadMode mode) => switch (mode) {
+      LoadMode.total => 'The weight you type is the whole load',
+      LoadMode.perSide => 'The weight you type is per hand — two are moving',
+      LoadMode.bodyweight => 'Reps only, no external load',
+      LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
+    };
+
+/// Where today's suggested numbers came from, spelled out.
+///
+/// The header prints the short version when there *is* one; this says the same
+/// thing in a sentence, and is the only place the "nothing to go on" case is
+/// stated at all.
+String _prefillBlurb(PrefillResult? prefill) {
+  final p = prefill;
+  if (p == null || !p.hasSuggestion) {
+    return 'First time — nothing to suggest from';
+  }
+  final reference = p.reference!;
+  final date = DateFormat('d MMM yyyy')
+      .format(dateFromDayKey(reference.dayKey));
+  final scaled = p.deloadApplied ? ', scaled for the deload' : '';
+  return switch (p.source) {
+    PrefillSource.sameSession => '${reference.sessionName} · $date$scaled',
+    PrefillSource.sameSessionDeload =>
+      '${reference.sessionName} · $date · deload week$scaled',
+    // The borrowed case has its own row, in amber, above.
+    PrefillSource.otherSession =>
+      '${reference.sessionName} · $date$scaled',
+    PrefillSource.none => 'First time — nothing to suggest from',
+  };
+}
 
 /// Actions available on an exercise mid-workout.
 ///
@@ -35,156 +168,176 @@ Future<void> showExerciseMenu(
   required ValueChanged<int> onMove,
 }) async {
   final repo = ref.read(trainingRepositoryProvider);
-  final videos = entry.exercise.formVideoUrls;
 
   await showModalBottomSheet<void>(
     context: context,
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-            child: Text(entry.exercise.name, style: sheetContext.t.titleLarge),
-          ),
-          if (entry.exercise.notes != null)
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg),
-              child: Text(
-                entry.exercise.notes!,
-                style: sheetContext.t.bodySmall,
-              ),
-            ),
-          for (var i = 0; i < videos.length; i++)
-            ListTile(
-              leading: const Icon(Icons.play_circle_outline),
-              title: Text(videos.length == 1 ? 'Form video' : 'Form video ${i + 1}'),
-              subtitle: Text(
-                videos[i],
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sheetContext.t.labelSmall,
-              ),
-              onTap: () => launchUrl(
-                Uri.parse(videos[i]),
-                mode: LaunchMode.externalApplication,
-              ),
-            ),
-          // Drag-to-reorder went away with the vertical list; moving an
-          // exercise is now an explicit step so it can't happen by accident
-          // while turning pages.
-          if (total > 1)
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.sm),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.arrow_back, size: 16),
-                      label: const Text('Move earlier'),
-                      onPressed: index == 0
-                          ? null
-                          : () {
-                              Navigator.of(sheetContext).pop();
-                              onMove(-1);
-                            },
-                    ),
-                  ),
-                  const SizedBox(width: Space.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.arrow_forward, size: 16),
-                      label: const Text('Move later'),
-                      onPressed: index >= total - 1
-                          ? null
-                          : () {
-                              Navigator.of(sheetContext).pop();
-                              onMove(1);
-                            },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ListTile(
-            leading: const Icon(Icons.swap_horiz),
-            title: const Text('Swap exercise'),
-            subtitle: const Text('Today only — the template keeps its version'),
-            onTap: () async {
-              final navigator = Navigator.of(sheetContext);
-              final replacement = await pickExercise(context, ref);
+    isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
+    builder: (sheetContext) => AppSheet(
+      title: entry.exercise.name,
+      // Actions only. The cue, the videos and where today's numbers came from
+      // are facts about the exercise, and they live behind the ⓘ — a menu that
+      // opens with two paragraphs before its first button is a page.
+      //
+      // Same construction as the session drawer in workout detail: full-bleed
+      // `AppRow`s, no card, no rules between them. The two sheets are the same
+      // object in two places and used to be built two different ways, so their
+      // rows sat on different insets and their titles in different sizes.
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        // Today's note on today's exercise. Distinct from the cue above it,
+        // which is the catalog's and permanent, and from a set's note, which
+        // is one row: this one is how the movement felt in this session.
+        AppRow(
+          icon: Icons.sticky_note_2_outlined,
+          title: entry.workoutExercise.notes == null
+              ? 'Add a note for today'
+              : "Edit today's note",
+          subtitle: entry.workoutExercise.notes ??
+              'This session only — the exercise keeps its cue',
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            final note = await promptForNote(
+              context,
+              title: entry.exercise.name,
+              subtitle: 'Note for today',
+              initial: entry.workoutExercise.notes ?? '',
+              hint: 'Shoulder felt off, bench was the wide one',
+            );
+            navigator.pop();
+            if (note == null) return;
+            await repo.setWorkoutExerciseNotes(entry.workoutExercise.id, note);
+          },
+        ),
+        AppRow(
+          icon: Icons.swap_horiz,
+          title: 'Swap exercise',
+          subtitle: 'Today only — the template keeps its version',
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            final replacement = await pickExercise(context, ref);
+            navigator.pop();
+            if (replacement == null) return;
+            // In place: same position, same target sets, set shape from the
+            // replacement's own history. Remove-then-add used to drop it at
+            // the end of the workout.
+            await repo.replaceExerciseInWorkout(
+              entry.workoutExercise.id,
+              replacement.id,
+            );
+          },
+        ),
+        AppRow(
+          icon: Icons.remove_circle_outline,
+          title: entry.workoutExercise.skipReason == SkipReason.none
+              ? 'Mark as skipped'
+              : 'Un-skip',
+          subtitle: 'Recorded with a reason, not just left blank',
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            if (entry.workoutExercise.skipReason != SkipReason.none) {
+              await repo.setSkipReason(
+                  entry.workoutExercise.id, SkipReason.none);
               navigator.pop();
-              if (replacement == null) return;
-              // In place: same position, same target sets, set shape from the
-              // replacement's own history. Remove-then-add used to drop it at
-              // the end of the workout.
-              await repo.replaceExerciseInWorkout(
-                entry.workoutExercise.id,
-                replacement.id,
+              return;
+            }
+            final reason = await _pickSkipReason(context);
+            navigator.pop();
+            if (reason == null) return;
+            await repo.setSkipReason(entry.workoutExercise.id, reason);
+          },
+        ),
+        AppRow(
+          icon: Icons.delete_outline_rounded,
+          title: 'Remove from this workout',
+          subtitle: 'Takes any sets logged under it',
+          tint: sheetContext.c.negative,
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            final logged = entry.sets.where((s) => s.isDone).length;
+            // Only when there is something to lose. Removing an exercise you
+            // have not started is a correction and asking about it is noise;
+            // removing one you have logged four sets into deletes those four
+            // sets, and it was one tap from a sheet with no way back.
+            if (logged > 0) {
+              final sure = await confirmAction(
+                context,
+                title: 'Remove ${entry.exercise.name}?',
+                message:
+                    '$logged logged set${logged == 1 ? '' : 's'} '
+                    '${logged == 1 ? 'is' : 'are'} deleted with it. '
+                    'This cannot be undone.',
+                confirmLabel: 'Remove',
+                cancelLabel: 'Keep it',
+                destructive: true,
               );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.remove_circle_outline),
-            title: Text(
-              entry.workoutExercise.skipReason == SkipReason.none
-                  ? 'Mark as skipped'
-                  : 'Un-skip',
+              if (!sure) return;
+            }
+            await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
+            navigator.pop();
+          },
+        ),
+        // Drag-to-reorder went away with the vertical list; moving an exercise
+        // is an explicit step so it can't happen by accident while turning
+        // pages. Buttons, not rows: it is a pair of directions, not an action.
+        if (total > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Space.lg, Space.lg, Space.lg, Space.xs),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SecondaryButton(
+                    label: 'Move earlier',
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: index == 0
+                        ? null
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            onMove(-1);
+                          },
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                Expanded(
+                  child: SecondaryButton(
+                    label: 'Move later',
+                    icon: Icons.arrow_forward_rounded,
+                    onPressed: index >= total - 1
+                        ? null
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            onMove(1);
+                          },
+                  ),
+                ),
+              ],
             ),
-            subtitle: const Text('Recorded with a reason, not just left blank'),
-            onTap: () async {
-              final navigator = Navigator.of(sheetContext);
-              if (entry.workoutExercise.skipReason != SkipReason.none) {
-                await repo.setSkipReason(
-                    entry.workoutExercise.id, SkipReason.none);
-                navigator.pop();
-                return;
-              }
-              final reason = await _pickSkipReason(context);
-              navigator.pop();
-              if (reason == null) return;
-              await repo.setSkipReason(entry.workoutExercise.id, reason);
-            },
           ),
-          ListTile(
-            leading: Icon(Icons.delete_outline, color: sheetContext.c.negative),
-            title: Text(
-              'Remove from this workout',
-              style: TextStyle(color: sheetContext.c.negative),
-            ),
-            onTap: () async {
-              final navigator = Navigator.of(sheetContext);
-              final logged = entry.sets.where((s) => s.isDone).length;
-              // Only when there is something to lose. Removing an exercise you
-              // have not started is a correction and asking about it is noise;
-              // removing one you have logged four sets into deletes those four
-              // sets, and it was one tap from a sheet with no way back.
-              if (logged > 0) {
-                final sure = await confirmAction(
-                  context,
-                  title: 'Remove ${entry.exercise.name}?',
-                  message:
-                      '$logged logged set${logged == 1 ? '' : 's'} '
-                      '${logged == 1 ? 'is' : 'are'} deleted with it. '
-                      'This cannot be undone.',
-                  confirmLabel: 'Remove',
-                  cancelLabel: 'Keep it',
-                  destructive: true,
-                );
-                if (!sure) return;
-              }
-              await repo.removeExerciseFromWorkout(entry.workoutExercise.id);
-              navigator.pop();
-            },
-          ),
-          const SizedBox(height: Space.sm),
-        ],
-      ),
+      ],
     ),
   );
+}
+
+/// What each set type does, in the one line a row has room for. Only the three
+/// offered in the set sheet: backoff, rest-pause and AMRAP exist in the data
+/// and arrive from a template, but nothing types them by hand mid-session.
+String _typeBlurb(SetType type) => switch (type) {
+      SetType.warmup => 'Ignored by progression and by last-time',
+      SetType.working => 'Counts toward the top set and e1RM',
+      SetType.drop => 'Continues the set above it, lighter',
+      _ => '',
+    };
+
+/// What the set sheet calls itself.
+///
+/// A working set is numbered, because that number is what the table shows and
+/// what "beat last time" is measured against. Every other type is *named*: its
+/// chip is a letter, and "Set W" reads as a set called W.
+String _setTitle(SetType type, String label, int? leg) {
+  final head = type == SetType.working ? 'Set $label' : '${type.label} set';
+  return leg == null ? head : '$head · leg $leg';
 }
 
 /// Everything you can do to one set.
@@ -196,10 +349,18 @@ Future<void> showSetActions(
   BuildContext context,
   WidgetRef ref,
   SetLog set, {
-  /// What the row's chip prints — `2`, `W`, `D`. Not the raw position: the
+  /// The working-set number the row's chip prints. Not the raw position: the
   /// sheet used to head itself "Set 4" for the row marked `2` whenever
   /// warm-ups or drop legs sat above it, because it counted rows.
+  ///
+  /// Only used for a working set. A warm-up's chip prints `W` and a drop leg's
+  /// prints `D`, which are marks on a table, not names — heading a sheet
+  /// "Set W" said nothing.
   required String label,
+
+  /// Which leg of a drop group, counting the head as 1. Null for a set that is
+  /// not part of one.
+  int? leg,
 
   /// Everything this delete removes. A drop group's head takes its legs.
   required List<String> deleteIds,
@@ -208,128 +369,74 @@ Future<void> showSetActions(
 
   await showModalBottomSheet<void>(
     context: context,
-    builder: (sheetContext) => SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-              child: Text('Set $label', style: sheetContext.t.titleLarge),
-            ),
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.sm),
-              child: Text('TYPE', style: sheetContext.t.labelSmall),
-            ),
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-              child: Wrap(
-                spacing: Space.sm,
-                runSpacing: Space.sm,
-                children: [
-                  for (final type in const [
-                    SetType.warmup,
-                    SetType.working,
-                    SetType.drop,
-                  ])
-                    GestureDetector(
-                      onTap: () async {
-                        final navigator = Navigator.of(sheetContext);
-                        // The group side of the change — the first leg of a new
-                        // drop set, the release of the legs of one that stops
-                        // being a drop — belongs with the write, not here.
-                        await repo.setSetType(set.id, type);
-                        navigator.pop();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: Space.md,
-                          vertical: Space.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: type == set.setType
-                              ? sheetContext.c.accent
-                              : sheetContext.c.surfaceHigh,
-                          borderRadius: BorderRadius.circular(Radii.pill),
-                        ),
-                        child: Text(
-                          type.label,
-                          style: sheetContext.t.titleSmall?.copyWith(
-                            color: type == set.setType
-                                ? sheetContext.c.onAccent
-                                : sheetContext.c.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Divider(color: sheetContext.c.border, height: 1),
-            ListTile(
-              leading: const Icon(Icons.notes),
-              title: Text(set.note == null ? 'Add a note' : 'Edit note'),
-              subtitle: set.note == null ? null : Text(set.note!),
-              onTap: () async {
-                final navigator = Navigator.of(sheetContext);
-                final note = await _promptNote(context, set.note);
-                navigator.pop();
-                if (note == null) return;
-                await repo.updateSet(
-                  set.id,
-                  note: Value(note.isEmpty ? null : note),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_outline, color: sheetContext.c.negative),
-              title: Text(
-                deleteIds.length > 1 ? 'Delete drop set' : 'Delete set',
-                style: TextStyle(color: sheetContext.c.negative),
-              ),
-              subtitle: deleteIds.length > 1
-                  ? Text('Removes all ${deleteIds.length} legs')
-                  : null,
-              onTap: () async {
-                final navigator = Navigator.of(sheetContext);
-                await repo.deleteSets(deleteIds);
-                navigator.pop();
-              },
-            ),
-            const SizedBox(height: Space.sm),
+    isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
+    builder: (sheetContext) => AppSheet(
+      title: _setTitle(set.setType, label, leg),
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        // A picker, built the way every other picker in the app is: rows with
+        // the live one ticked. It was a strip of chips, which made this the
+        // only sheet where choosing something meant hitting a pill instead of
+        // a row, and the chips carried no room to say what a type does.
+        for (final type in const [
+          SetType.warmup,
+          SetType.working,
+          SetType.drop,
+        ]) ...[
+          AppRow(
+            icon: type == set.setType
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_unchecked_rounded,
+            title: type.label,
+            subtitle: _typeBlurb(type),
+            onTap: () async {
+              final navigator = Navigator.of(sheetContext);
+              // The group side of the change — the first leg of a new drop
+              // set, the release of the legs of one that stops being a drop —
+              // belongs with the write, not here.
+              await repo.setSetType(set.id, type);
+              navigator.pop();
+            },
+          ),
           ],
+        AppRow(
+          icon: Icons.sticky_note_2_outlined,
+          title: set.note == null ? 'Add a note' : 'Edit note',
+          subtitle: set.note ?? 'Felt heavy, elbow tucked, …',
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            final note = await promptForNote(
+              context,
+              title: 'Set note',
+              initial: set.note ?? '',
+              hint: 'Felt heavy, elbow tucked, …',
+              // Shorter than a session's: this one is rendered under a set row
+              // in the log and under a set line in history, where anything
+              // longer than a phrase pushes the table apart.
+              maxLength: 200,
+            );
+            navigator.pop();
+            if (note == null) return;
+            await repo.updateSet(
+              set.id,
+              note: Value(note.isEmpty ? null : note),
+            );
+          },
         ),
-      ),
-    ),
-  );
-}
-
-Future<String?> _promptNote(BuildContext context, String? initial) {
-  final controller = TextEditingController(text: initial ?? '');
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Set note'),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        maxLines: 3,
-        decoration: const InputDecoration(
-          hintText: 'Felt heavy, elbow tucked, …',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-          child: const Text('Save'),
+        AppRow(
+          icon: Icons.delete_outline_rounded,
+          title: deleteIds.length > 1 ? 'Delete drop set' : 'Delete set',
+          subtitle: deleteIds.length > 1
+              ? 'Removes all ${deleteIds.length} legs'
+              : 'Removes this row',
+          tint: sheetContext.c.negative,
+          onTap: () async {
+            final navigator = Navigator.of(sheetContext);
+            await repo.deleteSets(deleteIds);
+            navigator.pop();
+          },
         ),
       ],
     ),
@@ -337,24 +444,25 @@ Future<String?> _promptNote(BuildContext context, String? initial) {
 }
 
 Future<SkipReason?> _pickSkipReason(BuildContext context) {
+  final reasons =
+      SkipReason.values.where((r) => r != SkipReason.none).toList();
   return showModalBottomSheet<SkipReason>(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-            child: Text('Why skipped?', style: ctx.t.titleLarge),
+    isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
+    builder: (ctx) => AppSheet(
+      title: 'Why skipped?',
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        for (var i = 0; i < reasons.length; i++) ...[
+          if (i > 0) Divider(color: ctx.c.border, height: 1, indent: Space.lg),
+          AppRow(
+            title: reasons[i].label,
+            onTap: () => Navigator.of(ctx).pop(reasons[i]),
           ),
-          for (final r in SkipReason.values.where((r) => r != SkipReason.none))
-            ListTile(
-              title: Text(r.label),
-              onTap: () => Navigator.of(ctx).pop(r),
-            ),
         ],
-      ),
+      ],
     ),
   );
 }

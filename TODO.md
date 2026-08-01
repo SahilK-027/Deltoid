@@ -64,7 +64,7 @@ a device before the next starts.
       the eyebrow, session name as the title, facts as one line under it); the
       note is a row, the popup menu is a sheet, and exercises are full-bleed
       rows that expand into set lines — index chip, `60 kg × 8`, inset
-      dividers — with the per-exercise history as an underlined link inside the
+      dividers — with the per-exercise history as a text link inside the
       expansion rather than the whole block being a link somewhere else.
 
       The Table view is gone (see **Built** → History). Two views left, so the
@@ -90,6 +90,130 @@ a device before the next starts.
       Row meta lost `0 min`, a clock that never ran, and the programme name,
       which the tile already carries as colour and which ellipsized the line on
       a phone. `WorkoutSummary.regimeName` went with it.
+
+      The session drawer behind the overflow was double-inset: `ListCard` rows
+      inside `AppSheet`'s gutter, so every action stood in from the title above
+      it, and a card inside a sheet is a panel inside a panel. Rows are
+      full-bleed now (`AppSheet.contentPadding`), each with a subtitle saying
+      what it does, and `SheetHeader` gained the 4pt over the ✕ that the drag
+      handle was sitting on.
+
+      The log's three sheets — exercise menu, set actions, skip reason — were
+      still hand-built out of `ListTile` on their own insets, so the same action
+      list sat at different spacing depending on which screen opened it. All
+      three are `AppSheet` + `AppRow` now, which is what makes the log and
+      workout detail agree — and the rules between rows went with the rebuild:
+      a hairline under every row turned five choices into five boxes, on a
+      surface that already has one under its header. `OutlinedButton` on the move pair
+      became `SecondaryButton`, and the set-type chips became picker rows with
+      a radio — the sheet was the only place in the app where choosing meant
+      hitting a pill rather than a row, and a chip has no room to say what a
+      warm-up does to progression.
+
+      **The log header got an ⓘ and lost a caption.** "First time — no
+      previous log" was a line announcing an absence, on the screen with the
+      least room for one; the attribution line it shares a slot with stays
+      exactly as it was when there *is* something to attribute — `From Push 2 ·
+      12 Jul` is untouched, and still the one rule this app exists for. The ⓘ
+      beside the ⋯ opens `showExerciseInfo`: where today's numbers came from in
+      a sentence, muscle and equipment, what the load field means, the bar and
+      its empty weight, today's note, form videos. The ⋯ menu is actions only
+      now — the cue and the videos moved out of it, since a menu that opens
+      with two paragraphs before its first button is a page.
+
+      **The caption moved inside the ⓘ, and left a dot behind.** `Last time ·
+      12 Jul` was the info sheet's `Last logged` row printed a second time, in
+      the header, on the screen with the least room for one — rule 6. It is
+      gone. What is *not* gone is the warning it carried: when prefill borrows
+      from another session the ⓘ wears an amber dot, and the sheet's first row
+      is `Borrowed from Push 2` — amber, wearing the same dot, so the badge has
+      a visible cause the moment you open it — subtitled `First time here — 3
+      Aug's numbers, until you log your own`. That is one row saying one thing;
+      it started as a row plus a three-line paragraph on its own insets. Three
+      states, one control: no dot (this session's own numbers), dot (borrowed),
+      and the sheet for the detail.
+
+      **Today's improvisation can be kept.** `domain/session_diff.dart` diffs
+      what was trained against the session template — added, removed,
+      reordered — and the summary screen offers each change as its own
+      checkbox: keep the leg raises you added, throw away the order you ran them
+      in. The section says what it is before it asks anything — "You changed
+      Push 1 today / These changes apply to today either way. Tick anything Push
+      1 should do every time from now on." — each row states its own outcome
+      (`Today only` until it is ticked, then `In Push 1 from now on`), and the
+      button is live with nothing ticked, where it reads *Keep Push 1 as it is*.
+      A dead button gave no way to say the thing most people mean and left the
+      section looking unanswered. Nothing is ticked by default, and `applySessionChanges` writes
+      `session_exercises` and only that, so past workouts are untouched
+      (invariant 2, with a test standing on it). Re-adding a movement revives
+      its tombstoned slot rather than making a second one, so its set target and
+      rep range come back with it. Appending an exercise deliberately does not
+      also report a reorder — one decision, one question.
+
+      Both note surfaces were wrong on the first pass and are fixed: the sheet's
+      field sat on `surfaceSunken`, the keypad's bed, which on a `surface` sheet
+      reads as a hole rather than as somewhere to type — it is `surfaceHigh`
+      now, going to a white 2px outline on focus like every other field. The
+      note *displayed* on workout detail was a sunken quote block with a rule
+      down its left, in caption grey: the one piece of writing on the page, in
+      the darkest box on it, at the lowest contrast. It is an `AppCard` of
+      `body` text in `textPrimary` now, with a pencil on the right.
+
+      **Notes are capped** — 500 characters, 200 for a set note, with the
+      counter reading `120 / 500`. Nothing truncates an existing note: the cap
+      is on typing, so anything already stored stays whole.
+
+      **Notes are sheets, not pop-ups.** `promptForNote` in `primitives`
+      replaces the `AlertDialog` every note used to open — session note,
+      per-exercise note, per-set note, from the log, the summary and workout
+      detail. Sunken field, autofocus, one white Save, and it rides above the
+      keyboard instead of fighting it. `promptForText` stays for *names*, which
+      are one line and belong in a dialog.
+
+      **Workout detail's expansion has a hierarchy.** Three unrelated things
+      used to sit there as three identical links. Now: the sets are a table, the
+      note is a card of prose in the primary colour — `_NoteBlock` — and
+      only the one thing that navigates (`All Back Squat history`) looks like a
+      link. The day's own note uses the same block under a `Session note`
+      heading, so the page has one way of showing a note instead of two.
+
+      **The summary screen stopped impersonating workout detail**, over three
+      passes. Same facts, opposite posture: the band is composed *centre* — ✕
+      that leaves, `Session complete`, the session's name under it — where
+      detail is left-flush with a back arrow and an overflow. The note is a
+      field you write in, where detail quotes it back. The exercises are one
+      card of rows that never open, where detail's are full-bleed and expand
+      into every set.
+
+      It briefly had no band at all and a `surfaceSunken` well under the note,
+      which made it the one page in the app darker than the page — reverted. The
+      three numbers were briefly stat tiles too; they are labelled rows now
+      (`Volume · 4 250 kg`, `Sets logged · 18`, `Duration · 47 min`), because
+      tiles are for a dashboard you scan and this is a short list of facts read
+      once, where a row carries a unit and an em-dash without its caption
+      wrapping. One way out, pinned.
+
+      **Bodyweight sessions reported `0 kg` moved.** The summary computed volume
+      by hand off `weight`, which is null on every bodyweight set, so a day of
+      chins and dips totalled nothing. `sessionVolume` in `domain/metrics.dart`
+      now does it through `effectiveLoad` with the interpolated bodyweight —
+      dumbbells count double, BW+ adds the belt, warm-ups count (this is work
+      done, not a progression score). Five tests, no database. With no
+      bodyweight ever logged the total is genuinely unknown, so the tile prints
+      a dash rather than a number that dropped half the session.
+
+      **Sheet subtitles identify or they go.** They had become a scope caption
+      — "This workout only" under a title that was already an exercise name —
+      which is rule 6 duplication and made the header two lines tall for
+      nothing. What is left names *which* thing: the date under a session name,
+      the exercise under `Set 2`. Three sheets lost theirs outright.
+
+      **Links lost their underline.** `LinkAction` is text plus a chevron now.
+      Some links were underlined and some weren't, depending on whether the
+      screen used the widget or wrote its own `Text`, and a rule under a word
+      is the one decoration that has to be perfectly consistent to read as
+      anything but a mistake. Tab and segment underlines are unaffected — those
+      are indicators, not links.
 - [ ] **4 · Progress + exercise history** — builds the chart language once:
       dashed gridlines, right-hand Y labels, range pill, legend chips, em-dash
       empty state instead of a gridded void. Three screens consume it.
@@ -107,8 +231,10 @@ Two things to preserve through all of it, both easy to lose in a redesign:
 
 - The log screen owns the horizontal axis. Nothing inside its `PageView` may
   take a horizontal gesture.
-- The prefill attribution line — `From Push 2 · 12 Jul` — has to survive. It is
-  the one rule the app exists for.
+- Prefill attribution has to survive. It is the one rule the app exists for.
+  It is no longer a caption in the log header: it is the `Last logged` line in
+  the exercise's ⓘ, plus an amber dot on that button whenever the numbers were
+  borrowed from another session. Moving it is fine; losing it is not.
 
 ---
 
@@ -142,6 +268,23 @@ layout moved — which, after the rebrand, is everything.
   too — supersets and busy racks are normal — and the page says how much is
   left behind. Starting a session twice in one tap-tap creates one workout, not
   two.
+
+- **Three levels of note** — `exercises.notes` is the permanent cue,
+  `set_logs.note` is one set, and `workout_exercises.notes` is this exercise on
+  this day ("shoulder felt off on incline today"). The third is new to the UI,
+  not to the schema: the column already existed on the snapshot row and was
+  never written. Editable from the exercise menu mid-session, from the summary
+  screen, and from the exercise's expansion in workout detail; shown under the
+  cue on the log page. Writing it can never reach the catalog or the template —
+  invariant 2, and there is a test standing on it.
+
+- **Session end screen** — finishing no longer drops straight back to Today.
+  `session_summary_screen.dart` opens as a *replacement* for the log: sets,
+  volume moved and time in the header, then every exercise with what it came to
+  and its note for the day, and the session note written from the screen rather
+  than found again in History. It sits after `completeWorkout`, so there is
+  nothing to confirm on it — the finish-with-sets-open confirmation still
+  happens before the write, unchanged. Back and Done are the same single pop.
 
 - **Session-scoped prefill** _(driven on the emulator)_ — ghost values,
   cross-session borrowing labelled, ghost adopted on completion, beat-last-time
@@ -196,7 +339,7 @@ layout moved — which, after the rebrand, is everything.
   long after the undo snackbar is gone.
 - Light / dark / system theme, adaptive launcher icon.
 
-**200 tests**: prefill rules (including a deload never re-scaling a light week),
+**220 tests**: prefill rules (including a deload never re-scaling a light week),
 cycle/deload timing and closing a cycle early, metrics, unit conversion, keypad
 key handling, backup round-trip, history paging, deleting a workout (including
 the cycle it reopens), swap-in-place, mid-session prefill, date and note
@@ -208,6 +351,12 @@ SQLite.
 ---
 
 ## Not built
+
+- **Records on the summary screen** — the end-of-session screen prints sets,
+  volume and time, but not what was *beaten*. Doing it properly means resolving
+  prefill for every exercise a second time on a screen that opens after the
+  write, so it was left out rather than half-done off the ghost values still in
+  memory.
 
 - **Supabase sync** — schema, RLS, magic-link auth, push dirty rows / pull since
   `last_pull_at`, LWW merge on `updated_at`, tombstones. **Blocked:** needs the

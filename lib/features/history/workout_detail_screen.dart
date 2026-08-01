@@ -10,7 +10,6 @@ import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/units.dart';
-import '../regime/regime_screen.dart' show promptForText;
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
@@ -100,17 +99,27 @@ class WorkoutDetailScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: Space.huge),
               children: [
                 const SizedBox(height: Space.lg),
+                // The day's own note, as prose rather than as a settings row —
+                // it is somebody's sentence about the session, and the same
+                // block the exercises use for theirs, so the page has one way
+                // of showing a note rather than two.
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: Space.gutter),
-                  child: ListCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AppRow(
-                        icon: Icons.sticky_note_2_outlined,
-                        title: hasNote ? 'Note' : 'Add a note',
-                        subtitle: hasNote
-                            ? workout.notes!
-                            : 'How it felt, what got in the way',
+                      SectionHeader(
+                        'Session note',
+                        actionLabel: hasNote ? 'Edit' : null,
+                        onAction:
+                            hasNote ? () => _editNotes(context, ref, detail) : null,
+                      ),
+                      _NoteBlock(
+                        note: workout.notes?.isEmpty == true
+                            ? null
+                            : workout.notes,
+                        placeholder: 'How it felt, what got in the way',
                         onTap: () => _editNotes(context, ref, detail),
                       ),
                     ],
@@ -162,30 +171,38 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
+      // `AppSheet` draws its own grab handle, tighter than the framework's.
+      showDragHandle: false,
       builder: (sheet) => AppSheet(
         title: detail.session?.name ?? 'Ad-hoc session',
         subtitle: DateFormat('d MMMM yyyy')
             .format(dateFromDayKey(detail.workout.dayKey)),
+        // Full-bleed rows, no card. The rows had been sitting on a card inside
+        // a sheet — a panel in a panel — and the sheet's gutter then inset them
+        // a second time on top of the padding `AppRow` already carries, so the
+        // left edge of every action stood in from the title above it.
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
         children: [
-          ListCard(
-            children: [
-              AppRow(
-                icon: Icons.edit_calendar_outlined,
-                title: 'Change the date',
-                onTap: () => Navigator.of(sheet).pop('date'),
-              ),
-              AppRow(
-                icon: Icons.sticky_note_2_outlined,
-                title: hasNote ? 'Edit the note' : 'Add a note',
-                onTap: () => Navigator.of(sheet).pop('notes'),
-              ),
-              AppRow(
-                icon: Icons.delete_outline_rounded,
-                title: 'Delete this session',
-                tint: sheet.c.negative,
-                onTap: () => Navigator.of(sheet).pop('delete'),
-              ),
-            ],
+          AppRow(
+            icon: Icons.edit_calendar_outlined,
+            title: 'Change the date',
+            subtitle: 'Logged on the wrong day',
+            onTap: () => Navigator.of(sheet).pop('date'),
+          ),
+          AppRow(
+            icon: Icons.sticky_note_2_outlined,
+            title: hasNote ? 'Edit the note' : 'Add a note',
+            subtitle: hasNote
+                ? detail.workout.notes
+                : 'How it felt, what got in the way',
+            onTap: () => Navigator.of(sheet).pop('notes'),
+          ),
+          AppRow(
+            icon: Icons.delete_outline_rounded,
+            title: 'Delete this session',
+            subtitle: 'Removes it from history and the heatmap',
+            tint: sheet.c.negative,
+            onTap: () => Navigator.of(sheet).pop('delete'),
           ),
         ],
       ),
@@ -228,13 +245,11 @@ class WorkoutDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     WorkoutDetail detail,
   ) async {
-    final text = await promptForText(
+    final text = await promptForNote(
       context,
       title: 'Session note',
       initial: detail.workout.notes ?? '',
       hint: 'Slept badly, everything felt heavy',
-      maxLines: 4,
-      allowEmpty: true,
     );
     if (text == null) return;
     await ref
@@ -320,6 +335,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
     // Sets logged before the skip are kept. Hiding them made history disagree
     // with itself: they survived, they fed prefill and the progress chart, and
     // only these views pretended otherwise.
+    final note = entry.workoutExercise.notes;
     final summary = done.isEmpty
         ? (skipped ? 'Not trained' : 'Nothing logged')
         : [
@@ -333,7 +349,11 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
       children: [
         Pressable(
           scale: 0.99,
-          onTap: done.isEmpty ? null : () => setState(() => _open = !_open),
+          // With sets under it the row opens; with none there is nothing to
+          // open, so the tap goes to the only thing the block still holds.
+          onTap: done.isEmpty
+              ? _editNote
+              : () => setState(() => _open = !_open),
           child: Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: Space.gutter, vertical: Space.md),
@@ -356,6 +376,24 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                           color: skipped && done.isEmpty ? c.negative : null,
                         ),
                       ),
+                      // Only when the block has no expansion to hold it. With
+                      // sets under it the note is inside, in full, and printing
+                      // an ellipsized copy up here was the same sentence twice
+                      // — once cut short, once whole.
+                      if (note != null && done.isEmpty) ...[
+                        const SizedBox(height: Space.xs),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.sticky_note_2_outlined,
+                                size: 14, color: c.textTertiary),
+                            const SizedBox(width: Space.xs),
+                            Expanded(
+                              child: Text(note, style: context.t.bodySmall),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -396,7 +434,22 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                     index: _workingIndex(done, i),
                   ),
                 ],
-                const SizedBox(height: Space.sm),
+                // Three different kinds of thing used to sit here as three
+                // identical links: what happened, what was said about it, and
+                // where to go next. They are told apart now — the sets are a
+                // table, the note is a card of prose, and only the one thing
+                // that navigates looks like a link.
+                const SizedBox(height: Space.md),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: Space.gutter),
+                  child: _NoteBlock(
+                    note: note,
+                    placeholder: 'Add a note for this day',
+                    onTap: _editNote,
+                  ),
+                ),
+                const SizedBox(height: Space.md),
                 Padding(
                   padding: const EdgeInsets.only(left: Space.gutter),
                   child: Align(
@@ -417,6 +470,24 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
           ),
       ],
     );
+  }
+
+  /// This exercise on this day — not the catalog's cue, which every session
+  /// shares, and not a set's note. Editing it writes the workout's own snapshot
+  /// row, so the movement and the template are untouched.
+  Future<void> _editNote() async {
+    final entry = widget.entry;
+    final text = await promptForNote(
+      context,
+      title: entry.exercise.name,
+      subtitle: 'Note for this day',
+      initial: entry.workoutExercise.notes ?? '',
+      hint: 'Shoulder felt off, bench was the wide one',
+    );
+    if (text == null) return;
+    await ref
+        .read(trainingRepositoryProvider)
+        .setWorkoutExerciseNotes(entry.workoutExercise.id, text);
   }
 
   /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
@@ -441,6 +512,62 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
       if (t != SetType.warmup && !t.isContinuation) n++;
     }
     return n;
+  }
+}
+
+/// What was said about a day, or about one exercise on it.
+///
+/// A card of prose, built the same way every other block on this page is: the
+/// note is the *content* of its section, not a quote pinned to the side of one.
+/// It was a sunken panel with a rule down its left, which put the one piece of
+/// writing on the screen in the darkest box on it, at the smallest contrast.
+class _NoteBlock extends StatelessWidget {
+  const _NoteBlock({
+    required this.note,
+    required this.onTap,
+    this.placeholder = 'Add a note for this day',
+  });
+
+  final String? note;
+  final VoidCallback onTap;
+
+  /// What the empty state offers. Says which note is being asked for — the
+  /// day's, or this exercise on it.
+  final String placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final text = note;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.99,
+      child: AppCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                text ?? placeholder,
+                // `body` at 15 on `surface`, in the primary colour once there
+                // is something to read — a written note is the only prose on
+                // this page and had been set in the same grey as the captions.
+                style: text == null
+                    ? context.t.bodyLarge?.copyWith(color: c.textTertiary)
+                    : context.t.bodyLarge?.copyWith(color: c.textPrimary),
+              ),
+            ),
+            const SizedBox(width: Space.md),
+            Icon(
+              text == null ? Icons.add_rounded : Icons.edit_outlined,
+              size: 18,
+              color: c.textTertiary,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

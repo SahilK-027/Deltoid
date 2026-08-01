@@ -246,8 +246,14 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Tertiary action: underlined text in the primary colour. Not a coloured link
-/// — colour is data, and "See all" is not data.
+/// Tertiary action: primary-colour text with a small chevron. Not a coloured
+/// link — colour is data, and "See all" is not data.
+///
+/// No underline. Some of these were underlined and some weren't, depending on
+/// whether the screen used this widget or wrote its own `Text`, and a rule
+/// under a word is the one decoration in the app that has to be perfectly
+/// consistent to read as anything but a mistake. The chevron says "goes
+/// somewhere" without needing to be.
 class LinkAction extends StatelessWidget {
   const LinkAction(this.label, {super.key, this.onTap});
 
@@ -262,16 +268,13 @@ class LinkAction extends StatelessWidget {
       scale: 0.94,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.xs),
-        child: Text(
-          label,
-          style: context.t.titleMedium?.copyWith(
-            decoration: TextDecoration.underline,
-            // A hairline. At 1.5 the rule was heavier than the stems of the
-            // word above it, which made every link look like a heading with a
-            // border under it rather than something to tap.
-            decorationThickness: 1,
-            decorationColor: c.textSecondary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: context.t.titleMedium),
+            const SizedBox(width: Space.xxs),
+            Icon(Icons.chevron_right_rounded, size: 18, color: c.textTertiary),
+          ],
         ),
       ),
     );
@@ -428,9 +431,12 @@ class AppRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final row = Padding(
-      padding: const EdgeInsets.symmetric(
+      padding: EdgeInsets.symmetric(
         horizontal: Space.lg,
-        vertical: Space.md,
+        // A row carrying two lines needs more air than one carrying a label,
+        // or the subtitle crowds the hairline under it and the list reads as
+        // one grey block rather than as rows.
+        vertical: subtitle == null ? Space.md : Space.lg,
       ),
       child: Row(
         children: [
@@ -439,7 +445,14 @@ class AppRow extends StatelessWidget {
           else if (icon != null)
             SizedBox(
               width: 40,
-              child: Icon(icon, size: 22, color: tint ?? c.textPrimary),
+              // Flush left in its column, not centred in it. Centred, the glyph
+              // stood 9pt in from the gutter the title above it starts at, and
+              // left only 9pt of gap before the text — the icon looked both
+              // indented and crowded at once.
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Icon(icon, size: 24, color: tint ?? c.textPrimary),
+              ),
             ),
           if (leading != null) const SizedBox(width: Space.md),
           Expanded(
@@ -903,8 +916,12 @@ class Pill extends StatelessWidget {
 
 // ─── Sheets and confirmations ───────────────────────────────────────────────
 
-/// The header every sheet wears: ✕ on the left, title centred, subtitle under
-/// it, hairline beneath.
+/// The header every sheet wears: title centred, subtitle under it, ✕ on the
+/// right, hairline beneath.
+///
+/// The ✕ is on the **right** and larger than a row's glyph: it is the one
+/// control on the sheet that is not one of the choices, and on the left it read
+/// as the first item in the list rather than as the way out.
 ///
 /// The subtitle is not optional in spirit: two sheets that both list session
 /// names are indistinguishable without one line saying which question is being
@@ -920,37 +937,81 @@ class SheetHeader extends StatelessWidget {
     final c = context.c;
     return Column(
       children: [
+        // The grab handle, drawn here rather than by the framework. Material's
+        // own sits in a 48pt interactive box, which put an inch of empty
+        // charcoal over every sheet title; this is the same 36×4 bar with the
+        // gap the design actually asks for.
+        Container(
+          width: 36,
+          height: 4,
+          margin: const EdgeInsets.only(top: Space.sm),
+          decoration: BoxDecoration(
+            color: c.surfaceHighest,
+            borderRadius: BorderRadius.circular(Radii.pill),
+          ),
+        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.md),
-          child: Row(
+          // Equal room above and below the title — 16 from the handle, 16 to
+          // the hairline. The gap above used to be the handle's margin plus a
+          // header inset, which made it wider than the one below for no reason
+          // anyone could name.
+          padding:
+              const EdgeInsets.fromLTRB(Space.sm, Space.lg, Space.sm, Space.lg),
+          // A stack, not a row: the ✕ is a 48pt tap target and the title on its
+          // own is 26 tall, so in a row the button set the header's height and
+          // left 22pt of dead charcoal under a one-line title. Out of the flow,
+          // the text decides how tall the header is and the target overhangs it
+          // into the handle's gap, where there is nothing to collide with.
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
             children: [
-              CircleIconButton(
-                icon: Icons.close_rounded,
-                fill: Colors.transparent,
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      title,
-                      style: context.t.headlineSmall,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: Space.xxs),
+              Padding(
+                // Room for the ✕ on both sides, so the title is centred on the
+                // sheet rather than on what is left of it.
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                // Full width on purpose: a `Stack` takes its size from its
+                // largest unpositioned child, so a shrink-wrapped title made
+                // the stack as narrow as the words in it and `right: 0` landed
+                // beside the title instead of at the sheet's edge.
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    children: [
                       Text(
-                        subtitle!,
-                        style: context.t.bodyMedium,
+                        title,
+                        style: context.t.headlineSmall,
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: Space.xxs),
+                        Text(
+                          subtitle!,
+                          style: context.t.bodyMedium,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 40),
+              // Centred on the title's line — it closes the sheet, and centring
+              // it on the whole block dragged it down beside a subtitle it has
+              // nothing to do with.
+              Positioned(
+                right: 0,
+                top: -11,
+                child: CircleIconButton(
+                  icon: Icons.close_rounded,
+                  fill: Colors.transparent,
+                  size: 48,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+              ),
             ],
           ),
         ),
@@ -968,11 +1029,18 @@ class AppSheet extends StatelessWidget {
     required this.children,
     this.subtitle,
     this.footer,
+    this.contentPadding,
   });
 
   final String title;
   final String? subtitle;
   final List<Widget> children;
+
+  /// Overrides the body's insets. Pass `EdgeInsets.zero` for a sheet whose
+  /// content is full-bleed rows — a card inside a sheet is a panel inside a
+  /// panel, and the gutter then double-insets rows that already carry their
+  /// own padding.
+  final EdgeInsets? contentPadding;
 
   /// Pinned under the scroll area — a Save button, usually.
   final Widget? footer;
@@ -986,12 +1054,13 @@ class AppSheet extends StatelessWidget {
           SheetHeader(title: title, subtitle: subtitle),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                Space.gutter,
-                Space.lg,
-                Space.gutter,
-                Space.lg,
-              ),
+              padding: contentPadding ??
+                  const EdgeInsets.fromLTRB(
+                    Space.gutter,
+                    Space.lg,
+                    Space.gutter,
+                    Space.lg,
+                  ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
@@ -1011,6 +1080,135 @@ class AppSheet extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Writes a note. The one text-entry surface in the app, and a sheet.
+///
+/// Every note used to be typed into a centred `AlertDialog` with Material's own
+/// buttons on it — the one surface the rebrand never reached, and the one used
+/// most. It also opened in the middle of the screen while the row that summoned
+/// it sat at the bottom, and it fought the keyboard for the same space.
+///
+/// Returns the trimmed text, or null if dismissed. **Empty is a valid answer**:
+/// a note you can write and never clear is a note you stop writing.
+Future<String?> promptForNote(
+  BuildContext context, {
+  required String title,
+  String? subtitle,
+  String initial = '',
+  String? hint,
+  int maxLength = 500,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    // The sheet rides above the keyboard rather than behind it.
+    builder: (sheet) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
+      child: _NoteSheet(
+        title: title,
+        subtitle: subtitle,
+        initial: initial,
+        hint: hint,
+        maxLength: maxLength,
+      ),
+    ),
+  );
+}
+
+class _NoteSheet extends StatefulWidget {
+  const _NoteSheet({
+    required this.title,
+    required this.subtitle,
+    required this.initial,
+    required this.hint,
+    required this.maxLength,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String initial;
+  final String? hint;
+  final int maxLength;
+
+  @override
+  State<_NoteSheet> createState() => _NoteSheetState();
+}
+
+class _NoteSheetState extends State<_NoteSheet> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AppSheet(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      footer: PrimaryButton(
+        label: 'Save',
+        onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+      ),
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          maxLines: 5,
+          minLines: 3,
+          maxLength: widget.maxLength,
+          // `120 / 500` — the convention, and the only form that says what the
+          // limit *is* before you hit it. "60 left" answers a question you can
+          // only ask once you are already near the end.
+          buildCounter: (
+            context, {
+            required currentLength,
+            required isFocused,
+            required maxLength,
+          }) {
+            final full = currentLength >= (maxLength ?? 0);
+            return Text(
+              '$currentLength / $maxLength',
+              style: context.t.bodySmall?.copyWith(
+                color: full ? context.c.negative : context.c.textTertiary,
+              ),
+            );
+          },
+          textCapitalization: TextCapitalization.sentences,
+          style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
+          cursorColor: c.textPrimary,
+          decoration: InputDecoration(
+            hintText: widget.hint,
+            hintStyle: context.t.bodyLarge?.copyWith(color: c.textTertiary),
+            filled: true,
+            // `surfaceHigh` is this app's input fill, and `surfaceHighest` is
+            // what a focused one goes to (§5). The field was on
+            // `surfaceSunken` — the keypad's bed — which on a `surface` sheet
+            // read as a hole rather than as somewhere to type.
+            fillColor: c.surfaceHigh,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide(color: c.textPrimary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.all(Space.lg),
+          ),
+        ),
+      ],
     );
   }
 }
