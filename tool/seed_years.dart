@@ -65,8 +65,12 @@ void main(List<String> args) async {
     stdout.writeln('  ${entry.value.toString().padLeft(7)}  ${entry.key}');
   }
 
-  if (args.contains('--push')) {
-    await _push(file.path, _stringFlag(args, 'device'));
+  // `--device` on its own is a push: naming the phone and then not sending it
+  // anything is never what was meant, and the failure is silent — a file
+  // written to build/ and someone waiting at the phone for it.
+  final device = _stringFlag(args, 'device');
+  if (args.contains('--push') || device != null) {
+    await _push(file.path, device);
   }
 }
 
