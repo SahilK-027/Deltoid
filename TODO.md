@@ -219,15 +219,54 @@ a device before the next starts.
       workout detail, both drawers, the note sheet against the keyboard, the
       summary screen, and the ⓘ with its dot. Everything above went through
       several passes on real hardware before this step closed.
-- [ ] **4 · Progress + exercise history** — builds the chart language once:
-      dashed gridlines, right-hand Y labels, range pill, legend chips, em-dash
-      empty state instead of a gridded void. Three screens consume it.
+- [ ] **4 · Progress folds into History, and the chart language gets built** —
+      the one structural step in the rebrand. Everything else so far has been
+      one screen at a time; this moves a feature out of its own tab and changes
+      what the nav bar is a list of.
+
+      **Progress stops being a tab.** "How has my bench moved" is a *history*
+      question, and History's per-exercise index already asks half of it —
+      tapping an exercise there should open its chart, rather than sending you
+      to a fourth tab to ask the same thing with a different picker. One screen,
+      one job. `progress_screen` becomes the exercise's own view inside History;
+      the tab goes.
+
+      It deliberately does **not** fold into Today. Today is the busiest screen
+      in the app and the one that breaks rule 6 most, and it already has weekly
+      sets per muscle queued for it. A chart on top of the hero, the cycle, the
+      heatmap and the rate makes it a dashboard, which is the thing §1 exists to
+      stop.
+
+      **The chart language, built once**: dashed gridlines, right-hand Y labels,
+      range pill, legend chips, em-dash empty state instead of a gridded void.
+      Two screens consume it now rather than three, which is the point of doing
+      the move first.
+
+      **Then the nav bar becomes Workouts · Regime · History · Settings.**
+
+      - `Today` → **Workouts**. The name was already wrong: the screen backfills
+        a session logged on Tuesday and resumes one left open yesterday, so a
+        tab named after a day shows other days. The *page* keeps the date as its
+        title (§9) — only the nav label moves.
+      - Progress's slot goes to **Settings**, which is behind a gear on Today
+        today. The argument is not symmetry, it is that **bodyweight logging**
+        lives in there and is not a setting at all: it is data entered weekly
+        that feeds every pull-up and dip score in the app, currently two taps
+        deep behind a cog.
+
+      Order matters, and it is three commits, not one: fold Progress into
+      History (structural), then build the chart language, then rename the tabs
+      (cosmetic). Renaming inside the move makes a diff nobody can review.
 - [ ] **5 · Regime cluster** — `regime_screen`, `session_editor`,
       `exercise_catalog_screen`, `regimes_screen`, `regime_setup`. Day tabs,
       count-as-heading, single targets card + editor sheet, catalog picker with
       search and filter chips. Creation stays in sheets: no wizard.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion of
-      bespoke layout once the list primitives exist.
+      bespoke layout once the list primitives exist. Settings is a *tab* by the
+      time this runs (step 4), so it gets a header band and a masthead like
+      every other destination rather than the pushed-screen app bar it wears
+      now, and bodyweight comes up out of it far enough to be reachable in one
+      tap.
 - [ ] **7 · Reconciliation** — light theme audited on every screen (only checked
       at token level so far), empty states, motion consistency, and THEME.md
       corrected where the build taught us something the audit didn't.
