@@ -5,6 +5,7 @@
 //   dart run tool/seed_years.dart 3                  # writes a file
 //   dart run tool/seed_years.dart 3 --push           # …and adb pushes it
 //   dart run tool/seed_years.dart 50 --seed=7        # deterministic
+//   dart run tool/seed_years.dart 3 --push --device=22888794
 //
 // Then: Settings → Restore, pick the file. Restore is destructive by design —
 // it clears every table first — so this replaces whatever is on the device.
@@ -65,14 +66,50 @@ void main(List<String> args) async {
   }
 
   if (args.contains('--push')) {
-    const dest = '/sdcard/Download/';
-    final result = await Process.run('adb', ['push', file.path, dest]);
-    stdout.write(result.stdout);
-    stderr.write(result.stderr);
-    if (result.exitCode != 0) exit(result.exitCode);
-    stdout.writeln('\nPushed to $dest — on the phone: '
-        'Settings → Restore from a file → Downloads.');
+    await _push(file.path, _stringFlag(args, 'device'));
   }
+}
+
+/// `adb push`, with the device resolved first.
+///
+/// A phone and a running emulator are the normal state of this machine, and
+/// bare `adb push` fails on it with "more than one device/emulator" — after the
+/// generator has already done all its work. Pick the only device when there is
+/// one, name them when there is a choice.
+Future<void> _push(String path, String? device) async {
+  const dest = '/sdcard/Download/';
+
+  var target = device;
+  if (target == null) {
+    final listed = await Process.run('adb', ['devices']);
+    final ids = const LineSplitter()
+        .convert(listed.stdout as String)
+        .skip(1)
+        .map((l) => l.trim())
+        .where((l) => l.endsWith('\tdevice'))
+        .map((l) => l.split('\t').first)
+        .toList();
+
+    if (ids.isEmpty) {
+      stderr.writeln('No device. Plug one in, or start an emulator.');
+      exit(1);
+    }
+    if (ids.length > 1) {
+      stderr.writeln('More than one device attached. Pick one:\n');
+      for (final id in ids) {
+        stderr.writeln('  dart run tool/seed_years.dart … --device=$id');
+      }
+      exit(1);
+    }
+    target = ids.single;
+  }
+
+  final result = await Process.run('adb', ['-s', target, 'push', path, dest]);
+  stdout.write(result.stdout);
+  stderr.write(result.stderr);
+  if (result.exitCode != 0) exit(result.exitCode);
+  stdout.writeln('\nPushed to $target:$dest — on the phone: '
+      'Settings → Restore from a file → Downloads.');
 }
 
 /// The generator as a function, so a test can restore what it writes rather
