@@ -276,7 +276,18 @@ class LinkAction extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: context.t.titleMedium),
+            // Flexible, because a link is usually the right-hand half of a
+            // `SectionHeader` row and its label is often an exercise name. On a
+            // narrow phone, or inside a card, "All Bulgarian split squat
+            // history" is wider than what is left of the line.
+            Flexible(
+              child: Text(
+                label,
+                style: context.t.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const SizedBox(width: Space.xxs),
             Icon(Icons.chevron_right_rounded, size: 18, color: c.textTertiary),
           ],

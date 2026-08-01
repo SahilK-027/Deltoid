@@ -392,49 +392,68 @@ class TodayScreen extends ConsumerWidget {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  Space.gutter,
-                  Space.lg,
-                  Space.gutter,
-                  Space.huge,
-                ),
+                padding: const EdgeInsets.only(bottom: Space.huge),
                 children: [
                   // The session is the page's first *section*, not part of the
                   // masthead. The band ends at the line about when you last
                   // trained; everything you can act on is content under it,
                   // with its own heading like every other block here.
+                  // The band's own `surface`, full width — connected to the
+                  // header by colour, separated from it by the gap. On the page
+                  // background the screen's one primary action sat on the
+                  // flattest surface the app has.
                   if (open != null)
-                    _ResumeHero(
-                      workout: open,
-                      owner: today.snapshot.openWorkoutOwner,
-                      doneSets: today.snapshot.openWorkoutDoneSets,
-                      totalSets: today.snapshot.openWorkoutTotalSets,
-                      preview: today.snapshot.openWorkoutExerciseNames,
-                      activeRegimeId: r.id,
-                      activeRegimeName: r.name,
-                      sessions: sessions,
+                    _SurfaceBlock(
+                      child: _ResumeHero(
+                        workout: open,
+                        owner: today.snapshot.openWorkoutOwner,
+                        doneSets: today.snapshot.openWorkoutDoneSets,
+                        totalSets: today.snapshot.openWorkoutTotalSets,
+                        preview: today.snapshot.openWorkoutExerciseNames,
+                        activeRegimeId: r.id,
+                        activeRegimeName: r.name,
+                        sessions: sessions,
+                      ),
                     )
-                  else if (status != null) ...[
-                    const SectionHeader("Today's session"),
-                    _NextUpHero(
-                      regimeId: r.id,
-                      regimeName: r.name,
-                      status: status,
-                      sessions: sessions,
-                      preview: today
-                          .snapshot
-                          .exerciseNamesBySession[status.nextSessionId],
+                  else if (status != null)
+                    _SurfaceBlock(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SectionHeader("Today's session"),
+                          _NextUpHero(
+                            regimeId: r.id,
+                            regimeName: r.name,
+                            status: status,
+                            sessions: sessions,
+                            preview: today
+                                .snapshot
+                                .exerciseNamesBySession[status.nextSessionId],
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                  const SizedBox(height: Space.section),
-                  _ConsistencyCard(
-                    data: today.heatmap,
-                    hasHistory: today.hasHistory,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      Space.gutter,
+                      Space.section,
+                      Space.gutter,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ConsistencyCard(
+                          data: today.heatmap,
+                          hasHistory: today.hasHistory,
+                        ),
+                        if (today.lastCompleted != null) ...[
+                          const SizedBox(height: Space.section),
+                          _LastSessionCard(last: today.lastCompleted!),
+                        ],
+                      ],
+                    ),
                   ),
-                  if (today.lastCompleted != null) ...[
-                    const SizedBox(height: Space.section),
-                    _LastSessionCard(last: today.lastCompleted!),
-                  ],
                 ],
               ),
             ),
@@ -500,6 +519,32 @@ class _TodayHeader extends StatelessWidget {
         // decide about twice.
         actions: actions,
       ),
+    );
+  }
+}
+
+/// A full-width block on the band's own `surface`.
+///
+/// Connected to the header by colour, separated from it by the gap — a card
+/// would draw a rounded seam between two identical greys, which is the thing
+/// the hero was taken out of a card to stop.
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: context.c.surface,
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        Space.lg,
+        Space.gutter,
+        Space.xl,
+      ),
+      child: child,
     );
   }
 }
@@ -707,9 +752,9 @@ class _ResumeHero extends ConsumerWidget {
         ? c.deload
         : c.identityFor(ownerRegimeId);
 
-    // No card, and no accent fill to replace it. This block lives on the header
-    // band (see [_TodayHeader]); what makes it loud is the pulse, the label and
-    // a stopwatch at display size, not a tinted rectangle.
+    // No accent fill: what makes this loud is the pulse, the label and a
+    // stopwatch at display size, not a tinted rectangle. The `surface` under it
+    // is the card the caller wraps it in.
     //
     // Same skeleton as [_NextUpHero], deliberately: identity row, a status
     // line, the session name at display size, the exercise preview, then the
@@ -1005,8 +1050,8 @@ class _NextUpHero extends ConsumerWidget {
     // programme it belongs to.
     final mark = status.isDeload ? c.deload : c.identityFor(regimeId);
 
-    // On the header band, not in a card of the band's own colour — see
-    // [_TodayHeader].
+    // The caller wraps this in an `AppCard`: out of the header band, `surface`
+    // has to be drawn rather than inherited.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
