@@ -497,11 +497,20 @@ skipped it.
   or excluded — the consistency rate has the same problem and already made this
   choice once; follow it.
 
-- **Weekly sets per muscle on Today.** The surface for the above. Today is
-  already the busiest screen in the app and rule 6 is the one it breaks most,
-  so this arrives as *one* block or not at all — most likely a short bar list
-  under the heatmap, muscle name and count, no chart. It replaces nothing; it
-  has to earn its height against the consistency grid.
+- **Weekly sets per muscle on Today, as the hero's second page.** Today's
+  first screenful is the most contested space in the app, and this does not win
+  a fight against "start the session" — so it does not have one. The hero
+  becomes a **two-page pager with dots**: today's session first, the week's
+  muscle volume second. Nothing moves below the fold and nothing is deleted.
+
+  The block itself is a **horizontal bar list**, specced in THEME §5 → Muscle
+  volume bars: one row per muscle, name left, bar, count right, sorted
+  descending, normalised to the biggest muscle that week rather than to a
+  target this app has no business inventing.
+
+  The pager is the *only* horizontal gesture outside the log, and the log's
+  axis stays untouchable (invariant 4). First page is always the action: a
+  landing screen that opens on a statistic makes you swipe to use the app.
 
 - **Muscle chip on every exercise.** `muscle` is rendered as text in the
   catalog and nowhere else. As a chip on the exercise row it makes the catalog
