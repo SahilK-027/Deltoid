@@ -152,7 +152,12 @@ class PageHeader extends StatelessWidget {
                       const SizedBox(height: Space.xs),
                     ],
                     Text(
-                      title.toUpperCase(),
+                      // Sentence case. Uppercase was doing the work of size and
+                      // weight, which `pageTitle` already has at 30/800 — and
+                      // it cost every title its word shapes, which is what you
+                      // actually read a heading by. It also made a long session
+                      // name ellipsize sooner, for nothing.
+                      title,
                       style: context.t.displayLarge,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

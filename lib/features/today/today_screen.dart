@@ -368,8 +368,11 @@ class TodayScreen extends ConsumerWidget {
         // 16pt below a band it matched exactly. The band is also the answer to
         // why this block, alone on the screen, had no section header over it:
         // it is not a section, it is the header.
-        (_, final r?, false) => ListView(
-          padding: const EdgeInsets.only(bottom: Space.huge),
+        // The band is pinned and the record scrolls under it. It used to be the
+        // first item in the list, so the one thing you came for — the session,
+        // and the button that starts it — slid off the top the moment you
+        // looked at the heatmap.
+        (_, final r?, false) => Column(
           children: [
             _TodayHeader(
               last: today!.lastCompleted,
@@ -412,15 +415,14 @@ class TodayScreen extends ConsumerWidget {
                           .exerciseNamesBySession[status.nextSessionId],
                     ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.gutter,
-                Space.section,
-                Space.gutter,
-                0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  Space.section,
+                  Space.gutter,
+                  Space.huge,
+                ),
                 children: [
                   _ConsistencyCard(
                     data: today.heatmap,
@@ -448,18 +450,15 @@ class TodayScreen extends ConsumerWidget {
 /// restoring a backup lives. Settings is always here for that reason; anything
 /// that needs sessions to exist is passed in by the caller.
 ///
-/// The title is the date, not the word "Today".
+/// The title is the screen's name, with the date as its eyebrow. It was the
+/// other way round — the date as the title, on the grounds that the nav bar
+/// already named the screen — and that made the one screen you land on the only
+/// one whose masthead never says where you are. The nav label is 11sp at the
+/// far end of the screen; a masthead is not.
 ///
-/// It used to print *when* three times over: the date as an eyebrow, `TODAY` at
-/// 27sp under it, and a status line under that. The middle one is the label the
-/// nav bar already draws under a highlighted icon — the largest type on the
-/// landing screen, carrying nothing. So the date takes the slot it was already
-/// half filling, at the size it deserves: weekday as the eyebrow, `31 JULY`
-/// under it in page-title type.
-///
-/// Split across the two roles rather than set as one string: the weekday is the
-/// eyebrow it always was, and `31 JULY 2026` is the title. One string would run
-/// past the two action buttons sharing the title's row at 27sp/800.
+/// It is pinned, and the record below it scrolls: the session and the button
+/// that starts it are the reason the screen exists, and they used to slide away
+/// the moment you looked at the heatmap.
 ///
 /// The rest gap stays a quiet line under it. It answers the question the app is
 /// opened with, but it is not the page's name and does not want title type:
@@ -495,8 +494,14 @@ class _TodayHeader extends StatelessWidget {
     final below = this.below;
     return HeaderBand(
       child: PageHeader(
-        title: DateFormat('d MMMM y').format(now),
-        eyebrow: DateFormat('EEEE').format(now),
+        // The screen names itself, like every other destination. It used to be
+        // titled with the date on the grounds that the nav bar already said
+        // "Today" — but the nav label is 11sp at the bottom of the screen, and
+        // a masthead that never says where you are makes the one screen you
+        // land on the only one you have to identify by inference. The date is
+        // still here, over it.
+        title: 'Workouts',
+        eyebrow: DateFormat('EEEE d MMMM').format(now),
         // Tight to the date: the rest gap is a line about it, not the next
         // thing on the page.
         belowGap: Space.xs,

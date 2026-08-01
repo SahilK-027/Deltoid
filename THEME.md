@@ -145,7 +145,7 @@ title or smaller than a nav label.
 
 | Role | Size / line | Weight | Case | Colour | Used for |
 | --- | --- | --- | --- | --- | --- |
-| `pageTitle` | 30 / 36 | 800 | **UPPERCASE**, tracking −0.5 | primary | The one title in a header band: `HISTORY`, `PROGRESS` — or, on the landing screen whose name is already on the nav bar, the date (see §9) |
+| `pageTitle` | 30 / 36 | 800 | Sentence, tracking −0.5 | primary | The one title in a header band, and it **names the screen**: `History`, `Workouts`, `Settings` |
 | `pageEyebrow` | 13 / 16 | 600 | UPPERCASE, tracking +1.2 | secondary | Date line above a page title |
 | `section` | 20 / 26 | 700 | Sentence | primary | Section headings on the page background |
 | `title` | 16 / 22 | 600 | Sentence | primary | Card titles, list-row titles, exercise names |
@@ -338,6 +338,13 @@ stays a grid.
   baseline.
 - Series: `data` line 2px with open circle markers (fill `bg`, stroke series
   colour). Sparklines drop the axes entirely.
+- **Markers only while they mark something.** Past ~40 points the circles touch
+  and a year of training renders as a thick dotted band with the line lost
+  inside it — the shape you came to read, hidden by the points it is made of.
+  Drop them and say `Pinch to zoom, drag to pan` instead.
+- **Zoom is horizontal only.** Time is the axis with too much in it; scaling
+  the value axis as well would make the same progress look like whatever you
+  last pinched.
 - Above the plot: two stats as `label` + `value` + unit, then the date range in
   `body`.
 - Below the plot: range selector as a segmented pill — `surfaceHigh` track,
@@ -345,6 +352,25 @@ stays a grid.
   `surfaceHigh` pill with a caret for granularity.
 - Legend: chips inside a `surface` card, marker + label; disabled series dim to
   `textSecondary`.
+
+### Mastheads
+
+**A page title names its page, in sentence case.** Both halves of that were
+once the other way round and both were wrong:
+
+- **No uppercase.** At 30sp and weight 800 the size and weight already carry
+  the emphasis; uppercase only cost every title its word shapes — which is what
+  a heading is actually read by — and made long ones ellipsize sooner.
+- **The landing screen names itself too.** It used to be titled with the date,
+  on the grounds that the nav bar already said "Today". The nav label is 11sp
+  at the far end of the screen, so that made the one screen you land on the
+  only one whose masthead never says where you are. The date is the eyebrow
+  above it, which is the slot it always half-occupied.
+
+**The band does not scroll.** A masthead that slides away takes the screen's
+one primary action with it — on Workouts that is the session and the button
+that starts it, which is the reason the screen exists. Pin the band, scroll the
+record underneath.
 
 ### The metric screen
 
@@ -625,7 +651,7 @@ deliberate departures — keep them when implementing.
 | Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: amber dot on the ⓘ, the session and date inside it | The entire reason this app exists (README) |
 | Programme identity is a colour + glyph you must pick during creation | Same mark, but auto-assigned on create and changeable later | Identity is worth having; a mandatory question about it is not |
 | Rep targets hidden two taps deep behind a card, placeholder `Optional` | Same sheet, but the card shows the target inline (`4 × 8–10`) so it is readable without opening | The target is the point of the slot |
-| Every screen's masthead prints the screen's name | The **landing** screen prints the date instead — weekday as the eyebrow, `31 JULY` in `pageTitle` under it, and the rest gap as a `body` line beneath | `TODAY` is the label the nav bar already draws under a highlighted icon. Spending the largest type on the screen you open into on a word that adds nothing is what makes a page look filled rather than designed. The date is what that slot is for here. Screens you navigate *to* keep their name — arriving somewhere, you want it confirmed |
+| Every screen's masthead prints the screen's name | Same, landing screen included: `Workouts` in `pageTitle`, the date as its eyebrow, the rest gap as a `body` line beneath | This was briefly the other way round — the date as the title, on the grounds that the nav bar already says the name. It made the one screen you open into the only one whose masthead never says where you are, and the nav label answering for it is 11sp at the far end of the screen |
 
 ---
 

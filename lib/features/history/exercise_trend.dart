@@ -188,12 +188,25 @@ class _Chart extends ConsumerWidget {
     final maxY = ys.reduce((a, b) => a > b ? a : b);
     final pad = ((maxY - minY) * 0.15).clamp(2.0, 30.0);
 
+    // Whether there are more points than the width can give each one a marker.
+    final dense = source.length > 40;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 200,
+          height: 220,
           child: LineChart(
+            // Pinch to zoom the time axis, drag to pan. `All` on a long history
+            // is hundreds of sessions in a phone's width, where the only honest
+            // options are to draw it unreadably or to let you get closer. The
+            // vertical axis stays fixed: scaling weight against nothing would
+            // make the same progress look like whatever you last pinched.
+            transformationConfig: const FlTransformationConfig(
+              scaleAxis: FlScaleAxis.horizontal,
+              minScale: 1,
+              maxScale: 12,
+            ),
             LineChartData(
               minX: minX,
               maxX: maxX,
@@ -271,7 +284,13 @@ class _Chart extends ConsumerWidget {
                     isCurved: false,
                     color: palette[i % palette.length],
                     barWidth: 2,
+                    // Markers only while they still mark something. Past about
+                    // forty sessions the circles touch, and a year of training
+                    // renders as a thick dotted band with the line lost inside
+                    // it — the shape you came to read, hidden by the points it
+                    // is made of.
                     dotData: FlDotData(
+                      show: dense ? false : true,
                       getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                         radius: 3,
                         color: c.bg,
@@ -284,6 +303,13 @@ class _Chart extends ConsumerWidget {
             ),
           ),
         ),
+        if (dense) ...[
+          const SizedBox(height: Space.sm),
+          Text(
+            'Pinch to zoom, drag to pan',
+            style: context.t.bodySmall?.copyWith(color: c.textTertiary),
+          ),
+        ],
         if (names.length > 1) ...[
           const SizedBox(height: Space.md),
           Wrap(
