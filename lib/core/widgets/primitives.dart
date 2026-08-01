@@ -908,34 +908,43 @@ class _Tab extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       scale: 0.96,
-      child: Column(
-        // Stretch, so the rule is exactly as wide as the word above it. A fixed
-        // width underlines `Legs` and `Upper body A` identically, which reads as
-        // a marker parked near the tab rather than as the tab being live.
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Space.md, Space.md, Space.md, Space.sm),
-            child: Text(
-              label,
-              style: context.t.titleMedium?.copyWith(
-                color: selected ? c.textPrimary : (tint ?? c.textSecondary),
+      // `IntrinsicWidth` is what makes the stretch below legal. The strip is a
+      // horizontal scroll, so the tab's incoming width is unbounded, and a
+      // stretching column in unbounded space asks for an infinite width — one
+      // "BoxConstraints forces an infinite width" at the top and then a hundred
+      // "RenderBox was not laid out" behind it, which is the whole screen gone.
+      // This measures the label first and gives the column a tight width.
+      child: IntrinsicWidth(
+        child: Column(
+          // Stretch, so the rule is exactly as wide as the word above it. A
+          // fixed width underlines `Legs` and `Upper body A` identically, which
+          // reads as a marker parked near the tab rather than as the tab being
+          // live.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  Space.md, Space.md, Space.md, Space.sm),
+              child: Text(
+                label,
+                style: context.t.titleMedium?.copyWith(
+                  color: selected ? c.textPrimary : (tint ?? c.textSecondary),
+                ),
               ),
             ),
-          ),
-          AnimatedContainer(
-            duration: Motion.base,
-            curve: Motion.emphasized,
-            height: 3,
-            decoration: BoxDecoration(
-              color: selected ? c.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(Radii.pill),
+            AnimatedContainer(
+              duration: Motion.base,
+              curve: Motion.emphasized,
+              height: 3,
+              decoration: BoxDecoration(
+                color: selected ? c.accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(Radii.pill),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

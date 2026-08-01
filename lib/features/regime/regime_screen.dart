@@ -186,14 +186,25 @@ class _CycleLine extends ConsumerWidget {
       onTap: () => _showCycleSheet(context, ref, status, sessions),
       child: Row(
         children: [
-          Text(
-            'Cycle ${status.cycleIndex} · ${status.done} of ${status.total} · ',
-            style: context.t.bodyMedium,
+          // Flexible, both of them: `Cycle 12 · 3 of 6 · deload in progress` is
+          // wider than a narrow phone's band, and a status line is not worth an
+          // overflow stripe.
+          Flexible(
+            child: Text(
+              'Cycle ${status.cycleIndex} · ${status.done} of ${status.total} · ',
+              style: context.t.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          Text(
-            tail,
-            style: context.t.bodyMedium?.copyWith(
-              color: status.isDeload ? c.deload : c.textSecondary,
+          Flexible(
+            child: Text(
+              tail,
+              style: context.t.bodyMedium?.copyWith(
+                color: status.isDeload ? c.deload : c.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Icon(Icons.chevron_right_rounded, size: 18, color: c.textTertiary),
