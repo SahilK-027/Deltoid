@@ -16,13 +16,14 @@ Color heatCellColor(
   final c = context.c;
   if (isFuture) return c.heatEmpty.withValues(alpha: 0.4);
   if (day == null) return c.heatEmpty;
-  if (day.isDeload) return c.deloadMuted;
-
-  final scale = c.heatScale;
-  final index = (day.workouts - 1).clamp(0, scale.length - 1);
-  // A single session is already a full day's work — start at a mid step so
-  // normal days read as "done", not "barely".
-  return scale[(index + 2).clamp(0, scale.length - 1)];
+  // Deload is a solid amber, not an outlined cell. An outline on a 4dp square
+  // is a smudge, and a light week is a *kind* of trained day rather than a
+  // trained day with a note on it.
+  if (day.isDeload) return c.deload;
+  // One tone, whatever the day held. The ramp made a single session — a full
+  // day's work — the darkest thing on the grid, and three sessions read as
+  // three times the achievement when it is usually just a Saturday.
+  return c.heatOn;
 }
 
 /// One cell. Square, tooltipped, and told nothing about where it sits.
@@ -42,7 +43,6 @@ class HeatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final day = this.day;
     final stamp = DateFormat('EEE d MMM y').format(date);
 
@@ -58,9 +58,6 @@ class HeatCell extends StatelessWidget {
         decoration: BoxDecoration(
           color: heatCellColor(context, day, isFuture: isFuture),
           borderRadius: BorderRadius.circular(4),
-          border: day != null && day.isDeload
-              ? Border.all(color: c.deload, width: 1)
-              : null,
         ),
       ),
     );
@@ -239,11 +236,11 @@ class HeatmapLegend extends StatelessWidget {
         const SizedBox(width: Space.xs),
         Text('Rest', style: context.t.labelSmall),
         const SizedBox(width: Space.lg),
-        swatch(c.heatScale[2]),
+        swatch(c.heatOn),
         const SizedBox(width: Space.xs),
         Text('Trained', style: context.t.labelSmall),
         const SizedBox(width: Space.lg),
-        swatch(c.deloadMuted, border: c.deload),
+        swatch(c.deload),
         const SizedBox(width: Space.xs),
         Text('Deload', style: context.t.labelSmall),
       ],

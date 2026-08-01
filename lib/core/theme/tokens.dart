@@ -41,7 +41,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.identity,
     required this.effort,
     required this.heatEmpty,
-    required this.heatScale,
+    required this.heatOn,
     required this.shadow,
   });
 
@@ -110,7 +110,15 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
 
   /// Heatmap: unworked day, then increasing intensity.
   final Color heatEmpty;
-  final List<Color> heatScale;
+
+  /// One tone for a day you trained, whatever it held.
+  ///
+  /// It was a four-step ramp on session count, which said the wrong thing
+  /// twice: a day with one session — a full day's work — came out darkest and
+  /// nearly indistinguishable from a rest day, and a day with three read as
+  /// three times the achievement when it is usually just a Saturday. The grid
+  /// answers "did I train", and that is a yes or a no.
+  final Color heatOn;
 
   /// Kept for the rare surface that genuinely floats above the page (a snack
   /// bar, a dragged row). Cards, sheets and the nav bar do **not** use it:
@@ -167,12 +175,10 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     // #222222 the grid dissolved into the card and the pattern — the whole
     // point of the section — could only be read where it was filled.
     heatEmpty: Color(0xFF2F2F2F),
-    heatScale: [
-      Color(0xFF1B3357),
-      Color(0xFF23508F),
-      Color(0xFF2A67C4),
-      Color(0xFF2F7BFF),
-    ],
+    // Light, not saturated: a year of these is most of the screen, and a wall
+    // of full-strength `info` blue is a wall. This reads as "on" against the
+    // rest days without shouting.
+    heatOn: Color(0xFF6FA8F5),
     shadow: Color(0x66000000),
   );
 
@@ -223,12 +229,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       Color(0xFF2563EB),
     ],
     heatEmpty: Color(0xFFE7E7E7),
-    heatScale: [
-      Color(0xFFCBDDFA),
-      Color(0xFF8EB4F3),
-      Color(0xFF5289E6),
-      Color(0xFF2563EB),
-    ],
+    heatOn: Color(0xFF3B7BE0),
     shadow: Color(0x1A000000),
   );
 
@@ -274,7 +275,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     List<Color>? identity,
     List<Color>? effort,
     Color? heatEmpty,
-    List<Color>? heatScale,
+    Color? heatOn,
     Color? shadow,
   }) {
     return DeltoidColors(
@@ -302,7 +303,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       identity: identity ?? this.identity,
       effort: effort ?? this.effort,
       heatEmpty: heatEmpty ?? this.heatEmpty,
-      heatScale: heatScale ?? this.heatScale,
+      heatOn: heatOn ?? this.heatOn,
       shadow: shadow ?? this.shadow,
     );
   }
@@ -339,7 +340,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       identity: l(identity, other.identity),
       effort: l(effort, other.effort),
       heatEmpty: c(heatEmpty, other.heatEmpty),
-      heatScale: l(heatScale, other.heatScale),
+      heatOn: c(heatOn, other.heatOn),
       shadow: c(shadow, other.shadow),
     );
   }
