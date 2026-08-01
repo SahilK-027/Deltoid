@@ -204,6 +204,8 @@ Future<void> _logPastSession(
       await showModalBottomSheet<({String sessionId, DateTime date})>(
         context: context,
         isScrollControlled: true,
+        // `AppSheet` draws its own grab handle, tighter than the framework's.
+        showDragHandle: false,
         builder: (sheet) => _BackfillSheet(sessions: sessions),
       );
   if (picked == null || !context.mounted) return;

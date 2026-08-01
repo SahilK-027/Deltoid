@@ -20,18 +20,10 @@ class RegimesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(regimeSummariesProvider).valueOrNull;
+    final c = context.c;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Regimes')),
-      floatingActionButton: summaries == null || summaries.isEmpty
-          ? null
-          : FloatingActionButton.extended(
-              backgroundColor: context.c.accent,
-              foregroundColor: context.c.onAccent,
-              onPressed: () => createRegimeFlow(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('New regime'),
-            ),
       body: summaries == null
           ? const Center(child: CircularProgressIndicator())
           : summaries.isEmpty
@@ -40,36 +32,55 @@ class RegimesScreen extends ConsumerWidget {
                   title: 'No regimes yet',
                   message: 'Build your own split, or start from a template and '
                       'edit it into shape.',
-                  action: FilledButton(
+                  action: PrimaryButton(
+                    label: 'Create regime',
                     onPressed: () => createRegimeFlow(context, ref),
-                    child: const Text('Create regime'),
                   ),
                 )
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                      Space.lg, Space.sm, Space.lg, Space.huge),
+              : Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(bottom: Space.md),
+                      padding: const EdgeInsets.fromLTRB(
+                          Space.gutter, Space.sm, Space.gutter, Space.lg),
                       child: Text(
-                        'One regime is active at a time. Switching keeps every '
-                        'past workout intact and still attached to the '
-                        'programme it was run under.',
-                        style: context.t.bodySmall,
+                        'One is active at a time. Switching keeps every past '
+                        'workout intact and still attached to the programme it '
+                        'was run under.',
+                        style: context.t.bodyMedium,
                       ),
                     ),
-                    for (final s in summaries) ...[
-                      _RegimeCard(summary: s, total: summaries.length),
-                      const SizedBox(height: Space.sm),
-                    ],
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.only(bottom: Space.lg),
+                        itemCount: summaries.length,
+                        separatorBuilder: (_, _) =>
+                            Divider(height: 1, color: c.border),
+                        itemBuilder: (context, i) => _RegimeRow(
+                          summary: summaries[i],
+                          total: summaries.length,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                          Space.gutter, Space.sm, Space.gutter, Space.md),
+                      child: SafeArea(
+                        top: false,
+                        child: PrimaryButton(
+                          label: 'New regime',
+                          icon: Icons.add_rounded,
+                          onPressed: () => createRegimeFlow(context, ref),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
     );
   }
 }
 
-class _RegimeCard extends ConsumerWidget {
-  const _RegimeCard({required this.summary, required this.total});
+class _RegimeRow extends ConsumerWidget {
+  const _RegimeRow({required this.summary, required this.total});
 
   final RegimeSummary summary;
 
@@ -84,8 +95,7 @@ class _RegimeCard extends ConsumerWidget {
     final active = regime.isActive;
 
     final facts = [
-      '${summary.sessionCount} session'
-          '${summary.sessionCount == 1 ? '' : 's'}',
+      '${summary.sessionCount} day${summary.sessionCount == 1 ? '' : 's'}',
       '${summary.workoutCount} logged',
       if (regime.deloadEnabled)
         'deload every ${regime.deloadAfterCycles}'
@@ -93,70 +103,84 @@ class _RegimeCard extends ConsumerWidget {
         'no deload',
     ];
 
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-          horizontal: Space.lg, vertical: Space.md),
-      outline: active ? BorderSide(color: c.accent, width: 2) : null,
+    return AppRow(
+      // The identity mark History already scans by, on the row that owns it.
+      leading: IconTile(
+        active ? Icons.bolt_rounded : Icons.layers_outlined,
+        color: c.identityFor(regime.id),
+        solid: active,
+      ),
+      title: regime.name,
+      subtitle: facts.join('  ·  '),
       onTap: active ? null : () => _activate(context, ref),
-      child: Row(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            active ? Icons.radio_button_checked : Icons.radio_button_off,
-            size: 20,
-            color: active ? c.accent : c.textTertiary,
+          if (active) ...[
+            const Pill('Active'),
+            const SizedBox(width: Space.sm),
+          ],
+          CircleIconButton(
+            icon: Icons.more_horiz_rounded,
+            fill: Colors.transparent,
+            onTap: () => _showActions(context, ref),
           ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        regime.name,
-                        style: context.t.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (active) ...[
-                      const SizedBox(width: Space.sm),
-                      Pill('Active', color: c.accent),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: Space.xs),
-                Text(facts.join('  ·  '), style: context.t.labelSmall),
-              ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showActions(BuildContext context, WidgetRef ref) {
+    final active = summary.regime.isActive;
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder: (sheet) => AppSheet(
+        title: summary.regime.name,
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
+        children: [
+          if (!active)
+            AppRow(
+              icon: Icons.play_circle_outline,
+              title: 'Train this one',
+              subtitle: 'Today and Regime switch to it',
+              onTap: () {
+                Navigator.of(sheet).pop();
+                _activate(context, ref);
+              },
             ),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_horiz, size: 20, color: c.textTertiary),
-            onSelected: (value) => switch (value) {
-              'activate' => _activate(context, ref),
-              'rename' => _rename(context, ref),
-              'delete' => _delete(context, ref),
-              _ => null,
+          AppRow(
+            icon: Icons.edit_outlined,
+            title: 'Rename',
+            onTap: () async {
+              final navigator = Navigator.of(sheet);
+              final name = await promptForText(
+                context,
+                title: 'Rename regime',
+                initial: summary.regime.name,
+              );
+              if (name == null || name.isEmpty) return;
+              await ref
+                  .read(regimeRepositoryProvider)
+                  .updateRegime(summary.regime.id, name: Value(name));
+              navigator.pop();
             },
-            itemBuilder: (_) => [
-              if (!active)
-                const PopupMenuItem(
-                  value: 'activate',
-                  child: Text('Make active'),
-                ),
-              const PopupMenuItem(value: 'rename', child: Text('Rename')),
-              PopupMenuItem(
-                value: 'delete',
-                enabled: total > 1,
-                child: Text(
-                  total > 1 ? 'Delete regime' : 'Delete (only regime)',
-                  style: TextStyle(
-                    color: total > 1 ? c.negative : c.textTertiary,
-                  ),
-                ),
-              ),
-            ],
+          ),
+          AppRow(
+            icon: Icons.delete_outline_rounded,
+            title: 'Delete regime',
+            subtitle: total > 1
+                ? 'Its days and slots go with it'
+                : 'Not the only one — there would be nothing to train',
+            tint: total > 1 ? sheet.c.negative : sheet.c.textTertiary,
+            onTap: total > 1
+                ? () async {
+                    final navigator = Navigator.of(sheet);
+                    final done = await _delete(context, ref);
+                    if (done) navigator.pop();
+                  }
+                : null,
           ),
         ],
       ),
@@ -165,41 +189,28 @@ class _RegimeCard extends ConsumerWidget {
 
   Future<void> _activate(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
-    await ref
-        .read(regimeRepositoryProvider)
-        .setActiveRegime(summary.regime.id);
+    await ref.read(regimeRepositoryProvider).setActiveRegime(summary.regime.id);
     messenger.showSnackBar(
       SnackBar(content: Text('Training ${summary.regime.name}')),
     );
   }
 
-  Future<void> _rename(BuildContext context, WidgetRef ref) async {
-    final name = await promptForText(
-      context,
-      title: 'Rename regime',
-      initial: summary.regime.name,
-    );
-    if (name == null || name.isEmpty) return;
-    await ref
-        .read(regimeRepositoryProvider)
-        .updateRegime(summary.regime.id, name: Value(name));
-  }
-
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+  Future<bool> _delete(BuildContext context, WidgetRef ref) async {
     final logged = summary.workoutCount;
     final ok = await confirmAction(
       context,
       title: 'Delete ${summary.regime.name}?',
       message: logged == 0
-          ? 'Its sessions and exercise slots go with it. Nothing has been '
-              'logged under this regime.'
-          : 'Its sessions and exercise slots go with it.\n\n'
+          ? 'Its days and exercise slots go with it. Nothing has been logged '
+              'under this regime.'
+          : 'Its days and exercise slots go with it.\n\n'
               'The $logged workout${logged == 1 ? '' : 's'} logged under it '
               'stay in History — each one holds its own record of what you '
               'actually did.',
       confirmLabel: 'Delete',
     );
-    if (!ok) return;
+    if (!ok) return false;
     await ref.read(regimeRepositoryProvider).deleteRegime(summary.regime.id);
+    return true;
   }
 }

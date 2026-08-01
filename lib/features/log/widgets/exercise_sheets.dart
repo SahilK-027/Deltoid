@@ -631,6 +631,8 @@ Future<Exercise?> showExerciseEditor(
   return showModalBottomSheet<Exercise>(
     context: context,
     isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
     builder: (_) => _ExerciseFormSheet(name: initialName, existing: existing),
   );
 }

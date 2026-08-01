@@ -18,6 +18,8 @@ Future<String?> createRegimeFlow(BuildContext context, WidgetRef ref) async {
   final template = await showModalBottomSheet<RegimeTemplate>(
     context: context,
     isScrollControlled: true,
+    // `SheetHeader` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
     builder: (_) => const _TemplateSheet(),
   );
   if (template == null || !context.mounted) return null;
@@ -41,6 +43,11 @@ Future<String?> createRegimeFlow(BuildContext context, WidgetRef ref) async {
   return createRegimeFromTemplate(db, template, name: trimmed);
 }
 
+/// Choice cards (THEME §7): the one genuinely branching decision this app has
+/// — start from a template, or from nothing — as a stack of outlined cards in a
+/// sheet rather than the first screen of a wizard. There is no radio and no
+/// confirm: picking one *is* the answer, and the next sheet asks the one other
+/// question there is.
 class _TemplateSheet extends StatelessWidget {
   const _TemplateSheet();
 
@@ -48,65 +55,64 @@ class _TemplateSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.sm),
-              child: Text('New regime', style: context.t.titleLarge),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-              child: Text(
-                'Start empty, or from a split you can edit freely afterwards. '
-                'Each session keeps its own progression.',
-                style: context.t.bodySmall,
-              ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(
-                    Space.lg, 0, Space.lg, Space.xl),
-                itemCount: regimeTemplates.length,
-                separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
-                itemBuilder: (context, i) {
-                  final t = regimeTemplates[i];
-                  return AppCard(
-                    padding: const EdgeInsets.all(Space.lg),
-                    onTap: () => Navigator.of(context).pop(t),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(t.name, style: context.t.titleSmall),
-                              const SizedBox(height: Space.xs),
-                              Text(t.summary, style: context.t.bodySmall),
-                              if (!t.isBlank) ...[
-                                const SizedBox(height: Space.sm),
-                                Text(
-                                  t.sessions.map((s) => s.name).join('  ·  '),
-                                  style: context.t.labelSmall,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.8,
+      child: Column(
+        children: [
+          const SheetHeader(
+            title: 'New regime',
+            // The sheet says what it will make, before it asks anything (§7).
+            subtitle: 'A split you can edit freely afterwards',
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                  Space.gutter, Space.lg, Space.gutter, Space.xl),
+              itemCount: regimeTemplates.length,
+              separatorBuilder: (_, _) => const SizedBox(height: Space.md),
+              itemBuilder: (context, i) {
+                final t = regimeTemplates[i];
+                return AppCard(
+                  radius: Radii.lg,
+                  outline: BorderSide(color: c.border),
+                  onTap: () => Navigator.of(context).pop(t),
+                  child: Row(
+                    children: [
+                      Icon(
+                        t.isBlank
+                            ? Icons.add_circle_outline_rounded
+                            : Icons.dashboard_outlined,
+                        size: 28,
+                        color: c.textPrimary,
+                      ),
+                      const SizedBox(width: Space.lg),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.name, style: context.t.titleMedium),
+                            const SizedBox(height: Space.xxs),
+                            Text(t.summary, style: context.t.bodyMedium),
+                            if (!t.isBlank) ...[
+                              const SizedBox(height: Space.sm),
+                              Text(
+                                t.sessions.map((s) => s.name).join('  ·  '),
+                                style: context.t.bodySmall
+                                    ?.copyWith(color: c.textTertiary),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
-                          ),
+                          ],
                         ),
-                        Icon(Icons.chevron_right, size: 18, color: c.textTertiary),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
