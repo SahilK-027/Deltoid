@@ -24,6 +24,31 @@ import 'history_screen.dart' show formatWeight;
 /// One line per session slot is the point, not a detail: 22.5kg in Push 1 and
 /// 20kg in Push 2 are two progressions, and drawing them as one is the mistake
 /// this whole app exists to avoid.
+/// What the chart and the rows under it are measuring.
+///
+/// Two, not four. A 3-RM and a 10-RM are the same Epley curve with a different
+/// constant, so a third tab would draw the same shape twice and ask you to
+/// notice it did. These two disagree with each other — an estimate that credits
+/// reps, and the number that was actually on the bar — which is the only reason
+/// a second metric is worth a tab.
+enum ExerciseMetric { e1rm, heaviest }
+
+extension ExerciseMetricX on ExerciseMetric {
+  String get label => switch (this) {
+        ExerciseMetric.e1rm => 'Est. 1RM',
+        ExerciseMetric.heaviest => 'Heaviest',
+      };
+
+  /// The figure this metric reads off one performance, in kg.
+  double? valueOf(ProgressPoint p) => switch (this) {
+        ExerciseMetric.e1rm => p.best1RM,
+        ExerciseMetric.heaviest => p.topSetLoad,
+      };
+}
+
+final exerciseMetricProvider =
+    StateProvider<ExerciseMetric>((ref) => ExerciseMetric.e1rm);
+
 enum ChartRange { threeMonths, year, all }
 
 extension ChartRangeX on ChartRange {
@@ -59,6 +84,7 @@ class ExerciseTrend extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final all = ref.watch(exerciseProgressProvider(exerciseId)).valueOrNull;
     final range = ref.watch(chartRangeProvider);
+    final metric = ref.watch(exerciseMetricProvider);
 
     // Nothing at all is the history screen's own empty state, not a chart's.
     if (all == null || all.isEmpty) return const SizedBox.shrink();
@@ -81,9 +107,9 @@ class ExerciseTrend extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: Space.lg),
-        _Chart(points: points),
+        _Chart(points: points, metric: metric),
         const SizedBox(height: Space.lg),
-        _Summary(all: all, windowed: points),
+        _Summary(all: all, windowed: points, metric: metric),
       ],
     );
   }
@@ -106,9 +132,10 @@ class _RangeChip extends ConsumerWidget {
 }
 
 class _Chart extends ConsumerWidget {
-  const _Chart({required this.points});
+  const _Chart({required this.points, required this.metric});
 
   final List<ProgressPoint> points;
+  final ExerciseMetric metric;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -142,7 +169,7 @@ class _Chart extends ConsumerWidget {
     final xs = source.map((p) => _x(p.dayKey)).toList();
     final minX = xs.reduce((a, b) => a < b ? a : b);
     final maxX = xs.reduce((a, b) => a > b ? a : b);
-    final ys = source.map((p) => p.best1RM ?? 0).toList();
+    final ys = source.map((p) => metric.valueOf(p) ?? 0).toList();
     final minY = ys.reduce((a, b) => a < b ? a : b);
     final maxY = ys.reduce((a, b) => a > b ? a : b);
     final pad = ((maxY - minY) * 0.15).clamp(2.0, 30.0);
@@ -213,7 +240,8 @@ class _Chart extends ConsumerWidget {
                   getTooltipItems: (spots) => [
                     for (final s in spots)
                       LineTooltipItem(
-                        '${formatWeight(s.y, unit)} ${unit.label} e1RM',
+                        '${formatWeight(s.y, unit)} ${unit.label} '
+                        '${metric.label.toLowerCase()}',
                         context.t.labelMedium!.copyWith(color: c.textPrimary),
                       ),
                   ],
@@ -224,7 +252,7 @@ class _Chart extends ConsumerWidget {
                   LineChartBarData(
                     spots: [
                       for (final p in bySession[names[i]]!)
-                        FlSpot(_x(p.dayKey), p.best1RM ?? 0),
+                        FlSpot(_x(p.dayKey), metric.valueOf(p) ?? 0),
                     ],
                     isCurved: false,
                     color: palette[i % palette.length],
@@ -286,28 +314,33 @@ class _Chart extends ConsumerWidget {
 }
 
 class _Summary extends ConsumerWidget {
-  const _Summary({required this.all, required this.windowed});
+  const _Summary({
+    required this.all,
+    required this.windowed,
+    required this.metric,
+  });
 
   final List<ProgressPoint> all;
   final List<ProgressPoint> windowed;
+  final ExerciseMetric metric;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final real = windowed.where((p) => !p.isDeload).toList();
-    final stalled = stalledSessions(real.map((p) => p.best1RM).toList());
+    final stalled = stalledSessions([for (final p in real) metric.valueOf(p)]);
 
     final best = all
         .where((p) => !p.isDeload)
-        .map((p) => p.best1RM)
+        .map(metric.valueOf)
         .whereType<double>()
         .fold<double?>(null, (a, b) => a == null || b > a ? b : a);
 
     // A percentage change needs two points. With one, "+0.0%" reads as
     // "no progress" when the truth is "not enough data yet".
-    final first = real.length >= 2 ? real.first.best1RM : null;
-    final last = real.length >= 2 ? real.last.best1RM : null;
+    final first = real.length >= 2 ? metric.valueOf(real.first) : null;
+    final last = real.length >= 2 ? metric.valueOf(real.last) : null;
     final delta = (first != null && last != null && first > 0)
         ? (last - first) / first * 100
         : null;
@@ -319,7 +352,7 @@ class _Summary extends ConsumerWidget {
           child: StatTile(
             value: best == null ? '—' : formatWeight(best, unit),
             unit: best == null ? null : unit.label,
-            label: 'best e1RM',
+            label: 'best ${metric.label.toLowerCase()}',
           ),
         ),
         Expanded(

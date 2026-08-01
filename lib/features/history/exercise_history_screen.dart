@@ -63,9 +63,58 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
     final exercise = ref.watch(_exerciseProvider(widget.exerciseId)).valueOrNull;
     final history = ref.watch(exerciseHistoryProvider(widget.exerciseId));
 
+    final metric = ref.watch(exerciseMetricProvider);
+
     return Scaffold(
-      appBar: AppBar(title: Text(exercise?.name ?? 'Exercise')),
-      body: history.when(
+      body: Column(
+        children: [
+          // The metric strip pins under the title while the chart scrolls away
+          // beneath it (THEME §5): the thing you change stays reachable, the
+          // thing you read does not hold half the screen for ever.
+          HeaderBand(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      Space.sm, Space.sm, Space.gutter, 0),
+                  child: Row(
+                    children: [
+                      CircleIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        fill: Colors.transparent,
+                        onTap: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                PageHeader(
+                  title: exercise?.name ?? 'Exercise',
+                  belowGap: Space.lg,
+                  below: SegmentedPill<ExerciseMetric>(
+                    expand: true,
+                    value: metric,
+                    onChanged: (m) =>
+                        ref.read(exerciseMetricProvider.notifier).state = m,
+                    segments: [
+                      for (final m in ExerciseMetric.values)
+                        (value: m, label: m.label),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: _body(history, exercise)),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(
+    AsyncValue<PagedHistory<ExercisePerformance>> history,
+    Exercise? exercise,
+  ) {
+    return history.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
@@ -86,21 +135,27 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
           // The trend rides at the head of the list rather than pinning: it is
           // a summary, not a control, and pinned it costs half a phone screen
           // while you are reading the performances under it.
+          //
+          // Rows are grouped by month, the same grouping the session feed uses,
+          // so a year of one movement reads as a year rather than as a run of
+          // dates.
+          final rows = _rowsFor(page.items);
+
           return ListView.separated(
             controller: _controller,
             padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.md, Space.lg, Space.huge),
-            itemCount: page.items.length + 2,
+                Space.gutter, Space.md, Space.gutter, Space.huge),
+            itemCount: rows.length + 2,
             separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
             itemBuilder: (context, i) {
               if (i == 0) {
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: Space.lg),
+                  padding: const EdgeInsets.only(bottom: Space.xl),
                   child: ExerciseTrend(exerciseId: widget.exerciseId),
                 );
               }
               i -= 1;
-              if (i == page.items.length) {
+              if (i == rows.length) {
                 return page.hasMore
                     ? const Padding(
                         padding: EdgeInsets.symmetric(vertical: Space.xl),
@@ -124,15 +179,38 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
                         ),
                       );
               }
+              final row = rows[i];
+              if (row.heading != null) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: Space.lg),
+                  child: SectionHeader(row.heading!),
+                );
+              }
               return _PerformanceCard(
-                performance: page.items[i],
+                performance: row.performance!,
                 exercise: exercise,
               );
             },
           );
         },
-      ),
-    );
+      );
+  }
+
+  /// Flattens performances into month headings + rows, newest first.
+  static List<({String? heading, ExercisePerformance? performance})> _rowsFor(
+    List<ExercisePerformance> items,
+  ) {
+    final out = <({String? heading, ExercisePerformance? performance})>[];
+    String? current;
+    for (final p in items) {
+      final month = DateFormat('MMMM yyyy').format(dateFromDayKey(p.dayKey));
+      if (month != current) {
+        current = month;
+        out.add((heading: month, performance: null));
+      }
+      out.add((heading: null, performance: p));
+    }
+    return out;
   }
 }
 
@@ -161,6 +239,7 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
     final exercise = widget.exercise;
     final c = context.c;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+    final metric = ref.watch(exerciseMetricProvider);
     final date = dateFromDayKey(performance.dayKey);
     final done = performance.sets.where((s) => s.isDone).toList();
     final skipped = performance.skipReason != SkipReason.none;
@@ -175,24 +254,40 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The number leads and the day captions it. This is a *metric*
+          // screen — you came to see how the movement moved — where the session
+          // feed puts the date first because there the day is the subject.
+          // Same row, inverted, and the inversion is the information.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                DateFormat('d MMM yyyy').format(date),
-                style: context.t.titleSmall,
-              ),
-              const SizedBox(width: Space.sm),
-              Flexible(
-                child: Text(
-                  performance.sessionName,
-                  style: context.t.labelSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _headline(performance, metric, unit),
+                      style: context.t.titleMedium,
+                    ),
+                    const SizedBox(height: Space.xxs),
+                    Text(
+                      '${DateFormat('EEE, d MMM yyyy').format(date)} · '
+                      '${performance.sessionName}',
+                      style: context.t.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              if (performance.isDeload) Pill('Deload', color: c.deload),
-              if (skipped) Pill(performance.skipReason.label, color: c.negative),
+              if (performance.isDeload) ...[
+                const SizedBox(width: Space.sm),
+                Pill('Deload', color: c.deload),
+              ],
+              if (skipped) ...[
+                const SizedBox(width: Space.sm),
+                Pill(performance.skipReason.label, color: c.negative),
+              ],
               if (canExpand) ...[
                 const SizedBox(width: Space.sm),
                 Icon(
@@ -216,22 +311,13 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
               style: context.t.labelSmall,
             )
           else ...[
+            // Every set as it was logged. The metric's own figure is the
+            // headline above, so repeating it here in prose would be the same
+            // number twice on one row (rule 6).
             Text(
               done.map((s) => _setLabel(s, exercise, unit)).join('   '),
-              style: context.t.labelLarge,
+              style: context.t.bodyMedium,
             ),
-            if (performance.best1RM != null) ...[
-              const SizedBox(height: Space.xs),
-              Text(
-                'Best e1RM ${formatWeight(performance.best1RM!, unit)} '
-                '${unit.label}'
-                '${performance.topSetLoad == null ? '' : '  ·  top set '
-                    '${formatWeight(performance.topSetLoad!, unit)} '
-                    '${unit.label}'
-                    '${performance.topSetReps == null ? '' : ' × ${performance.topSetReps}'}'}',
-                style: context.t.labelSmall,
-              ),
-            ],
             if (_expanded && done.isNotEmpty) ...[
               const SizedBox(height: Space.md),
               Divider(color: c.border, height: 1),
@@ -247,6 +333,24 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
         ],
       ),
     );
+  }
+
+  /// What this performance came to, in the metric being viewed. A day with
+  /// nothing scoreable in it says so rather than printing a zero (rule 4).
+  static String _headline(
+    ExercisePerformance p,
+    ExerciseMetric metric,
+    WeightUnit unit,
+  ) {
+    final value = switch (metric) {
+      ExerciseMetric.e1rm => p.best1RM,
+      ExerciseMetric.heaviest => p.topSetLoad,
+    };
+    if (value == null) return '—';
+    final reps = metric == ExerciseMetric.heaviest && p.topSetReps != null
+        ? ' × ${p.topSetReps}'
+        : '';
+    return '${formatWeight(value, unit)} ${unit.label}$reps';
   }
 
   /// `22.5×8`, with the set type appended when it is not a plain working set.
