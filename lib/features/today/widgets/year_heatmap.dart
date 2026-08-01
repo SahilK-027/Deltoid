@@ -46,7 +46,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
   /// axis the year gets. The weekday column went with the old layout: three
   /// letters down the left cost a tenth of the width to answer a question
   /// nobody opens this screen with, and losing it makes every cell bigger.
-  static const _monthRow = 18.0;
+  static const _monthRow = 16.0;
 
   @override
   Widget build(BuildContext context) {
@@ -109,10 +109,13 @@ class _YearHeatmapState extends State<YearHeatmap> {
                 ),
               ),
             ),
-            // The readout replaces 366 tooltips. Empty until something is
-            // tapped, and it keeps its height so the grid below never jumps.
+            // The readout replaces 366 tooltips. It keeps its height whether
+            // or not a day is picked, so nothing below it jumps — and it is a
+            // row of this block rather than an overhang, which is what left
+            // the card with more space under the grid than over it.
+            const SizedBox(height: Space.sm),
             SizedBox(
-              height: 20,
+              height: 18,
               child: Text(
                 _caption(),
                 style: context.t.bodySmall,
@@ -162,6 +165,16 @@ class _YearHeatmapState extends State<YearHeatmap> {
     final key = dayKeyOf(date);
     setState(() => _picked = key == _picked ? null : key);
   }
+}
+
+/// Where one month sits along the width of the year.
+class _Span {
+  const _Span({required this.left, required this.right});
+
+  final double left;
+  final double right;
+
+  double get width => right - left;
 }
 
 /// Colours resolved once, on the widget side. A painter has no `BuildContext`,
@@ -226,7 +239,9 @@ class _YearPainter extends CustomPainter {
       ..strokeWidth = cell < 6 ? 0.8 : 1;
 
     var lastMonth = -1;
-    final monthStarts = <int, double>{};
+    // Where each month begins and ends along the width, so the strip below is
+    // laid out from the same geometry the cells were.
+    final spans = <int, _Span>{};
 
     for (var w = 0; w < weeks; w++) {
       for (var d = 0; d < 7; d++) {
@@ -255,50 +270,67 @@ class _YearPainter extends CustomPainter {
           );
         }
 
-        // Remember where each month starts, so the strip below can be laid
-        // out from the same geometry the cells were.
-        if (d == 0 && date.month != lastMonth) {
+        final x = w * (cell + gap);
+        if (date.month != lastMonth) {
           lastMonth = date.month;
-          monthStarts[date.month] = w * (cell + gap);
+          spans[date.month] = _Span(left: x, right: x + cell);
+        } else {
+          final span = spans[date.month];
+          if (span != null && x + cell > span.right) {
+            spans[date.month] = _Span(left: span.left, right: x + cell);
+          }
         }
       }
     }
 
-    _months(canvas, size, monthStarts);
+    _months(canvas, size, spans);
   }
 
-  /// Twelve labels under the grid, each above the week its month begins.
+  /// Twelve labels under the grid, one centred on each month's own columns.
   ///
-  /// Under, not over: a label sitting on top of the first row reads as part of
-  /// the grid and squeezes the cells. And all twelve, because a year that only
-  /// admits to four quarters is harder to read a gap in — the reference does
-  /// the same, and it is the thing that makes a dense year navigable.
-  void _months(Canvas canvas, Size size, Map<int, double> starts) {
+  /// Centred rather than left-aligned on the week a month starts: a month is
+  /// four or five columns wide, so anchoring to its first week pushes every
+  /// label left of the block it names and makes December fall off the end.
+  ///
+  /// All twelve, always. They used to be dropped when two would have touched,
+  /// which is how a year ended up labelled Jan, Apr, Jul, Oct — the type
+  /// shrinks to fit instead, down to a floor, because a missing month is worse
+  /// than a small one.
+  void _months(Canvas canvas, Size size, Map<int, _Span> spans) {
+    if (spans.isEmpty) return;
     final top = 7 * cell + 6 * gap + gap * 2;
-    // Every month is labelled, and the collision guard below is what thins
-    // them — not a rule about cell size. A month is four or five columns, and
-    // at `micro` a three-letter label is narrow enough that twelve of them fit
-    // a phone; deciding up front to print four was throwing away labels that
-    // had room.
-    var previousRight = -1.0;
-    for (var month = 1; month <= 12; month++) {
-      final x = starts[month];
-      if (x == null) continue;
 
-      final painter = TextPainter(
-        text: TextSpan(
-          text: _monthName(month),
-          style: labelStyle.copyWith(color: colours.label),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+    // The narrowest month decides the size for all of them, so the strip stays
+    // one typeface at one size rather than a ragged mix.
+    final slot = spans.values
+        .map((s) => s.width)
+        .reduce((a, b) => a < b ? a : b);
 
-      // Never let two labels touch, whatever the arithmetic says.
-      if (x < previousRight + 4) continue;
-      previousRight = x + painter.width;
-      painter.paint(canvas, Offset(x, top));
+    var style = labelStyle.copyWith(color: colours.label);
+    var painters = _measure(style);
+    final widest =
+        painters.values.map((p) => p.width).reduce((a, b) => a > b ? a : b);
+    if (widest > slot - 2) {
+      final scale = ((slot - 2) / widest).clamp(0.62, 1.0);
+      style = style.copyWith(fontSize: (style.fontSize ?? 11) * scale);
+      painters = _measure(style);
+    }
+
+    for (final entry in spans.entries) {
+      final painter = painters[entry.key];
+      if (painter == null) continue;
+      final centre = entry.value.left + entry.value.width / 2;
+      painter.paint(canvas, Offset(centre - painter.width / 2, top));
     }
   }
+
+  Map<int, TextPainter> _measure(TextStyle style) => {
+        for (var month = 1; month <= 12; month++)
+          month: TextPainter(
+            text: TextSpan(text: _monthName(month), style: style),
+            textDirection: TextDirection.ltr,
+          )..layout(),
+      };
 
   Color _colourFor(HeatDay? day, {required bool isFuture}) {
     if (isFuture) return colours.future;

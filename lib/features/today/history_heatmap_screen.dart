@@ -103,8 +103,10 @@ class _Years extends StatelessWidget {
                     '${(byYear[year] ?? 0) == 1 ? '' : 's'}',
               ),
               AppCard(
-                padding: const EdgeInsets.fromLTRB(
-                    Space.md, Space.md, Space.md, Space.sm),
+                // Even on all four sides. The grid and its readout are one
+                // block now, so the card has no reason to hold its breath at
+                // the bottom.
+                padding: const EdgeInsets.all(Space.md),
                 child: YearHeatmap(
                   year: year,
                   days: days,
