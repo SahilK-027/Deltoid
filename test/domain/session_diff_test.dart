@@ -81,6 +81,19 @@ void main() {
       ]);
     });
 
+    test('a movement done twice in one day is offered once', () {
+      // Bench at the start and a back-off set of it at the end is one
+      // decision, and two adds would write two slots for one movement.
+      final changes = diffSession(
+        template: refs(['ohp']),
+        logged: refs(['bench', 'ohp', 'bench']),
+      );
+      expect(
+        changes.where((c) => c.kind == SessionChangeKind.added),
+        hasLength(1),
+      );
+    });
+
     test('a workout logged with no template offers everything as an add', () {
       final changes = diffSession(template: const [], logged: refs(['bench']));
       expect(changes.single.kind, SessionChangeKind.added);

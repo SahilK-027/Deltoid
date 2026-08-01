@@ -153,10 +153,24 @@ class _Chart extends ConsumerWidget {
       );
     }
 
+    // A performance the metric cannot score is not a zero. Chin-ups with no
+    // bodyweight ever logged have no load and no e1RM, and plotting them at 0
+    // drew a flat line along the axis and called it a year of training.
+    final scored =
+        points.where((p) => metric.valueOf(p) != null).toList();
+    if (scored.length < 2) {
+      return EmptyBox(
+        icon: Icons.timeline,
+        message: scored.isEmpty
+            ? 'Nothing here to measure as ${metric.label.toLowerCase()}.'
+            : 'One session so far — a second one gives this a trend.',
+      );
+    }
+
     // Deload weeks are excluded: a deliberately light week is not a regression,
     // and plotting it as one makes the chart lie.
-    final real = points.where((p) => !p.isDeload).toList();
-    final source = real.length >= 2 ? real : points;
+    final real = scored.where((p) => !p.isDeload).toList();
+    final source = real.length >= 2 ? real : scored;
 
     final bySession = <String, List<ProgressPoint>>{};
     for (final p in source) {
@@ -169,7 +183,7 @@ class _Chart extends ConsumerWidget {
     final xs = source.map((p) => _x(p.dayKey)).toList();
     final minX = xs.reduce((a, b) => a < b ? a : b);
     final maxX = xs.reduce((a, b) => a > b ? a : b);
-    final ys = source.map((p) => metric.valueOf(p) ?? 0).toList();
+    final ys = source.map((p) => metric.valueOf(p)!).toList();
     final minY = ys.reduce((a, b) => a < b ? a : b);
     final maxY = ys.reduce((a, b) => a > b ? a : b);
     final pad = ((maxY - minY) * 0.15).clamp(2.0, 30.0);
@@ -252,7 +266,7 @@ class _Chart extends ConsumerWidget {
                   LineChartBarData(
                     spots: [
                       for (final p in bySession[names[i]]!)
-                        FlSpot(_x(p.dayKey), metric.valueOf(p) ?? 0),
+                        FlSpot(_x(p.dayKey), metric.valueOf(p)!),
                     ],
                     isCurved: false,
                     color: palette[i % palette.length],

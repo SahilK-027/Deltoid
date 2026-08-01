@@ -187,6 +187,11 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
                 );
               }
               return _PerformanceCard(
+                // Keyed by the workout it came from. Without it the expansion
+                // state belongs to a *position*, and a month heading appearing
+                // above a row — or a day being backdated — hands one row's open
+                // set list to another.
+                key: ValueKey(row.performance!.workoutId),
                 performance: row.performance!,
                 exercise: exercise,
               );
@@ -221,7 +226,11 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
 /// forever without ever arriving anywhere new. Everything the row could send
 /// you looking for — every set, its type and its note — opens here instead.
 class _PerformanceCard extends ConsumerStatefulWidget {
-  const _PerformanceCard({required this.performance, required this.exercise});
+  const _PerformanceCard({
+    super.key,
+    required this.performance,
+    required this.exercise,
+  });
 
   final ExercisePerformance performance;
   final Exercise? exercise;

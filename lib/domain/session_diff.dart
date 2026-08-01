@@ -69,14 +69,19 @@ List<SessionChange> diffSession({
 
   final changes = <SessionChange>[];
 
+  // Deduped: the same movement can legitimately appear twice in one workout
+  // (bench at the start, a back-off set of it at the end), and offering "Add
+  // bench" twice would ask one question two ways — and, if both were ticked,
+  // write two slots for one movement.
+  final offered = <String>{};
   for (final e in logged) {
-    if (!templateIds.contains(e.exerciseId)) {
-      changes.add(SessionChange(
-        kind: SessionChangeKind.added,
-        exerciseIds: [e.exerciseId],
-        label: 'Added ${e.name}',
-      ));
-    }
+    if (templateIds.contains(e.exerciseId)) continue;
+    if (!offered.add(e.exerciseId)) continue;
+    changes.add(SessionChange(
+      kind: SessionChangeKind.added,
+      exerciseIds: [e.exerciseId],
+      label: 'Added ${e.name}',
+    ));
   }
 
   for (final e in template) {

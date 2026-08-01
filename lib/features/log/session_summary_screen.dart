@@ -296,8 +296,11 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
     final changes =
         ref.watch(sessionChangesProvider(widget.workoutId)).valueOrNull ??
             const [];
-    if (changes.isEmpty) return const SizedBox.shrink();
 
+    // Answered first, empty second. Applying a change makes the diff empty by
+    // definition, so testing `changes.isEmpty` before `_saved` meant the
+    // section could vanish mid-interaction and take its own confirmation with
+    // it — the moment anything else on the screen invalidated the provider.
     if (_saved) {
       final kept = _picked.length;
       return Padding(
@@ -325,6 +328,8 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
         ),
       );
     }
+
+    if (changes.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.section),
