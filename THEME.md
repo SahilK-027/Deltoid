@@ -393,8 +393,12 @@ Chest    ██████████             6 sets
 Arms     ██████████████         8 sets
 ```
 
-- Rows sort **descending by count**, so the shape of the week reads top to
-  bottom without a scale to interpret.
+- Rows are in **`MuscleGroup` order and never re-sorted** — chest, back,
+  shoulders, arms, legs, core. A list that reorders itself as you train puts
+  chest in a different place every week, so reading it means finding the row
+  first; fixed, the position *is* the label and a gap is visible at a glance.
+  Sorting by count would make the biggest bar first, which is the one fact the
+  bar lengths already tell you.
 - The bar is normalised to the **largest muscle that week**, not to a target.
   This app has no volume targets and inventing one would be advice, not a
   measurement (README non-goals).

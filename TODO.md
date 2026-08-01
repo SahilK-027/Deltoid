@@ -504,9 +504,10 @@ skipped it.
   muscle volume second. Nothing moves below the fold and nothing is deleted.
 
   The block itself is a **horizontal bar list**, specced in THEME §5 → Muscle
-  volume bars: one row per muscle, name left, bar, count right, sorted
-  descending, normalised to the biggest muscle that week rather than to a
-  target this app has no business inventing.
+  volume bars: one row per muscle, name left, bar, count right, in fixed
+  `MuscleGroup` order — never re-sorted, so a row stays where you last looked
+  for it — normalised to the biggest muscle that week rather than to a target
+  this app has no business inventing.
 
   The pager is the *only* horizontal gesture outside the log, and the log's
   axis stays untouchable (invariant 4). First page is always the action: a
