@@ -265,11 +265,15 @@ class _Generator {
 
   final _sessionIds = <String>[];
 
-  /// The working weight each *slot* is on, keyed session+exercise — never by
-  /// exercise alone. Bench in Push 1 and bench in Push 2 progress separately,
-  /// and collapsing them here would generate exactly the data that hides the
-  /// bug this app was written to avoid.
-  final _working = <String, double>{};
+  /// How many times each *slot* has been trained, keyed session+exercise —
+  /// never by exercise alone. Bench in Push 1 and bench in Push 2 progress
+  /// separately, and collapsing them here would generate exactly the data that
+  /// hides the bug this app was written to avoid.
+  final _sessionsOn = <String, int>{};
+
+  /// A little permanent noise per slot, so two sessions running the same
+  /// movement do not converge on identical numbers.
+  final _slotBias = <String, double>{};
 
   void _train(String regimeId, RegimeTemplate template, DateTime start) {
     var day = start;
@@ -424,14 +428,31 @@ class _Generator {
     required bool stopEarly,
   }) {
     final bodyweightOnly = exercise.loadMode == LoadMode.bodyweight;
-    final base = _working[slotKey] ?? _startingLoad(exercise);
 
-    // Progress, but not on rails: a rep added most sessions, weight when the
-    // top of the rep range is reached, and a plateau every so often that lasts
-    // a few sessions. A dataset that only goes up tests nothing.
-    final stalling = random.nextInt(6) == 0;
-    final next = stalling ? base : base + _increment(exercise);
-    if (!isDeload) _working[slotKey] = next;
+    // Progress towards a ceiling, not in a straight line. Adding a fixed
+    // increment every session is fine for a month and absurd for a decade —
+    // it produced 900kg deadlifts and lateral raises no human has held. Real
+    // training is fast at the start, slower as it goes, and then a plateau you
+    // wobble around for years.
+    if (!isDeload) {
+      _sessionsOn[slotKey] = (_sessionsOn[slotKey] ?? 0) + 1;
+    }
+    final n = _sessionsOn[slotKey] ?? 1;
+    final start = _startingLoad(exercise);
+    final ceiling = _ceiling(exercise);
+    final bias = _slotBias.putIfAbsent(
+      slotKey,
+      () => 0.92 + random.nextDouble() * 0.16,
+    );
+
+    // Asymptotic: two thirds of the way from novice to ceiling in ~60
+    // sessions, and creeping after that.
+    final progressed =
+        start + (ceiling * bias - start) * (1 - exp(-n / 55));
+    // Week-to-week noise, and the occasional session that goes backwards —
+    // sleep, food, a bad week. A line that only rises tests nothing.
+    final wobble = 1 + (random.nextDouble() - 0.5) * 0.05;
+    final next = _round(progressed * wobble);
 
     final load = isDeload ? _round(next * 0.8) : next;
     final targetSets = isDeload ? (slot.sets - 1).clamp(1, 10) : slot.sets;
@@ -463,25 +484,81 @@ class _Generator {
     }
   }
 
+  /// Where an untrained-ish lifter starts, in kg.
   double _startingLoad(StarterExercise e) => switch (e.loadMode) {
         LoadMode.bodyweight => 0,
         LoadMode.bodyweightPlus => 0,
-        LoadMode.perSide => 10 + random.nextInt(6) * 2.5,
-        LoadMode.total => e.equipment == Equipment.barbell
-            ? 40 + random.nextInt(8) * 2.5
-            : 20 + random.nextInt(8) * 2.5,
+        LoadMode.perSide => 8,
+        LoadMode.total => e.equipment == Equipment.barbell ? 30 : 15,
       };
 
-  /// Small, and smaller on isolation work — a year of 2.5kg jumps on a lateral
-  /// raise would end at a number no human has ever lifted.
-  double _increment(StarterExercise e) {
-    if (e.loadMode == LoadMode.bodyweight) return 0;
-    final base = switch (e.muscle) {
-      MuscleGroup.quads || MuscleGroup.glutes || MuscleGroup.hamstrings => 1.25,
-      MuscleGroup.chest || MuscleGroup.back => 0.6,
-      _ => 0.3,
+  /// Roughly what a committed amateur around 75kg tops out at, per movement —
+  /// an experienced lifter, not a competitor, and nowhere near a record.
+  ///
+  /// Per movement rather than per muscle group, because the group is the wrong
+  /// unit: a leg press and a leg extension are both "quads on a machine" and
+  /// differ by a factor of three. Guessing from the group gave a hamstring curl
+  /// a heavier ceiling than an overhead press.
+  ///
+  /// `perSide` numbers are **one dumbbell** — 36 means a pair of 36s. Belted
+  /// bodyweight work is the added load only.
+  double _ceiling(StarterExercise e) {
+    const byKey = <String, double>{
+      // Push
+      'barbell_bench': 105,
+      'incline_barbell_bench': 85,
+      'flat_db_bench': 38,
+      'incline_db_press': 32,
+      'chest_fly': 22,
+      'cable_crossover': 25,
+      'overhead_press': 65,
+      'seated_ohp_db': 26,
+      'lateral_raise_db': 14,
+      'lateral_raise_machine': 30,
+      'triceps_pushdown': 40,
+      'skullcrusher': 40,
+      'overhead_tri_ext': 30,
+      // Pull
+      'lat_pulldown': 75,
+      'seated_row': 80,
+      'barbell_row': 90,
+      'db_row': 40,
+      'straight_arm_pulldown': 35,
+      'shrug': 120,
+      'reverse_pec_deck': 35,
+      'face_pull': 30,
+      'barbell_curl': 45,
+      'incline_db_curl': 16,
+      'preacher_curl': 30,
+      'hammer_curl': 18,
+      'reverse_curl': 25,
+      'wrist_curl': 25,
+      // Legs
+      'back_squat': 140,
+      'front_squat': 100,
+      'leg_press': 220,
+      'leg_extension': 85,
+      'bulgarian_split_squat': 24,
+      'deadlift': 180,
+      'rdl': 120,
+      'hamstring_curl': 60,
+      'hip_thrust': 150,
+      'standing_calf_raise': 110,
+      'seated_calf_raise': 80,
+      // Core / belted bodyweight
+      'cable_crunch': 45,
+      'dips': 30,
+      'pullup': 25,
+      'chinup': 25,
     };
-    return random.nextInt(3) == 0 ? 0 : base;
+
+    final known = byKey[e.key];
+    if (known != null) return known;
+
+    if (e.loadMode == LoadMode.bodyweight) return 0;
+    if (e.loadMode == LoadMode.bodyweightPlus) return 25;
+    if (e.loadMode == LoadMode.perSide) return 20;
+    return e.equipment == Equipment.barbell ? 70 : 50;
   }
 
   double _round(double kg) => (kg * 2).round() / 2;

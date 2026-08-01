@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -57,6 +58,42 @@ void main() {
       reason: 'a chunk went missing',
     );
   });
+
+  test('nobody deadlifts 900kg after fifty years', () async {
+    // Progression used to be a fixed increment per session, which is fine for
+    // a month and absurd for a decade: it produced barbell numbers no human
+    // has lifted and lateral raises heavier than the bar. Loads approach a
+    // ceiling instead, so a long history plateaus like a real one.
+    await BackupService(db).restore(
+      jsonEncode(buildSeedPayload(years: 50, seed: 5)),
+    );
+
+    final rows = await (db.select(db.setLogs).join([
+      innerJoin(
+        db.workoutExercises,
+        db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId),
+      ),
+      innerJoin(
+        db.exercises,
+        db.exercises.id.equalsExp(db.workoutExercises.exerciseId),
+      ),
+    ])).get();
+
+    for (final row in rows) {
+      final weight = row.readTable(db.setLogs).weight;
+      if (weight == null) continue;
+      final exercise = row.readTable(db.exercises);
+      // Generous on purpose: this is a guard against a decade of linear
+      // increments, not a judgement on anyone's leg press. A 220kg leg press
+      // is a real number; a 900kg deadlift is a bug.
+      final limit = exercise.loadMode == LoadMode.perSide ? 50.0 : 260.0;
+      expect(
+        weight,
+        lessThanOrEqualTo(limit),
+        reason: '${exercise.name} reached $weight kg',
+      );
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   test('the data it writes is the shape the app reads', () async {
     await BackupService(db).restore(
