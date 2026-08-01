@@ -157,7 +157,7 @@ class _NavItem extends StatelessWidget {
             duration: Motion.base,
             curve: Motion.spring,
             child: destination.icon == null
-                ? PlateIcon(size: 24, color: tint, filled: selected)
+                ? PlateIcon(size: 27, color: tint, filled: selected)
                 : Icon(
                     selected ? destination.active : destination.icon,
                     size: 24,
