@@ -357,12 +357,6 @@ SQLite.
 
 ## Not built
 
-- **Records on the summary screen** — the end-of-session screen prints sets,
-  volume and time, but not what was *beaten*. Doing it properly means resolving
-  prefill for every exercise a second time on a screen that opens after the
-  write, so it was left out rather than half-done off the ghost values still in
-  memory.
-
 - **Supabase sync** — schema, RLS, magic-link auth, push dirty rows / pull since
   `last_pull_at`, LWW merge on `updated_at`, tombstones. **Blocked:** needs the
   project URL + anon key. Every table already carries the sync columns (`id`,
@@ -381,3 +375,72 @@ SQLite.
 3. iOS verification once Xcode exists.
 4. Per-exercise deload overrides — the columns exist
    (`session_exercises.deload_set_delta` / `deload_weight_pct`), no UI yet.
+
+---
+
+## Wanted, not designed yet
+
+Asked for and agreed; none of it is specified, and each one has a decision in
+front of it that has to be made before any code. Check the README's
+**Non-goals** before starting any of them — the answer there is usually no, and
+these are on this list because they survived that check, not because they
+skipped it.
+
+- **Records on the summary screen.** The end of a session prints sets, volume
+  and time, but never says what was *beaten*. `beatsPrevious` already answers
+  it live in the log, per set, against the same slot last time — the summary
+  cannot reuse that because it opens *after* `completeWorkout`, when the ghosts
+  are gone. Doing it honestly means re-resolving prefill for every exercise on
+  that screen. Cheap to fold into step 4, which is in that code anyway.
+
+- **All-time PRs.** A separate feature from the above, and the harder one,
+  because it is the first thing in this app that would deliberately cross the
+  session boundary. `beatsPrevious` compares against *this session's* last
+  time, so a 100kg bench in Push 1 lights up green over last week's 97.5 even
+  when 105 is sitting in Push 2's history.
+
+  **Decide first:** is a PR per exercise across every session, or per
+  session-slot? Global is what "my best ever bench" means to a person;
+  session-scoped is the thesis of the whole app. Getting this wrong turns the
+  one rule the app exists for into a footnote. Worth seeing step 4's chart
+  first — it may already answer the question, and then the badge is redundant.
+
+- **Weekly sets per muscle.** The volume figure that actually drives
+  programming decisions, and the one thing this log cannot currently answer:
+  "am I doing enough for side delts". `exercises.muscle` is already an enum on
+  every row, so the data is there and this is a pure aggregation over a rolling
+  seven days — `domain/`, tested without a database.
+
+  **Decide first:** what counts. Working sets only, or warm-ups too (no).
+  Direct muscle only, or fractional credit for secondaries (there is no
+  secondary-muscle column, so: direct only, and say so). A deload week counted
+  or excluded — the consistency rate has the same problem and already made this
+  choice once; follow it.
+
+- **Weekly sets per muscle on Today.** The surface for the above. Today is
+  already the busiest screen in the app and rule 6 is the one it breaks most,
+  so this arrives as *one* block or not at all — most likely a short bar list
+  under the heatmap, muscle name and count, no chart. It replaces nothing; it
+  has to earn its height against the consistency grid.
+
+- **Muscle chip on every exercise.** `muscle` is rendered as text in the
+  catalog and nowhere else. As a chip on the exercise row it makes the catalog
+  filterable by tapping what you can see, which is what the picker mid-session
+  actually needs — you are looking for "a triceps thing that is free", not
+  scrolling an alphabet. Ties directly into the filter chips step 5 already
+  plans for the catalog picker.
+
+- **Isometric holds.** Planks, dead hangs, L-sits, wall sits. **The only item
+  here that needs a migration**, and the reason it is not trivial: a set is
+  currently `weight × reps`, and a hold is `load × seconds`. That is a third
+  measurement axis, and it lands in the middle of everything — `SetLog` needs a
+  duration, the keypad needs a seconds mode, `effectiveLoad` and `estimated1RM`
+  need to refuse to score it (a 90-second plank has no 1RM), prefill has to
+  suggest a time instead of a weight, and the set row has to render `2:00`
+  where it renders `60 kg × 8`.
+
+  **Decide first:** is a hold a new `SetType`, or a property of the *exercise*
+  (a `MeasureMode` beside `LoadMode`)? Exercise-level is almost certainly
+  right — a plank is never sometimes reps — and it keeps every set of that
+  movement consistent instead of letting one row be reps and the next be time.
+  The rest of the app can then branch on one enum in one place.
