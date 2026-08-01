@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/tokens.dart';
 import '../history/history_screen.dart';
-import '../progress/progress_screen.dart';
 import '../regime/regime_screen.dart';
 import '../today/today_screen.dart';
 
@@ -22,7 +21,6 @@ class _AppShellState extends State<AppShell> {
   final _pages = const [
     TodayScreen(),
     HistoryScreen(),
-    ProgressScreen(),
     RegimeScreen(),
   ];
 
@@ -55,14 +53,12 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
+// Three, not four: the chart moved inside History (an exercise's trend is a
+// history question), so a fourth destination existed only to ask it again with
+// a worse picker. Settings takes the freed slot in step 4's third commit.
 const _destinations = [
   (icon: Icons.today_outlined, active: Icons.today_rounded, label: 'Today'),
   (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
-  (
-    icon: Icons.insights_outlined,
-    active: Icons.insights_rounded,
-    label: 'Progress'
-  ),
   (
     icon: Icons.dashboard_outlined,
     active: Icons.dashboard_rounded,

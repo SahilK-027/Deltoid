@@ -10,6 +10,7 @@ import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/units.dart';
+import 'exercise_trend.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
 
@@ -82,13 +83,23 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
             );
           }
 
+          // The trend rides at the head of the list rather than pinning: it is
+          // a summary, not a control, and pinned it costs half a phone screen
+          // while you are reading the performances under it.
           return ListView.separated(
             controller: _controller,
             padding: const EdgeInsets.fromLTRB(
                 Space.lg, Space.md, Space.lg, Space.huge),
-            itemCount: page.items.length + 1,
+            itemCount: page.items.length + 2,
             separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
             itemBuilder: (context, i) {
+              if (i == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: Space.lg),
+                  child: ExerciseTrend(exerciseId: widget.exerciseId),
+                );
+              }
+              i -= 1;
               if (i == page.items.length) {
                 return page.hasMore
                     ? const Padding(
