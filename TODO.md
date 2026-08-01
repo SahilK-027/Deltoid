@@ -22,23 +22,22 @@ a device before the next starts.
       feed rows, month headings, composed masthead, workout detail rebuilt.
       Session summary screen, notes at three levels, keep-today's-changes, and
       the sheet/link/subtitle rules now in THEME §5.
-- [ ] **4 · Progress folds into History, and the chart language gets built** —
-      the one structural step. Three commits, in this order:
+- [x] **4 · Progress folds into History, and the chart language gets built** —
+      three commits, as planned.
 
-      1. **Fold.** `progress_screen` becomes the exercise's own view inside
-         History; the Progress tab goes. "How has my bench moved" is a history
-         question, and the `Exercises` index is already the picker the Progress
-         tab opens with, done better. It deliberately does *not* fold into
-         Today, which is the busiest screen in the app.
-      2. **Chart language**, per THEME §5 → Charts and The metric screen: card
-         contract, metric tab strip (pinned) over a scrolling chart, value-first
-         rows, month-grouped list beneath.
-      3. **Rename the tabs** to `Workouts · Regime · History · Settings`.
-         "Today" backfills other days, so it was already lying. Settings takes
-         the freed slot because **bodyweight lives in it** and is not a setting.
+      1. **Fold.** `progress_screen` is gone; `exercise_trend.dart` puts the
+         chart at the head of an exercise's own history, where the list under it
+         is that exercise's performances. The tab's exercise picker went with
+         it — the `Exercises` index is that, done better.
+      2. **Metric screen.** Metric strip pinned in the header band while the
+         chart scrolls beneath, value-first rows (`92.5 kg × 5` over
+         `Sat, 12 Jul · Push 1`), month grouping. Two metrics — est. 1RM and
+         heaviest weight — because a 3-RM and a 10-RM are the same Epley curve
+         with a different constant.
+      3. **Rename.** `Workouts · Regime · History · Settings`. Settings is a
+         destination with a masthead, and Today's cog is gone with it.
 
-      Keep the metric tabs to **two** (1-RM, heaviest weight) unless a third
-      earns itself — 10-RM is the same curve as 1-RM with a different constant.
+      **Not yet driven on a device.**
 
 - [ ] **5 · Regime cluster** — regime screen, session editor, catalog, setup.
       Day tabs, count-as-heading, targets card + editor sheet, catalog picker
