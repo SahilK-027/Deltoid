@@ -14,9 +14,9 @@ import '../../domain/consistency.dart';
 import '../../domain/cycle_engine.dart';
 import '../history/workout_detail_screen.dart';
 import '../log/log_screen.dart';
+import '../log/widgets/exercise_sheets.dart';
 import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
-import '../regime/session_editor.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'today_providers.dart';
@@ -1133,11 +1133,16 @@ class _NextUpHero extends ConsumerWidget {
           SecondaryButton(
             label: 'Add exercises',
             icon: Icons.add_rounded,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SessionEditorScreen(sessionId: nextId),
-              ),
-            ),
+            // The picker, not a trip to the Regime tab: the session is one
+            // exercise away from being startable, and sending someone to
+            // another tab to fix it is three taps and a way back.
+            onPressed: () async {
+              final exercise = await pickExercise(context, ref);
+              if (exercise == null) return;
+              await ref
+                  .read(regimeRepositoryProvider)
+                  .addExerciseToSession(nextId, exercise.id);
+            },
           )
         else
           PrimaryButton(

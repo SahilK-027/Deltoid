@@ -1,5 +1,6 @@
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
+import 'package:deltoid/core/widgets/primitives.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/features/regime/regime_setup.dart';
@@ -71,7 +72,9 @@ void main() {
     // Nothing typed yet, so there is nothing to save — a blank name would
     // create a regime called "".
     expect(
-      tester.widget<TextButton>(find.widgetWithText(TextButton, 'Save')).onPressed,
+      tester
+          .widget<PrimaryButton>(find.widgetWithText(PrimaryButton, 'Save'))
+          .onPressed,
       isNull,
     );
 
@@ -85,14 +88,16 @@ void main() {
     expect(await db.select(db.sessions).get(), isEmpty);
   });
 
-  testWidgets('cancelling the name dialog creates nothing', (tester) async {
+  testWidgets('closing the name sheet creates nothing', (tester) async {
     await pumpHost(tester);
 
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Push / Pull / Legs · 6 day'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
+    // Naming is a sheet now, not a dialog: the way out is its ✕, not a text
+    // button paired with Save (THEME §5, §7).
+    await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
 
     expect(await db.select(db.regimes).get(), isEmpty);

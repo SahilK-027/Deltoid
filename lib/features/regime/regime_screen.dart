@@ -8,10 +8,13 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../domain/cycle_engine.dart';
+import '../../domain/enums.dart';
+import '../log/widgets/exercise_sheets.dart';
 import 'exercise_catalog_screen.dart';
 import 'regime_setup.dart';
+import 'regime_settings.dart';
 import 'regimes_screen.dart';
-import 'session_editor.dart';
+import 'session_slot_screen.dart';
 
 final regimeRepositoryProvider = Provider<RegimeRepository>(
   (ref) => RegimeRepository(ref.watch(databaseProvider)),
@@ -25,683 +28,13 @@ final regimeSummariesProvider = StreamProvider<List<RegimeSummary>>((ref) {
   return ref.watch(regimeRepositoryProvider).watchRegimeSummaries();
 });
 
-/// Exercise count per session, for the summary rows.
-final sessionSlotCountProvider =
-    StreamProvider.family<int, String>((ref, sessionId) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.sessionExercises)
-    ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull());
-  return query.watch().map((rows) => rows.length);
-});
-
-class RegimeScreen extends ConsumerWidget {
-  const RegimeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final regime = ref.watch(activeRegimeProvider).valueOrNull;
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
-    final status = ref.watch(cycleStatusProvider).valueOrNull;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Regime'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.fitness_center),
-            tooltip: 'Exercises',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ExerciseCatalogScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Regimes',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const RegimesScreen()),
-            ),
-          ),
-          const SizedBox(width: Space.sm),
-        ],
-      ),
-      body: regime == null
-          ? EmptyState(
-              icon: Icons.tune,
-              title: 'No regime yet',
-              message: 'Build your own split, or start from a template and '
-                  'edit it into shape.',
-              action: FilledButton(
-                onPressed: () => _createRegime(context, ref),
-                child: const Text('Create regime'),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(
-                  Space.lg, Space.sm, Space.lg, Space.huge),
-              children: [
-                _RegimeHeader(regime: regime, status: status),
-                if (status != null) ...[
-                  const SizedBox(height: Space.md),
-                  _CycleControls(status: status, sessions: sessions),
-                ],
-                const SizedBox(height: Space.xxl),
-                SectionLabel(
-                  'Sessions · one cycle',
-                  trailing: TextButton(
-                    onPressed: () => addSessionPrompt(context, ref, regime.id),
-                    child: const Text('Add'),
-                  ),
-                ),
-                _SessionList(sessions: sessions, regimeId: regime.id),
-                const SizedBox(height: Space.xxl),
-                const SectionLabel('Deload'),
-                _DeloadCard(regime: regime),
-              ],
-            ),
-    );
-  }
-
-  Future<void> _createRegime(BuildContext context, WidgetRef ref) =>
-      createRegimeFlow(context, ref);
-}
-
-class _RegimeHeader extends ConsumerWidget {
-  const _RegimeHeader({required this.regime, required this.status});
-
-  final Regime regime;
-  final CycleStatus? status;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
-    final all = ref.watch(regimeSummariesProvider).valueOrNull ?? const [];
-    final position = all.indexWhere((s) => s.regime.id == regime.id) + 1;
-
-    return AppCard(
-      padding: const EdgeInsets.all(Space.xl),
-      onTap: () => _rename(context, ref),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text('ACTIVE REGIME', style: context.t.labelSmall)),
-              Icon(Icons.edit_outlined, size: 14, color: c.textTertiary),
-            ],
-          ),
-          const SizedBox(height: Space.sm),
-          Text(regime.name, style: context.t.titleLarge),
-          // The other regimes are not gone, they are just not active. Saying so
-          // here is the difference between "switching" and "losing" one.
-          if (all.length > 1) ...[
-            const SizedBox(height: Space.sm),
-            InkWell(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const RegimesScreen()),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$position of ${all.length} regimes',
-                    style: context.t.labelMedium?.copyWith(color: c.accent),
-                  ),
-                  const SizedBox(width: Space.xs),
-                  Icon(Icons.chevron_right, size: 14, color: c.accent),
-                ],
-              ),
-            ),
-          ],
-          if (status != null) ...[
-            const SizedBox(height: Space.md),
-            Row(
-              children: [
-                Text('Cycle ${status!.cycleIndex}', style: context.t.bodyMedium),
-                Text('  ·  ', style: context.t.bodyMedium),
-                Text(
-                  status!.deloadEnabled
-                      ? (status!.isDeload
-                          ? 'deload in progress'
-                          : '${status!.cyclesUntilDeload} cycles to deload')
-                      : 'deload off',
-                  style: context.t.bodyMedium?.copyWith(
-                    color: status!.isDeload ? c.deload : c.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _rename(BuildContext context, WidgetRef ref) async {
-    final name = await promptForText(
-      context,
-      title: 'Rename regime',
-      initial: regime.name,
-    );
-    if (name == null || name.isEmpty) return;
-    await ref
-        .read(regimeRepositoryProvider)
-        .updateRegime(regime.id, name: Value(name));
-  }
-}
-
-/// The two cycle overrides, which existed in the repository long before they
-/// existed on screen.
-///
-/// Without "Close this cycle" a session you permanently skip stalls the
-/// programme: the cycle never closes, the cycle index never moves, and the
-/// deload you configured never arrives. Without the deload override the
-/// schedule is binding, which contradicts the one promise this app makes —
-/// it suggests, it never forces. Whether you need a light week is a decision
-/// made in the gym, not six cycles in advance.
-class _CycleControls extends ConsumerWidget {
-  const _CycleControls({required this.status, required this.sessions});
-
-  final CycleStatus status;
-  final List<Session> sessions;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
-    final remaining = status.remainingSessionIds;
-    final canClose = status.done > 0 && remaining.isNotEmpty;
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'CYCLE ${status.cycleIndex}',
-                  style: context.t.labelSmall,
-                ),
-              ),
-              Text(
-                '${status.done} of ${status.total} done',
-                style: context.t.labelMedium?.copyWith(color: c.textSecondary),
-              ),
-            ],
-          ),
-          const SizedBox(height: Space.md),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: canClose
-                      ? () => _closeCycle(context, ref, remaining)
-                      : null,
-                  child: const Text('Close this cycle'),
-                ),
-              ),
-              const SizedBox(width: Space.sm),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _toggleDeload(context, ref),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: status.isDeload ? c.deload : null,
-                  ),
-                  child: Text(
-                    status.isDeload ? 'Not a deload' : 'Make it a deload',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Space.sm),
-          Text(
-            canClose
-                ? 'Closing skips what is left and starts the next cycle.'
-                : status.done == 0
-                ? 'Nothing trained yet this cycle.'
-                : 'Every session is done — the next workout opens a new cycle.',
-            style: context.t.labelSmall?.copyWith(color: c.textTertiary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _nameOf(String sessionId) {
-    for (final s in sessions) {
-      if (s.id == sessionId) return s.name;
-    }
-    return 'A session';
-  }
-
-  Future<void> _closeCycle(
-    BuildContext context,
-    WidgetRef ref,
-    List<String> remaining,
-  ) async {
-    // Name what it costs. "Are you sure" tells you nothing; "Leg 2 won't be
-    // trained this cycle" is the actual decision.
-    final names = remaining.map(_nameOf).toList();
-    final list = names.length == 1
-        ? '${names.single} won\'t be trained this cycle.'
-        : '${names.join(', ')} won\'t be trained this cycle.';
-
-    final ok = await confirmAction(
-      context,
-      title: 'Close cycle ${status.cycleIndex}?',
-      message: '$list\n\nThe next cycle starts from the top, and this one '
-          'counts towards your deload.',
-      confirmLabel: 'Close cycle',
-      destructive: false,
-    );
-    if (!ok) return;
-
-    final regime = ref.read(activeRegimeProvider).valueOrNull;
-    if (regime == null) return;
-    await ref.read(trainingRepositoryProvider).advanceCycle(regime.id);
-  }
-
-  Future<void> _toggleDeload(BuildContext context, WidgetRef ref) async {
-    final next = !status.isDeload;
-    await ref
-        .read(trainingRepositoryProvider)
-        .setCycleDeload(status.cycleId, next);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          next
-              ? 'Cycle ${status.cycleIndex} is a deload — lighter, fewer sets.'
-              : 'Cycle ${status.cycleIndex} is a normal cycle again.',
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-}
-
-class _SessionList extends ConsumerWidget {
-  const _SessionList({required this.sessions, required this.regimeId});
-
-  final List<Session> sessions;
-  final String regimeId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (sessions.isEmpty) {
-      return AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'No sessions yet. Add the days that make up one cycle — a cycle '
-              'is one pass through all of them, not a calendar week.',
-              style: context.t.bodySmall,
-            ),
-            const SizedBox(height: Space.md),
-            OutlinedButton(
-              onPressed: () => addSessionPrompt(context, ref, regimeId),
-              child: const Text('Add session'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Explicit move controls rather than a drag handle. The list is nested in
-    // the tab's own ListView, and ReorderableDragStartListener is an immediate
-    // vertical drag: it competed with the parent scrollable and lost, so a
-    // normal-speed drag scrolled the page instead of reordering, and there was
-    // no auto-scroll to carry a session past the fold at all. A reorder should
-    // never depend on how fast your thumb moves.
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (var i = 0; i < sessions.length; i++)
-            _SessionRow(
-              session: sessions[i],
-              index: i,
-              total: sessions.length,
-              onMove: (delta) {
-                final ids = sessions.map((s) => s.id).toList();
-                final target = (i + delta).clamp(0, ids.length - 1);
-                if (target == i) return;
-                ids.insert(target, ids.removeAt(i));
-                ref.read(regimeRepositoryProvider).reorderSessions(ids);
-              },
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionRow extends ConsumerWidget {
-  const _SessionRow({
-    required this.session,
-    required this.index,
-    required this.total,
-    required this.onMove,
-  });
-
-  final Session session;
-  final int index;
-  final int total;
-  final ValueChanged<int> onMove;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
-    final count = ref.watch(sessionSlotCountProvider(session.id)).valueOrNull;
-
-    return Column(
-      children: [
-        if (index > 0) Divider(color: c.border, height: 1),
-        ListTile(
-          leading: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _MoveButton(
-                icon: Icons.keyboard_arrow_up,
-                onTap: index == 0 ? null : () => onMove(-1),
-              ),
-              _MoveButton(
-                icon: Icons.keyboard_arrow_down,
-                onTap: index >= total - 1 ? null : () => onMove(1),
-              ),
-            ],
-          ),
-          title: Text(session.name, style: context.t.titleSmall),
-          subtitle: Text(
-            count == null ? '' : '$count exercises',
-            style: context.t.labelSmall,
-          ),
-          trailing:
-              Icon(Icons.chevron_right, color: c.textTertiary, size: 18),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SessionEditorScreen(sessionId: session.id),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MoveButton extends StatelessWidget {
-  const _MoveButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Radii.sm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        child: Icon(
-          icon,
-          size: 18,
-          color: onTap == null ? c.border : c.textSecondary,
-        ),
-      ),
-    );
-  }
-}
-
-/// Deload is configured here and nowhere else: on, how often, and how much
-/// lighter. The app suggests; it never forces.
-class _DeloadCard extends ConsumerWidget {
-  const _DeloadCard({required this.regime});
-
-  final Regime regime;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.read(regimeRepositoryProvider);
-    final c = context.c;
-
-    return AppCard(
-      padding: const EdgeInsets.symmetric(vertical: Space.sm),
-      child: Column(
-        children: [
-          SwitchListTile(
-            value: regime.deloadEnabled,
-            activeThumbColor: c.deload,
-            title: Text('Scheduled deload', style: context.t.titleSmall),
-            subtitle: Text(
-              'A lighter cycle after every N complete cycles',
-              style: context.t.labelSmall,
-            ),
-            onChanged: (v) =>
-                repo.updateRegime(regime.id, deloadEnabled: Value(v)),
-          ),
-          if (regime.deloadEnabled) ...[
-            Divider(color: c.border, height: 1),
-            _StepperTile(
-              label: 'Deload after',
-              value: '${regime.deloadAfterCycles} cycles',
-              onDecrement: regime.deloadAfterCycles > 1
-                  ? () => repo.updateRegime(regime.id,
-                      deloadAfterCycles: Value(regime.deloadAfterCycles - 1))
-                  : null,
-              onIncrement: () => repo.updateRegime(regime.id,
-                  deloadAfterCycles: Value(regime.deloadAfterCycles + 1)),
-            ),
-            Divider(color: c.border, height: 1),
-            _StepperTile(
-              label: 'Sets during deload',
-              value: regime.deloadSetDelta == 0
-                  ? 'unchanged'
-                  : '${regime.deloadSetDelta}',
-              helper: 'Applied to each exercise, never below one set',
-              onDecrement: regime.deloadSetDelta > -3
-                  ? () => repo.updateRegime(regime.id,
-                      deloadSetDelta: Value(regime.deloadSetDelta - 1))
-                  : null,
-              onIncrement: regime.deloadSetDelta < 0
-                  ? () => repo.updateRegime(regime.id,
-                      deloadSetDelta: Value(regime.deloadSetDelta + 1))
-                  : null,
-            ),
-            Divider(color: c.border, height: 1),
-            _StepperTile(
-              label: 'Weight during deload',
-              value: '${regime.deloadWeightPct}%',
-              helper: 'Of the last working weight in that session',
-              onDecrement: regime.deloadWeightPct > 40
-                  ? () => repo.updateRegime(regime.id,
-                      deloadWeightPct: Value(regime.deloadWeightPct - 5))
-                  : null,
-              onIncrement: regime.deloadWeightPct < 100
-                  ? () => repo.updateRegime(regime.id,
-                      deloadWeightPct: Value(regime.deloadWeightPct + 5))
-                  : null,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StepperTile extends StatelessWidget {
-  const _StepperTile({
-    required this.label,
-    required this.value,
-    required this.onDecrement,
-    required this.onIncrement,
-    this.helper,
-  });
-
-  final String label;
-  final String value;
-  final String? helper;
-  final VoidCallback? onDecrement;
-  final VoidCallback? onIncrement;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.md, Space.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: context.t.titleSmall),
-                if (helper != null)
-                  Text(helper!, style: context.t.labelSmall),
-              ],
-            ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.remove_circle_outline, size: 20),
-            onPressed: onDecrement,
-          ),
-          SizedBox(
-            width: 72,
-            child: Text(
-              value,
-              textAlign: TextAlign.center,
-              style: context.t.labelLarge?.copyWith(color: c.textPrimary),
-            ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.add_circle_outline, size: 20),
-            onPressed: onIncrement,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Adds a training day to a regime. Shared by the section header and the empty
-/// state, which are the two places it is ever asked for.
-Future<void> addSessionPrompt(
-  BuildContext context,
-  WidgetRef ref,
-  String regimeId,
-) async {
-  final name = await promptForText(
-    context,
-    title: 'New session',
-    hint: 'Push 1, Upper A, Legs …',
-  );
-  if (name == null || name.isEmpty) return;
-  await ref.read(regimeRepositoryProvider).addSession(regimeId, name);
-}
-
-/// Small single-field prompt used for names throughout the regime editor.
-///
-/// Returns the trimmed text, or null when dismissed. Never returns an empty
-/// string: Save stays disabled until there is something to save, so a stray tap
-/// can't create a session called "".
-Future<String?> promptForText(
-  BuildContext context, {
-  required String title,
-  String? hint,
-  String initial = '',
-  int maxLines = 1,
-  /// Notes are the one text this app takes that you must also be able to
-  /// clear, so emptiness has to be a savable answer rather than a disabled
-  /// button.
-  bool allowEmpty = false,
-}) {
-  return showDialog<String>(
-    context: context,
-    builder: (_) => _TextPromptDialog(
-      title: title,
-      hint: hint,
-      initial: initial,
-      maxLines: maxLines,
-      allowEmpty: allowEmpty,
-    ),
-  );
-}
-
-class _TextPromptDialog extends StatefulWidget {
-  const _TextPromptDialog({
-    required this.title,
-    required this.hint,
-    required this.initial,
-    required this.maxLines,
-    required this.allowEmpty,
-  });
-
-  final String title;
-  final String? hint;
-  final String initial;
-  final int maxLines;
-  final bool allowEmpty;
-
-  @override
-  State<_TextPromptDialog> createState() => _TextPromptDialogState();
-}
-
-class _TextPromptDialogState extends State<_TextPromptDialog> {
-  late final _controller = TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final value = _controller.text.trim();
-    if (value.isEmpty && !widget.allowEmpty) return;
-    Navigator.of(context).pop(value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLines: widget.maxLines,
-        textCapitalization: TextCapitalization.sentences,
-        textInputAction:
-            widget.maxLines > 1 ? TextInputAction.newline : TextInputAction.done,
-        decoration: InputDecoration(hintText: widget.hint),
-        onChanged: (_) => setState(() {}),
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: _controller.text.trim().isEmpty && !widget.allowEmpty
-              ? null
-              : _submit,
-          child: const Text('Save'),
-        ),
-      ],
-    );
-  }
-}
-
 /// Session template rows joined with their exercises.
 final sessionSlotsProvider = StreamProvider.family<
     List<({SessionExercise slot, Exercise exercise})>, String>((ref, sessionId) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.sessionExercises).join([
-    innerJoin(db.exercises, db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
+    innerJoin(
+        db.exercises, db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
   ])
     ..where(db.sessionExercises.sessionId.equals(sessionId) &
         db.sessionExercises.deletedAt.isNull())
@@ -715,3 +48,724 @@ final sessionSlotsProvider = StreamProvider.family<
           ),
       ]);
 });
+
+/// The programme editor, and the only screen it takes.
+///
+/// A training day is a **tab**, not a row you push into (THEME §7): switching
+/// days is a context change, and the vertical list it replaced put a screen
+/// between you and the thing you came to edit. Everything about the regime
+/// itself — its name, deload, the order of its days, the catalog, the other
+/// regimes — is behind the one sliders button in the band, because none of it
+/// is what you open this tab to do.
+class RegimeScreen extends ConsumerStatefulWidget {
+  const RegimeScreen({super.key});
+
+  @override
+  ConsumerState<RegimeScreen> createState() => _RegimeScreenState();
+}
+
+class _RegimeScreenState extends ConsumerState<RegimeScreen> {
+  int _day = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final regime = ref.watch(activeRegimeProvider).valueOrNull;
+    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+    final status = ref.watch(cycleStatusProvider).valueOrNull;
+
+    if (regime == null) {
+      return Scaffold(
+        body: EmptyState(
+          icon: Icons.tune,
+          title: 'No regime yet',
+          message: 'Build your own split, or start from a template and edit it '
+              'into shape.',
+          action: PrimaryButton(
+            label: 'Create regime',
+            onPressed: () => createRegimeFlow(context, ref),
+          ),
+        ),
+      );
+    }
+
+    // A day deleted out from under the strip must not leave the body pointing
+    // past the end of it.
+    final day = sessions.isEmpty ? 0 : _day.clamp(0, sessions.length - 1);
+
+    return Scaffold(
+      body: Column(
+        children: [
+          HeaderBand(
+            child: Column(
+              children: [
+                PageHeader(
+                  // The screen names itself; the regime's own name is the
+                  // eyebrow above it, the slot a date takes on Today.
+                  title: 'Regime',
+                  eyebrow: regime.name,
+                  belowGap: Space.sm,
+                  actions: [
+                    CircleIconButton(
+                      icon: Icons.tune_rounded,
+                      tooltip: 'Regime settings',
+                      onTap: () => showRegimeSettings(context, ref, regime),
+                    ),
+                  ],
+                  below: status == null
+                      ? null
+                      : _CycleLine(status: status, sessions: sessions),
+                ),
+                // No strip at all until there is a day in it: an `Add day +`
+                // tab alone under the masthead is a tab bar with no tabs, and
+                // the empty state below already asks for the same thing.
+                if (sessions.isNotEmpty)
+                  UnderlineTabs(
+                    labels: [for (final s in sessions) s.name],
+                    index: day,
+                    onSelect: (i) => setState(() => _day = i),
+                    trailingLabel: 'Add day  +',
+                    onTrailing: () => _addDay(regime.id, sessions.length),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: sessions.isEmpty
+                ? EmptyState(
+                    icon: Icons.calendar_today_outlined,
+                    title: 'No days yet',
+                    message: 'Add the days that make up one cycle. A cycle is '
+                        'one pass through all of them, not a calendar week.',
+                    action: PrimaryButton(
+                      label: 'Add day',
+                      onPressed: () => _addDay(regime.id, 0),
+                    ),
+                  )
+                : _DayBody(
+                    key: ValueKey(sessions[day].id),
+                    session: sessions[day],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addDay(String regimeId, int position) async {
+    await addSessionPrompt(context, ref, regimeId);
+    if (!mounted) return;
+    // Land on what was just made, rather than leaving it as a tab off the
+    // right-hand edge that nothing points at.
+    setState(() => _day = position);
+  }
+}
+
+/// Where the cycle is, and the way into the two overrides that move it.
+///
+/// One quiet line in the band (THEME §5): the cycle is the state of things, not
+/// something the page is about. Everything you can *do* to it — close it early,
+/// call it a deload — is a tap away rather than a pair of buttons taking the top
+/// third of the screen, which is what it used to be.
+class _CycleLine extends ConsumerWidget {
+  const _CycleLine({required this.status, required this.sessions});
+
+  final CycleStatus status;
+  final List<Session> sessions;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final tail = status.deloadEnabled
+        ? (status.isDeload
+            ? 'deload in progress'
+            : '${status.cyclesUntilDeload} to deload')
+        : 'deload off';
+
+    return Pressable(
+      scale: 0.99,
+      onTap: () => _showCycleSheet(context, ref, status, sessions),
+      child: Row(
+        children: [
+          Text(
+            'Cycle ${status.cycleIndex} · ${status.done} of ${status.total} · ',
+            style: context.t.bodyMedium,
+          ),
+          Text(
+            tail,
+            style: context.t.bodyMedium?.copyWith(
+              color: status.isDeload ? c.deload : c.textSecondary,
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, size: 18, color: c.textTertiary),
+        ],
+      ),
+    );
+  }
+}
+
+/// The two cycle overrides, which existed in the repository long before they
+/// existed on screen.
+///
+/// Without "Close this cycle" a session you permanently skip stalls the
+/// programme: the cycle never closes, the cycle index never moves, and the
+/// deload you configured never arrives. Without the deload override the
+/// schedule is binding, which contradicts the one promise this app makes — it
+/// suggests, it never forces. Whether you need a light week is a decision made
+/// in the gym, not six cycles in advance.
+Future<void> _showCycleSheet(
+  BuildContext context,
+  WidgetRef ref,
+  CycleStatus status,
+  List<Session> sessions,
+) {
+  final remaining = status.remainingSessionIds;
+  final canClose = status.done > 0 && remaining.isNotEmpty;
+
+  String nameOf(String id) {
+    for (final s in sessions) {
+      if (s.id == id) return s.name;
+    }
+    return 'A session';
+  }
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    builder: (sheet) => AppSheet(
+      title: 'Cycle ${status.cycleIndex}',
+      subtitle: '${status.done} of ${status.total} days trained',
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      children: [
+        AppRow(
+          icon: Icons.skip_next_rounded,
+          title: 'Close this cycle',
+          subtitle: canClose
+              ? '${remaining.map(nameOf).join(', ')} would be skipped'
+              : status.done == 0
+                  ? 'Nothing trained yet this cycle'
+                  : 'Every day is done — the next workout opens a new one',
+          onTap: !canClose
+              ? null
+              : () async {
+                  final navigator = Navigator.of(sheet);
+                  final ok = await confirmAction(
+                    context,
+                    title: 'Close cycle ${status.cycleIndex}?',
+                    // Name what it costs. "Are you sure" tells you nothing;
+                    // "Leg 2 won't be trained this cycle" is the decision.
+                    message:
+                        '${remaining.map(nameOf).join(', ')} won\'t be trained '
+                        'this cycle.\n\nThe next cycle starts from the top, and '
+                        'this one counts towards your deload.',
+                    confirmLabel: 'Close cycle',
+                    destructive: false,
+                  );
+                  if (!ok) return;
+                  final regime = ref.read(activeRegimeProvider).valueOrNull;
+                  if (regime == null) return;
+                  await ref
+                      .read(trainingRepositoryProvider)
+                      .advanceCycle(regime.id);
+                  navigator.pop();
+                },
+        ),
+        AppRow(
+          icon: Icons.trending_down_rounded,
+          title: status.isDeload ? 'Not a deload after all' : 'Make it a deload',
+          subtitle: status.isDeload
+              ? 'Back to full weight and full sets'
+              : 'Lighter weights, fewer sets, for this cycle only',
+          tint: status.isDeload ? null : sheet.c.deload,
+          onTap: () async {
+            final navigator = Navigator.of(sheet);
+            await ref
+                .read(trainingRepositoryProvider)
+                .setCycleDeload(status.cycleId, !status.isDeload);
+            navigator.pop();
+          },
+        ),
+      ],
+    ),
+  );
+}
+
+/// One training day: what is in it, and the three things you do to the day
+/// itself.
+class _DayBody extends ConsumerWidget {
+  const _DayBody({super.key, required this.session});
+
+  final Session session;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final slots = ref.watch(sessionSlotsProvider(session.id)).valueOrNull;
+    final c = context.c;
+
+    if (slots == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: Space.huge),
+      children: [
+        // Chips, not an overflow menu: these are the things you actually do to
+        // a training day, and a menu hides three of them behind a glyph.
+        SizedBox(
+          height: 60,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(
+                Space.gutter, Space.md, Space.gutter, Space.xs),
+            children: [
+              AppChip(
+                label: 'Rename',
+                icon: Icons.edit_outlined,
+                onTap: () => _rename(context, ref),
+              ),
+              const SizedBox(width: Space.sm),
+              AppChip(
+                label: 'Re-order',
+                icon: Icons.swap_vert_rounded,
+                onTap: slots.length < 2
+                    ? null
+                    : () => _reorder(context, ref, slots),
+              ),
+              const SizedBox(width: Space.sm),
+              AppChip(
+                label: 'Delete day',
+                icon: Icons.delete_outline_rounded,
+                onTap: () => _delete(context, ref),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              Space.gutter, Space.lg, Space.gutter, 0),
+          // Count as heading (§7): the number is the useful part of the word.
+          child: SectionHeader(
+            slots.isEmpty
+                ? 'No exercises'
+                : '${slots.length} exercise${slots.length == 1 ? '' : 's'}',
+            actionLabel: 'Add',
+            onAction: () => _add(context, ref),
+          ),
+        ),
+        if (slots.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: Space.gutter),
+            child: EmptyBox(
+              icon: Icons.self_improvement_rounded,
+              message: 'A rest day, until something is in it. Add an exercise '
+                  'and this becomes a day the cycle expects you to train.',
+            ),
+          )
+        else
+          for (var i = 0; i < slots.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: c.border),
+            _SlotBlock(
+              sessionId: session.id,
+              slot: slots[i].slot,
+              exercise: slots[i].exercise,
+            ),
+          ],
+      ],
+    );
+  }
+
+  Future<void> _rename(BuildContext context, WidgetRef ref) async {
+    final name = await promptForText(
+      context,
+      title: 'Rename day',
+      initial: session.name,
+    );
+    if (name == null || name.isEmpty) return;
+    await ref.read(regimeRepositoryProvider).renameSession(session.id, name);
+  }
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final exercise = await pickExercise(context, ref);
+    if (exercise == null) return;
+    await ref
+        .read(regimeRepositoryProvider)
+        .addExerciseToSession(session.id, exercise.id);
+  }
+
+  Future<void> _reorder(
+    BuildContext context,
+    WidgetRef ref,
+    List<({SessionExercise slot, Exercise exercise})> slots,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder: (_) => _ReorderSheet(
+        title: 'Re-order exercises',
+        subtitle: session.name,
+        labels: [for (final s in slots) s.exercise.name],
+        ids: [for (final s in slots) s.slot.id],
+        onCommit: (ids) =>
+            ref.read(regimeRepositoryProvider).reorderSessionExercises(ids),
+      ),
+    );
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmAction(
+      context,
+      title: 'Delete ${session.name}?',
+      message: 'It leaves the cycle, and its exercise slots go with it.\n\n'
+          'Workouts already logged under this day stay in History — they hold '
+          'their own record of what you did.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
+    final repo = ref.read(regimeRepositoryProvider);
+    await repo.deleteSession(session.id);
+    // Deleting the last day a cycle was still waiting on satisfies that cycle.
+    // Without this it sat complete-but-open, and Today read "UP NEXT" over a
+    // full row of filled dots.
+    await ref
+        .read(trainingRepositoryProvider)
+        .closeCycleIfSatisfied(session.regimeId);
+  }
+}
+
+/// One exercise in a day: what it is, and what it is for.
+///
+/// Two tap targets, each stating one action (rule 6). The name opens the
+/// exercise's own screen, where the catalog facts and this day's overrides are
+/// split; the targets card opens the target editor, because the target is the
+/// point of the slot and burying it behind a screen is what §9 calls out.
+class _SlotBlock extends ConsumerWidget {
+  const _SlotBlock({
+    required this.sessionId,
+    required this.slot,
+    required this.exercise,
+  });
+
+  final String sessionId;
+  final SessionExercise slot;
+  final Exercise exercise;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          Space.gutter, Space.md, Space.gutter, Space.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Pressable(
+            scale: 0.99,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SessionSlotScreen(
+                  sessionId: sessionId,
+                  slotId: slot.id,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        exercise.name,
+                        style: context.t.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: Space.xs),
+                      Row(
+                        children: [
+                          Pill(exercise.muscle.label),
+                          if (slot.deloadSetDelta != null ||
+                              slot.deloadWeightPct != null) ...[
+                            const SizedBox(width: Space.xs),
+                            Pill('Own deload', color: c.deload),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                Icon(Icons.chevron_right_rounded,
+                    size: 20, color: c.textTertiary),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          AppCard(
+            radius: Radii.lg,
+            padding: const EdgeInsets.symmetric(
+                horizontal: Space.lg, vertical: Space.md),
+            onTap: () => showTargetEditor(context, ref, slot, exercise),
+            child: Row(
+              children: [
+                Text(targetLabel(slot), style: context.t.labelLarge),
+                const SizedBox(width: Space.xs),
+                Text(
+                  slot.targetRepLow == null ? '' : 'reps',
+                  style: context.t.bodyMedium,
+                ),
+                const Spacer(),
+                Icon(Icons.chevron_right_rounded,
+                    size: 18, color: c.textTertiary),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `4 × 8–10`, or `4 sets` when no range is set.
+///
+/// Never `4 × ——`: a slot without a rep range is not missing a measurement, it
+/// is a slot you decided not to give one. Dashes are for a number that should
+/// be there and isn't (rule 4).
+String targetLabel(SessionExercise slot) {
+  final low = slot.targetRepLow;
+  final high = slot.targetRepHigh;
+  if (low == null) {
+    return '${slot.targetSets} set${slot.targetSets == 1 ? '' : 's'}';
+  }
+  final range = high == null || high == low ? '$low' : '$low–$high';
+  return '${slot.targetSets} × $range';
+}
+
+/// Explicit move controls rather than a drag handle, and in a sheet rather than
+/// in the list.
+///
+/// `ReorderableDragStartListener` is an immediate vertical drag: nested in a
+/// scrollable it competed with the page and lost, so a normal-speed drag
+/// scrolled instead of reordering and there was no auto-scroll to carry a row
+/// past the fold. A reorder should never depend on how fast your thumb moves.
+class _ReorderSheet extends StatefulWidget {
+  const _ReorderSheet({
+    required this.title,
+    required this.subtitle,
+    required this.labels,
+    required this.ids,
+    required this.onCommit,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<String> labels;
+  final List<String> ids;
+  final ValueChanged<List<String>> onCommit;
+
+  @override
+  State<_ReorderSheet> createState() => _ReorderSheetState();
+}
+
+class _ReorderSheetState extends State<_ReorderSheet> {
+  late final _order = [
+    for (var i = 0; i < widget.ids.length; i++)
+      (id: widget.ids[i], label: widget.labels[i]),
+  ];
+
+  void _move(int from, int delta) {
+    final to = (from + delta).clamp(0, _order.length - 1);
+    if (to == from) return;
+    setState(() => _order.insert(to, _order.removeAt(from)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AppSheet(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      footer: PrimaryButton(
+        label: 'Save order',
+        onPressed: () {
+          widget.onCommit([for (final e in _order) e.id]);
+          Navigator.of(context).pop();
+        },
+      ),
+      children: [
+        for (var i = 0; i < _order.length; i++)
+          AppRow(
+            title: _order[i].label,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleIconButton(
+                  icon: Icons.keyboard_arrow_up_rounded,
+                  size: 36,
+                  tint: i == 0 ? c.textTertiary : null,
+                  onTap: i == 0 ? null : () => _move(i, -1),
+                ),
+                const SizedBox(width: Space.sm),
+                CircleIconButton(
+                  icon: Icons.keyboard_arrow_down_rounded,
+                  size: 36,
+                  tint: i == _order.length - 1 ? c.textTertiary : null,
+                  onTap:
+                      i == _order.length - 1 ? null : () => _move(i, 1),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Re-orders the days of a regime. Opened from the regime settings sheet, since
+/// the tab strip is where you *read* the order and not where you change it.
+Future<void> showDayReorder(
+  BuildContext context,
+  WidgetRef ref,
+  List<Session> sessions,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    builder: (_) => _ReorderSheet(
+      title: 'Re-order days',
+      subtitle: 'The order one cycle runs in',
+      labels: [for (final s in sessions) s.name],
+      ids: [for (final s in sessions) s.id],
+      onCommit: (ids) => ref.read(regimeRepositoryProvider).reorderSessions(ids),
+    ),
+  );
+}
+
+/// Adds a training day to a regime. Shared by the `Add day +` tab and the empty
+/// state, which are the two places it is ever asked for.
+Future<void> addSessionPrompt(
+  BuildContext context,
+  WidgetRef ref,
+  String regimeId,
+) async {
+  final name = await promptForText(
+    context,
+    title: 'New day',
+    hint: 'Push 1, Upper A, Legs …',
+  );
+  if (name == null || name.isEmpty) return;
+  await ref.read(regimeRepositoryProvider).addSession(regimeId, name);
+}
+
+/// Small single-field prompt used for names throughout the regime editor.
+///
+/// A sheet, not a dialog: it rides above the keyboard, where a centred alert
+/// lands in the middle of the screen and then fights the keyboard for the same
+/// space (§5, §7). The confirm sits directly under the field and stays
+/// `surfaceHigh` with a `textTertiary` label until there is something to save,
+/// so a stray tap can't create a day called "".
+///
+/// Returns the trimmed text, or null when dismissed.
+Future<String?> promptForText(
+  BuildContext context, {
+  required String title,
+  String? hint,
+  String initial = '',
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    builder: (sheet) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
+      child: _NamePromptSheet(title: title, hint: hint, initial: initial),
+    ),
+  );
+}
+
+class _NamePromptSheet extends StatefulWidget {
+  const _NamePromptSheet({
+    required this.title,
+    required this.hint,
+    required this.initial,
+  });
+
+  final String title;
+  final String? hint;
+  final String initial;
+
+  @override
+  State<_NamePromptSheet> createState() => _NamePromptSheetState();
+}
+
+class _NamePromptSheetState extends State<_NamePromptSheet> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AppSheet(
+      title: widget.title,
+      footer: PrimaryButton(
+        label: 'Save',
+        onPressed: _controller.text.trim().isEmpty ? null : _submit,
+      ),
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _submit(),
+          style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
+          cursorColor: c.textPrimary,
+          decoration: InputDecoration(
+            hintText: widget.hint,
+            hintStyle: context.t.bodyLarge?.copyWith(color: c.textTertiary),
+            filled: true,
+            fillColor: c.surfaceHigh,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Radii.md),
+              borderSide: BorderSide(color: c.textPrimary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.all(Space.lg),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The catalog and the regime switcher, which the settings sheet points at.
+void openExerciseCatalog(BuildContext context) => Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ExerciseCatalogScreen()),
+    );
+
+void openRegimes(BuildContext context) => Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RegimesScreen()),
+    );

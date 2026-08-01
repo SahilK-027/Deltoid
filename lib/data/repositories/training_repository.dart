@@ -1898,6 +1898,21 @@ class TrainingRepository {
           ..where((t) => t.id.equals(workout.regimeId)))
         .getSingleOrNull();
 
+    // The slot's own deload override, exactly as `startWorkout` reads it. This
+    // used to take the regime's figures whatever the slot said, so the same
+    // exercise deloaded one way when the session opened and another way when it
+    // was added ten minutes later.
+    final sessionId = workout.sessionId;
+    final slot = sessionId == null
+        ? null
+        : await (db.select(db.sessionExercises)
+              ..where((t) =>
+                  t.sessionId.equals(sessionId) &
+                  t.exerciseId.equals(exerciseId) &
+                  t.deletedAt.isNull())
+              ..limit(1))
+            .getSingleOrNull();
+
     final past = await pastPerformances(
       exerciseId,
       excludeWorkoutId: workoutId,
@@ -1908,8 +1923,10 @@ class TrainingRepository {
       candidates: past,
       sessionId: workout.sessionId,
       targetIsDeload: workout.isDeload,
-      deloadSetDelta: regime?.deloadSetDelta ?? -1,
-      deloadWeightPct: regime?.deloadWeightPct ?? 80,
+      deloadSetDelta:
+          slot?.deloadSetDelta ?? regime?.deloadSetDelta ?? -1,
+      deloadWeightPct:
+          slot?.deloadWeightPct ?? regime?.deloadWeightPct ?? 80,
       unit: unit,
     );
   }

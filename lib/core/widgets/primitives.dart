@@ -804,6 +804,143 @@ class SegmentedPill<T> extends StatelessWidget {
   }
 }
 
+/// Tabs with a white underline under the live one (THEME §7 day tabs, §8
+/// exercise detail).
+///
+/// A strip, not a list: a training day is a context you switch, not an item you
+/// scroll past. It scrolls horizontally and bleeds off the right edge, so the
+/// clipped tab is the affordance — the same rule the chip rows follow.
+///
+/// [trailing] is a tab that is not one of the choices: `Add day +`, always last.
+class UnderlineTabs extends StatefulWidget {
+  const UnderlineTabs({
+    super.key,
+    required this.labels,
+    required this.index,
+    required this.onSelect,
+    this.trailingLabel,
+    this.onTrailing,
+  });
+
+  final List<String> labels;
+  final int index;
+  final ValueChanged<int> onSelect;
+
+  final String? trailingLabel;
+  final VoidCallback? onTrailing;
+
+  @override
+  State<UnderlineTabs> createState() => _UnderlineTabsState();
+}
+
+class _UnderlineTabsState extends State<UnderlineTabs> {
+  final _keys = <int, GlobalKey>{};
+
+  @override
+  void didUpdateWidget(UnderlineTabs old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index) _reveal();
+  }
+
+  /// A day added at the end, or selected off-screen, has to come into view by
+  /// itself — otherwise adding your sixth day looks like nothing happened.
+  void _reveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _keys[widget.index]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: Motion.base,
+        curve: Motion.curve,
+        alignment: 0.5,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return SizedBox(
+      height: 48,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+        child: Row(
+          children: [
+            for (var i = 0; i < widget.labels.length; i++)
+              _Tab(
+                key: _keys[i] ??= GlobalKey(),
+                label: widget.labels[i],
+                selected: i == widget.index,
+                onTap: () => widget.onSelect(i),
+              ),
+            if (widget.trailingLabel != null)
+              _Tab(
+                label: widget.trailingLabel!,
+                selected: false,
+                tint: c.textTertiary,
+                onTap: widget.onTrailing,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  const _Tab({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.tint,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Pressable(
+      onTap: onTap,
+      scale: 0.96,
+      child: Column(
+        // Stretch, so the rule is exactly as wide as the word above it. A fixed
+        // width underlines `Legs` and `Upper body A` identically, which reads as
+        // a marker parked near the tab rather than as the tab being live.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Space.md, Space.md, Space.md, Space.sm),
+            child: Text(
+              label,
+              style: context.t.titleMedium?.copyWith(
+                color: selected ? c.textPrimary : (tint ?? c.textSecondary),
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: Motion.base,
+            curve: Motion.emphasized,
+            height: 3,
+            decoration: BoxDecoration(
+              color: selected ? c.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(Radii.pill),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Marks ──────────────────────────────────────────────────────────────────
 
 /// A rounded square holding one icon, tinted to an identity colour. The mark

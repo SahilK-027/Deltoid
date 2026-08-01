@@ -294,6 +294,11 @@ class RegimeRepository {
     Value<int?> targetRepLow = const Value.absent(),
     Value<int?> targetRepHigh = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    /// Null means "follow the regime". An exercise that is already light does
+    /// not need the same cut as a heavy compound, and the columns carried that
+    /// distinction long before anything could set them.
+    Value<int?> deloadSetDelta = const Value.absent(),
+    Value<int?> deloadWeightPct = const Value.absent(),
   }) async {
     await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
       SessionExercisesCompanion(
@@ -301,6 +306,8 @@ class RegimeRepository {
         targetRepLow: targetRepLow,
         targetRepHigh: targetRepHigh,
         notes: notes,
+        deloadSetDelta: deloadSetDelta,
+        deloadWeightPct: deloadWeightPct,
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
