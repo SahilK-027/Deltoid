@@ -49,7 +49,7 @@ a device before the next starts.
       The keypad lost its title and its readout with it: both captioned what
       the screen behind them already said. Entry is capped by value (1000 for a
       load, 999 reps), not by digit count.
-- [ ] **3 · History + workout detail** — header band + segmented pill for the
+- [x] **3 · History + workout detail** — header band + segmented pill for the
       three views, month headings in `section` on the page background, and the
       feed rebuilt as full-bleed rows: identity tile in the regime's colour
       (amber on a deload), session name, a meta line, and the movements as one
@@ -214,6 +214,13 @@ a device before the next starts.
       is the one decoration that has to be perfectly consistent to read as
       anything but a mistake. Tab and segment underlines are unaffected — those
       are indicators, not links.
+
+      **Not yet driven.** The step is built, analyzer-clean and green, and it
+      is ticked on that basis — but the rule at the top of this list says a
+      step gets looked at on a device before the next one starts, and this one
+      has not been. What wants a real screen: both drawers, the note sheet
+      against the keyboard, the summary screen on a session with changes to
+      offer (it is four sections tall then), and the amber dot on the ⓘ.
 - [ ] **4 · Progress + exercise history** — builds the chart language once:
       dashed gridlines, right-hand Y labels, range pill, legend chips, em-dash
       empty state instead of a gridded void. Three screens consume it.
