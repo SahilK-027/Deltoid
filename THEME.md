@@ -367,6 +367,17 @@ once the other way round and both were wrong:
   only one whose masthead never says where you are. The date is the eyebrow
   above it, which is the slot it always half-occupied.
 
+**Only a destination gets a masthead.** `pageTitle` at 30sp belongs to the four
+tabs — Workouts, Regime, History, Settings. Everything you *push* wears the app
+bar instead: back arrow left, **small centred title** in `title` size, actions
+right. A logged day or one exercise in a 30sp masthead reads as somewhere you
+navigated *to* rather than into, and there is no way back up the hierarchy from
+a screen that looks like the top of one.
+
+Anything the centred title has no room for — a date, a set count, a metric
+strip — goes in a `surface` block directly under the bar, sharing its colour so
+the two read as one header.
+
 **The band does not scroll**, and it holds *only* the masthead: the screen's
 name, its eyebrow, and at most one quiet line about the state of things (on
 Workouts, when you last trained). Everything you can act on is a section under

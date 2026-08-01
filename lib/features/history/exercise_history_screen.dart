@@ -65,42 +65,29 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
 
     final metric = ref.watch(exerciseMetricProvider);
 
+    // A pushed screen, so a small centred title and a back arrow — the
+    // masthead's 30sp belongs to the four destinations, and spending it here
+    // made an exercise look like a tab of its own.
     return Scaffold(
+      appBar: AppBar(title: Text(exercise?.name ?? 'Exercise')),
       body: Column(
         children: [
-          // The metric strip pins under the title while the chart scrolls away
+          // The metric strip pins under the bar while the chart scrolls away
           // beneath it (THEME §5): the thing you change stays reachable, the
           // thing you read does not hold half the screen for ever.
-          HeaderBand(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      Space.sm, Space.sm, Space.gutter, 0),
-                  child: Row(
-                    children: [
-                      CircleIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        fill: Colors.transparent,
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                ),
-                PageHeader(
-                  title: exercise?.name ?? 'Exercise',
-                  belowGap: Space.lg,
-                  below: SegmentedPill<ExerciseMetric>(
-                    expand: true,
-                    value: metric,
-                    onChanged: (m) =>
-                        ref.read(exerciseMetricProvider.notifier).state = m,
-                    segments: [
-                      for (final m in ExerciseMetric.values)
-                        (value: m, label: m.label),
-                    ],
-                  ),
-                ),
+          Container(
+            width: double.infinity,
+            color: context.c.surface,
+            padding: const EdgeInsets.fromLTRB(
+                Space.gutter, 0, Space.gutter, Space.md),
+            child: SegmentedPill<ExerciseMetric>(
+              expand: true,
+              value: metric,
+              onChanged: (m) =>
+                  ref.read(exerciseMetricProvider.notifier).state = m,
+              segments: [
+                for (final m in ExerciseMetric.values)
+                  (value: m, label: m.label),
               ],
             ),
           ),

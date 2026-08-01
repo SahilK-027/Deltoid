@@ -51,46 +51,44 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final date = dateFromDayKey(workout.dayKey);
     final hasNote = workout.notes?.isNotEmpty == true;
 
+    // A pushed screen: small centred title, back arrow, actions on the right.
+    // The 30sp masthead belongs to the four destinations — a logged day wearing
+    // one made it look like somewhere you navigate to rather than into.
     return Scaffold(
+      appBar: AppBar(
+        title: Text(detail.session?.name ?? 'Ad-hoc session'),
+        actions: [
+          if (workout.isDeload) ...[
+            Pill('Deload', color: c.deload),
+            const SizedBox(width: Space.sm),
+          ],
+          IconButton(
+            icon: const Icon(Icons.more_horiz_rounded),
+            tooltip: 'Session actions',
+            onPressed: () => _showActions(context, ref, detail),
+          ),
+          const SizedBox(width: Space.xs),
+        ],
+      ),
       body: Column(
         children: [
-          // The screen is one you navigate *to*, so it keeps its name: the
-          // session, with the day it was as the eyebrow (§9). The old screen
-          // spent a whole card on that date and then repeated the weekday
-          // inside it.
-          HeaderBand(
+          // The day and what it came to, under the bar rather than in it — a
+          // centred title has room for a name, not for a name and a date and a
+          // set count.
+          Container(
+            width: double.infinity,
+            color: c.surface,
+            padding: const EdgeInsets.fromLTRB(
+                Space.gutter, 0, Space.gutter, Space.lg),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      Space.sm, Space.sm, Space.gutter, 0),
-                  child: Row(
-                    children: [
-                      CircleIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        fill: Colors.transparent,
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                      const Spacer(),
-                      if (workout.isDeload) Pill('Deload', color: c.deload),
-                      const SizedBox(width: Space.sm),
-                      CircleIconButton(
-                        icon: Icons.more_horiz_rounded,
-                        tooltip: 'Session actions',
-                        onTap: () => _showActions(context, ref, detail),
-                      ),
-                    ],
-                  ),
+                Text(
+                  DateFormat('EEEE d MMMM yyyy').format(date),
+                  style: context.t.titleMedium,
                 ),
-                PageHeader(
-                  eyebrow: DateFormat('EEEE d MMMM yyyy').format(date),
-                  title: detail.session?.name ?? 'Ad-hoc session',
-                  belowGap: Space.sm,
-                  below: Text(
-                    _facts(detail).join(' · '),
-                    style: context.t.bodyMedium,
-                  ),
-                ),
+                const SizedBox(height: Space.xxs),
+                Text(_facts(detail).join(' · '), style: context.t.bodyMedium),
               ],
             ),
           ),
