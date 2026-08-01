@@ -50,24 +50,24 @@ a device before the next starts.
       listing only years with something in them. A year at a time is legible
       and two of them are compared by switching; everything at once never was.
 
-- [ ] **5 · Regime cluster** — built, **not yet driven on the device.**
+- [ ] **5 · Regime cluster** — built, and driven once. **Wants another pass on
+      the device** now that the day reads as a list.
 
       The Regime tab is the programme editor: day tabs under a band that names
-      the regime, the day's exercises under a count heading, and Rename /
-      Re-order / Delete as chips. `session_editor.dart` is gone — a training
-      day was a context you switch, not a screen you push into.
+      the regime, the day's exercises under a count heading, and Rename and
+      Re-order as chips. `session_editor.dart` is gone — a training day was a
+      context you switch, not a screen you push into.
 
       An exercise is **one row** — name, muscle, target on the right — opening
       its own screen. It was a block with a muscle pill and a targets card
       under it, three stacked things and 130pt per exercise, and six of those
       is a wall rather than a day you can read. The slot screen carries the
-      **General / Overrides** split.
-      Overrides are that day's — targets, note, and the per-slot deload whose
-      columns had existed since the first migration with no way to set them.
+      **General / Overrides** split. Overrides are that day's — targets, note,
+      and the per-slot deload whose columns had existed since the first
+      migration with no way to set them.
       `prefillForWorkout` read the regime's figures whatever the slot said, so
       an exercise added mid-session deloaded differently from the same exercise
       at the door; it reads the slot first now, as `startWorkout` does.
-
 
       Cycle controls left the page for a sheet behind one status line; the
       regime's own settings (name, deload, day order, catalog, other regimes)
