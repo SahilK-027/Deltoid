@@ -346,6 +346,42 @@ stays a grid.
 - Legend: chips inside a `surface` card, marker + label; disabled series dim to
   `textSecondary`.
 
+### The metric screen
+
+Re-audited on the device against a year of real logs, because our Progress
+screen is the one place the language never landed. The shapes below are what
+make that app read as one product; none of them costs a feature we don't have.
+
+**One card contract, everywhere.** Title → range subtitle (`Last 7 Workouts`)
+→ the visual → headline value with its unit one step down → chevron. A
+dashboard tile, an exercise tile and a muscle tile are the *same card* with a
+different payload. Ours diverge per screen, which is what makes the app feel
+assembled rather than designed.
+
+**A grid of those cards is the picker.** There is no "choose an exercise, then
+see a chart" step: every exercise is a card already showing its sparkline and
+its latest figure, grouped under plain headings (`Last Week`, `Lifetime`), and
+tapping one opens the full chart. The answer is on screen before the question
+is asked.
+
+**On a metric screen the number leads and the date is the caption** — `63.7 kg`
+in `title`, `Sat, Feb 28` in `body` beneath it. On a *session* screen it is the
+other way round, because there the day is the subject. Same row, inverted, and
+the inversion is the information.
+
+**The metric is a tab strip, not a setting.** `1-RM · 3-RM · 10-RM · Heaviest
+Weight` across the top; switching restates every row and the chart in that
+metric. It answers "by which measure" — a better question than "over what
+window", which is what a range pill answers, and both are present.
+
+**The tabs pin, the chart scrolls.** The metric strip stays under the title bar
+while the plot and the range pill scroll away beneath it, so the thing you
+change is always reachable and the thing you read is not permanently occupying
+half the screen.
+
+**Lists under a chart group by month**, `section` heading on the page
+background, rows in one card beneath — the same grouping History already uses.
+
 ### Badges
 
 - **PR / record** — icon + value inline in `label` size, in `positive`.

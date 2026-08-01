@@ -272,6 +272,14 @@ a device before the next starts.
         that feeds every pull-up and dip score in the app, currently two taps
         deep behind a cog.
 
+      **Build it against THEME §5 → The metric screen**, which was re-audited
+      on the device for exactly this step. The short version: one card contract
+      everywhere, a grid of those cards *is* the exercise picker, the number
+      leads and the date captions it (inverted from a session row), the metric
+      is a tab strip rather than a setting, and the tabs pin while the chart
+      scrolls. Our Progress screen fails all five, which is why it reads as a
+      different app.
+
       Order matters, and it is three commits, not one: fold Progress into
       History (structural), then build the chart language, then rename the tabs
       (cosmetic). Renaming inside the move makes a diff nobody can review.
@@ -279,6 +287,21 @@ a device before the next starts.
       `exercise_catalog_screen`, `regimes_screen`, `regime_setup`. Day tabs,
       count-as-heading, single targets card + editor sheet, catalog picker with
       search and filter chips. Creation stays in sheets: no wizard.
+
+      **The exercise's own screen needs a shape**, and it does not have one:
+      everything about an exercise is currently scattered across the catalog
+      editor, the log's ⓘ and the log's ⋯. The reference splits it in two and
+      the split is worth taking — **General** (what it is: info, the permanent
+      cue, its history) and **Overrides** (what this setup does differently:
+      rest target, bar, equipment weights). Each row states its current value
+      as its subtitle and carries a right-hand `Edit` pill or a toggle, so the
+      screen reads as a list of settled decisions rather than a form.
+
+      The catalog list gets the same treatment: a tab strip over the list
+      (`All` / `Performed`), filter chips under it, and rows that carry the
+      muscle as a chip and a `Performed N times` line. That is where the parked
+      "muscle chip on every exercise" item lands, and it is the same filter-chip
+      work this step already plans.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion of
       bespoke layout once the list primitives exist. Settings is a *tab* by the
       time this runs (step 4), so it gets a header band and a masthead like
