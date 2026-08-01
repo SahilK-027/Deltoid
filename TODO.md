@@ -215,12 +215,10 @@ a device before the next starts.
       anything but a mistake. Tab and segment underlines are unaffected — those
       are indicators, not links.
 
-      **Not yet driven.** The step is built, analyzer-clean and green, and it
-      is ticked on that basis — but the rule at the top of this list says a
-      step gets looked at on a device before the next one starts, and this one
-      has not been. What wants a real screen: both drawers, the note sheet
-      against the keyboard, the summary screen on a session with changes to
-      offer (it is four sections tall then), and the amber dot on the ⓘ.
+      **Driven on the device**, which is what the tick is for: the feed and
+      workout detail, both drawers, the note sheet against the keyboard, the
+      summary screen, and the ⓘ with its dot. Everything above went through
+      several passes on real hardware before this step closed.
 - [ ] **4 · Progress + exercise history** — builds the chart language once:
       dashed gridlines, right-hand Y labels, range pill, legend chips, em-dash
       empty state instead of a gridded void. Three screens consume it.
