@@ -172,16 +172,18 @@ void main() {
     // And it never claimed a regime existed on the way there.
     expect(seen.where((f) => f.contains('Cycle 1')), isEmpty);
 
-    // The empty state is still this screen: masthead present, and Settings
-    // reachable — a fresh install restoring a backup has no other route to it.
-    // The masthead is the date and the rest gap, not the screen's name — on a
-    // fresh install there is nothing to count from, and it says so.
-    expect(find.text('Nothing logged'), findsOneWidget);
+    // The empty state is still this screen: the masthead survives it. It is the
+    // date and the rest gap, not the screen's name — on a fresh install there
+    // is nothing to count from, and it says so.
     expect(
-      find.byTooltip('Settings'),
+      find.text('Nothing logged'),
       findsOneWidget,
-      reason: 'the zero state used to drop the header, stranding first-launch '
-          'users with no way into Settings',
+      reason: 'the zero state used to drop the header entirely',
     );
+    // Settings used to be a cog up here, and this test guarded it because a
+    // fresh install restoring a backup had no other route in. It is a nav
+    // destination now, so the cog is gone and the route is one tap from
+    // everywhere — including this screen.
+    expect(find.byTooltip('Settings'), findsNothing);
   });
 }

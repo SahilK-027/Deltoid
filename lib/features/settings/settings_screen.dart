@@ -43,10 +43,28 @@ class SettingsScreen extends ConsumerWidget {
     final c = context.c;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
+      body: Column(
+        children: [
+          // A tab now, not a screen pushed from a cog, so it wears the masthead
+          // every other destination wears.
+          const HeaderBand(child: PageHeader(title: 'Settings', topGap: Space.xxl)),
+          Expanded(child: _body(context, ref, log, lastBackup, unit, c)),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(
+    BuildContext context,
+    WidgetRef ref,
+    List<BodyweightLog> log,
+    DateTime? lastBackup,
+    WeightUnit unit,
+    DeltoidColors c,
+  ) {
+    return ListView(
         padding: const EdgeInsets.fromLTRB(
-            Space.lg, Space.sm, Space.lg, Space.huge),
+            Space.gutter, Space.lg, Space.gutter, Space.huge),
         children: [
           const SectionLabel('Bodyweight'),
           // A summary that opens the real thing. This used to be the whole
@@ -149,7 +167,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
     );
   }
 

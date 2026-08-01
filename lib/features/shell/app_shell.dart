@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/tokens.dart';
 import '../history/history_screen.dart';
 import '../regime/regime_screen.dart';
+import '../settings/settings_screen.dart';
 import '../today/today_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -20,8 +21,9 @@ class _AppShellState extends State<AppShell> {
   // survive navigation.
   final _pages = const [
     TodayScreen(),
-    HistoryScreen(),
     RegimeScreen(),
+    HistoryScreen(),
+    SettingsScreen(),
   ];
 
   void _select(int i) {
@@ -53,16 +55,30 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-// Three, not four: the chart moved inside History (an exercise's trend is a
-// history question), so a fourth destination existed only to ask it again with
-// a worse picker. Settings takes the freed slot in step 4's third commit.
+// `Today` was already lying: the screen backfills a session logged on Tuesday
+// and resumes one left open yesterday, so a tab named after a day shows other
+// days. The page keeps the date as its own title (§9) — only the label moved.
+//
+// Settings takes the slot Progress left behind, and not for symmetry:
+// bodyweight logging lives in there and is not a setting. It is data entered
+// weekly that feeds every pull-up and dip score in the app, and it had never
+// once been logged through the UI while it sat two taps deep behind a cog.
 const _destinations = [
-  (icon: Icons.today_outlined, active: Icons.today_rounded, label: 'Today'),
-  (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
+  (
+    icon: Icons.fitness_center_outlined,
+    active: Icons.fitness_center_rounded,
+    label: 'Workouts'
+  ),
   (
     icon: Icons.dashboard_outlined,
     active: Icons.dashboard_rounded,
     label: 'Regime'
+  ),
+  (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
+  (
+    icon: Icons.settings_outlined,
+    active: Icons.settings_rounded,
+    label: 'Settings'
   ),
 ];
 

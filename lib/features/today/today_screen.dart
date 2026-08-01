@@ -17,7 +17,6 @@ import '../log/log_screen.dart';
 import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
 import '../regime/session_editor.dart';
-import '../settings/settings_screen.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'today_providers.dart';
@@ -519,16 +518,10 @@ class _TodayHeader extends StatelessWidget {
             ],
           ],
         ),
-        actions: [
-          ...actions,
-          CircleIconButton(
-            icon: Icons.settings_outlined,
-            tooltip: 'Settings',
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
-          ),
-        ],
+        // The cog went with the rename: Settings is a destination on the nav
+        // bar now, and a screen reachable two ways is a screen you have to
+        // decide about twice.
+        actions: actions,
       ),
     );
   }
