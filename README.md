@@ -56,6 +56,24 @@ Workout  ──  one Session actually performed, on a day, inside a Cycle
        └─ SetLog  ──  weight, reps, type, added weight, rest, note
 ```
 
+**Three levels of note, and they never leak into each other:**
+
+| Column | Scope | Written from |
+| --- | --- | --- |
+| `exercises.notes` | the movement, forever — a cue | catalog editor |
+| `workout_exercises.notes` | this exercise on this day | log ⋯, summary, detail |
+| `set_logs.note` | one set | the set sheet |
+
+Editing the second must never reach the first: the snapshot row is a copy for
+exactly this reason.
+
+**Improvising is a snapshot edit, and staying that way is deliberate.** Adding
+a movement mid-session, dropping one or running the day out of order changes
+today and nothing else. The end-of-session screen then *offers* each change back
+to the template (`domain/session_diff.dart`), one at a time, and
+`applySessionChanges` writes `session_exercises` and only that — so keeping a
+change never rewrites a logged workout.
+
 ### Invariants that are easy to break
 
 | Invariant                                               | Why                                                                                                                                                                                                                                                                                  |
@@ -253,6 +271,13 @@ and every card below appeared a frame or two apart, so an app whose data is on
 local disk still looked like it was fetching. Loading and empty are different
 states; a screen with more than one query needs them told apart, or one query.
 
+**A rate needs the weeks to have happened.** Sessions-per-week was
+`sessionsInTheLast29Days / 4`, which told a two-day-old install it trained
+"0.3 / week" — divided by three weeks that did not exist.
+`domain/consistency.dart` divides by the weeks it actually has and prints a
+plain count below a fortnight of history. Any change belongs in that file,
+tested without a database.
+
 **`formatWeight` also formats computed numbers.** An estimated 1RM is an
 arbitrary double — `55.733333333333334 kg` shipped to the screen before it was
 capped at two decimals.
@@ -273,7 +298,15 @@ The design language every screen implements is **[THEME.md](THEME.md)**.
 
 Deliberately absent, and should stay that way: social features, macros /
 nutrition, AI coaching, an exercise GIF library, Apple Health / Google Fit,
-1RM testing protocols, volume dashboards, a PR feed.
+1RM testing protocols, streaks, levels, muscle maps, motivational copy.
+
+**A volume dashboard and a PR feed** were on that list and have come off it,
+under the same test the plate view passed: no new screen, no question asked.
+Weekly sets per muscle is one bar list on a page you already open, normalised
+to your own biggest muscle rather than to a target this app has no business
+inventing. Records appear inline on the day that earned them. What stays ruled
+out is the thing that made them non-goals — a dashboard you navigate *to*, a
+feed to scroll, targets to fail against.
 
 The app should stay small enough to open mid-set and understand at a glance.
 When in doubt, don't add the screen.
