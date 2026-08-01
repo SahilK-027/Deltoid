@@ -22,15 +22,10 @@ class YearHeatmap extends StatefulWidget {
     super.key,
     required this.year,
     required this.days,
-    required this.isCurrent,
   });
 
   final int year;
   final Map<int, HeatDay> days;
-
-  /// The current year stops at today rather than drawing months of empty
-  /// cells for a future nobody has trained yet.
-  final bool isCurrent;
 
   @override
   State<YearHeatmap> createState() => _YearHeatmapState();
@@ -46,7 +41,11 @@ class _YearHeatmapState extends State<YearHeatmap> {
   /// axis the year gets. The weekday column went with the old layout: three
   /// letters down the left cost a tenth of the width to answer a question
   /// nobody opens this screen with, and losing it makes every cell bigger.
-  static const _monthRow = 16.0;
+  ///
+  /// Tall enough for one line of `labelSmall` and no taller — this row *is* the
+  /// bottom of the block, so every spare pixel in it shows up as a card that
+  /// sits lower under the grid than it does over it.
+  static const _monthRow = 18.0;
 
   @override
   Widget build(BuildContext context) {
@@ -55,11 +54,15 @@ class _YearHeatmapState extends State<YearHeatmap> {
 
     // UTC throughout: `add(Duration(days: 1))` across a DST boundary lands on
     // 23:00 the day before, which doubles a column twice a year.
+    //
+    // Always Jan 1 to Dec 31, the current year included. Stopping at today
+    // made this year a different shape from every year under it — thirty-one
+    // weeks stretched across the same width, so its cells were twice the size
+    // and its month strip ran out at August. A year block is a year: the days
+    // that have not happened yet are drawn dim, and the grid stays comparable.
     final jan1 = DateTime.utc(widget.year, 1, 1);
     final start = jan1.subtract(Duration(days: jan1.weekday - 1));
-    final lastDay = widget.isCurrent
-        ? DateTime.utc(now.year, now.month, now.day)
-        : DateTime.utc(widget.year, 12, 31);
+    final lastDay = DateTime.utc(widget.year, 12, 31);
     final end = lastDay.add(Duration(days: 7 - lastDay.weekday));
     final weeks = (end.difference(start).inDays + 1) ~/ 7;
 
@@ -79,50 +82,38 @@ class _YearHeatmapState extends State<YearHeatmap> {
         final gridWidth = weeks * cell + (weeks - 1) * gap;
         final gridHeight = 7 * cell + 6 * gap;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTapUp: (details) => _pick(details.localPosition, start,
-                  cell: cell, gap: gap, weeks: weeks),
-              child: CustomPaint(
-                size: Size(gridWidth, gridHeight + _monthRow),
-                painter: _YearPainter(
-                  year: widget.year,
-                  days: widget.days,
-                  start: start,
-                  weeks: weeks,
-                  cell: cell,
-                  gap: gap,
-                  monthRow: _monthRow,
-                  todayKey: dayKeyOf(now),
-                  picked: _picked,
-                  colours: _Palette(
-                    empty: c.heatEmpty,
-                    future: c.heatEmpty.withValues(alpha: 0.4),
-                    on: c.heatOn,
-                    deload: c.deload,
-                    label: c.textSecondary,
-                    ring: c.textPrimary,
-                  ),
-                  labelStyle: context.t.labelSmall!,
-                ),
+        return GestureDetector(
+          onTapUp: (details) => _pick(details.localPosition, start,
+              cell: cell, gap: gap, weeks: weeks),
+          child: CustomPaint(
+            size: Size(gridWidth, gridHeight + _monthRow),
+            painter: _YearPainter(
+              year: widget.year,
+              days: widget.days,
+              start: start,
+              weeks: weeks,
+              cell: cell,
+              gap: gap,
+              monthRow: _monthRow,
+              todayKey: dayKeyOf(now),
+              picked: _picked,
+              // The readout replaces 366 tooltips, and it takes over the month
+              // strip rather than adding a row of its own. A reserved line
+              // under the strip was empty almost always, and an empty line is
+              // just padding the card can't see — which is why the bottom of
+              // every year sat lower than its top.
+              caption: _caption(),
+              colours: _Palette(
+                empty: c.heatEmpty,
+                future: c.heatEmpty.withValues(alpha: 0.4),
+                on: c.heatOn,
+                deload: c.deload,
+                label: c.textSecondary,
+                ring: c.textPrimary,
               ),
+              labelStyle: context.t.labelSmall!,
             ),
-            // The readout replaces 366 tooltips. It keeps its height whether
-            // or not a day is picked, so nothing below it jumps — and it is a
-            // row of this block rather than an overhang, which is what left
-            // the card with more space under the grid than over it.
-            const SizedBox(height: Space.sm),
-            SizedBox(
-              height: 18,
-              child: Text(
-                _caption(),
-                style: context.t.bodySmall,
-                maxLines: 1,
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -214,6 +205,7 @@ class _YearPainter extends CustomPainter {
     required this.monthRow,
     required this.todayKey,
     required this.picked,
+    required this.caption,
     required this.colours,
     required this.labelStyle,
   });
@@ -227,6 +219,10 @@ class _YearPainter extends CustomPainter {
   final double monthRow;
   final int todayKey;
   final int? picked;
+
+  /// What the picked day was, or empty. Drawn in the month strip's row.
+  final String caption;
+
   final _Palette colours;
   final TextStyle labelStyle;
 
@@ -298,7 +294,23 @@ class _YearPainter extends CustomPainter {
   /// than a small one.
   void _months(Canvas canvas, Size size, Map<int, _Span> spans) {
     if (spans.isEmpty) return;
-    final top = 7 * cell + 6 * gap + gap * 2;
+    final top = 7 * cell + 6 * gap + gap;
+
+    // A picked day answers the question the month strip was answering, and
+    // more precisely — so it borrows the row for as long as it is picked.
+    if (caption.isNotEmpty) {
+      TextPainter(
+        text: TextSpan(
+          text: caption,
+          style: labelStyle.copyWith(color: colours.ring),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )
+        ..layout(maxWidth: size.width)
+        ..paint(canvas, Offset(0, top));
+      return;
+    }
 
     // The narrowest month decides the size for all of them, so the strip stays
     // one typeface at one size rather than a ragged mix.
@@ -347,6 +359,7 @@ class _YearPainter extends CustomPainter {
   @override
   bool shouldRepaint(_YearPainter old) =>
       old.picked != picked ||
+      old.caption != caption ||
       old.days != days ||
       old.cell != cell ||
       old.weeks != weeks;

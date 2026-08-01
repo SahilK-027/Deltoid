@@ -103,15 +103,13 @@ class _Years extends StatelessWidget {
                     '${(byYear[year] ?? 0) == 1 ? '' : 's'}',
               ),
               AppCard(
-                // Even on all four sides. The grid and its readout are one
-                // block now, so the card has no reason to hold its breath at
-                // the bottom.
-                padding: const EdgeInsets.all(Space.md),
-                child: YearHeatmap(
-                  year: year,
-                  days: days,
-                  isCurrent: year == now.year,
-                ),
+                // Shy of even at the bottom: the month strip is 18dp tall for
+                // a 14dp line, so it carries ~4dp of its own slack under the
+                // labels. Padding the full 12 there put the grid visibly high
+                // in the card.
+                padding: const EdgeInsets.fromLTRB(
+                    Space.md, Space.md, Space.md, Space.sm),
+                child: YearHeatmap(year: year, days: days),
               ),
             ],
           ),
