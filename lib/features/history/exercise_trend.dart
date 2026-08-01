@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -167,10 +169,20 @@ class _Chart extends ConsumerWidget {
       );
     }
 
-    // Deload weeks are excluded: a deliberately light week is not a regression,
-    // and plotting it as one makes the chart lie.
-    final real = scored.where((p) => !p.isDeload).toList();
-    final source = real.length >= 2 ? real : scored;
+    // Deload weeks never appear. A light week is periodisation, not a drop in
+    // strength, and an estimated 1RM taken off 80% of your working weight is a
+    // number about the programme rather than about you. It used to fall back to
+    // including them when there were fewer than two ordinary sessions, which
+    // put the one misleading kind of point on the emptiest kind of chart.
+    final source = scored.where((p) => !p.isDeload).toList();
+    if (source.length < 2) {
+      return EmptyBox(
+        icon: Icons.timeline,
+        message: source.isEmpty
+            ? 'Only deload weeks in this range.'
+            : 'One ordinary session so far — a second one gives this a trend.',
+      );
+    }
 
     final bySession = <String, List<ProgressPoint>>{};
     for (final p in source) {
@@ -184,9 +196,20 @@ class _Chart extends ConsumerWidget {
     final minX = xs.reduce((a, b) => a < b ? a : b);
     final maxX = xs.reduce((a, b) => a > b ? a : b);
     final ys = source.map((p) => metric.valueOf(p)!).toList();
-    final minY = ys.reduce((a, b) => a < b ? a : b);
-    final maxY = ys.reduce((a, b) => a > b ? a : b);
-    final pad = ((maxY - minY) * 0.15).clamp(2.0, 30.0);
+    final lowest = ys.reduce((a, b) => a < b ? a : b);
+    final highest = ys.reduce((a, b) => a > b ? a : b);
+
+    // Bounds snapped to a round step, so every gridline lands on a number a
+    // person would say. Left to itself the axis labelled `1126.5` and `1197.5`
+    // at the extremes, which wrapped onto two lines and collided with the
+    // gridline above.
+    final step = _niceStep((highest - lowest) / 4);
+    final minY = ((lowest - step * 0.5) / step).floorToDouble() * step;
+    final maxY = ((highest + step * 0.5) / step).ceilToDouble() * step;
+
+    // Ticks across the width, in days, on a boundary that means something.
+    final spanDays = maxX - minX;
+    final xInterval = _niceDayStep(spanDays / 4);
 
     // Whether there are more points than the width can give each one a marker.
     final dense = source.length > 40;
@@ -210,11 +233,12 @@ class _Chart extends ConsumerWidget {
             LineChartData(
               minX: minX,
               maxX: maxX,
-              minY: (minY - pad).clamp(0, double.infinity),
-              maxY: maxY + pad,
+              minY: minY.clamp(0, double.infinity),
+              maxY: maxY,
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: false,
+                horizontalInterval: step,
                 getDrawingHorizontalLine: (_) =>
                     FlLine(color: c.border, strokeWidth: 1, dashArray: [4, 4]),
               ),
@@ -228,36 +252,56 @@ class _Chart extends ConsumerWidget {
                 rightTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 42,
+                    interval: step,
+                    reservedSize: 52,
                     // The axis sits inches from the tooltip. One of them
                     // rendering kilograms while the other says pounds is the
                     // worst possible version of a units bug: both numbers on
                     // screen at once, neither labelled.
-                    getTitlesWidget: (value, meta) => Padding(
-                      padding: const EdgeInsets.only(left: Space.sm),
-                      child: Text(
-                        formatWeight(value, unit),
-                        style: context.t.bodySmall,
-                      ),
-                    ),
+                    getTitlesWidget: (value, meta) {
+                      // The label at the very top or bottom has half a line of
+                      // room and wraps into the one next to it.
+                      if (value <= meta.min || value >= meta.max) {
+                        return const SizedBox.shrink();
+                      }
+                      return SideTitleWidget(
+                        meta: meta,
+                        space: Space.sm,
+                        child: Text(
+                          formatWeight(value, unit),
+                          style: context.t.bodySmall,
+                          maxLines: 1,
+                        ),
+                      );
+                    },
                   ),
                 ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 28,
-                    interval: ((maxX - minX) / 3).clamp(1, double.infinity),
-                    getTitlesWidget: (value, meta) => Padding(
-                      padding: const EdgeInsets.only(top: Space.sm),
-                      child: Text(
-                        DateFormat(_axisFormat(maxX - minX)).format(
-                          DateTime.fromMillisecondsSinceEpoch(
-                            value.round() * 86400000,
+                    reservedSize: 30,
+                    interval: xInterval,
+                    getTitlesWidget: (value, meta) {
+                      // Same reason as the Y axis: an edge tick has no room and
+                      // ends up printed over its neighbour. `Jul Jun Jun Jul`
+                      // was two months rendering four times between them.
+                      if (value <= meta.min || value >= meta.max) {
+                        return const SizedBox.shrink();
+                      }
+                      return SideTitleWidget(
+                        meta: meta,
+                        space: Space.sm,
+                        child: Text(
+                          DateFormat(_axisFormat(spanDays)).format(
+                            DateTime.fromMillisecondsSinceEpoch(
+                              value.round() * 86400000,
+                            ),
                           ),
+                          style: context.t.bodySmall,
+                          maxLines: 1,
                         ),
-                        style: context.t.bodySmall,
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -350,6 +394,29 @@ class _Chart extends ConsumerWidget {
     if (spanDays <= 45) return 'd MMM';
     if (spanDays <= 400) return 'MMM';
     return "MMM ''yy";
+  }
+
+  /// The nearest round number at or above [raw], from the 1 / 2.5 / 5 / 10
+  /// family. Gridlines then land on numbers a person would say — 1160, 1180 —
+  /// instead of wherever the data happened to start.
+  static double _niceStep(double raw) {
+    if (raw <= 0) return 1;
+    final magnitude = pow(10, (log(raw) / ln10).floor()).toDouble();
+    for (final multiple in const [1, 2, 2.5, 5, 10]) {
+      final step = magnitude * multiple;
+      if (step >= raw) return step;
+    }
+    return magnitude * 10;
+  }
+
+  /// The same idea on the time axis, but in units a calendar has: a week, a
+  /// fortnight, a month, a quarter, a year. Ticks every 97 days label three
+  /// different months and read as noise.
+  static double _niceDayStep(double raw) {
+    for (final step in const [7.0, 14.0, 30.0, 61.0, 91.0, 182.0, 365.0]) {
+      if (step >= raw) return step;
+    }
+    return (raw / 365).ceilToDouble() * 365;
   }
 }
 
