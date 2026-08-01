@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/plate_icon.dart';
 import '../history/history_screen.dart';
 import '../regime/regime_screen.dart';
 import '../settings/settings_screen.dart';
@@ -63,12 +64,14 @@ class _AppShellState extends State<AppShell> {
 // bodyweight logging lives in there and is not a setting. It is data entered
 // weekly that feeds every pull-up and dip score in the app, and it had never
 // once been logged through the UI while it sat two taps deep behind a cog.
+//
+// Workouts wears a drawn stack of plates rather than Material's dumbbell.
+// Material ships exactly one piece of gym equipment, and it is the icon every
+// training app on the phone already has; plates are what this app is actually
+// about, and the taper reads as load at 24dp where a figure or a barbell does
+// not.
 const _destinations = [
-  (
-    icon: Icons.fitness_center_outlined,
-    active: Icons.fitness_center_rounded,
-    label: 'Workouts'
-  ),
+  (icon: null, active: null, label: 'Workouts'),
   (
     icon: Icons.dashboard_outlined,
     active: Icons.dashboard_rounded,
@@ -132,7 +135,9 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final ({IconData icon, IconData active, String label}) destination;
+  /// A null glyph pair means the destination draws its own icon — today that is
+  /// Workouts and its plates.
+  final ({IconData? icon, IconData? active, String label}) destination;
   final bool selected;
   final VoidCallback onTap;
 
@@ -151,11 +156,13 @@ class _NavItem extends StatelessWidget {
             scale: selected ? 1.04 : 1,
             duration: Motion.base,
             curve: Motion.spring,
-            child: Icon(
-              selected ? destination.active : destination.icon,
-              size: 24,
-              color: tint,
-            ),
+            child: destination.icon == null
+                ? PlateIcon(size: 24, color: tint, filled: selected)
+                : Icon(
+                    selected ? destination.active : destination.icon,
+                    size: 24,
+                    color: tint,
+                  ),
           ),
           const SizedBox(height: Space.xs),
           AnimatedDefaultTextStyle(
