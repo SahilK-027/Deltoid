@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../data/db/database.dart';
 import '../../data/db/watch.dart';
 import '../../data/repositories/training_repository.dart';
+import '../../domain/muscle_volume.dart';
 import 'heatmap_data.dart';
 
 /// How far back the consistency grid looks.
@@ -51,6 +52,30 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
     [db.workouts],
     () async => buildHeatmapFromDays(await repo.loggedDays()),
   );
+});
+
+/// This week's hard sets per muscle, for the bar list under the heatmap.
+///
+/// Its own provider rather than a field on [TodayData], and this is the one
+/// place that split is right: `todaySnapshot` is what the screen *is* — a
+/// missing field there is a frame where "no sessions" is indistinguishable from
+/// "not loaded yet" (README). The bars are a section further down that has an
+/// honest empty state of its own, so a frame without them costs nothing, and
+/// they are the only thing in the app that reads `set_logs` for Today. Folding
+/// this query into the snapshot would re-run the whole screen's read on every
+/// set you tick mid-session.
+final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
+  final db = ref.watch(databaseProvider);
+  final repo = ref.watch(trainingRepositoryProvider);
+
+  return db.watchQuery([db.setLogs, db.workoutExercises, db.workouts], () async {
+    // `volumeWindowDays - 1`, because the window includes today — the same
+    // off-by-one `computeConsistency` documents.
+    final from = dayKeyOf(
+      DateTime.now().subtract(const Duration(days: volumeWindowDays - 1)),
+    );
+    return computeWeeklyVolume(setsByMuscle: await repo.setsByMuscleSince(from));
+  });
 });
 
 final todayProvider = StreamProvider<TodayData>((ref) {

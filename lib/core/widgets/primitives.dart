@@ -475,10 +475,19 @@ class AppRow extends StatelessWidget {
     this.tint,
     this.chevron = false,
     this.ink = true,
+    this.subtitleLeading,
   });
 
   final String title;
   final String? subtitle;
+
+  /// Sits at the head of the subtitle line, before [subtitle] — a dense
+  /// [AppChip] for the one word in the description that is also a filter.
+  ///
+  /// It takes its own taps, so the row's [onTap] is not the only thing you can
+  /// do to it: the muscle on an exercise row selects that muscle in the strip
+  /// above the list, rather than opening the exercise.
+  final Widget? subtitleLeading;
 
   /// A bare glyph. Colour it only to mark something semantic (a destructive
   /// action, a deload).
@@ -508,7 +517,9 @@ class AppRow extends StatelessWidget {
         // A row carrying two lines needs more air than one carrying a label,
         // or the subtitle crowds the hairline under it and the list reads as
         // one grey block rather than as rows.
-        vertical: subtitle == null ? Space.md : Space.lg,
+        vertical: subtitle == null && subtitleLeading == null
+            ? Space.md
+            : Space.lg,
       ),
       child: Row(
         children: [
@@ -538,14 +549,35 @@ class AppRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (subtitle != null) ...[
+                if (subtitle != null || subtitleLeading != null) ...[
                   const SizedBox(height: Space.xxs),
-                  Text(
-                    subtitle!,
-                    style: context.t.bodyMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  if (subtitleLeading == null)
+                    Text(
+                      subtitle!,
+                      style: context.t.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  else
+                    Row(
+                      children: [
+                        subtitleLeading!,
+                        if (subtitle != null) ...[
+                          const SizedBox(width: Space.sm),
+                          // One line beside the chip, not two: the chip fixes
+                          // the line's height, and a second line of text next
+                          // to a 26pt pill leaves it floating against the first.
+                          Expanded(
+                            child: Text(
+                              subtitle!,
+                              style: context.t.bodyMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                 ],
               ],
             ),
@@ -788,6 +820,8 @@ class AppChip extends StatelessWidget {
     this.onTap,
     this.selected = false,
     this.caret = false,
+    this.dense = false,
+    this.hue,
   });
 
   final String label;
@@ -795,23 +829,42 @@ class AppChip extends StatelessWidget {
   final VoidCallback? onTap;
   final bool selected;
 
+  /// The category's own colour, where the label names a category that already
+  /// has one — a muscle, whose hue is the bar it is counted in (THEME §5).
+  ///
+  /// Unselected it is a dot before the label and the pill stays grey: chrome is
+  /// monochrome (rule 1), and a list of coloured pills over a list of exercise
+  /// names would be the loudest thing on the screen. Selected it fills, with the
+  /// label taken down out of its own fill the way [IconTile] does — white on
+  /// `yellow` is 1.4:1, and near-black would make the chip two colours.
+  final Color? hue;
+
   /// Marks a chip that opens a picker rather than toggling.
   final bool caret;
+
+  /// The in-row variant: 26 tall, same `label` text, for a chip that sits
+  /// *inside* a list row rather than in the filter strip above it. A 40pt chip
+  /// on a row's subtitle line makes the row 90 tall and reads as the row's
+  /// control rather than as one word in its description.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final fg = selected ? c.onAccent : c.textPrimary;
+    final fill = selected ? (hue ?? c.accent) : c.surfaceHigh;
+    final fg = selected
+        ? (hue == null ? c.onAccent : IconTile.glyphOn(hue!))
+        : c.textPrimary;
     return Pressable(
       onTap: onTap,
       scale: 0.95,
       child: AnimatedContainer(
         duration: Motion.fast,
         curve: Motion.curve,
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: Space.md),
+        height: dense ? 26 : 40,
+        padding: EdgeInsets.symmetric(horizontal: dense ? Space.sm : Space.md),
         decoration: BoxDecoration(
-          color: selected ? c.accent : c.surfaceHigh,
+          color: fill,
           borderRadius: BorderRadius.circular(Radii.pill),
         ),
         child: Row(
@@ -820,6 +873,13 @@ class AppChip extends StatelessWidget {
             if (icon != null) ...[
               Icon(icon, size: 16, color: fg),
               const SizedBox(width: Space.sm),
+            ] else if (hue != null && !selected) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: hue, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: Space.xs),
             ],
             Text(label, style: context.t.bodySmall?.copyWith(color: fg)),
             if (caret) ...[
@@ -1575,6 +1635,7 @@ Future<bool> confirmAction(
   required String confirmLabel,
   String cancelLabel = 'Go back',
   bool destructive = true,
+  List<String> highlight = const [],
 }) async {
   final answer = await showModalBottomSheet<bool>(
     context: context,
@@ -1607,10 +1668,7 @@ Future<bool> confirmAction(
                 ],
               ),
               const SizedBox(height: Space.sm),
-              Text(
-                message,
-                style: ctx.t.bodyLarge?.copyWith(color: c.textSecondary),
-              ),
+              _ConfirmMessage(message: message, highlight: highlight),
               const SizedBox(height: Space.xl),
               PrimaryButton(
                 label: confirmLabel,
@@ -1635,6 +1693,53 @@ Future<bool> confirmAction(
     },
   );
   return answer ?? false;
+}
+
+/// The body of a confirmation, with the values that are actually changing lifted
+/// out of it.
+///
+/// A confirmation is read in about a second, and the part that decides the
+/// answer is the two or three words naming what it becomes. In one flat grey
+/// paragraph those words are the same weight as `everywhere this exercise
+/// appears`, so the sentence has to be read to the end to find them; in
+/// `textPrimary` at 600 they are what the eye lands on and the rest is the
+/// explanation it already expected.
+class _ConfirmMessage extends StatelessWidget {
+  const _ConfirmMessage({required this.message, required this.highlight});
+
+  final String message;
+  final List<String> highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final base = context.t.bodyLarge?.copyWith(color: c.textSecondary);
+    if (highlight.isEmpty) return Text(message, style: base);
+
+    final strong = base?.copyWith(
+      color: c.textPrimary,
+      fontWeight: FontWeight.w600,
+    );
+    // Longest first, so a term that contains another ("Olympic bar" over "bar")
+    // wins the match rather than being cut in half by it.
+    final terms = [...highlight.where((t) => t.isNotEmpty)]
+      ..sort((a, b) => b.length.compareTo(a.length));
+    if (terms.isEmpty) return Text(message, style: base);
+
+    final pattern = RegExp(terms.map(RegExp.escape).join('|'));
+    final spans = <TextSpan>[];
+    var i = 0;
+    for (final match in pattern.allMatches(message)) {
+      if (match.start > i) {
+        spans.add(TextSpan(text: message.substring(i, match.start)));
+      }
+      spans.add(TextSpan(text: match[0], style: strong));
+      i = match.end;
+    }
+    if (i < message.length) spans.add(TextSpan(text: message.substring(i)));
+
+    return Text.rich(TextSpan(children: spans), style: base);
+  }
 }
 
 // ─── Notices ────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import '../../core/ids.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
+import '../../domain/muscle_volume.dart';
 import '../../domain/prefill.dart';
 import '../../domain/session_diff.dart';
 import '../../domain/units.dart';
@@ -574,6 +575,68 @@ class TrainingRepository {
           anyWorkoutId: r.read(anyId) ?? '',
         ),
     ];
+  }
+
+  /// Hard sets per muscle since [fromDayKey], for the weekly volume bars.
+  ///
+  /// Aggregated in SQL for the same reason [loggedDays] is: the answer is
+  /// twelve numbers, and folding it in Dart means shipping every set row of
+  /// every workout in the window across the isolate port to count them.
+  ///
+  /// Three rules, all of them decisions rather than defaults:
+  ///
+  /// * **Ticked sets only.** [startWorkout] writes the planned rows up front,
+  ///   so counting rows would credit you with a session you have not done yet.
+  /// * **Volume set types only** ([countsAsVolume]) — not the progress rule.
+  ///   A backoff set is work; a drop leg is the same set continued.
+  /// * **Deload weeks count.** A light week is still sets performed, and this
+  ///   number is about work done rather than about progress — the same call
+  ///   `domain/consistency.dart` already made for the heatmap. The chart is
+  ///   where deloads are excluded, because an e1RM off 80% describes the
+  ///   programme rather than you.
+  Future<Map<MuscleGroup, int>> setsByMuscleSince(int fromDayKey) async {
+    final counted = db.setLogs.id.count();
+    final rows = await (db.selectOnly(db.setLogs).join([
+      innerJoin(
+        db.workoutExercises,
+        db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId),
+      ),
+      innerJoin(
+        db.workouts,
+        db.workouts.id.equalsExp(db.workoutExercises.workoutId),
+      ),
+      innerJoin(
+        db.exercises,
+        db.exercises.id.equalsExp(db.workoutExercises.exerciseId),
+      ),
+    ])
+          ..addColumns(<Expression<Object>>[db.exercises.muscle, counted])
+          ..where(
+            db.workouts.dayKey.isBiggerOrEqualValue(fromDayKey) &
+                // Sets logged in the session you are standing in count the
+                // moment they are ticked: the bar list is read mid-workout, and
+                // a set you have done is a set you have done whether or not you
+                // have pressed Finish yet.
+                db.workouts.status
+                    .equalsValue(WorkoutStatus.abandoned)
+                    .not() &
+                db.workouts.deletedAt.isNull() &
+                db.workoutExercises.deletedAt.isNull() &
+                db.workoutExercises.skipReason.equalsValue(SkipReason.none) &
+                db.setLogs.isDone.equals(true) &
+                db.setLogs.deletedAt.isNull() &
+                db.setLogs.setType.isIn([
+                  for (final t in SetType.values)
+                    if (countsAsVolume(t)) t.name,
+                ]),
+          )
+          ..groupBy([db.exercises.muscle]))
+        .get();
+
+    return {
+      for (final r in rows)
+        r.readWithConverter(db.exercises.muscle)!: r.read(counted) ?? 0,
+    };
   }
 
   /// Every completed workout, oldest first.

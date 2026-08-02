@@ -168,22 +168,29 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           // Which day this is, sharing the bar's surface so the two read as one
           // header — the centred title has room for a name, not for a name and
           // the day it sits in (§5).
-          Container(
-            width: double.infinity,
-            color: c.surface,
-            padding: const EdgeInsets.fromLTRB(
-                Space.gutter, 0, Space.gutter, Space.lg),
-            child: Text(
-              [
-                if (widget.fromDay) dayName,
-                muscle?.label ?? 'Not filed under a muscle yet',
-              ].join(' · '),
-              style: context.t.bodyMedium,
+          //
+          // The muscle used to sit here too, and it was the same word as the
+          // `Muscle` row's own value a few hundred pixels below it — a fact
+          // stated twice on one screen (rule 6), and the copy that could not be
+          // tapped. Opened from the catalog there is now nothing to say up here
+          // at all, so the block goes rather than shrinking to one word.
+          if (widget.fromDay) ...[
+            Container(
+              width: double.infinity,
+              color: c.surface,
+              padding: const EdgeInsets.fromLTRB(
+                Space.gutter,
+                0,
+                Space.gutter,
+                Space.lg,
+              ),
+              child: Text(dayName, style: context.t.bodyMedium),
             ),
-          ),
-          // 16 between a header block and the first section under it, as on
-          // every other screen that pins one.
-          const SizedBox(height: Space.lg),
+            // 16 between a header block and the first section under it, as on
+            // every other screen that pins one.
+            const SizedBox(height: Space.lg),
+          ] else
+            const SizedBox(height: Space.lg),
 
           // ── Overrides, only when opened from a day ───────────────────────
           if (widget.fromDay && entry != null) ...[
@@ -264,7 +271,18 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       current: muscle,
                       labelOf: (v) => v.label,
                     );
-                    if (picked == null) return;
+                    if (picked == null || picked == muscle) return;
+                    if (!await _confirmChange(
+                      exercise,
+                      field: 'muscle',
+                      from: muscle?.label ?? 'nothing',
+                      to: picked.label,
+                      consequence: 'Its sets move to that muscle in the '
+                          'weekly volume, and it is filed there in the '
+                          'catalog.',
+                    )) {
+                      return;
+                    }
                     _apply(exercise, muscle: picked);
                   },
                 ),
@@ -279,7 +297,15 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       current: equipment,
                       labelOf: (v) => v.label,
                     );
-                    if (picked == null) return;
+                    if (picked == null || picked == equipment) return;
+                    if (!await _confirmChange(
+                      exercise,
+                      field: 'equipment',
+                      from: equipment?.label ?? 'nothing',
+                      to: picked.label,
+                    )) {
+                      return;
+                    }
                     _setEquipment(exercise, picked);
                   },
                 ),
@@ -319,7 +345,20 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                             : '${v.label} · '
                                 '${formatInUnit(v.kg!, WeightUnit.kg)} kg',
                       );
-                      if (picked == null) return;
+                      if (picked == null || picked == barKind) return;
+                      if (!await _confirmChange(
+                        exercise,
+                        field: 'bar',
+                        from: barKind?.label ?? 'nothing',
+                        to: picked.label,
+                        consequence: picked == BarKind.none
+                            ? 'The keypad stops breaking its weights into '
+                                'plates.'
+                            : 'Every weight you type is broken into plates '
+                                'over a ${picked.label.toLowerCase()}.',
+                      )) {
+                        return;
+                      }
                       _apply(exercise, barKind: picked);
                     },
                   ),
@@ -442,6 +481,42 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       notes: notes == _unset
           ? const Value.absent()
           : Value(notes as String?),
+    );
+  }
+
+  /// Asks before changing a saved exercise, and never while creating one.
+  ///
+  /// Every row here writes the moment the sheet closes, which is right for a
+  /// screen you came to *edit* and wrong for one you opened to read: the
+  /// catalog row, the picker and the ⓘ all land on this screen, so a mis-tap on
+  /// `Muscle` followed by a mis-tap on a name silently refiled a movement that
+  /// has a year of history behind it. A draft has nothing to protect — the
+  /// exercise does not exist until `Create exercise` — so it is never asked.
+  ///
+  /// [_editLoadMode] asks its own, harder question, because that field re-reads
+  /// every set ever logged rather than changing where they are counted.
+  Future<bool> _confirmChange(
+    Exercise? exercise, {
+    required String field,
+    required String from,
+    required String to,
+    String? consequence,
+  }) async {
+    if (exercise == null) return true;
+    return confirmAction(
+      context,
+      title: 'Change ${exercise.name}?',
+      // Named in full — from and to — and both lifted out of the sentence. The
+      // question being answered is "did I mean to touch this at all", and the
+      // value it currently holds is half that answer.
+      message: [
+        'Its $field changes from $from to $to, everywhere this exercise '
+            'appears.',
+        ?consequence,
+      ].join(' '),
+      highlight: [from, to],
+      confirmLabel: 'Change it',
+      destructive: false,
     );
   }
 
@@ -597,6 +672,17 @@ Future<T?> _pick<T>(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
+    useSafeArea: true,
+    // Capped, and this is what stops `Muscle` reading as a drawer rather than a
+    // sheet. Twelve rows at 56 plus a header is taller than the phone, so an
+    // uncapped sheet opened edge to edge over the status bar with the page it
+    // came from nowhere in sight — and a panel that already fills the screen
+    // has almost no distance left to travel, so its entrance and its exit both
+    // looked like a cut. Two thirds leaves the screen behind it visible, which
+    // is the thing that makes the movement legible.
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.of(context).size.height * 0.66,
+    ),
     builder: (sheet) => AppSheet(
       title: title,
       contentPadding: const EdgeInsets.only(bottom: Space.md),

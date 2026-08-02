@@ -141,4 +141,93 @@ void main() {
     expect(find.text('Bar'), findsNothing);
     expect(createAction(tester), isNotNull);
   });
+
+  group('editing an existing exercise', () {
+    Future<Exercise> anExercise() async {
+      return (db.select(db.exercises)..where((t) => t.muscle.equalsValue(
+        MuscleGroup.chest,
+      ))).get().then((rows) => rows.first);
+    }
+
+    Future<void> pumpExisting(WidgetTester tester, String id) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.dark),
+            home: ExerciseScreen(exerciseId: id),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    testWidgets('a mis-tap does not refile a movement with history behind it', (
+      tester,
+    ) async {
+      final exercise = await anExercise();
+      await pumpExisting(tester, exercise.id);
+
+      await tester.tap(find.text('Muscle'));
+      await settle(tester);
+      await tester.tap(find.text('Back').last);
+      await settle(tester);
+
+      // Every row here writes the moment the sheet closes, which is right for a
+      // screen you came to edit and wrong for one you opened to read.
+      expect(find.textContaining('Change ${exercise.name}?'), findsOneWidget);
+      // Both values are named, and both are lifted out of the sentence.
+      final body = tester.widget<Text>(
+        find.byWidgetPredicate(
+          (w) => w is Text && (w.textSpan?.toPlainText().contains(
+                'changes from Chest to Back',
+              ) ?? false),
+        ),
+      );
+      final bold = (body.textSpan! as TextSpan)
+          .children!
+          .cast<TextSpan>()
+          .where((s) => s.style?.fontWeight == FontWeight.w600)
+          .map((s) => s.text)
+          .toList();
+      expect(bold, ['Chest', 'Back']);
+
+      await tester.tap(find.text('Go back').last);
+      await settle(tester);
+
+      final after = await (db.select(db.exercises)
+        ..where((t) => t.id.equals(exercise.id))).getSingle();
+      expect(after.muscle, exercise.muscle);
+    });
+
+    testWidgets('confirming writes it', (tester) async {
+      final exercise = await anExercise();
+      await pumpExisting(tester, exercise.id);
+
+      await tester.tap(find.text('Muscle'));
+      await settle(tester);
+      await tester.tap(find.text('Back').last);
+      await settle(tester);
+      await tester.tap(find.text('Change it').last);
+      await settle(tester);
+
+      final after = await (db.select(db.exercises)
+        ..where((t) => t.id.equals(exercise.id))).getSingle();
+      expect(after.muscle, MuscleGroup.back);
+    });
+
+    testWidgets('picking the value it already has asks nothing', (
+      tester,
+    ) async {
+      final exercise = await anExercise();
+      await pumpExisting(tester, exercise.id);
+
+      await tester.tap(find.text('Muscle'));
+      await settle(tester);
+      await tester.tap(find.text('Chest').last);
+      await settle(tester);
+
+      expect(find.textContaining('Change ${exercise.name}?'), findsNothing);
+    });
+  });
 }

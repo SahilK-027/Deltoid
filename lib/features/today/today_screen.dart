@@ -22,6 +22,7 @@ import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'today_providers.dart';
 import 'widgets/heatmap.dart';
+import 'widgets/volume_bars.dart';
 
 /// True between tapping Start and the log screen appearing.
 ///
@@ -559,6 +560,15 @@ class TodayScreen extends ConsumerWidget {
                           data: today.heatmap,
                           hasHistory: today.hasHistory,
                         ),
+                        // Under the grid, because they answer the same
+                        // question one level down: the heatmap says whether you
+                        // turned up, this says what you trained when you did.
+                        // Only once there is history — six empty tracks on a
+                        // fresh install is a chart of nothing.
+                        if (today.hasHistory) ...[
+                          const SizedBox(height: Space.section),
+                          const _VolumeCard(),
+                        ],
                         if (today.lastCompleted != null) ...[
                           const SizedBox(height: Space.section),
                           _LastSessionCard(last: today.lastCompleted!),
@@ -1447,6 +1457,50 @@ class _ConsistencyCard extends StatelessWidget {
           ? '${c.sessions} logged so far'
           : '${c.sessions} in ${c.windowDays} days',
     ].join('  ·  ');
+  }
+}
+
+/// This week's sets per muscle (THEME §5 → Muscle volume bars).
+///
+/// A section on the page you already open rather than a screen you navigate to
+/// — a volume dashboard came off the non-goals list on exactly that condition,
+/// and the hero pager that was going to carry it did not survive the test that
+/// a landing screen you have to swipe to use is a landing screen that failed.
+///
+/// Its own `ConsumerWidget` so the query that feeds it rebuilds this card and
+/// not the screen: it watches `set_logs`, which changes on every tick of every
+/// set you log.
+class _VolumeCard extends ConsumerWidget {
+  const _VolumeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final volume = ref.watch(weeklyVolumeProvider).valueOrNull;
+    // Nothing at all until the count arrives — the section is one query deep,
+    // and a card that appears empty and then fills is the staged reveal the
+    // rest of this screen exists to avoid.
+    if (volume == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('This week'),
+        AppCard(
+          padding: const EdgeInsets.all(Space.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              VolumeBars(volume: volume),
+              const SizedBox(height: Space.sm),
+              // The sentence under the bars, where Consistency puts its
+              // figures, and for the same reason: a total in the heading is a
+              // line away from the rows it is the sum of.
+              Text(volumeSummary(volume), style: context.t.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -100,7 +100,7 @@ class ConsistencyHeatmap extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const gap = 3.0;
+        const gap = 4.0;
         const labelWidth = 22.0;
         // The month row and the air under it. The labels used to sit straight
         // on top of the first cell row, which read as a caption stuck to the

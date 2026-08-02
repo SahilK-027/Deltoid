@@ -483,18 +483,63 @@ class _UnitPicker extends ConsumerWidget {
       children: [
         for (final unit in WeightUnit.values)
           AppRow(
-            title: switch (unit) {
-              WeightUnit.kg => 'Kilograms',
-              WeightUnit.lb => 'Pounds',
-            },
+            title: _unitName(unit),
             trailing: AppRadio(selected: unit == current),
             ink: false,
-            onTap: () => setWeightUnit(ref.read(databaseProvider), unit),
+            onTap: () => _switchTo(context, ref, from: current, to: unit),
           ),
       ],
     );
   }
+
+  /// Asks first, the way an exercise's own fields do.
+  ///
+  /// This one is reversible and stores nothing — the database is kilograms
+  /// whichever row is ticked — but it is a radio, one tap, and it restates every
+  /// number in the app at once: the logs, the charts, the keypad's step and the
+  /// plates on the bar. A screen you came to for a backup should not be able to
+  /// do that to you on the way past.
+  Future<void> _switchTo(
+    BuildContext context,
+    WidgetRef ref, {
+    required WeightUnit from,
+    required WeightUnit to,
+  }) async {
+    if (from == to) return;
+    // The database outlives the widget: a repository read after the sheet
+    // closes must not go through a `ref` this screen may have disposed.
+    final db = ref.read(databaseProvider);
+    final ok = await confirmAction(
+      context,
+      title: 'Show weights in ${_unitName(to).toLowerCase()}?',
+      message:
+          'Every weight in the app changes from ${_unitName(from)} to '
+          '${_unitName(to)} — your logs, the charts, the keypad and the plate '
+          'view. Nothing logged changes: weights are stored in kilograms '
+          'either way and converted for the screen.',
+      highlight: [_unitName(from), _unitName(to)],
+      confirmLabel: 'Switch to ${_unitName(to).toLowerCase()}',
+      destructive: false,
+    );
+    if (!ok) return;
+    // Written *after* the sheet has finished leaving, not while it is.
+    //
+    // Nothing is converted here — storage is kilograms either way — so there is
+    // no work to move off the UI isolate and nothing a progress bar could
+    // honestly count. What there is is one rebuild of every widget holding a
+    // weight, and the shell keeps all four tabs alive in an `IndexedStack`, so
+    // that rebuild lands on more than the screen you are looking at. Running it
+    // against the sheet's own exit animation is what makes it read as a stutter
+    // rather than as a redraw.
+    await Future<void>.delayed(Motion.base);
+    await setWeightUnit(db, to);
+  }
 }
+
+String _unitName(WeightUnit unit) => switch (unit) {
+  WeightUnit.kg => 'Kilograms',
+  WeightUnit.lb => 'Pounds',
+};
 
 /// Three miniatures of the app, side by side.
 ///

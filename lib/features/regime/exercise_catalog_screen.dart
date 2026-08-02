@@ -123,6 +123,9 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                     const SizedBox(width: Space.sm),
                     AppChip(
                       label: m.label,
+                      // The colour its sets are counted in on Workouts. `All`
+                      // stays grey: it is every category and therefore none.
+                      hue: c.forMuscle(m),
                       selected: _muscle == m,
                       onTap: () =>
                           setState(() => _muscle = _muscle == m ? null : m),
@@ -169,9 +172,22 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                   final e = filtered[i];
                   return AppRow(
                     title: e.name,
+                    // The muscle is a chip rather than the first word of the
+                    // subtitle, so the filter is the thing you can already see:
+                    // tapping it selects that muscle above, tapping it again
+                    // clears it. The strip stays — it is how you find a muscle
+                    // that is scrolled off the bottom.
+                    subtitleLeading: AppChip(
+                      label: e.muscle.label,
+                      dense: true,
+                      hue: c.forMuscle(e.muscle),
+                      selected: _muscle == e.muscle,
+                      onTap: () => setState(
+                        () => _muscle = _muscle == e.muscle ? null : e.muscle,
+                      ),
+                    ),
                     subtitle:
-                        '${e.muscle.label} · ${e.equipment.label} · '
-                        '${loadModeLabel(e.loadMode)}',
+                        '${e.equipment.label} · ${loadModeLabel(e.loadMode)}',
                     chevron: true,
                     onTap: () => openExercise(context, exerciseId: e.id),
                   );

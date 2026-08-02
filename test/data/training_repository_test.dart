@@ -1883,4 +1883,131 @@ void main() {
     });
   });
 
+  group('weekly sets per muscle', () {
+    /// Ticks every set of the first exercise in a workout, and reports which
+    /// muscle they counted toward and how many there were.
+    ///
+    /// The count is read back rather than assumed: a session opens with the
+    /// sets the *last* performance had, so a workout logged after one with
+    /// warmups in it starts with more rows than the template's three.
+    Future<({MuscleGroup muscle, int sets})> tickFirstExercise(
+      String workoutId, {
+      SetType type = SetType.working,
+      bool done = true,
+    }) async {
+      final detail = await repo.workoutDetail(workoutId);
+      final entry = detail!.entries.first;
+      for (final set in entry.sets) {
+        await repo.updateSet(
+          set.id,
+          weight: const Value(40),
+          reps: const Value(8),
+          setType: Value(type),
+          isDone: Value(done),
+        );
+      }
+      return (muscle: entry.exercise.muscle, sets: entry.sets.length);
+    }
+
+    test('counts ticked sets in the window, per muscle', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[logged.muscle], logged.sets);
+    });
+
+    test('a set that has not been ticked is not volume', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      // `startWorkout` writes the planned rows up front, so counting rows
+      // would credit a session that has not happened.
+      await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts.values.fold(0, (a, b) => a + b), 0);
+    });
+
+    test('warmups and drop legs do not count; backoff sets do', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+
+      final warm = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final warmed = await tickFirstExercise(warm, type: SetType.warmup);
+      await repo.completeWorkout(warm);
+
+      var counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[warmed.muscle] ?? 0, 0);
+
+      final back = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final backed = await tickFirstExercise(back, type: SetType.backoff);
+      await repo.completeWorkout(back);
+
+      counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[backed.muscle], backed.sets);
+    });
+
+    test('the window is a cutoff, not the whole history', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final old = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+        at: DateTime.now().subtract(const Duration(days: 30)),
+      );
+      final logged = await tickFirstExercise(old);
+      await repo.completeWorkout(old);
+
+      final week = dayKeyOf(DateTime.now().subtract(const Duration(days: 6)));
+      expect((await repo.setsByMuscleSince(week))[logged.muscle] ?? 0, 0);
+
+      final month = dayKeyOf(DateTime.now().subtract(const Duration(days: 40)));
+      expect((await repo.setsByMuscleSince(month))[logged.muscle], logged.sets);
+    });
+
+    test('sets count while the session is still open', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+
+      // Not finished: the bar list is read mid-workout, and a set you have
+      // done is a set you have done.
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[logged.muscle], logged.sets);
+    });
+
+    test('a skipped slot contributes nothing', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      final detail = await repo.workoutDetail(id);
+      await repo.setSkipReason(
+        detail!.entries.first.workoutExercise.id,
+        SkipReason.shortOnTime,
+      );
+
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[logged.muscle] ?? 0, 0);
+    });
+  });
 }

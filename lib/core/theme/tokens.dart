@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/enums.dart';
+import '../../domain/muscle_volume.dart';
+
 /// Semantic colours. Widgets read these, never raw hex.
 ///
 /// Exposed as a [ThemeExtension] so the same widget tree renders correctly in
@@ -121,7 +124,13 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// white glyph on them rather than colour on charcoal.
   final List<Color> identity;
 
-  /// Heatmap: unworked day, then increasing intensity.
+  /// A day you did not train, and the empty part of a volume bar's track.
+  ///
+  /// **The same grey as [surfaceHighest], on purpose**, and kept as its own name
+  /// because it is its own job: the heatmap grid and the muscle bars sit one
+  /// above the other on the landing screen and are read as one answer, so a
+  /// rest day and an untrained muscle have to be the same absence. Two greys
+  /// eight points apart there say they are not.
   final Color heatEmpty;
 
   /// One tone for a day you trained, whatever it held.
@@ -206,8 +215,10 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     identity: [orange, blue, yellow, green, lavender, cyan],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
     // #222222 the grid dissolved into the card and the pattern — the whole
-    // point of the section — could only be read where it was filled.
-    heatEmpty: Color(0xFF2F2F2F),
+    // point of the section — could only be read where it was filled. It was
+    // #2F2F2F for that reason and is `surfaceHighest` now, which is a step
+    // clearer again and the grey the app already uses for an inert fill.
+    heatEmpty: Color(0xFF3A3A3A),
     // The palette's blue, not a lighter cousin of it. It used to be #6FA8F5,
     // one nudge off `info`, which is a bug waiting to be noticed.
     heatOn: blue,
@@ -239,10 +250,32 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     info: blue,
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
-    heatEmpty: Color(0xFFE7E7E7),
+    heatEmpty: Color(0xFFE0E0E0),
     heatOn: blue,
     shadow: Color(0x1A000000),
   );
+
+  /// The hue a muscle region owns: the six, in `MuscleRegion` order.
+  ///
+  /// The same closed set the Regimes screen hands out, used here for the same
+  /// reason — six fixed categories, one apiece, and the colour *is* the
+  /// category. The two never share a screen (a regime's mark is on the Regimes
+  /// screen and nowhere else, THEME §2), so nothing claims a hue means a
+  /// programme. `series` will not do: it holds five, and the sixth region would
+  /// wrap onto a colour already spoken for.
+  Color forRegion(MuscleRegion region) =>
+      identity[region.index % identity.length];
+
+  /// The hue a *muscle* carries, which is its region's — biceps, triceps and
+  /// forearms are all the colour of the arms bar they roll into, because that
+  /// is the bar they are read against.
+  ///
+  /// Null for [MuscleGroup.other], which belongs to no region and therefore
+  /// carries no colour rather than borrowing one.
+  Color? forMuscle(MuscleGroup muscle) {
+    final region = regionOf(muscle);
+    return region == null ? null : forRegion(region);
+  }
 
   /// The hue a regime owns, by the slot stored on its row.
   ///

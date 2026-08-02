@@ -4,6 +4,7 @@ import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
+import 'package:deltoid/domain/units.dart';
 import 'package:deltoid/features/settings/bodyweight_screen.dart';
 import 'package:deltoid/features/settings/settings_screen.dart';
 import 'package:drift/native.dart';
@@ -36,6 +37,14 @@ void main() {
     container.dispose();
     await db.close();
   });
+
+  /// What the database says the unit is, which is the only thing a confirmed
+  /// switch is allowed to have changed.
+  Future<WeightUnit> savedUnit() async {
+    final rows = await (db.select(db.appSettings)
+      ..where((t) => t.key.equals(unitsKey))).get();
+    return WeightUnitX.parse(rows.isEmpty ? null : rows.first.value);
+  }
 
   Future<void> pump(WidgetTester tester, Widget screen) async {
     await tester.pumpWidget(
@@ -117,6 +126,40 @@ void main() {
       expect(find.text('Light'), findsOneWidget);
       expect(find.text('Dark'), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
+    });
+
+    testWidgets('the unit asks before it restates every number in the app', (
+      tester,
+    ) async {
+      await pump(tester, const SettingsScreen());
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
+
+      await tester.tap(find.text('Pounds'));
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(find.text('Show weights in pounds?'), findsOneWidget);
+
+      await tester.tap(find.text('Go back').last);
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // A radio is one tap, and this one is on the way past to a backup.
+      expect(await savedUnit(), WeightUnit.kg);
+
+      await tester.tap(find.text('Pounds'));
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.tap(find.text('Switch to pounds').last);
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(await savedUnit(), WeightUnit.lb);
     });
   });
 

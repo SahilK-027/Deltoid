@@ -318,6 +318,54 @@ a device before the next starts.
       for a day you trained (a single session is a full day's work and used to
       render darkest), solid amber for a deload rather than an outline, and the
       month strip under the grid with the weekday column dropped.
+- [x] **Weekly muscle volume, and the muscle chip** _(not yet driven)_ — the two
+      short items off the wanted list, built together because both are about
+      reading a muscle rather than a movement.
+
+      **The bars are a section on Workouts, under the heatmap**, not the hero
+      pager they were designed for: the grid says whether you turned up and this
+      says what you trained when you did. `domain/muscle_volume.dart` folds the
+      twelve `MuscleGroup` values into six `MuscleRegion` rows and
+      `setsByMuscleSince` counts them in SQL, the way the all-time heatmap does.
+
+      **Six rows that open.** Six is what a glance reads and ten to fourteen is
+      what the volume research counts, because the splits that catch
+      under-training are biceps vs triceps and quads vs hamstrings — so arms and
+      legs fold open onto their own muscles, against the same week maximum,
+      zeros included. `Legs 18` is a number you cannot act on.
+
+      Two counting rules that are decisions, both tested: a **backoff set is
+      volume** though it is not progress (`countsForProgress` protects a
+      comparison; this counts work), and **deload weeks count**, following
+      `domain/consistency.dart`. Sets count as they are ticked, mid-session.
+
+      **The muscle on an exercise row is a chip**, and tapping it filters the
+      catalog to that muscle — the filter you can already see. The strip above
+      the list stays, for a muscle whose rows are all below the fold. A muscle
+      chip wears its region's hue wherever it appears, from the one place that
+      hands the six out (`DeltoidColors.forRegion` / `forMuscle`), so a bar and
+      the chip naming the same muscle cannot drift apart.
+
+      **Three things the screen taught us on the way**, all fixed here. The
+      exercise's picker sheets were taller than the phone, so `Muscle` opened
+      edge to edge with the page nowhere in sight and had no distance left to
+      travel — its entrance and exit both read as a cut. They are capped at two
+      thirds now. Every value row wrote the moment the sheet closed, on a screen
+      three routes land on, so a mis-tap refiled a movement with a year of
+      history behind it — muscle, equipment and bar ask first, naming both ends
+      of the change and lifting them out of the sentence (`confirmAction` grew a
+      `highlight`). Load mode already asked its own, harder question. And the
+      line under the header repeated the `Muscle` row's own value a few hundred
+      pixels above it — rule 6 — so it is gone, along with the whole block when
+      there is no training day to name.
+
+      **The unit asks too**, and its message says that nothing stored changes:
+      it is the one confirm here for a reversible display setting, and a dialog
+      that does not say so reads scarier than the act. It writes after the sheet
+      has left rather than against its exit animation — nothing is converted (
+      storage is kilograms either way), but every widget holding a weight
+      rebuilds, and the shell keeps all four tabs alive.
+
 - [ ] **7 · Reconciliation** — light theme on every screen (only checked at
       token level), empty states, motion, and THEME corrected where the build
       taught us something the audit didn't.
@@ -349,6 +397,8 @@ the wakelock, audio ducking, and the share sheet.
 - **Progress** — e1RM over time, one line per session slot, stall detection,
   deload weeks excluded. Rebuilt in step 4.
 - **Consistency heatmap** — eighteen weeks on Today, all-time view behind it.
+- **Weekly muscle volume** — six rows under the heatmap, arms and legs opening
+  onto their own muscles. `domain/muscle_volume.dart` + `setsByMuscleSince`.
 - **Backup** — export / restore / auto-export, round-trip tested.
 - **Bodyweight log** — schema, repository, interpolation, its own screen, and
   since step 6 one tap from Settings to log or correct a weight. The screen is a
@@ -375,7 +425,7 @@ the wakelock, audio ducking, and the share sheet.
   than the longest; and the bodyweight screen built every month row eagerly —
   six hundred of them to show eight.
 
-**291 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**317 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and
@@ -396,19 +446,6 @@ repository integration against real in-memory SQLite.
 
 Agreed but unspecified. Each carries the decision that blocks it. Check the
 README's **Non-goals** first — these are here because they survived that check.
-
-- **Weekly sets per muscle** — the bar list in THEME §5 → Muscle volume bars.
-  Pure aggregation over a rolling seven days — `domain/`, no database. *Decide
-  first:* working sets only (yes), direct muscle only (yes — there is no
-  secondary column), deload weeks counted or not (follow
-  `domain/consistency.dart`, which already chose once) — and **where it goes**.
-  The hero pager was the answer and it is gone (a landing screen you swipe to
-  use), so the bars need a home that is a page you already open.
-
-- **Muscle chip on every exercise**, making the catalog filterable by tapping
-  what you can see. Step 5 shipped the filter strip above the list; what is left
-  is the chip *on the row* being the thing you tap — today the row says the
-  muscle as text in its subtitle.
 
 - **Isometric holds.** The only item here needing a **migration**: a set is
   `weight × reps` and a hold is `load × seconds`, which touches `SetLog`, the

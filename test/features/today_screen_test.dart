@@ -5,6 +5,8 @@ import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/enums.dart';
+import 'package:deltoid/domain/muscle_volume.dart';
 import 'package:deltoid/features/today/today_screen.dart';
 import 'package:deltoid/features/today/widgets/heatmap.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
@@ -185,5 +187,89 @@ void main() {
     // destination now, so the cog is gone and the route is one tap from
     // everywhere — including this screen.
     expect(find.byTooltip('Settings'), findsNothing);
+  });
+
+  group('this week', () {
+    /// A finished session with every set of the first exercise ticked.
+    Future<void> logSession(String regimeId) async {
+      final repo = TrainingRepository(db);
+      final sessions = await (db.select(db.sessions)
+            ..where((t) => t.regimeId.equals(regimeId))
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      final id = await repo.startWorkout(
+        regimeId: regimeId,
+        sessionId: sessions.first.id,
+      );
+      final detail = await repo.workoutDetail(id);
+      for (final set in detail!.entries.first.sets) {
+        await repo.updateSet(
+          set.id,
+          weight: const Value(40),
+          reps: const Value(8),
+          isDone: const Value(true),
+        );
+      }
+      await repo.completeWorkout(id);
+    }
+
+    testWidgets('is not on a fresh install', (tester) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpToday(tester);
+      await frames(tester);
+
+      // Six empty tracks before anything has been logged is a chart of
+      // nothing, and it would be the first thing a new install saw.
+      expect(find.text('This week'), findsNothing);
+    });
+
+    testWidgets('draws all six rows once there is history, zeros included', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      final regimeId = await createRegimeFromTemplate(db, ppl);
+      await logSession(regimeId);
+      await pumpToday(tester);
+      await frames(tester);
+
+      expect(find.text('This week'), findsOneWidget);
+      for (final region in MuscleRegion.values) {
+        expect(
+          find.text(region.label),
+          findsOneWidget,
+          reason: 'a muscle trained zero times is still a row',
+        );
+      }
+      // The session logged is a chest opener, so chest is the only row with
+      // anything in it — and the untrained ones say so out loud.
+      expect(find.text('0'), findsWidgets);
+    });
+
+    testWidgets('a compound row opens onto its own muscles', (tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      final regimeId = await createRegimeFromTemplate(db, ppl);
+      await logSession(regimeId);
+      await pumpToday(tester);
+      await frames(tester);
+
+      expect(find.text('Quads'), findsNothing);
+
+      await tester.tap(find.text('Legs'));
+      await frames(tester);
+
+      // `Legs 18` is a number you cannot act on; `Quads 12 · Hamstrings 0` is
+      // the same week saying something you would train differently over.
+      for (final m in MuscleRegion.legs.parts) {
+        expect(find.text(m.label), findsOneWidget);
+      }
+      // Chest is not compound, so it has nothing to open and does not offer to.
+      expect(find.text('Chest'), findsOneWidget);
+    });
   });
 }

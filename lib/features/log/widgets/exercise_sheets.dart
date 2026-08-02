@@ -524,6 +524,7 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                       const SizedBox(width: Space.sm),
                       AppChip(
                         label: m.label,
+                        hue: context.c.forMuscle(m),
                         selected: _muscle == m,
                         onTap: () =>
                             setState(() => _muscle = _muscle == m ? null : m),
@@ -555,8 +556,19 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                         final e = filtered[i];
                         return AppRow(
                           title: e.name,
-                          subtitle:
-                              '${e.muscle.label} · ${e.equipment.label}',
+                          // Tappable here for the same reason as in the catalog
+                          // (§5): the muscle you can see is the filter.
+                          subtitleLeading: AppChip(
+                            label: e.muscle.label,
+                            dense: true,
+                            hue: context.c.forMuscle(e.muscle),
+                            selected: _muscle == e.muscle,
+                            onTap: () => setState(
+                              () => _muscle =
+                                  _muscle == e.muscle ? null : e.muscle,
+                            ),
+                          ),
+                          subtitle: e.equipment.label,
                           onTap: () => Navigator.of(context).pop(e),
                         );
                       },

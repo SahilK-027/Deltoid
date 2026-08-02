@@ -161,6 +161,13 @@ White was the rule before that and measured 1.9:1 on the old yellow.
 A palette is therefore only ever a list of fills. Nothing about a glyph is
 attached to it, and a hue retuned later cannot break its own mark.
 
+**The six are also the muscle-region palette** (§5 → Muscle volume bars): six
+fixed categories, one hue apiece, in enum order, handed out by
+`DeltoidColors.forRegion` / `forMuscle` so a bar and the chip naming the same
+muscle cannot drift apart. A closed set of six used twice
+is not an ambiguity as long as the two never share a screen — and they do not,
+because of the rule directly below.
+
 **Identity marks live on the Regimes screen and nowhere else.** The tile on a
 Today card or a History row is `heatOn` blue for a session and `deload` orange
 for a light week — the regime's own hue was there once, and it made the one
@@ -317,6 +324,26 @@ Unselected `surfaceHigh` + primary text. **Selected `accent` fill + `onAccent`
 text.** A trailing caret ⌄ means it opens a picker; a chip with no caret is a
 toggle. Rows of chips scroll horizontally and bleed off the right edge — the
 clipped chip is the scroll affordance.
+
+**A muscle chip carries its region's hue**, wherever it appears — the filter
+strip, the dense in-row chip — because that is the colour its sets are counted
+in on the volume bars, and biceps, triceps and forearms are all the colour of
+the arms bar they roll into. Unselected it is an 8dp **dot before the label**
+and the pill stays grey: chrome is monochrome (rule 1), and a column of filled
+pills beside a column of exercise names is the loudest thing on the screen.
+Selected it **fills with the hue**, label taken down out of its own fill by
+`IconTile.glyphOn` — white measures 1.4:1 on `yellow`, and near-black would make
+the chip two colours. `All` has no hue: it is every category and therefore none.
+`MuscleGroup.other` has none either — it belongs to no region and borrows
+nothing.
+
+**Dense (26 tall, same `label` text)** is the chip that sits *inside* a list
+row, on the subtitle line: the muscle on an exercise row. It is the filter you
+can already see — tapping it selects that muscle in the strip above the list and
+tapping it again clears it, so finding every hamstring movement never needs the
+strip scrolled. The strip stays, because a muscle whose rows are all below the
+fold has to be reachable too. A full-height chip there makes the row 90 tall and
+reads as the row's control rather than as one word in its description.
 
 ### Cards
 
@@ -660,15 +687,47 @@ Arms       ██████████████::::::   8 sets
 Shoulders  ::::::::::::::::::::   0 sets
 ```
 
-- Rows are in **`MuscleGroup` order and never re-sorted** — chest, back,
-  shoulders, arms, legs, core.
-- The bar is normalised to the **largest muscle that week**, not to a target.
-- Bar: `data`, height 8, radius 4, on a `surfaceHigh` track that shows the full
-  width so an empty week is still a row rather than a gap.
+- Rows are the **six `MuscleRegion` values, in order, never re-sorted** — chest,
+  back, shoulders, arms, legs, core.
+- The bar is normalised to the **largest region that week**, not to a target.
+- Bar: **height 12, radius 2, one hue per region** — the six, in `MuscleRegion`
+  order — on a **`surfaceHighest`** track that shows the full width so an empty
+  week is still a row rather than a gap. (`data` for every bar and a
+  `surfaceHigh` track were the original spec. Six bars of one colour make a
+  row's identity its position in the list, and the colour is free to carry it;
+  `series[]` holds five, so the sixth row would wrap onto a colour already
+  spoken for.)
+- **`heatEmpty` is that same grey now** (`#3A3A3A` / `#E0E0E0`), moved onto
+  `surfaceHighest` rather than the bars being moved onto it. The grid and the
+  bars sit one above the other on the landing screen and are read as one answer
+  — a rest day and an untrained muscle are the same absence, and two greys eight
+  points apart say they are not. The token keeps its name because it keeps its
+  job.
+- Radius 2, not a pill. Six pill-ended bars stacked read as six lozenges of
+  different lengths, and a full radius eats the short ones — a one-set bar is
+  about as wide as its own two end caps.
 - Name in `body`, count in `valueSm` with `sets` in `micro` beside it. A muscle
   trained zero times prints `0 sets` and an empty track (rule 4).
 - No axis, no gridlines, no legend. A bar list whose longest bar is the maximum
   needs none of them, and they are what turn six rows into a chart nobody reads.
+- **Arms and legs open.** Six rows is what a glance reads; the volume research
+  this list serves counts ten to fourteen muscles, because the splits that catch
+  under-training are biceps vs triceps and quads vs hamstrings. So a compound
+  row folds open onto its own muscles — inset, on `surfaceHigh`, bars against
+  the *same* week maximum as the rows above, zeros included. The zero is the
+  whole point: `Legs 18` is a number you cannot act on, `Quads 12 · Hamstrings
+  0` is one you would change a session over. Chest, back, shoulders and core are
+  one muscle each and do not offer a fold — a row that opens onto itself is a
+  control that does nothing.
+- The label of an openable row carries a small caret that flips; no chevrons
+  down the left. Six chevrons beside six rows is a column of furniture over a
+  column of data.
+
+It lives as a **section on the landing screen, under the heatmap** — the grid
+says whether you turned up, this says what you trained when you did. It is not a
+screen you navigate to, which is the condition a volume dashboard came off the
+non-goals list under, and it is not a pager page, which is the thing that idea
+died of.
 
 ### Badges
 
