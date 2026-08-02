@@ -15,7 +15,8 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell>
+    with SingleTickerProviderStateMixin {
   int _index = 0;
 
   // Kept alive across tab switches so scroll position and in-progress edits
@@ -27,10 +28,32 @@ class _AppShellState extends State<AppShell> {
     SettingsScreen(),
   ];
 
+  /// Drives the fade-and-rise. A controller rather than a
+  /// `TweenAnimationBuilder` keyed on the index, which is what this was:
+  /// changing a key throws away the element subtree under it, and the subtree
+  /// under it was the `IndexedStack`. Every tab switch therefore **rebuilt all
+  /// four screens from scratch** — the thing `IndexedStack` is there to
+  /// prevent — dropping their scroll positions and their providers' warm state,
+  /// and doing all of that work on the same frame the nav bar's ripple was
+  /// trying to animate. That is why switching tabs hitched and why the ripple
+  /// appeared to freeze halfway.
+  late final _fade = AnimationController(
+    vsync: this,
+    duration: Motion.base,
+    value: 1,
+  );
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
   void _select(int i) {
     if (i == _index) return;
     HapticFeedback.selectionClick();
     setState(() => _index = i);
+    _fade.forward(from: 0);
   }
 
   @override
@@ -39,17 +62,20 @@ class _AppShellState extends State<AppShell> {
       // The page fades and rises a few pixels on each switch. Not a slide: the
       // tabs are peers, and a horizontal transition would imply an order they
       // don't have — and the log screen owns the horizontal axis.
-      body: TweenAnimationBuilder<double>(
-        key: ValueKey(_index),
-        tween: Tween(begin: 0, end: 1),
-        duration: Motion.base,
-        curve: Motion.curve,
-        builder: (context, t, child) => Opacity(
-          opacity: t,
-          child:
-              Transform.translate(offset: Offset(0, (1 - t) * 8), child: child),
-        ),
+      body: AnimatedBuilder(
+        animation: _fade,
+        // The stack is the `child`: built once, animated over.
         child: IndexedStack(index: _index, children: _pages),
+        builder: (context, child) {
+          final t = Motion.curve.transform(_fade.value);
+          return Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, (1 - t) * 8),
+              child: child,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _NavBar(index: _index, onSelect: _select),
     );
@@ -101,11 +127,12 @@ class _NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border(top: BorderSide(color: c.border)),
-      ),
+    // `Material`, not a plain `Container`: ink has to have a surface to paint
+    // on, and the nearest one was the Scaffold *behind* the bar — so a ripple
+    // would have spread under an opaque background and never been seen.
+    return Material(
+      color: c.surface,
+      shape: Border(top: BorderSide(color: c.border)),
       child: SafeArea(
         top: false,
         child: SizedBox(
@@ -146,9 +173,35 @@ class _NavItem extends StatelessWidget {
     final c = context.c;
     final tint = selected ? c.textPrimary : c.textSecondary;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+    // The one destination control in the app, tapped more than anything else,
+    // and until now the only tappable thing with no press state at all: no
+    // scale, no dim, no ink. A tab that does not answer the finger makes the
+    // whole app feel a frame behind.
+    return InkResponse(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      // A **circle**, and no highlight at all.
+      //
+      // This was an unbounded rectangle sized to the bar, and it looked like
+      // exactly what it was: a lit box a cell and a half wide, with a hard
+      // edge, sitting behind the labels. Two separate mistakes in one control —
+      // `highlightShape: rectangle` paints a filled rect for as long as the
+      // finger is down, which is the pill this bar explicitly does not have,
+      // and a radius taken from the bar's width made the splash a wash across
+      // its neighbours rather than a ripple under the thumb.
+      //
+      // What is left is one circle, centred on the destination, a little wider
+      // than the icon it starts from, fading as it grows.
+      containedInkWell: false,
+      highlightShape: BoxShape.circle,
+      radius: 42,
+      splashFactory: InkRipple.splashFactory,
+      splashColor: c.textPrimary.withValues(alpha: 0.12),
+      // The press state is the ripple. A highlight underneath it is a second
+      // shape doing the same job, and it is the one that leaves an edge.
+      highlightColor: Colors.transparent,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

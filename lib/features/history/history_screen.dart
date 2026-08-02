@@ -166,9 +166,22 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
     // to the masthead, which holds the screen's name and nothing else (§5).
     return Column(
       children: [
-        const _FeedFilterBar(),
+        // The bar arrives once there is more than one day in history, and
+        // leaves when a filter is cleared on a short log. Both used to happen
+        // between two frames, jolting the list under it.
+        AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.emphasized,
+          alignment: Alignment.topCenter,
+          child: const _FeedFilterBar(),
+        ),
         Expanded(
+          // A write anywhere in history invalidates this provider, and `when`
+          // would drop the whole feed for a spinner while the page reloads —
+          // the list you are reading vanishing because you ticked a set two
+          // screens away. The rows stay until the new ones arrive.
           child: feed.when(
+            skipLoadingOnReload: true,
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
               child: Padding(

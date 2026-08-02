@@ -248,8 +248,49 @@ identity tiles **30% of tile size**, heat cells **4**.
 
 **Motion** — 140ms micro (press), 220ms standard (state, layout), 340ms
 transitions. Easing `easeOutCubic`; `easeOutQuint` for anything travelling a
-distance. Press feedback is a scale to 0.97 plus a dim to 0.86 — never an ink
-ripple, which on charcoal is either invisible or a grey smear.
+distance.
+
+**Press feedback is a scale to 0.97 plus a dim to 0.86 — except on a row.**
+Scale reads on a card, a chip or a button because the whole shape travels. On a
+full-width row against an identical row above it, 1% of scale is invisible, and
+a list that does not answer the finger makes the whole app feel a frame behind.
+So rows and nav destinations get **ink** (`InkRow`), and nothing else does:
+`splashFactory` stays `NoSplash` app-wide and the ripple is asked for
+explicitly. It is white at 10% rather than Material's `onSurface` at 12%, which
+on `#1F1F1F` is the grey smear this rule used to ban outright.
+
+**A ripple is a circle, and it is the only press state.** The nav bar's ink was
+briefly a rectangle sized to the whole bar, and it looked like what it was: a
+lit box a cell and a half wide with a hard edge, sitting behind the labels —
+which is the pill `No pill, no indicator` rules out, arriving by accident. Two
+rules came out of it:
+
+- `highlightShape` is **never** `rectangle` on a bare surface. A highlight is a
+  filled shape held for as long as the finger is down, and on anything that is
+  not already a bounded row it draws an edge nobody asked for.
+- **No highlight under a splash.** The ripple is the press state; a highlight
+  beneath it is a second shape doing the same job, and it is the one that
+  leaves the edge. `highlightColor: transparent` on the nav.
+
+A row is the exception, and only because a row *is* a rectangle: `InkRow` keeps
+a faint one because the shape it fills is the shape you pressed.
+
+**Scrolling is damped, everywhere.** `AppScrollBehavior` puts
+`BouncingScrollPhysics` on every list on every platform and drops the
+overscroll glow with it. Android's clamping physics stops a list dead at the end
+of its content and leaves a stretch indicator to say so; a list that visibly
+resists has already said it, and this is an app scrolled one-handed with a bar
+in the other.
+
+**Anything with a height animates to it.** A fold that arrives in one frame
+reads as the widget being replaced rather than as this one opening — every
+expand/collapse is an `AnimatedSize` on `easeOutQuint`, and every chevron that
+marks one is an `AnimatedRotation` rather than two glyphs swapped.
+
+**A reload never blanks what is on screen.** `skipLoadingOnReload` on every
+paged view: a write anywhere in history invalidates the feed, and the list you
+are reading must not vanish for a spinner because you ticked a set two screens
+away.
 
 ---
 

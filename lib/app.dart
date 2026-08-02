@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers.dart';
 import 'core/theme/theme.dart';
 import 'core/theme/tokens.dart';
+import 'core/widgets/scroll.dart';
 import 'features/shell/app_shell.dart';
 import 'features/today/today_providers.dart';
 
@@ -28,13 +29,19 @@ class DeltoidApp extends ConsumerWidget {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: mode,
-      // Switch outright rather than cross-fade. `MaterialApp` otherwise
-      // lerps every colour in the tree for 200ms, which on a screen of cards,
-      // charts and a heatmap is a long grey wash through the midpoint of two
-      // palettes — it reads as the app struggling, not as a transition. A
-      // theme change is a state change, and §4's motion budget covers things
-      // that travel, not the entire surface of the app changing what it is.
-      themeAnimationStyle: AnimationStyle.noAnimation,
+      // Damped scrolling everywhere, and no overscroll glow — see
+      // [AppScrollBehavior].
+      scrollBehavior: const AppScrollBehavior(),
+      // Crossed, not cut. This was `noAnimation` on the argument that lerping
+      // every colour in the tree is a grey wash through the midpoint of two
+      // palettes — true at Material's default 200ms linear, and the reason the
+      // switch is now driven at this app's own micro duration on
+      // `easeOutCubic`: fast enough that the midpoint is never a state you can
+      // read, slow enough that the screen does not appear to be replaced.
+      themeAnimationStyle: AnimationStyle(
+        duration: Motion.fast,
+        curve: Motion.curve,
+      ),
       home: const _Boot(),
     );
   }

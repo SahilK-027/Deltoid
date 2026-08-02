@@ -37,16 +37,19 @@ class TodayData {
 
 /// Every day ever logged, for the full-history heatmap behind Today's grid.
 ///
-/// Its own provider, and `autoDispose`: Today reads thirteen weeks on every
-/// write to any of six tables, and a year-by-year view is worth a second query
-/// when it is opened rather than a permanent tax on the first screen.
-final fullHeatmapProvider = StreamProvider.autoDispose<HeatmapData>((ref) {
+/// **Kept alive, and warmed while Today is on screen.** It was `autoDispose`,
+/// on the grounds that a year-by-year view is worth a query when it is opened —
+/// but "when it is opened" is precisely the moment there is nothing to draw,
+/// and the screen rendered blank until the query came back. The data is on
+/// local disk and it is one row per day: it should be sitting there before the
+/// route animation finishes, not started by it.
+final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);
 
   return db.watchQuery(
     [db.workouts],
-    () async => buildHeatmap(await repo.allCompleted()),
+    () async => buildHeatmapFromDays(await repo.loggedDays()),
   );
 });
 

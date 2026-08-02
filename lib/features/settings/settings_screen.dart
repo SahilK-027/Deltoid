@@ -245,11 +245,17 @@ class SettingsScreen extends ConsumerWidget {
     final file = await openFile();
     if (file == null) return;
 
+    // Parsed once, off the UI isolate, and the parsed map is what the restore
+    // is handed. It used to be read three times over — the prompt, then
+    // `restore`'s own check, then the real decode — two of them on the thread
+    // drawing the dialog, which is most of why a long history froze here.
     final BackupSummary summary;
+    final Map<String, dynamic> decoded;
     final String contents;
     try {
       contents = await file.readAsString();
-      summary = service.inspect(contents);
+      decoded = await service.decode(contents);
+      summary = service.summarise(decoded);
     } on FormatException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
       return;
@@ -276,7 +282,8 @@ class SettingsScreen extends ConsumerWidget {
       final result = await _withProgress<ImportResult>(
         context,
         title: 'Restoring',
-        task: (report) => service.restore(contents, onProgress: report),
+        task: (report) =>
+            service.restore(contents, onProgress: report, decoded: decoded),
       );
       if (result == null) return;
       messenger.showSnackBar(

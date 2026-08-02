@@ -45,10 +45,44 @@ class ExerciseRail extends StatefulWidget {
 class _ExerciseRailState extends State<ExerciseRail> {
   final _scroll = ScrollController();
 
+  /// The order the finger just put things in, held until the database agrees.
+  ///
+  /// Without it a drag ends by snapping back: `ReorderableListView` is built
+  /// straight off the stream, so the frame after the drop still carries the old
+  /// order, and the tab jumps home and then jumps again when the write lands.
+  /// Two jumps to express one move, both of them backwards.
+  List<String>? _pending;
+
   @override
   void didUpdateWidget(ExerciseRail old) {
     super.didUpdateWidget(old);
     if (old.current != widget.current) _revealCurrent();
+    // The write has come back around: whatever the stream now says is the
+    // truth, and the optimistic copy is spent.
+    if (_pending != null && !_sameOrder(old.entries, widget.entries)) {
+      _pending = null;
+    }
+  }
+
+  static bool _sameOrder(List<ExerciseEntry> a, List<ExerciseEntry> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].workoutExercise.id != b[i].workoutExercise.id) return false;
+    }
+    return true;
+  }
+
+  /// What to draw: the finger's order while one is in flight, the database's
+  /// otherwise.
+  List<ExerciseEntry> get _entries {
+    final pending = _pending;
+    if (pending == null) return widget.entries;
+    final byId = {
+      for (final e in widget.entries) e.workoutExercise.id: e,
+    };
+    final ordered = [for (final id in pending) ?byId[id]];
+    // An exercise added or removed under a drag invalidates the guess.
+    return ordered.length == widget.entries.length ? ordered : widget.entries;
   }
 
   @override
@@ -82,8 +116,9 @@ class _ExerciseRailState extends State<ExerciseRail> {
     // ReorderableListView reports the insertion slot, which is one past the
     // target when dragging forwards.
     if (to > from) to -= 1;
-    final ids = [for (final e in widget.entries) e.workoutExercise.id];
+    final ids = [for (final e in _entries) e.workoutExercise.id];
     ids.insert(to, ids.removeAt(from));
+    setState(() => _pending = ids);
     widget.onReorder(ids);
   }
 
@@ -103,14 +138,14 @@ class _ExerciseRailState extends State<ExerciseRail> {
               scrollDirection: Axis.horizontal,
               buildDefaultDragHandles: false,
               padding: const EdgeInsets.only(left: Space.gutter),
-              itemCount: widget.entries.length,
+              itemCount: _entries.length,
               onReorder: _handleReorder,
               proxyDecorator: (child, _, _) => Material(
                 color: Colors.transparent,
                 child: Opacity(opacity: 0.9, child: child),
               ),
                   itemBuilder: (context, i) {
-                    final entry = widget.entries[i];
+                    final entry = _entries[i];
                     final skipped =
                         entry.workoutExercise.skipReason != SkipReason.none;
                     final total = entry.sets.length;

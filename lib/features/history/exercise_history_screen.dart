@@ -102,6 +102,8 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
     Exercise? exercise,
   ) {
     return history.when(
+        // The chart and the list stay put while a write reloads the page.
+        skipLoadingOnReload: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
@@ -286,10 +288,15 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
               ],
               if (canExpand) ...[
                 const SizedBox(width: Space.sm),
-                Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                  color: c.textTertiary,
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: Motion.fast,
+                  curve: Motion.curve,
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 18,
+                    color: c.textTertiary,
+                  ),
                 ),
               ],
             ],
@@ -314,17 +321,30 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
               done.map((s) => _setLabel(s, exercise, unit)).join('   '),
               style: context.t.bodyMedium,
             ),
-            if (_expanded && done.isNotEmpty) ...[
-              const SizedBox(height: Space.md),
-              Divider(color: c.border, height: 1),
-              const SizedBox(height: Space.sm),
-              for (var i = 0; i < done.length; i++)
-                _ExpandedSetLine(
-                  set: done[i],
-                  position: i,
-                  exercise: exercise,
-                ),
-            ],
+            // The fold has a height, so it animates to it. It used to appear
+            // between two frames, which reads as the card being replaced
+            // rather than as it opening.
+            AnimatedSize(
+              duration: Motion.base,
+              curve: Motion.emphasized,
+              alignment: Alignment.topCenter,
+              child: !_expanded
+                  ? const SizedBox(width: double.infinity)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: Space.md),
+                        Divider(color: c.border, height: 1),
+                        const SizedBox(height: Space.sm),
+                        for (var i = 0; i < done.length; i++)
+                          _ExpandedSetLine(
+                            set: done[i],
+                            position: i,
+                            exercise: exercise,
+                          ),
+                      ],
+                    ),
+            ),
           ],
         ],
       ),

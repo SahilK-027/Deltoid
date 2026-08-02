@@ -248,9 +248,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final detail = ref
+    final loaded = ref
         .watch(workoutDetailProvider(widget.workoutId))
         .valueOrNull;
+    // Everything below reads the order the finger asked for, not the one the
+    // database has got round to.
+    final detail = loaded == null ? null : _withPendingOrder(loaded);
     final prefill =
         ref.watch(workoutPrefillProvider(widget.workoutId)).valueOrNull ??
         const {};
@@ -326,9 +329,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                 current: _page.clamp(0, detail.entries.length - 1),
                 onSelect: _goToPage,
                 onAdd: () => _addExercise(detail),
-                onReorder: (ids) => ref
-                    .read(trainingRepositoryProvider)
-                    .reorderWorkoutExercises(ids),
+                onReorder: (ids) {
+                  setState(() => _pendingOrder = ids);
+                  ref
+                      .read(trainingRepositoryProvider)
+                      .reorderWorkoutExercises(ids);
+                },
               ),
             Expanded(
               child: detail.entries.isEmpty
@@ -830,8 +836,56 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
     final ids = detail.entries.map((e) => e.workoutExercise.id).toList();
     ids.insert(target, ids.removeAt(index));
+    setState(() => _pendingOrder = ids);
     ref.read(trainingRepositoryProvider).reorderWorkoutExercises(ids);
     _goToPage(target);
+  }
+
+  /// The order the last move put things in, held until the database agrees.
+  ///
+  /// The rail holds its own while a *drag* is in flight, but `Move up` and
+  /// `Move down` in the ⋮ sheet went straight to the repository — so the tab
+  /// stayed where it was, the page animated to a neighbour that had not moved
+  /// yet, and both jumped when the write landed a frame or two later. One
+  /// optimistic order, owned here, covers the drag and both buttons: the rail,
+  /// the pager and the cell map are all built from it.
+  List<String>? _pendingOrder;
+
+  /// [detail] with the pending order applied, or unchanged when there is none
+  /// and when the database has caught up.
+  WorkoutDetail _withPendingOrder(WorkoutDetail detail) {
+    final pending = _pendingOrder;
+    if (pending == null) return detail;
+
+    final actual = [for (final e in detail.entries) e.workoutExercise.id];
+    // Caught up: the guess is spent, and the database's own order is the truth
+    // from here.
+    if (actual.length == pending.length) {
+      var same = true;
+      for (var i = 0; i < actual.length; i++) {
+        if (actual[i] != pending[i]) same = false;
+      }
+      if (same) {
+        _pendingOrder = null;
+        return detail;
+      }
+    }
+
+    final byId = {
+      for (final e in detail.entries) e.workoutExercise.id: e,
+    };
+    final ordered = [for (final id in pending) ?byId[id]];
+    // An exercise added, swapped or removed under the move invalidates it.
+    if (ordered.length != detail.entries.length) {
+      _pendingOrder = null;
+      return detail;
+    }
+
+    return WorkoutDetail(
+      workout: detail.workout,
+      session: detail.session,
+      entries: ordered,
+    );
   }
 
   Future<void> _addExercise(WorkoutDetail detail) async {

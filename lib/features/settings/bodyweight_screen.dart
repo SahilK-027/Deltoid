@@ -120,76 +120,134 @@ class _MonthListState extends State<_MonthList> {
   /// record, the chart is the reading.
   TrendWindow _window = const TrendWindow.rolling(ChartRange.threeMonths);
 
-  @override
-  Widget build(BuildContext context) {
-    final log = widget.log;
-    final unit = widget.unit;
-    final months = groupByMonth(log);
-    if (!_seeded && months.isNotEmpty) {
-      _seeded = true;
-      _open.add(months.first.label);
-    }
+  /// Months, and where each one starts in the flat log. Recomputed only when
+  /// the log itself changes — grouping two thousand entries on every expand
+  /// was work done to answer a question nobody had asked again.
+  List<BodyweightMonth> _months = const [];
+  List<int> _starts = const [];
 
-    // Where each month begins in [log], so a month's first row still reads
-    // against the last entry of the month before it rather than losing its
-    // delta at the seam.
+  @override
+  void initState() {
+    super.initState();
+    _group();
+  }
+
+  @override
+  void didUpdateWidget(_MonthList old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.log, widget.log)) _group();
+  }
+
+  void _group() {
+    _months = groupByMonth(widget.log);
     final starts = <int>[];
     var offset = 0;
-    for (final month in months) {
+    for (final month in _months) {
       starts.add(offset);
       offset += month.entries.length;
     }
+    _starts = starts;
+    if (!_seeded && _months.isNotEmpty) {
+      _seeded = true;
+      _open.add(_months.first.label);
+    }
+  }
 
-    return ListView(
+  @override
+  Widget build(BuildContext context) {
+    final unit = widget.unit;
+
+    // `.builder`, and one card per month rather than one card holding every
+    // month. A `ListView` with a `children:` list builds every one of them
+    // before the first frame: fifty years is six hundred month rows, each with
+    // its own average and delta, all constructed to show the eight that fit on
+    // screen. That is the whole of this screen's slowness.
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(
           Space.gutter, Space.lg, Space.gutter, Space.huge),
-      children: [
-        const SectionHeader('Trend'),
-        _TrendCard(
-          log: log,
-          unit: unit,
-          window: _window,
-          onWindow: (w) => setState(() => _window = w),
-        ),
-        const SizedBox(height: Space.section),
-        SectionHeader(
-          'By month',
-          trailing: Text(
-            '${log.length} logged',
-            style: context.t.bodySmall,
-          ),
-        ),
-        ListCard(
-          inset: Space.lg,
-          children: [
-            for (var m = 0; m < months.length; m++) ...[
-              _MonthRow(
-                month: months[m],
-                previous: m + 1 < months.length ? months[m + 1] : null,
+      // Two headers and the chart, then a card per month.
+      itemCount: _months.length + 2,
+      itemBuilder: (context, i) {
+        if (i == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeader('Trend'),
+              _TrendCard(
+                log: widget.log,
                 unit: unit,
-                open: _open.contains(months[m].label),
-                onTap: () => setState(() {
-                  final label = months[m].label;
-                  _open.contains(label)
-                      ? _open.remove(label)
-                      : _open.add(label);
-                }),
+                window: _window,
+                onWindow: (w) => setState(() => _window = w),
               ),
-              if (_open.contains(months[m].label))
-                _MonthDays(
-                  entries: months[m].entries,
-                  // The entry before each one in time, wherever it lives — a
-                  // month's first row still reads against the last of the
-                  // month before it rather than losing its delta at the seam.
-                  previousOf: (i) => starts[m] + i + 1 < log.length
-                      ? log[starts[m] + i + 1]
-                      : null,
-                  unit: unit,
-                ),
+              const SizedBox(height: Space.section),
             ],
-          ],
-        ),
-      ],
+          );
+        }
+        if (i == 1) {
+          return SectionHeader(
+            'By month',
+            trailing: Text(
+              '${widget.log.length} logged',
+              style: context.t.bodySmall,
+            ),
+          );
+        }
+
+        final m = i - 2;
+        final month = _months[m];
+        final open = _open.contains(month.label);
+        return Padding(
+          // The hairline between months, drawn as a gap: one card each, so a
+          // month that is closed costs one row and nothing else.
+          padding: EdgeInsets.only(bottom: m == _months.length - 1 ? 0 : 1),
+          child: ClipRRect(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(m == 0 ? Radii.xl : 0),
+              bottom:
+                  Radius.circular(m == _months.length - 1 ? Radii.xl : 0),
+            ),
+            child: ColoredBox(
+              color: context.c.surface,
+              child: Column(
+                children: [
+                  _MonthRow(
+                    month: month,
+                    previous: m + 1 < _months.length ? _months[m + 1] : null,
+                    unit: unit,
+                    open: open,
+                    onTap: () => setState(() {
+                      open ? _open.remove(month.label) : _open.add(month.label);
+                    }),
+                  ),
+                  // Animated to its height rather than appearing: the days are
+                  // what the month row opens, and a fold that arrives in one
+                  // frame reads as a different list rather than as this one
+                  // opening.
+                  AnimatedSize(
+                    duration: Motion.base,
+                    curve: Motion.emphasized,
+                    alignment: Alignment.topCenter,
+                    child: !open
+                        ? const SizedBox(width: double.infinity)
+                        : _MonthDays(
+                            entries: month.entries,
+                            // The entry before each one in time, wherever it
+                            // lives — a month's first row still reads against
+                            // the last of the month before it rather than
+                            // losing its delta at the seam.
+                            previousOf: (i) =>
+                                _starts[m] + i + 1 < widget.log.length
+                                    ? widget.log[_starts[m] + i + 1]
+                                    : null,
+                            unit: unit,
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

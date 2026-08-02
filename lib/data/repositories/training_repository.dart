@@ -209,6 +209,25 @@ class WorkoutSummary {
   }
 }
 
+/// One calendar day that was trained, with only the facts a grid needs.
+class LoggedDay {
+  const LoggedDay({
+    required this.dayKey,
+    required this.workouts,
+    required this.isDeload,
+    required this.anyWorkoutId,
+  });
+
+  final int dayKey;
+  final int workouts;
+
+  /// True when any workout that day was a light week.
+  final bool isDeload;
+
+  /// One of the day's workouts, so a day on the calendar can be opened.
+  final String anyWorkoutId;
+}
+
 /// A training day that appears in history, for the feed's filter.
 class LoggedSession {
   const LoggedSession({
@@ -521,7 +540,43 @@ class TrainingRepository {
     );
   }
 
-  /// Every completed workout, oldest first, for the full-history heatmap.
+  /// One row per day trained, ever — for the full-history heatmap and for the
+  /// rings on the calendar.
+  ///
+  /// Aggregated in SQL rather than folded in Dart. The grid needs three facts
+  /// about a day and [allCompleted] was handing over every column of every
+  /// workout to get them: fifty years is a few thousand rows, each one
+  /// serialised across the database isolate's port and rebuilt as an object on
+  /// the UI isolate, to be thrown away the moment the day it belongs to had
+  /// been counted. That transfer is the hitch you feel when Consistency opens.
+  Future<List<LoggedDay>> loggedDays() async {
+    final counted = db.workouts.id.count();
+    // Any workout on the day, so a ringed day on the calendar has something to
+    // open. `max` because it has to be *some* deterministic one.
+    final anyId = db.workouts.id.max();
+    // Stored as an integer, so the max is "was any of them a deload".
+    final deload = db.workouts.isDeload.cast<int>().max();
+
+    final rows = await (db.selectOnly(db.workouts)
+          ..addColumns([db.workouts.dayKey, counted, anyId, deload])
+          ..where(db.workouts.status.equalsValue(WorkoutStatus.completed) &
+              db.workouts.deletedAt.isNull())
+          ..groupBy([db.workouts.dayKey])
+          ..orderBy([OrderingTerm(expression: db.workouts.dayKey)]))
+        .get();
+
+    return [
+      for (final r in rows)
+        LoggedDay(
+          dayKey: r.read(db.workouts.dayKey)!,
+          workouts: r.read(counted) ?? 0,
+          isDeload: (r.read(deload) ?? 0) != 0,
+          anyWorkoutId: r.read(anyId) ?? '',
+        ),
+    ];
+  }
+
+  /// Every completed workout, oldest first.
   ///
   /// Deliberately separate from [todaySnapshot]: Today only ever needs the last
   /// thirteen weeks, and loading a decade of rows to render three months of grid

@@ -1,4 +1,5 @@
 import '../../data/db/database.dart';
+import '../../data/repositories/training_repository.dart';
 import '../../domain/consistency.dart';
 
 /// One day on the consistency heatmap.
@@ -6,7 +7,7 @@ class HeatDay {
   const HeatDay({
     required this.workouts,
     required this.isDeload,
-    this.workoutIds = const [],
+    this.workoutId,
   });
 
   final int workouts;
@@ -15,10 +16,10 @@ class HeatDay {
   /// easy week, not a gap in the record.
   final bool isDeload;
 
-  /// What was logged that day, oldest first. Carried so a day picked on the
-  /// calendar can open the workout it already holds instead of only offering to
-  /// write a second one.
-  final List<String> workoutIds;
+  /// One of the day's workouts, so a day picked on the calendar can open what
+  /// it already holds instead of only offering to write a second one. Null when
+  /// the day came from a source that does not carry ids.
+  final String? workoutId;
 }
 
 class HeatmapData {
@@ -42,7 +43,7 @@ HeatmapData buildHeatmap(List<Workout> completed) {
     days[w.dayKey] = HeatDay(
       workouts: (existing?.workouts ?? 0) + 1,
       isDeload: (existing?.isDeload ?? false) || w.isDeload,
-      workoutIds: [...?existing?.workoutIds, w.id],
+      workoutId: existing?.workoutId ?? w.id,
     );
   }
 
@@ -50,6 +51,32 @@ HeatmapData buildHeatmap(List<Workout> completed) {
     days: days,
     consistency: computeConsistency(
       completedDayKeys: completed.map((w) => w.dayKey),
+      today: DateTime.now(),
+    ),
+  );
+}
+
+/// The same grid, from rows SQL has already folded by day.
+///
+/// What the all-time view uses. A day's session count still counts twice
+/// towards the rate — [computeConsistency] wants one key per session — so the
+/// keys are expanded back out, which is a few thousand integers rather than a
+/// few thousand objects across an isolate port.
+HeatmapData buildHeatmapFromDays(List<LoggedDay> logged) {
+  return HeatmapData(
+    days: {
+      for (final d in logged)
+        d.dayKey: HeatDay(
+          workouts: d.workouts,
+          isDeload: d.isDeload,
+          workoutId: d.anyWorkoutId,
+        ),
+    },
+    consistency: computeConsistency(
+      completedDayKeys: [
+        for (final d in logged)
+          for (var i = 0; i < d.workouts; i++) d.dayKey,
+      ],
       today: DateTime.now(),
     ),
   );

@@ -6,12 +6,12 @@ import '../theme/tokens.dart';
 /// The component vocabulary from THEME.md §5. Feature code composes these; it
 /// does not draw its own cards, rows, buttons or sheets.
 
-/// Press feedback for the whole app: a small scale-down and a dim, never an
-/// ink ripple.
+/// Press feedback for anything with a shape: a small scale-down and a dim.
 ///
-/// A ripple on charcoal is either invisible or a grey smear across the corner
-/// radius, and it arrives *after* the finger. Scale reads instantly and works
-/// identically on a 26pt chip and a full-width card.
+/// Scale reads instantly and works identically on a 26pt chip and a full-width
+/// card, because in both cases the whole thing moves. It is the wrong feedback
+/// for a **row** — 1% of a full-width strip is invisible — which is what
+/// [InkRow] is for, and the only place this app inks.
 class Pressable extends StatefulWidget {
   const Pressable({
     super.key,
@@ -408,6 +408,9 @@ class AppCard extends StatelessWidget {
       duration: Motion.base,
       curve: Motion.curve,
       padding: padding,
+      // Clipped, so a row's ink stops at the card's corner instead of painting
+      // a square one over it.
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: fill ?? c.surface,
         borderRadius: BorderRadius.circular(radius),
@@ -553,7 +556,60 @@ class AppRow extends StatelessWidget {
     );
 
     if (onTap == null) return row;
-    return Pressable(onTap: onTap, scale: 0.99, child: row);
+    return InkRow(onTap: onTap, child: row);
+  }
+}
+
+/// A tappable row, with ink.
+///
+/// The one place this app uses a ripple, and the reason is that a row has
+/// nothing else to move: [Pressable]'s scale reads on a card, a chip or a
+/// button because the whole shape travels, and on a full-width row against an
+/// identical row above it, 1% of scale is invisible. A wash spreading from
+/// where the finger landed is the only feedback a flat list can give.
+///
+/// It is not the app-wide default — `splashFactory` stays [NoSplash] and every
+/// other surface keeps scale-and-dim (THEME §4). This asks for ink explicitly.
+class InkRow extends StatelessWidget {
+  const InkRow({
+    super.key,
+    required this.child,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                onTap!();
+              },
+        onLongPress: onLongPress == null
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                onLongPress!();
+              },
+        // Explicit, because the theme turns splashes off globally.
+        splashFactory: InkRipple.splashFactory,
+        // Tuned for charcoal. Material's default is `onSurface` at 12%, which
+        // on `#1F1F1F` is a grey smear; a low-alpha white spreads as light
+        // rather than as dirt, and reads on the light theme as a shadow.
+        splashColor: c.textPrimary.withValues(alpha: 0.10),
+        highlightColor: c.textPrimary.withValues(alpha: 0.04),
+        child: child,
+      ),
+    );
   }
 }
 

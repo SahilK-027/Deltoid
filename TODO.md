@@ -358,8 +358,21 @@ the wakelock, audio ducking, and the share sheet.
   every day already logged (blue, or orange for a deload) and asks, on a day
   that has one, whether you came to read it or to add to it.
 - Light / dark / system theme, adaptive launcher icon.
+- **Feel** — ink on rows and nav (THEME §4), animated folds, no spinner where
+  there is already content, an optimistic order under a reorder drag, damped
+  scrolling everywhere, and the all-time heatmap aggregated in SQL instead of
+  shipping every workout row across the database isolate's port.
 
-**274 tests** — prefill and deload rules, cycle timing, metrics and volume,
+  The four that actually cost frames, all found by reading rather than
+  guessing: the shell keyed its transition on the tab index, which discarded
+  the `IndexedStack` and **rebuilt all four screens on every switch**; the log
+  screen's prefill key was the exercise ids *in order*, so a reorder re-walked
+  every movement's history against fifty years of logs; that prefill resolved
+  one exercise at a time, making first paint the sum of six round trips rather
+  than the longest; and the bodyweight screen built every month row eagerly —
+  six hundred of them to show eight.
+
+**276 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and

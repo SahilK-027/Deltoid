@@ -1281,6 +1281,41 @@ void main() {
     expect(seen.toSet(), hasLength(5));
   });
 
+  test('the heatmap reads one aggregated row per day, not every workout',
+      () async {
+    await writeHistory(6);
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    // A second session on a day already trained, and a light week.
+    final twice = (await repo.workoutFeed(limit: 50)).first;
+    await db.into(db.workouts).insert(
+          WorkoutsCompanion.insert(
+            id: Value(newId()),
+            regimeId: regime.id,
+            sessionId: Value(push1.id),
+            dayKey: twice.workout.dayKey,
+            startedAt: Value(twice.workout.startedAt + 1),
+            status: const Value(WorkoutStatus.completed),
+            isDeload: const Value(true),
+          ),
+        );
+
+    final days = await repo.loggedDays();
+
+    // Seven workouts, six days.
+    expect(days, hasLength(6));
+    expect(days.map((d) => d.dayKey).toList(),
+        [...days.map((d) => d.dayKey)]..sort());
+
+    final shared = days.firstWhere((d) => d.dayKey == twice.workout.dayKey);
+    expect(shared.workouts, 2);
+    // Any workout that day being a deload makes the day one.
+    expect(shared.isDeload, isTrue);
+    expect(shared.anyWorkoutId, isNotEmpty);
+
+    expect(days.where((d) => d.isDeload), hasLength(1));
+  });
+
   test('the filter only offers days that appear in history', () async {
     await writeHistory(3);
     final logged = await repo.loggedSessions();

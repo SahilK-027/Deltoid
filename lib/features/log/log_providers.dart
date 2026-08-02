@@ -97,23 +97,37 @@ final workoutPrefillProvider =
   // Joined into a string on purpose: Dart lists compare by identity, so
   // selecting a List would rebuild every time regardless and quietly do
   // nothing at all.
+  //
+  // **Sorted**, because which order they are in is not one of the things that
+  // makes this map stale. Unsorted, dragging a tab changed the key, which
+  // re-walked every exercise's history through `resolvePrefill` — six
+  // movements against fifty years of logs — for a result guaranteed to be
+  // identical. That work landed on the frame the drop animation was trying to
+  // play, which is what made a reorder judder and then jump.
   final exerciseIds = await ref.watch(
     workoutDetailProvider(workoutId).selectAsync(
-      (detail) => [
+      (detail) => ([
         for (final e in detail?.entries ?? const []) e.exercise.id,
-      ].join(','),
+      ]..sort())
+          .join(','),
     ),
   );
 
-  final out = <String, PrefillResult>{};
-  for (final exerciseId in exerciseIds.split(',')) {
-    if (exerciseId.isEmpty) continue;
-    out[exerciseId] = await ref.watch(
-      exercisePrefillProvider((
+  final ids = [
+    for (final id in exerciseIds.split(',')) if (id.isNotEmpty) id,
+  ];
+
+  // Resolved together, not one after another. Each exercise is its own chain of
+  // queries across the database isolate's port, and awaiting them in series
+  // made the log screen's first paint the *sum* of six round trips instead of
+  // the longest one.
+  final results = await Future.wait([
+    for (final exerciseId in ids)
+      ref.watch(exercisePrefillProvider((
         workoutId: workoutId,
         exerciseId: exerciseId,
-      )).future,
-    );
-  }
-  return out;
+      )).future),
+  ]);
+
+  return {for (var i = 0; i < ids.length; i++) ids[i]: results[i]};
 });

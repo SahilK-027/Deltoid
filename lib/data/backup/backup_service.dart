@@ -329,14 +329,35 @@ class BackupService {
 
   /// Reads a backup's header without touching the database, so the restore
   /// prompt can say exactly what is about to be written.
-  BackupSummary inspect(String json) {
+  ///
+  /// Prefer [decode] + [summarise] on anything user-facing: this parses the
+  /// whole file on the calling isolate, and a restore used to do it **three
+  /// times** — once here for the prompt, once inside `restore`, and once more
+  /// off-isolate to actually read the rows. On fifty years of training that is
+  /// three full parses of a multi-megabyte string, two of them on the thread
+  /// trying to draw the confirmation dialog.
+  BackupSummary inspect(String json) => summarise(_decode(json));
+
+  /// Parses a backup off the UI isolate. The result feeds both [summarise] and
+  /// [restore], so the file is read exactly once.
+  Future<Map<String, dynamic>> decode(String json) => _decodeOffIsolate(json);
+
+  static Map<String, dynamic> _decode(String json) {
     final Object? decoded;
     try {
       decoded = jsonDecode(json);
     } on FormatException {
       throw const FormatException('That file is not valid JSON.');
     }
-    if (decoded is! Map<String, dynamic> || decoded['data'] is! Map) {
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('That file is not a Deltoid backup.');
+    }
+    return decoded;
+  }
+
+  /// The header of an already-parsed backup.
+  BackupSummary summarise(Map<String, dynamic> decoded) {
+    if (decoded['data'] is! Map) {
       throw const FormatException('That file is not a Deltoid backup.');
     }
 
@@ -382,8 +403,12 @@ class BackupService {
   Future<ImportResult> restore(
     String json, {
     BackupProgress? onProgress,
+    /// An already-parsed file, from [decode]. Passing it is the difference
+    /// between reading a fifty-year backup once and reading it twice.
+    Map<String, dynamic>? decoded,
   }) async {
-    final summary = inspect(json);
+    final payload = decoded ?? await _decodeOffIsolate(json);
+    final summary = summarise(payload);
 
     onProgress?.call((
       phase: BackupPhase.decoding,
@@ -391,10 +416,6 @@ class BackupService {
       rows: 0,
       fraction: null,
     ));
-    // Off the UI isolate, for the same reason the export encodes there: this
-    // is one call that runs for as long as the file is big, and the dialog
-    // saying "restoring" cannot paint a frame while it does.
-    final payload = await _decodeOffIsolate(json);
     final data = Map<String, dynamic>.from(payload['data'] as Map);
 
     final total = summary.totalRows;

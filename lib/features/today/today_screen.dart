@@ -324,7 +324,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
     if (picked == null || !mounted) return;
 
     final already = logged[dayKeyOf(picked)];
-    if (already == null || already.workoutIds.isEmpty) {
+    if (already?.workoutId == null) {
       setState(() => _date = picked);
       return;
     }
@@ -333,10 +333,10 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
     // to add the session you also did that day — so it asks rather than
     // guessing. Guessing "log another" is how a tap meant to check Tuesday
     // ends with a second Tuesday in history.
-    final open = await _confirmTrainedDay(picked, already);
+    final open = await _confirmTrainedDay(picked, already!);
     if (open == null || !mounted) return;
     if (open) {
-      Navigator.of(context).pop(_BackfillResult.open(already.workoutIds.last));
+      Navigator.of(context).pop(_BackfillResult.open(already.workoutId!));
     } else {
       setState(() => _date = picked);
     }
@@ -450,6 +450,12 @@ class TodayScreen extends ConsumerWidget {
     // One value, one frame. `valueOrNull` keeps the last snapshot on screen
     // while a reload runs, so a write on another tab never blanks this one.
     final today = ref.watch(todayProvider).valueOrNull;
+    // Warmed here, drawn two screens away. `Consistency` and the backfill
+    // calendar both read every day ever logged, and both used to *start* that
+    // query when they opened — so both opened empty and filled in. Today is
+    // where you are before you go to either, and this costs one aggregated
+    // query per change to `workouts`.
+    ref.watch(fullHeatmapProvider);
     final regime = today?.regime;
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;

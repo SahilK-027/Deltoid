@@ -135,7 +135,8 @@ void main() {
       await pump(tester, const BodyweightScreen());
 
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.text('August 2026'));
+      await tester.scrollUntilVisible(find.text('August 2026'), 120,
+          scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       expect(find.text('August 2026'), findsOneWidget);
       expect(find.text('July 2026'), findsOneWidget);
@@ -147,7 +148,8 @@ void main() {
       expect(find.text('Tue 28 Jul'), findsNothing);
 
       // The chart leads the screen, so the older months are below the fold.
-      await tester.ensureVisible(find.text('July 2026'));
+      await tester.scrollUntilVisible(find.text('July 2026'), 120,
+          scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('July 2026'));
       await tester.pumpAndSettle();
@@ -163,7 +165,10 @@ void main() {
       await repo.logBodyweight(DateTime(2026, 8, 1), 76.0);
       await pump(tester, const BodyweightScreen());
 
-      await tester.ensureVisible(find.text('July 2026'));
+      // `.builder`: a month below the fold is not built until it is scrolled
+      // to, which is the point of the change.
+      await tester.scrollUntilVisible(find.text('July 2026'), 120,
+          scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       expect(find.text('2 weigh-ins'), findsOneWidget);
       expect(find.text('1 weigh-in'), findsOneWidget);
@@ -177,7 +182,8 @@ void main() {
       await TrainingRepository(db).logBodyweight(DateTime(2026, 8, 1), 76.0);
       await pump(tester, const BodyweightScreen());
 
-      await tester.ensureVisible(find.text('Sat 1 Aug'));
+      await tester.scrollUntilVisible(find.text('Sat 1 Aug'), 120,
+          scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sat 1 Aug'));
       for (var i = 0; i < 20; i++) {
