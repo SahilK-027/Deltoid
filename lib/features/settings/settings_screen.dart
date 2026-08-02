@@ -534,12 +534,22 @@ class _ThemeTile extends StatelessWidget {
           AnimatedContainer(
             duration: Motion.fast,
             curve: Motion.curve,
-            padding: const EdgeInsets.all(3),
+            // A hairline when it is not chosen, not nothing.
+            //
+            // The miniature is painted in its *own* palette, so the dark tile
+            // is `#131313` on a `#131313` page: with a transparent ring around
+            // it, the tile you are not using has no edge at all and reads as a
+            // hole in the section rather than as the other choice. The ring is
+            // the card, and it is `surface` filled so the mount is visible on
+            // both themes; selected takes it to 2px `accent`, which is the
+            // choice-card state from THEME §7.
+            padding: EdgeInsets.all(selected ? 3 : 4),
             decoration: BoxDecoration(
+              color: c.surface,
               borderRadius: BorderRadius.circular(Radii.md + 3),
               border: Border.all(
-                color: selected ? c.accent : Colors.transparent,
-                width: 2,
+                color: selected ? c.accent : c.border,
+                width: selected ? 2 : 1,
               ),
             ),
             child: ClipRRect(
@@ -635,14 +645,23 @@ class _ThemeMiniature extends StatelessWidget {
           const SizedBox(height: Space.xs),
           Row(
             children: [
-              for (final colour in palette.series.take(4)) ...[
+              // The identity hues, spaced across the six rather than the first
+              // four of `series[]` — which put cyan next to blue and made two
+              // of the four dots read as one colour at 5pt. Big enough to be a
+              // colour: at 5 they were punctuation.
+              for (final colour in const [
+                DeltoidColors.orange,
+                DeltoidColors.blue,
+                DeltoidColors.lavender,
+                DeltoidColors.green,
+              ]) ...[
                 Container(
-                  width: 5,
-                  height: 5,
+                  width: 8,
+                  height: 8,
                   decoration:
                       BoxDecoration(shape: BoxShape.circle, color: colour),
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(width: Space.xs),
               ],
             ],
           ),
