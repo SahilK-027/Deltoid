@@ -50,8 +50,8 @@ a device before the next starts.
       listing only years with something in them. A year at a time is legible
       and two of them are compared by switching; everything at once never was.
 
-- [ ] **5 · Regime cluster** — built, and driven once. **Wants another pass on
-      the device** now that the day reads as a list.
+- [x] **5 · Regime cluster** _(driven on the device)_ — the programme editor,
+      rebuilt around a day you can read.
 
       The Regime tab is the programme editor: day tabs under a band that names
       the regime, the day's exercises under a count heading, and Rename and
@@ -86,15 +86,24 @@ a device before the next starts.
       range and four identical rows would draw per-set targets this app cannot
       store.
 
-      **Driven, and the device found two things.** The day tabs asked for an
-      infinite width — a stretching column inside a horizontal scroll — and the
-      Regime tab rendered as nothing at all behind one `BoxConstraints forces
-      an infinite width` and a hundred `RenderBox was not laid out`. And the
-      screen had no masthead until it had data, so a first launch opened on a
-      bare empty state with nothing saying which tab you were in.
-      `regime_screen_test.dart` now pumps all four states against a real
-      database, because both were invisible to the analyzer and to every other
-      test.
+      **Driven twice, and the device found four things.** The first pass: the
+      day tabs asked for an infinite width — a stretching column inside a
+      horizontal scroll — and the Regime tab rendered as nothing at all behind
+      one `BoxConstraints forces an infinite width` and a hundred `RenderBox
+      was not laid out`. And the screen had no masthead until it had data, so a
+      first launch opened on a bare empty state with nothing saying which tab
+      you were in. `regime_screen_test.dart` now pumps all four states against
+      a real database, because both were invisible to the analyzer and to every
+      other test.
+
+      The second pass, after the day became a list: creating a regime always
+      activated it, so building next month's split abandoned the one you are
+      mid-cycle on and a shelf of programmes was impossible to assemble — from
+      the Regimes screen it creates and stays put, offering the switch in the
+      snackbar, and only an empty app still activates on create. And the tab
+      strip shrink-wrapped, so a regime with one day centred `Legs` and
+      `Add day +` in the band while a regime with six had them against the
+      gutter; the strip is full width now, whatever is in it.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion once the
       list primitives exist. Settings has its masthead already (step 4 made it
       a tab); what is left is bodyweight coming up out of it to one tap, and
