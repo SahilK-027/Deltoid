@@ -104,6 +104,105 @@ a device before the next starts.
       strip shrink-wrapped, so a regime with one day centred `Legs` and
       `Add day +` in the band while a regime with six had them against the
       gutter; the strip is full width now, whatever is in it.
+
+      **The tab is the index of the section, not the editor.** It opened
+      straight into the active regime, so the tab named after every programme
+      only ever showed one, and the other regimes and the exercise catalog sat
+      two sheets deep behind the sliders button — which is how a shelf of
+      programmes managed to look deleted. The tab is the list now, in two
+      sections — **`Active regime`** and **`Regime library`** — with the
+      catalog as a row beneath them, since it belongs to no single regime.
+      The heading carries the state, not a badge: an `Active` pill in one
+      row's trailing slot and no other's shifted that row's layout against
+      its neighbours, and the section says the same thing without bending
+      the column. `Train this one` is `Activate regime` — it names the state
+      it produces rather than the consequence.
+      Tapping a regime pushes the same editor as before, wearing the app bar
+      (THEME §5) and scoped to `regimeId` rather than to whatever is active —
+      `regimeByIdProvider` and `sessionsForRegimeProvider`, carried down
+      through the slot screen, which had been reading the active regime for a
+      day that need not belong to it. A tap edits and never switches; `Train
+      this one` stays in the row's ⋯ sheet, because training a programme is a
+      decision rather than a side effect of looking at it. The cycle line
+      renders only for the active regime — an inactive one has no cycle in
+      flight.
+
+      **A regime owns its colour, and there are six of them.** The mark was a
+      hash of the regime id, which is stable but not unique — six hues means
+      two programmes collide about a third of the time, and the mark is the
+      thing History and Today are scanned by. `Regimes.identityIndex` (schema
+      v5) stores the slot: assigned lowest-free on create, handed back on
+      delete, backfilled oldest-first for an upgraded database. That makes the
+      palette a cap — **six live regimes**, and the seventh create is refused
+      by `RegimeSlotsFullException` rather than allowed to share. The library
+      heading says so before `New` is tapped. Today and History hold a regime
+      id and not the row, so they read `regimeIdentityProvider` (id → slot,
+      deleted regimes included, or a deleted programme would turn every old
+      row orange).
+
+      **A name belongs to one regime.** Applying a template proposes the
+      template's own name, so `Upper / Lower` could be applied four times and
+      the History feed then held four identical rows in four colours. Live
+      regime names are unique now — trimmed, case-insensitive, enforced in
+      `createRegime`, `createRegimeFromTemplate` and `updateRegime`, and said
+      in the name field while you type rather than in a snackbar after the
+      sheet closes. A deleted regime releases its name. `promptForText` grew a
+      `validate` callback for it, which is how the rename sheets check too.
+
+      **Two templates, and blank.** `Push / Pull / Legs · 3 day` and `Full body
+      · 3 day` are gone: five splits is a magazine, and the two kept are the
+      shapes the model is built around. Scratch sits alone at the top of the
+      sheet, the templates under a `Regime templates` heading — they are two
+      different offers, and stacked together the empty card read as a template
+      of nothing.
+
+      **Deload is orange, and the session tile is blue.** Deload was amber, one
+      notch from the yellow in `series[]` and from a yellow identity mark. Once
+      it went orange the Today and History tiles — which took the *regime's*
+      identity hue — hid it outright on the orange regime and drowned it on
+      every other one. Those tiles are `heatOn` blue for a session and `deload`
+      orange for a light week, which is the one distinction a feed of trained
+      days is scanned for. Identity hues stay on the Regimes screen, where the
+      colour separates programmes. `regimeIdentityProvider` went with the
+      change; nothing outside that screen reads a slot now.
+
+      **The palette went round a loop and came home.** There were three sets
+      of the six hues — a light one tuned for charcoal, a saturated one identity
+      marks filled with, and a third the light theme kept privately — so a call
+      site had to know which job it was doing and the `blue` on Today was not
+      the `blue` in the chart beside it. Collapsing onto the saturated set read
+      as *too saturated*, correctly: it ran 4.0:1 at blue to 9.7:1 at yellow.
+      Solving every hue to one contrast fixed the evenness and cost the hues —
+      yellow came out `#A0812B`, an ochre, which is a number satisfying a
+      constraint rather than a yellow.
+
+      The answer was the six the app already had: `#FF8B66 · #689FFA · #FDD35F
+      · #5DBA86 · #BE8CFF · #77D4E3`, plus the one red. Screenshots of the
+      reference app's own charts sample within a few points of them on every
+      hue, and it uses one set in both themes — so we do too, and `light` points
+      at the same constants as `dark`. **A hue has to stay the hue**; evenness
+      is worth solving for only where it doesn't cost that.
+
+      The thing that made two sets look necessary was the *white* glyph these
+      fills cannot carry (1.4:1 on yellow). That is gone:
+
+      **a tile's glyph is its own hue taken down**, the way the reference app
+      draws them: `#FF8B66` carries `#9E2600`, `#5DBA86` carries `#275C3E`. White was
+      the rule and measured 1.9:1 on the old yellow; near-black fixed the ratio
+      and lost the point, because a tile is one colour with a shape cut out of
+      it and a black shape makes it two. `IconTile.glyphOn` walks the lightness
+      down until the glyph clears 3.2:1 against its own fill — solved, not a
+      fixed multiplier, which ranges 2.9–3.7 across the hues and is the
+      uneven-set problem one level down. Every tile lands at 3.24–3.35:1,
+      covered by `test/core/icon_tile_glyph_test.dart`. It is also what frees
+      the fills to be light enough for one palette to serve both themes.
+
+      **Restoring a pre-v5 backup no longer throws.** `Regime.fromJson` casts
+      `identityIndex` straight to int and a file written before the column has
+      no such key — `type 'Null' is not a subtype of type 'int'`, and the whole
+      restore died on the first regime. The codec defaults it, and the restore
+      deals the slots out afterwards, exactly as the migration does. A file
+      that already carries slots keeps them.
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — **built, not yet driven.**
 
       **Bodyweight is one tap.** It had never once been logged through the UI:

@@ -184,7 +184,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
 
         // No cards and no gutter: the rows run edge to edge under a spoken
         // date heading, which is what lets a year of training be scanned by
-        // the identity tiles alone (§8).
+        // the tiles and the day names alone (§8).
         return ListView.builder(
           controller: _controller,
           padding: const EdgeInsets.only(bottom: Space.huge),
@@ -324,11 +324,12 @@ class _WorkoutRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final date = dateFromDayKey(summary.workout.dayKey);
-    // The mark is the programme's, except on a light week — a deload outranks
-    // whose programme it belongs to, the same way it does on Today.
-    final mark = summary.workout.isDeload
-        ? c.deload
-        : c.identityFor(summary.workout.regimeId);
+    // Every session is the heatmap's blue; a deload is orange. The tile carried
+    // the regime's identity hue, which is what made a deload unreadable in this
+    // column — orange against six other colours, and invisible against the
+    // orange regime. Down a feed the question is which of these days was light,
+    // and that is now the only thing the colour answers.
+    final mark = summary.workout.isDeload ? c.deload : c.heatOn;
 
     // No programme name: the tile already carries it as colour, and spelled
     // out it was long enough to push the line into an ellipsis on a phone.

@@ -33,6 +33,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.accentSurface,
     required this.deload,
     required this.deloadMuted,
+    required this.warning,
+    required this.warningMuted,
     required this.positive,
     required this.negative,
     required this.data,
@@ -84,10 +86,22 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// give it.
   final Color accentSurface;
 
-  /// Deload identity. Amber, and the only hue in the cycle model — a light week
-  /// has to be legible at a glance on the heatmap and in history.
+  /// Deload identity. Orange, and the only hue in the cycle model — a light
+  /// week has to be legible at a glance on the heatmap and in history.
+  ///
+  /// It was amber, which sat one notch from the yellow in `series[]` and the
+  /// yellow identity mark; orange separates the one state the cycle model has
+  /// from the palette information is drawn from.
   final Color deload;
   final Color deloadMuted;
+
+  /// A rule the app is stating: a limit reached, a consequence worth reading
+  /// before you act. Yellow, and its own token rather than a second use of
+  /// [deload] — a light week and a refused action are different facts, and a
+  /// token shared between them means neither can be retuned without moving the
+  /// other. [warningMuted] is the ground it sits on.
+  final Color warning;
+  final Color warningMuted;
 
   final Color positive;
   final Color negative;
@@ -128,14 +142,32 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// depth in this app is surface colour.
   final Color shadow;
 
-  /// The six hues, named once.
+  /// The six hues, named once, and **the same six in both themes**.
   ///
-  /// Every semantic colour on the dark theme that is not red is one of these,
-  /// so a chart series, a regime's mark and the deload amber are the same six
-  /// tones wherever they turn up rather than six near-misses that happened to
-  /// be picked one screen at a time. They are tuned for charcoal — the light
-  /// theme keeps its own darker set, because a #fdd35f on white is not a
-  /// colour, it is a smudge.
+  /// Every semantic colour that is not red is one of these, so a chart series,
+  /// a regime's mark and the deload orange are the same tones wherever they
+  /// turn up rather than near-misses chosen one screen at a time.
+  ///
+  /// These are back where they started, and the round trip is the useful part
+  /// of the record. They were replaced by a saturated set (`#FF6535`, `#F9AC0E`
+  /// …), which read as shouting; then by a set solved for equal contrast on
+  /// charcoal, which fixed the evenness and turned yellow into an ochre —
+  /// `#A0812B` is a number satisfying a constraint, not a yellow. Sampling the
+  /// app we take the language from landed within a few points of this original
+  /// six, on every hue. **A hue has to stay the hue.** Equal contrast is worth
+  /// having only where it does not cost that; yellow is bright because yellow
+  /// is bright.
+  ///
+  /// One set, both themes, for the same reason our reference does it: an
+  /// identity mark is the same mark whichever theme it is drawn in, and a
+  /// colour that changes with the phone's setting is a colour you learn twice.
+  /// What made two sets look necessary was a **white** glyph on the fill, which
+  /// these are too light to carry. The glyph is the fill's own hue taken down
+  /// now (`IconTile.glyphOn`), so the fills are free to be light.
+  ///
+  /// The cost, stated: on a white card `yellow` is 1.4:1 and `orange` 1.9:1.
+  /// They are fills and marks on the light theme, never text and never a
+  /// hairline — see the note in THEME §2.
   ///
   /// Red has no entry: `negative` and the failure end of the effort ramp are
   /// the one signal that must never be mistaken for information, and it stays
@@ -147,33 +179,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   static const lavender = Color(0xFFBE8CFF);
   static const cyan = Color(0xFF77D4E3);
 
-  /// The same six, one step down, for anything that fills a shape and knocks a
-  /// **white glyph** out of it — the identity tile on a regime, a session, a
-  /// history row.
-  ///
-  /// The six above are tuned to sit *on* charcoal, where a light tone is the
-  /// point. Fill a 44pt tile with one and put a white icon on top and the icon
-  /// is gone: they are the brightest thing on the screen and white is barely
-  /// brighter. A fifth off each keeps the hue — a regime's mark is still
-  /// recognisably "the orange one" — and gives the glyph something to sit
-  /// against.
-  ///
-  /// Kept as their own constants rather than computed with `withValues` at the
-  /// call site, so the darker set is a decision written down once and not a
-  /// multiplication that drifts screen by screen.
-  /// A fifth off is enough for five of them. Yellow and cyan are the two the
-  /// eye reads as brightest to begin with, and at a fifth they left white at
-  /// 2.3:1 and 2.7:1 — a glyph you can see is there and cannot name. They go
-  /// down about a third instead, which puts every mark past 3:1 against white
-  /// and keeps the seven distinguishable from each other, which is the only
-  /// job an identity colour has.
-  static const orangeDeep = Color(0xFFCC6F52);
-  static const blueDeep = Color(0xFF537FC8);
-  static const yellowDeep = Color(0xFFAE8B37);
-  static const greenDeep = Color(0xFF4A956B);
-  static const lavenderDeep = Color(0xFF9870CC);
-  static const cyanDeep = Color(0xFF4A8F9B);
-  static const redDeep = Color(0xFFC82A38);
+  /// The one red, for the one thing red means — and the one place a hue is
+  /// allowed to shout.
+  static const red = Color(0xFFF83446);
 
   static const dark = DeltoidColors(
     bg: Color(0xFF131313),
@@ -190,39 +198,23 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     onAccent: Color(0xFF121212),
     accentMuted: Color(0xFF2B2B2B),
     accentSurface: Color(0xFF242424),
-    deload: yellow,
-    deloadMuted: Color(0xFF3A3117),
+    deload: orange,
+    deloadMuted: Color(0xFF3A2318),
+    warning: yellow,
+    warningMuted: Color(0xFF3A3117),
     positive: green,
-    negative: Color(0xFFF83446),
+    negative: red,
     data: cyan,
     info: blue,
     series: [cyan, blue, yellow, green, lavender],
-    identity: [
-      redDeep,
-      orangeDeep,
-      yellowDeep,
-      greenDeep,
-      blueDeep,
-      lavenderDeep,
-      cyanDeep,
-    ],
-    effort: [
-      Color(0xFFF83446),
-      Color(0xFFF83446),
-      orange,
-      orange,
-      green,
-      green,
-      blue,
-    ],
+    identity: [orange, blue, yellow, green, lavender, cyan],
+    effort: [red, red, orange, orange, green, green, blue],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
     // #222222 the grid dissolved into the card and the pattern — the whole
     // point of the section — could only be read where it was filled.
     heatEmpty: Color(0xFF2F2F2F),
-    // The palette's blue, not a lighter cousin of it. This used to be #6FA8F5
-    // precisely because `info` was a saturated #2F7BFF and a year of those is a
-    // wall; the blue is light enough now to read as "on" without shouting, and
-    // a token one nudge off another token is a bug waiting to be noticed.
+    // The palette's blue, not a lighter cousin of it. It used to be #6FA8F5,
+    // one nudge off `info`, which is a bug waiting to be noticed.
     heatOn: blue,
     shadow: Color(0x66000000),
   );
@@ -242,51 +234,32 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     onAccent: Color(0xFFFFFFFF),
     accentMuted: Color(0xFFE0E0E0),
     accentSurface: Color(0xFFF7F7F7),
-    deload: Color(0xFFB07206),
-    deloadMuted: Color(0xFFFBEED2),
-    positive: Color(0xFF12855F),
-    negative: Color(0xFFC33A2E),
-    data: Color(0xFF0E8FA6),
-    info: Color(0xFF2563EB),
-    series: [
-      Color(0xFF0E8FA6),
-      Color(0xFF2563EB),
-      Color(0xFFB07206),
-      Color(0xFF12855F),
-      Color(0xFF7C4DD1),
-    ],
-    identity: [
-      Color(0xFFD32F3D),
-      Color(0xFFDD6B20),
-      Color(0xFFB07206),
-      Color(0xFF12855F),
-      Color(0xFF2563EB),
-      Color(0xFF7C4DD1),
-      Color(0xFF0E8FA6),
-    ],
-    effort: [
-      Color(0xFFC33A2E),
-      Color(0xFFC33A2E),
-      Color(0xFFB07206),
-      Color(0xFFB07206),
-      Color(0xFF12855F),
-      Color(0xFF12855F),
-      Color(0xFF2563EB),
-    ],
+    deload: orange,
+    deloadMuted: Color(0xFFFBE4D6),
+    warning: yellow,
+    warningMuted: Color(0xFFFBEED2),
+    positive: green,
+    negative: red,
+    data: cyan,
+    info: blue,
+    series: [cyan, blue, yellow, green, lavender],
+    identity: [orange, blue, yellow, green, lavender, cyan],
+    effort: [red, red, orange, orange, green, green, blue],
     heatEmpty: Color(0xFFE7E7E7),
-    heatOn: Color(0xFF3B7BE0),
+    heatOn: blue,
     shadow: Color(0x1A000000),
   );
 
-  /// The identity colour for a stable string (a regime id). Deterministic, so a
-  /// regime keeps its mark across launches without storing anything.
-  Color identityFor(String seed) {
-    var hash = 0;
-    for (final unit in seed.codeUnits) {
-      hash = (hash * 31 + unit) & 0x7FFFFFFF;
-    }
-    return identity[hash % identity.length];
-  }
+  /// The hue a regime owns, by the slot stored on its row.
+  ///
+  /// This replaced a hash of the regime id. A hash is stable but not unique —
+  /// with six colours, two regimes collide about a third of the time — and the
+  /// mark is what History and Today are scanned by. Slots are assigned on
+  /// create and handed back on delete; see `Regimes.identityIndex`.
+  ///
+  /// The modulo is for a row that predates the column or came back from a
+  /// restore written against a longer palette. It never fires in normal use.
+  Color identityAt(int slot) => identity[slot.abs() % identity.length];
 
   /// Colour for a reps-in-reserve rating. Null (unrated) stays neutral.
   Color effortFor(int? rir) {
@@ -312,6 +285,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     Color? accentSurface,
     Color? deload,
     Color? deloadMuted,
+    Color? warning,
+    Color? warningMuted,
     Color? positive,
     Color? negative,
     Color? data,
@@ -340,6 +315,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       accentSurface: accentSurface ?? this.accentSurface,
       deload: deload ?? this.deload,
       deloadMuted: deloadMuted ?? this.deloadMuted,
+      warning: warning ?? this.warning,
+      warningMuted: warningMuted ?? this.warningMuted,
       positive: positive ?? this.positive,
       negative: negative ?? this.negative,
       data: data ?? this.data,
@@ -377,6 +354,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       accentSurface: c(accentSurface, other.accentSurface),
       deload: c(deload, other.deload),
       deloadMuted: c(deloadMuted, other.deloadMuted),
+      warning: c(warning, other.warning),
+      warningMuted: c(warningMuted, other.warningMuted),
       positive: c(positive, other.positive),
       negative: c(negative, other.negative),
       data: c(data, other.data),

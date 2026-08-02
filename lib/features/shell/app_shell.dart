@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/plate_icon.dart';
 import '../history/history_screen.dart';
-import '../regime/regime_screen.dart';
+import '../regime/regimes_screen.dart';
 import '../settings/settings_screen.dart';
 import '../today/today_screen.dart';
 
@@ -22,7 +22,7 @@ class _AppShellState extends State<AppShell> {
   // survive navigation.
   final _pages = const [
     TodayScreen(),
-    RegimeScreen(),
+    RegimesScreen(),
     HistoryScreen(),
     SettingsScreen(),
   ];
@@ -75,7 +75,7 @@ const _destinations = [
   (
     icon: Icons.dashboard_outlined,
     active: Icons.dashboard_rounded,
-    label: 'Regime'
+    label: 'Regimes'
   ),
   (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
   (

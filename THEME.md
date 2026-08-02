@@ -114,35 +114,74 @@ is the single biggest thing that separates "designed" from "themed".
 
 ### Data / semantic — the only hues
 
-**Six hues and a red.** Every semantic colour on the dark theme is one of
-`orange #FF8B66` · `blue #689FFA` · `yellow #FDD35F` · `green #5DBA86` ·
-`lavender #BE8CFF` · `cyan #77D4E3`, named on `DeltoidColors` and referenced by
-name. Never write a hex at a call site: a chart series, a regime's mark and the
-deload amber have to be the same six tones wherever they appear, not six
-near-misses picked one screen at a time.
+**Six hues and a red — `orange #FF8B66` · `blue #689FFA` · `yellow #FDD35F` ·
+`green #5DBA86` · `lavender #BE8CFF` · `cyan #77D4E3`, plus `red #F83446`.**
+Named on `DeltoidColors` and referenced by name. Never write a hex at a call
+site: a chart series, a regime's mark and the deload orange have to be the same
+tones wherever they appear, not near-misses picked one screen at a time.
 
-Red is deliberately not in that set. `negative` and the failure end of the
-effort ramp are the one signal that must never be read as information, so it
-stays out of the palette everything else draws from.
+**The same six in both themes**, as the reference app does it. An identity mark
+is the same mark whichever theme it is drawn in, and a colour that changes with
+the phone's setting is one you have to learn twice.
 
-**Colour on charcoal, and colour under a glyph, are two different jobs.** The
-six are tuned to sit *on* `bg` — light, so they read against it. An identity
-tile fills a shape with one and knocks a **white** glyph out of it, and there
-the same tone leaves the icon invisible. Identity marks use the deep set
-(`orangeDeep`, `blueDeep`, …), same hue, a fifth off — a third for yellow and
-cyan, which the eye reads brightest and which at a fifth still left the glyph
-under 3:1.
+These are the original six, returned to after a full loop, and the loop is the
+lesson. They were replaced by a saturated set (`#FF6535`, `#F9AC0E` …) that read
+as shouting on the device; then by a set solved for equal contrast on charcoal,
+which did make the weights even and turned yellow into `#A0812B` — an ochre. A
+number satisfying a constraint is not a yellow. Sampling the reference app's own
+charts landed within a few points of this six on every hue.
+
+So: **a hue has to stay the hue.** Evenness is worth solving for only where it
+does not cost that. These run 7.0:1 to 13.0:1 on `bg` — a wider spread than the
+solved set, and the right trade, because yellow is bright because yellow is
+bright.
+
+What previously forced a second, darker set for the light theme was a **white**
+glyph on the fill, which these are far too light to carry (1.4:1 on yellow). The
+glyph is derived from the fill now, so the fills are free to be light.
+
+The cost, stated plainly: on a white card `yellow` is 1.4:1 and `cyan` 1.7:1. On
+the light theme the six are **fills and marks — never text, never a hairline.**
+Where a hue must carry text on both themes, use `textPrimary` and let the hue be
+the shape behind it.
+
+Red is deliberately not in the six. `negative` and the failure end of the effort
+ramp are the one signal that must never be read as information, so it stays out
+of the palette everything else draws from — and it is allowed to shout where the
+six are not.
+
+**A filled mark's glyph is the fill's own hue, taken down.** Not white, not
+black — `#FF8B66` carries `#9E2600`, `#5DBA86` carries `#275C3E`. A tile is one
+colour with a shape cut out of it, and a white or black shape makes it two.
+
+`IconTile` solves for it: same hue, same saturation, lightness walked down until
+the glyph clears **3.2:1 against its own fill**, which lands every tile at
+3.24–3.35:1. A fixed multiplier was tried and ranges 2.9–3.7
+depending on where the hue sits — the uneven-set problem again, one level down.
+White was the rule before that and measured 1.9:1 on the old yellow.
+
+A palette is therefore only ever a list of fills. Nothing about a glyph is
+attached to it, and a hue retuned later cannot break its own mark.
+
+**Identity marks live on the Regimes screen and nowhere else.** The tile on a
+Today card or a History row is `heatOn` blue for a session and `deload` orange
+for a light week — the regime's own hue was there once, and it made the one
+distinction those screens exist to show invisible on the orange regime and
+indistinguishable from a mark on every other one. Which programme a workout
+belongs to is said in words; whether it was a deload is only ever said by the
+tile.
 
 | Token | Hex | Use |
 | --- | --- | --- |
 | `data` | `cyan #77D4E3` | Default chart series, sparklines |
 | `positive` | `green #5DBA86` | Success, completed, "you beat last time" |
-| `deload` | `yellow #FDD35F` | Deload identity, caution |
-| `negative` | `#F83446` | Destructive fill, delete swipe panel |
-| `info` | `blue #689FFA` | Second series, heatmap ramp, identity tiles |
+| `deload` | `orange #FF8B66` | Deload identity |
+| `warning` | `yellow #FDD35F` | Stated limit or consequence (`NoticeBox`) |
+| `negative` | `red #F83446` | Destructive fill, delete swipe panel |
+| `info` | `blue #689FFA` | Second series, heatmap ramp, session tiles |
 | `series[]` | `cyan · blue · yellow · green · lavender` | Categorical, in order |
-| `identity[]` | the six **one step down**, plus a deep red: `#C82A38 · #CC6F52 · #AE8B37 · #4A956B · #537FC8 · #9870CC · #4A8F9B` | Regime and session marks |
-| `heatOn` | `blue #689FFA` | A day you trained |
+| `identity[]` | the six, in order | Regime marks, on the Regimes screen only |
+| `heatOn` | `blue #689FFA` | A day you trained; the session tile |
 
 **RIR / effort scale** (a diverging ramp, used only on effort ratings):
 `0–1 #F83446` · `2–3 orange` · `4–5 green` · `6+ blue` · unknown `#3A3A3A`.
@@ -413,6 +452,25 @@ its own — Workouts had the session in there and the header ran half the screen
 with the first real section beginning somewhere in the middle of it, unmarked.
 Pin the band, scroll the content.
 
+**The notice.** A stated limit or consequence: `warningMuted` ground, a hairline
+of `warning` at 45%, `warning_amber_rounded` and the title in `warning` yellow,
+and the sentence itself in `textPrimary`. `NoticeBox`.
+
+It exists because a limit explained in a grey box, above a stack of greyed-out
+cards, is one more greyed-out thing — the whole sheet was off and nothing on it
+said which part was the *reason*. Colour is what separates a rule from a casualty
+of it.
+
+Yellow, not red: `negative` is for destroying something, and a limit destroys
+nothing. It carries its own `warning` token rather than borrowing `deload`'s
+amber, so a light week and a refused action can be retuned apart. Never for an
+error, never dismissible — a notice states a rule that is currently true.
+
+**The copy states the rule, not its cause.** "You can keep up to 6 regimes at a
+time" — not the reason there are six, which is an identity colour per regime and
+tells you nothing you can act on. An implementation detail in a warning reads as
+an excuse.
+
 ### The metric screen
 
 Re-audited on the device against a year of real logs, because our Progress
@@ -540,7 +598,7 @@ expanding columns.
 | Element | Spec |
 | --- | --- |
 | Index chip | A circle filling the index column, `valueSm`. **Warm-up shows `W`, drop set shows `D`**, and warm-ups are excluded from the "Set n of m" count. A typed set is tinted with it: `data` for a warm-up, `deload` for a drop — a letter *and* a colour. The tint is **blended into `surfaceHigh`, never translucent**: laid over the drop capsule at 18% it picked up the grey behind it and came out a washed olive. The letter alone put the two rows that are not your working sets in the same grey as the rows that are. |
-| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary`, and nothing else: no dot, no italic — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. Where the ghosts came from is not a caption in the header — that was the info sheet's line printed twice — it is the `Last logged` row behind the exercise's ⓘ, with an amber dot on the button whenever they were borrowed from another session. |
+| Prefill | Not a column. Last time's numbers sit **inside** the fields as ghost text — `textTertiary`, and nothing else: no dot, no italic — because you compare against them at the moment you are deciding what to lift, and a separate column costs the width the value needs. Where the ghosts came from is not a caption in the header — that was the info sheet's line printed twice — it is the `Last logged` row behind the exercise's ⓘ, with a `deload`-orange dot on the button whenever they were borrowed from another session. |
 | Value field | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: transparent fill + 2px white outline. |
 | Done | Checkbox as specced. |
 | Completed row | Values and index dim to `textSecondary`, the fields drop from `surfaceHigh` to `surface`, and the checkbox goes solid white. Dull, not black: at `surfaceSunken` a logged row read as a hole cut in the table. The row is *not* struck through, washed, or recoloured. |
@@ -688,8 +746,8 @@ deliberate departures — keep them when implementing.
 | 2-up stat tiles ellipsize to `45° Cable Rear…` | Two lines before ellipsis in grid tiles | A truncated exercise name is not an identifier |
 | Muscle chips hard-clip mid-word at the screen edge | Fade the overflow edge | Clipping looks like a layout bug; a fade looks like a scroll |
 | Warm-up-only exercise reads `Set 0 of 0` | `Warm-up only`, and the count appears when a working set does | A zero pair is a bug face |
-| No deload concept | Deload is `deload` amber everywhere it touches — cycle, heatmap, resume card, history row | It is the one thing our cycle model has that theirs doesn't; it must be legible at a glance |
-| Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: amber dot on the ⓘ, the session and date inside it | The entire reason this app exists (README) |
+| No deload concept | Deload is `deload` orange everywhere it touches — cycle, heatmap, resume card, history row | It is the one thing our cycle model has that theirs doesn't; it must be legible at a glance |
+| Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: an orange dot on the ⓘ, the session and date inside it | The entire reason this app exists (README) |
 | Programme identity is a colour + glyph you must pick during creation | Same mark, but auto-assigned on create and changeable later | Identity is worth having; a mandatory question about it is not |
 | Rep targets hidden two taps deep behind a card, placeholder `Optional` | Same sheet, but the card shows the target inline (`4 × 8–10`) so it is readable without opening | The target is the point of the slot |
 | Theme is three labelled words in a segmented track | Three miniatures of the app — background, `Aa`, chart series, cards — with System split on the diagonal, over a `title` label | A track asks you to remember what "System" did last time; the tile shows it. The one place in the app where a control renders the *other* palette on purpose |

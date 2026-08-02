@@ -41,7 +41,31 @@ final activeRegimeProvider = StreamProvider<Regime?>((ref) {
   return query.watchSingleOrNull();
 });
 
-/// Sessions of the active regime, in programme order.
+/// One regime by id.
+///
+/// The editor is reached by pushing a row off the Regime index, so it edits the
+/// regime you tapped rather than the one you happen to be training. Emits null
+/// when that regime is deleted from under the screen.
+final regimeByIdProvider = StreamProvider.family<Regime?, String>((ref, id) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.regimes)
+    ..where((t) => t.id.equals(id) & t.deletedAt.isNull())
+    ..limit(1);
+  return query.watchSingleOrNull();
+});
+
+/// Sessions of any regime, in programme order.
+final sessionsForRegimeProvider =
+    StreamProvider.family<List<Session>, String>((ref, id) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.sessions)
+    ..where((t) => t.regimeId.equals(id) & t.deletedAt.isNull())
+    ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]);
+  return query.watch();
+});
+
+/// Sessions of the active regime, in programme order. What Today and the log
+/// run on; the editor uses the family above.
 final activeSessionsProvider = StreamProvider<List<Session>>((ref) {
   final db = ref.watch(databaseProvider);
   final regime = ref.watch(activeRegimeProvider).valueOrNull;

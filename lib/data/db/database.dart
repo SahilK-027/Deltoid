@@ -32,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -67,6 +67,15 @@ class AppDatabase extends _$AppDatabase {
               "UPDATE exercises SET bar_kind = 'none' "
               "WHERE bar_kind = 'standard'",
             );
+          }
+          // v5: a regime owns one of the identity hues instead of hashing its
+          // id into the list. The column defaults to 0, which would put every
+          // existing regime in orange, so hand them the slots in the order they
+          // were created — oldest keeps the colour it is most likely to have
+          // had, and nothing shares.
+          if (from < 5) {
+            await m.addColumn(regimes, regimes.identityIndex);
+            await backfillIdentityIndexes(this);
           }
         },
         beforeOpen: (details) async {

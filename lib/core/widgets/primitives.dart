@@ -991,8 +991,48 @@ class IconTile extends StatelessWidget {
         color: solid ? tint : tint.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(size * 0.3),
       ),
-      child: Icon(icon, size: size * 0.5, color: solid ? Colors.white : tint),
+      child: Icon(icon, size: size * 0.5, color: solid ? glyphOn(tint) : tint),
     );
+  }
+
+  /// The glyph is **the fill's own hue, taken down** — not white, not black.
+  ///
+  /// White was the rule for a long time and broke outright on the old saturated
+  /// yellow (1.9:1). Swapping to near-black fixed the ratio and lost the point:
+  /// a tile is one colour with a shape cut out of it, and a black shape makes it
+  /// two. Same hue, same saturation, less light — the mark stays "the green one"
+  /// at arm's length, which is the only job it has.
+  ///
+  /// Solved rather than multiplied. A fixed `× 0.4` lands between 2.9:1 and
+  /// 3.7:1 depending on where a hue sits, which is the uneven-set problem again
+  /// one level down. This walks the lightness down until the glyph clears
+  /// [_glyphContrast] against its own fill, so every tile in both themes reads
+  /// at the same strength.
+  static Color glyphOn(Color fill) {
+    final hsl = HSLColor.fromColor(fill);
+    for (var l = hsl.lightness; l >= 0.04; l -= 0.01) {
+      final candidate = hsl.withLightness(l).toColor();
+      if (_contrast(candidate, fill) >= _glyphContrast) return candidate;
+    }
+    // An almost-black fill has no room left below it: go up instead, which is
+    // the same rule read the other way.
+    for (var l = hsl.lightness; l <= 0.96; l += 0.01) {
+      final candidate = hsl.withLightness(l).toColor();
+      if (_contrast(candidate, fill) >= _glyphContrast) return candidate;
+    }
+    return hsl.withLightness(0.04).toColor();
+  }
+
+  /// Enough to name the shape at 22pt, not so much that the tile reads as two
+  /// colours. 3:1 is the floor for a graphic; this sits just above it.
+  static const _glyphContrast = 3.2;
+
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final hi = la > lb ? la : lb;
+    final lo = la > lb ? lb : la;
+    return (hi + 0.05) / (lo + 0.05);
   }
 }
 
@@ -1495,6 +1535,68 @@ Future<bool> confirmAction(
     },
   );
   return answer ?? false;
+}
+
+// ─── Notices ────────────────────────────────────────────────────────────────
+
+/// A stated limit or consequence, in `warning` yellow on its own tinted ground.
+///
+/// The one shape in the app for "this is why you can't". It exists because a
+/// grey [EmptyBox] above a stack of greyed-out cards is indistinguishable from
+/// the greyed-out cards: everything on the screen was off, and nothing on it
+/// said which part was the reason.
+///
+/// Yellow rather than red: `negative` is for destroying something, and a limit
+/// destroys nothing. Its own token rather than `deload`'s amber, so a light
+/// week and a refused action can be retuned independently.
+///
+/// Not for errors, and not for anything the user can dismiss. A notice states a
+/// rule that is currently true.
+class NoticeBox extends StatelessWidget {
+  const NoticeBox({super.key, required this.message, this.icon, this.title});
+
+  final String message;
+  final String? title;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Space.lg),
+      decoration: BoxDecoration(
+        color: c.warningMuted,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: c.warning.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon ?? Icons.warning_amber_rounded, size: 22, color: c.warning),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null) ...[
+                  Text(title!,
+                      style: context.t.titleSmall?.copyWith(color: c.warning)),
+                  const SizedBox(height: Space.xxs),
+                ],
+                Text(
+                  message,
+                  // Body text, not yellow: the hue is the flag, and a whole
+                  // paragraph in it reads as an error rather than a rule.
+                  style: context.t.bodyMedium?.copyWith(color: c.textPrimary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Empty states ───────────────────────────────────────────────────────────

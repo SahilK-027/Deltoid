@@ -4,6 +4,7 @@ import 'package:deltoid/core/widgets/primitives.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/features/regime/regime_setup.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -122,5 +123,33 @@ void main() {
     final regimes = await db.select(db.regimes).get();
     expect(regimes, hasLength(2));
     expect(regimes.where((r) => r.isActive).single.id, first);
+  });
+
+  testWidgets('at the limit the sheet warns and offers nothing', (
+    tester,
+  ) async {
+    final repo = RegimeRepository(db);
+    for (var i = 0; i < identitySlots; i++) {
+      await repo.createRegime('R$i', activate: i == 0);
+    }
+    await pumpHost(tester);
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    // The reason is a notice, not another greyed-out box: with every card
+    // below it disabled, a grey message is indistinguishable from them.
+    expect(find.byType(NoticeBox), findsOneWidget);
+    expect(find.text('Regime limit reached'), findsOneWidget);
+
+    // And nothing in the sheet can be picked.
+    for (final card in tester.widgetList<AppCard>(find.byType(AppCard))) {
+      expect(card.onTap, isNull);
+    }
+
+    await tester.tap(find.text('Push / Pull / Legs · 6 day'));
+    await tester.pumpAndSettle();
+    expect(find.text('Name this regime'), findsNothing);
+    expect((await db.select(db.regimes).get()), hasLength(identitySlots));
   });
 }

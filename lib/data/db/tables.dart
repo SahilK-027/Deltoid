@@ -64,6 +64,16 @@ class Regimes extends Table with SyncColumns {
   /// Percentage of the last working weight prefilled during a deload cycle.
   IntColumn get deloadWeightPct => integer().withDefault(const Constant(80))();
 
+  /// Which of the identity hues this regime wears, as an index into
+  /// `DeltoidColors.identity`.
+  ///
+  /// Stored rather than hashed off the id. A hash collides — two regimes out of
+  /// six share a colour about a third of the time — and the mark is the thing
+  /// History and Today are scanned by, so two programmes wearing the same one
+  /// is the one failure it cannot have. A live regime holds its slot; deleting
+  /// one hands the slot back.
+  IntColumn get identityIndex => integer().withDefault(const Constant(0))();
+
   IntColumn get createdAt => integer().clientDefault(nowMs)();
 }
 

@@ -669,7 +669,7 @@ class _NoSessionsState extends ConsumerWidget {
             title: 'No sessions in ${regime.name}',
             message:
                 'Add the training days that make up one cycle, then fill '
-                'each one with exercises in the Regime tab.',
+                'each one with exercises in the Regimes tab.',
             action: PrimaryButton(
               label: 'Add a session',
               onPressed: () => addSessionPrompt(context, ref, regime.id),
@@ -749,10 +749,13 @@ class _ResumeHero extends ConsumerWidget {
     // Past a day this stops being a session in progress and becomes a decision:
     // a stopwatch reading 51 hours is not a useful thing to put on a screen.
     final stale = DateTime.now().difference(started).inHours >= 24;
-    final ownerRegimeId = owner?.regimeId ?? activeRegimeId;
-    final mark = workout.isDeload
-        ? c.deload
-        : c.identityFor(ownerRegimeId);
+    // A session is the heatmap's blue, whatever programme it belongs to, and a
+    // deload is orange. The tile used to take the regime's identity hue, which
+    // meant the one distinction worth seeing here — light week or not — was
+    // invisible on an orange regime and competing with the mark on every other
+    // one. Which programme a workout came from is on the row in words; whether
+    // it was a deload is only ever said by this tile.
+    final mark = workout.isDeload ? c.deload : c.heatOn;
 
     // No accent fill: what makes this loud is the pulse, the label and a
     // stopwatch at display size, not a tinted rectangle. The `surface` under it
@@ -1047,10 +1050,10 @@ class _NextUpHero extends ConsumerWidget {
     // An empty session can be started, but only produces an empty log. Send the
     // user to fill it in instead of into a blank page.
     final isEmptySession = preview.isEmpty;
-    // One colour on this card, and it is the regime's own identity mark — not
-    // an accent. A deload overrides it, because a light week outranks whose
-    // programme it belongs to.
-    final mark = status.isDeload ? c.deload : c.identityFor(regimeId);
+    // One colour on this card, and it is the blue a trained day gets on the
+    // heatmap — not an accent, and not the regime's identity hue. A deload
+    // overrides it: the light week is the fact this tile exists to state.
+    final mark = status.isDeload ? c.deload : c.heatOn;
 
     // The caller wraps this in an `AppCard`: out of the header band, `surface`
     // has to be drawn rather than inherited.

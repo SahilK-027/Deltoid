@@ -418,6 +418,12 @@ const starterExercises = <StarterExercise>[
 /// Optional starting points. Picking one writes ordinary sessions and slots the
 /// user can then rename, reorder, gut or extend — there is nothing special
 /// about a regime that came from a template.
+///
+/// Two, and blank. `Push / Pull / Legs · 3 day` and `Full body · 3 day` were
+/// dropped: a list of five splits is a magazine, and the two kept are the two
+/// shapes the app's own model is built around — a six-day cycle where the same
+/// movement runs two separate progressions, and the four-day one. Anything else
+/// is three renames away from either.
 const regimeTemplates = <RegimeTemplate>[
   RegimeTemplate(
     key: 'blank',
@@ -485,34 +491,6 @@ const regimeTemplates = <RegimeTemplate>[
     ],
   ),
   RegimeTemplate(
-    key: 'ppl3',
-    name: 'Push / Pull / Legs · 3 day',
-    summary: 'One push, one pull, one leg day per cycle.',
-    sessions: [
-      TemplateSession('Push', [
-        TemplateSlot('barbell_bench', 3, repLow: 5, repHigh: 8),
-        TemplateSlot('incline_db_press', 3, repLow: 8, repHigh: 12),
-        TemplateSlot('seated_ohp_db', 3, repLow: 8, repHigh: 12),
-        TemplateSlot('lateral_raise_db', 3, repLow: 12, repHigh: 20),
-        TemplateSlot('triceps_pushdown', 3, repLow: 10, repHigh: 15),
-      ]),
-      TemplateSession('Pull', [
-        TemplateSlot('pullup', 3, repLow: 5, repHigh: 8),
-        TemplateSlot('barbell_row', 3, repLow: 6, repHigh: 10),
-        TemplateSlot('seated_row', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('face_pull', 3, repLow: 12, repHigh: 15),
-        TemplateSlot('incline_db_curl', 3, repLow: 8, repHigh: 12),
-      ]),
-      TemplateSession('Legs', [
-        TemplateSlot('back_squat', 3, repLow: 5, repHigh: 8),
-        TemplateSlot('rdl', 3, repLow: 8, repHigh: 10),
-        TemplateSlot('leg_press', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('hamstring_curl', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('standing_calf_raise', 3, repLow: 10, repHigh: 15),
-      ]),
-    ],
-  ),
-  RegimeTemplate(
     key: 'upper_lower',
     name: 'Upper / Lower',
     summary: 'Four sessions per cycle: two upper, two lower.',
@@ -546,34 +524,6 @@ const regimeTemplates = <RegimeTemplate>[
         TemplateSlot('hamstring_curl', 3, repLow: 10, repHigh: 12),
         TemplateSlot('leg_extension', 3, repLow: 12, repHigh: 15),
         TemplateSlot('seated_calf_raise', 3, repLow: 12, repHigh: 15),
-      ]),
-    ],
-  ),
-  RegimeTemplate(
-    key: 'full_body',
-    name: 'Full body · 3 day',
-    summary: 'Three full-body sessions per cycle.',
-    sessions: [
-      TemplateSession('Full body A', [
-        TemplateSlot('back_squat', 3, repLow: 5, repHigh: 8),
-        TemplateSlot('barbell_bench', 3, repLow: 5, repHigh: 8),
-        TemplateSlot('barbell_row', 3, repLow: 6, repHigh: 10),
-        TemplateSlot('lateral_raise_db', 3, repLow: 12, repHigh: 20),
-        TemplateSlot('hanging_leg_raise', 3, repLow: 8, repHigh: 12),
-      ]),
-      TemplateSession('Full body B', [
-        TemplateSlot('deadlift', 3, repLow: 4, repHigh: 6),
-        TemplateSlot('overhead_press', 3, repLow: 6, repHigh: 10),
-        TemplateSlot('lat_pulldown', 3, repLow: 8, repHigh: 12),
-        TemplateSlot('leg_press', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('triceps_pushdown', 3, repLow: 10, repHigh: 15),
-      ]),
-      TemplateSession('Full body C', [
-        TemplateSlot('front_squat', 3, repLow: 6, repHigh: 10),
-        TemplateSlot('incline_db_press', 3, repLow: 8, repHigh: 12),
-        TemplateSlot('seated_row', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('hamstring_curl', 3, repLow: 10, repHigh: 12),
-        TemplateSlot('incline_db_curl', 3, repLow: 8, repHigh: 12),
       ]),
     ],
   ),

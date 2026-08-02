@@ -5,17 +5,19 @@ import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/features/regime/regime_screen.dart';
+import 'package:deltoid/features/regime/regimes_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The programme editor, pumped against a real database.
+/// The Regime index and the programme editor behind it, pumped against a real
+/// database.
 ///
-/// It went blank on the device twice — once because the day tabs asked for an
-/// infinite width, once on a regime with no days in it — and both times the
-/// analyzer and every other test were perfectly happy. A screen that renders
-/// nothing is a test this file should own.
+/// The editor went blank on the device twice — once because the day tabs asked
+/// for an infinite width, once on a regime with no days in it — and both times
+/// the analyzer and every other test were perfectly happy. A screen that
+/// renders nothing is a test this file should own.
 ///
 /// Two harness rules, both learned the hard way here:
 ///
@@ -45,14 +47,11 @@ void main() {
     await db.close();
   });
 
-  Future<void> pumpRegime(WidgetTester tester) async {
+  Future<void> pump(WidgetTester tester, Widget home) async {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.dark),
-          home: const RegimeScreen(),
-        ),
+        child: MaterialApp(theme: buildTheme(Brightness.dark), home: home),
       ),
     );
     for (var i = 0; i < 20; i++) {
@@ -60,25 +59,54 @@ void main() {
     }
   }
 
-  testWidgets('with no regime at all: masthead, then the empty state', (
+  Future<void> pumpIndex(WidgetTester tester) =>
+      pump(tester, const RegimesScreen());
+
+  Future<void> pumpEditor(WidgetTester tester, String regimeId) =>
+      pump(tester, RegimeEditorScreen(regimeId: regimeId));
+
+  testWidgets('index with nothing in it: masthead, empty box, catalog', (
     tester,
   ) async {
-    await pumpRegime(tester);
+    await pumpIndex(tester);
 
     expect(tester.takeException(), isNull);
     // The header is the screen, not a decoration on top of its content.
-    expect(find.text('Regime'), findsOneWidget);
-    expect(find.text('No regime yet'), findsOneWidget);
+    expect(find.text('Regimes'), findsOneWidget);
+    // No `Active regime` heading with nothing to put under it.
+    expect(find.text('Active regime'), findsNothing);
+    expect(find.text('Regime library'), findsOneWidget);
+    // The catalog is not a property of any one regime, so it is here even when
+    // there is no regime at all.
+    expect(find.text('Exercise catalog'), findsOneWidget);
+  });
+
+  testWidgets('the active regime is stated by its section, not by a pill', (
+    tester,
+  ) async {
+    final repo = RegimeRepository(db);
+    await repo.createRegime('Bench only');
+    await repo.createRegime('PPL', activate: false);
+    await pumpIndex(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Active regime'), findsOneWidget);
+    expect(find.text('Regime library'), findsOneWidget);
+    expect(find.text('Bench only'), findsOneWidget);
+    expect(find.text('PPL'), findsOneWidget);
+    // A badge on one row and not the others is what bent the column.
+    expect(find.text('Active'), findsNothing);
   });
 
   testWidgets('a regime with no days renders, and offers to add one', (
     tester,
   ) async {
-    await RegimeRepository(db).createRegime('Bench only');
-    await pumpRegime(tester);
+    final id = await RegimeRepository(db).createRegime('Bench only');
+    await pumpEditor(tester, id);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('BENCH ONLY'), findsOneWidget);
+    // Pushed, so the regime's name is the bar's title (THEME §5).
+    expect(find.text('Bench only'), findsOneWidget);
     expect(find.text('No days yet'), findsOneWidget);
   });
 
@@ -86,8 +114,8 @@ void main() {
     tester,
   ) async {
     final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
-    await createRegimeFromTemplate(db, ppl, name: 'PPL');
-    await pumpRegime(tester);
+    final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
+    await pumpEditor(tester, id);
 
     expect(tester.takeException(), isNull);
     // Every day is a tab, and `Add day +` is the last one.
@@ -99,10 +127,22 @@ void main() {
     expect(find.textContaining('exercises'), findsWidgets);
   });
 
+  testWidgets('an inactive regime opens without a cycle line', (tester) async {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+    final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
+    await RegimeRepository(db).createRegime('Something else');
+    await pumpEditor(tester, id);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Add day  +'), findsOneWidget);
+    // The cycle belongs to the programme being trained, not to this one.
+    expect(find.textContaining('Cycle '), findsNothing);
+  });
+
   testWidgets('switching tabs switches the day under them', (tester) async {
     final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
-    await createRegimeFromTemplate(db, ppl, name: 'PPL');
-    await pumpRegime(tester);
+    final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
+    await pumpEditor(tester, id);
 
     await tester.tap(find.text(ppl.sessions[1].name).first);
     for (var i = 0; i < 20; i++) {

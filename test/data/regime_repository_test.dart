@@ -253,4 +253,146 @@ void main() {
       expect(after.barKind, BarKind.none);
     });
   });
+
+  // ── Identity slots ──────────────────────────────────────────────────────
+  //
+  // The mark on a regime is what History and Today are scanned by, so two live
+  // regimes must never wear the same colour. There are six, which makes six the
+  // number of regimes that can exist at once.
+
+  test('every regime gets a colour of its own', () async {
+    final ids = [
+      for (var i = 0; i < identitySlots; i++) await repo.createRegime('R$i'),
+    ];
+
+    final all = await living();
+    expect(all.map((r) => r.id), ids);
+    expect(
+      all.map((r) => r.identityIndex).toSet(),
+      {for (var i = 0; i < identitySlots; i++) i},
+    );
+  });
+
+  test('the seventh regime is refused rather than sharing a colour', () async {
+    for (var i = 0; i < identitySlots; i++) {
+      await repo.createRegime('R$i');
+    }
+
+    expect(
+      () => repo.createRegime('One too many'),
+      throwsA(isA<RegimeSlotsFullException>()),
+    );
+    expect((await living()).length, identitySlots);
+  });
+
+  test('a template regime takes a slot and is capped the same way', () async {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+    final a = await createRegimeFromTemplate(db, ppl, name: 'One');
+    final b = await createRegimeFromTemplate(db, ppl, name: 'Two');
+
+    final all = await living();
+    final slots = {for (final r in all) r.id: r.identityIndex};
+    expect(slots[a], isNot(slots[b]));
+
+    for (var i = 2; i < identitySlots; i++) {
+      await repo.createRegime('R$i');
+    }
+    expect(
+      () => createRegimeFromTemplate(db, ppl, name: 'Surplus'),
+      throwsA(isA<RegimeSlotsFullException>()),
+    );
+  });
+
+  test('deleting a regime hands its colour back', () async {
+    final ids = [
+      for (var i = 0; i < identitySlots; i++) await repo.createRegime('R$i'),
+    ];
+    final freed = (await living()).firstWhere((r) => r.id == ids[2]);
+
+    await repo.deleteRegime(ids[2]);
+    final replacement = await repo.createRegime('Replacement');
+
+    final all = await living();
+    expect(all.length, identitySlots);
+    expect(
+      all.firstWhere((r) => r.id == replacement).identityIndex,
+      freed.identityIndex,
+    );
+    // And still no two the same.
+    expect(all.map((r) => r.identityIndex).toSet().length, identitySlots);
+  });
+
+  test('the backfill hands existing rows one slot each, oldest first', () async {
+    // Simulates a v4 database coming forward: every row on the column default.
+    for (var i = 0; i < 3; i++) {
+      await repo.createRegime('R$i');
+    }
+    await db.update(db.regimes).write(const RegimesCompanion(
+          identityIndex: Value(0),
+        ));
+
+    await backfillIdentityIndexes(db);
+
+    final all = await living();
+    expect(all.map((r) => r.identityIndex), [0, 1, 2]);
+  });
+
+  // ── Unique names ────────────────────────────────────────────────────────
+  //
+  // A regime is identified on screen by its name and its colour. Two called
+  // `PPL` is a history nobody can read.
+
+  test('a second regime cannot take a name already in use', () async {
+    await repo.createRegime('PPL');
+
+    expect(
+      () => repo.createRegime('PPL'),
+      throwsA(isA<RegimeNameTakenException>()),
+    );
+    expect((await living()).length, 1);
+  });
+
+  test('the check ignores case and surrounding space', () async {
+    await repo.createRegime('PPL');
+
+    expect(
+      () => repo.createRegime('  ppl '),
+      throwsA(isA<RegimeNameTakenException>()),
+    );
+  });
+
+  test('a template cannot be applied twice under its own name', () async {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+    await createRegimeFromTemplate(db, ppl);
+
+    expect(
+      () => createRegimeFromTemplate(db, ppl),
+      throwsA(isA<RegimeNameTakenException>()),
+    );
+    // Under a name of its own it is an ordinary second regime.
+    await createRegimeFromTemplate(db, ppl, name: 'PPL heavy');
+    expect((await living()).length, 2);
+  });
+
+  test('a deleted regime releases its name', () async {
+    final id = await repo.createRegime('PPL');
+    await repo.deleteRegime(id);
+
+    final second = await repo.createRegime('PPL');
+    expect(second, isNot(id));
+    expect((await living()).map((r) => r.name), ['PPL']);
+  });
+
+  test('renaming onto another regime is refused, onto itself is not', () async {
+    final first = await repo.createRegime('PPL');
+    final second = await repo.createRegime('Upper / Lower');
+
+    expect(
+      () => repo.updateRegime(second, name: const Value('PPL')),
+      throwsA(isA<RegimeNameTakenException>()),
+    );
+    // Saving a regime's own name back is a no-op, not a collision.
+    await repo.updateRegime(first, name: const Value('PPL'));
+    expect((await living()).map((r) => r.name), ['PPL', 'Upper / Lower']);
+  });
 }

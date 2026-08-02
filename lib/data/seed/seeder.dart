@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../repositories/regime_repository.dart';
 import 'seed_data.dart';
 
 /// Fills the exercise catalog on first launch and nothing else.
@@ -51,6 +52,20 @@ Future<String> createRegimeFromTemplate(
   final regimeId = newId();
 
   await db.transaction(() async {
+    // Same rules as the blank path — a template is still a regime. It needs a
+    // hue nobody else is wearing and a name nobody else answers to, and the
+    // second is how a shelf of four regimes all called `Upper / Lower` got
+    // built: the template's own name is the default, so applying it twice
+    // proposed the same name twice.
+    final repo = RegimeRepository(db);
+    final proposed =
+        name?.trim().isNotEmpty == true ? name!.trim() : template.name;
+    if (await repo.isNameTaken(proposed)) {
+      throw RegimeNameTakenException(proposed);
+    }
+    final slot = await repo.nextIdentitySlot();
+    if (slot == null) throw const RegimeSlotsFullException();
+
     if (activate) {
       await db.update(db.regimes).write(
             RegimesCompanion(
@@ -64,8 +79,9 @@ Future<String> createRegimeFromTemplate(
     await db.into(db.regimes).insert(
           RegimesCompanion.insert(
             id: Value(regimeId),
-            name: name?.trim().isNotEmpty == true ? name!.trim() : template.name,
+            name: proposed,
             isActive: Value(activate),
+            identityIndex: Value(slot),
           ),
         );
 
@@ -160,5 +176,27 @@ Future<void> backfillSeededBarKinds(AppDatabase db) async {
                 t.barKind.equalsValue(BarKind.none),
           ))
         .write(ExercisesCompanion(barKind: Value(starter.barKind)));
+  }
+}
+
+/// Hands every existing regime its own identity slot, oldest first.
+///
+/// The v5 column defaults to 0, so without this an upgraded database opens with
+/// every regime in the same orange — the exact collision the column was added
+/// to prevent. Ordered by `createdAt` so the assignment is stable: run it twice
+/// and each regime lands on the same hue.
+///
+/// A database already holding more than [identitySlots] regimes wraps rather
+/// than failing. The cap is enforced when a regime is *created*; an upgrade is
+/// not the moment to tell someone one of their programmes is surplus.
+Future<void> backfillIdentityIndexes(AppDatabase db) async {
+  final query = db.select(db.regimes)
+    ..where((t) => t.deletedAt.isNull())
+    ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]);
+  final live = await query.get();
+
+  for (var i = 0; i < live.length; i++) {
+    await (db.update(db.regimes)..where((t) => t.id.equals(live[i].id)))
+        .write(RegimesCompanion(identityIndex: Value(i % identitySlots)));
   }
 }

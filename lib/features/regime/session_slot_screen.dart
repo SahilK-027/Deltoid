@@ -21,10 +21,15 @@ import 'regime_settings.dart';
 class SessionSlotScreen extends ConsumerWidget {
   const SessionSlotScreen({
     super.key,
+    required this.regimeId,
     required this.sessionId,
     required this.slotId,
   });
 
+  /// The programme this day belongs to — carried down from the editor rather
+  /// than read off the active regime, since the one being edited need not be
+  /// the one being trained.
+  final String regimeId;
   final String sessionId;
   final String slotId;
 
@@ -33,9 +38,10 @@ class SessionSlotScreen extends ConsumerWidget {
     final async = ref.watch(sessionSlotsProvider(sessionId));
     final slots = async.valueOrNull;
     final entry = slots?.where((s) => s.slot.id == slotId).firstOrNull;
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
+    final sessions =
+        ref.watch(sessionsForRegimeProvider(regimeId)).valueOrNull ?? const [];
     final session = sessions.where((s) => s.id == sessionId).firstOrNull;
-    final regime = ref.watch(activeRegimeProvider).valueOrNull;
+    final regime = ref.watch(regimeByIdProvider(regimeId)).valueOrNull;
     final c = context.c;
 
     if (entry == null) {

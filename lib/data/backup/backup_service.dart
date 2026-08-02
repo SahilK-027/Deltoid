@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../seed/seeder.dart';
 
 /// Bumped whenever the export shape changes in a way an older build could not
 /// read. Import refuses anything newer than it understands rather than
@@ -126,7 +127,11 @@ class BackupService {
       dump: () async =>
           (await db.select(db.regimes).get()).map((e) => e.toJson()).toList(),
       table: db.regimes,
-      parse: Regime.fromJson,
+      // A file written before v5 has no identity slot in it, and
+      // `Regime.fromJson` casts the missing key straight to int. Everything
+      // lands on 0 here and the slots are dealt out properly once the restore
+      // is written — see the backfill at the end of [restore].
+      parse: (row) => Regime.fromJson({'identityIndex': 0, ...row}),
       clear: () => db.delete(db.regimes).go(),
     ),
     _TableCodec(
@@ -430,6 +435,17 @@ class BackupService {
         }
       }
     });
+
+    // A pre-v5 file carries no identity slots, so every regime came in on 0 —
+    // one colour for the whole shelf, and the uniqueness the mark depends on
+    // gone. Deal them out, exactly as the schema migration does. A file that
+    // does carry slots is left alone: they are the colours the user has been
+    // looking at.
+    final regimeRows = data['regimes'];
+    final needsSlots = regimeRows is List &&
+        regimeRows.any((row) =>
+            row is Map && !row.containsKey('identityIndex'));
+    if (needsSlots) await backfillIdentityIndexes(db);
 
     return ImportResult(summary: summary, rowsWritten: written);
   }

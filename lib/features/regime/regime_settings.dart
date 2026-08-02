@@ -10,10 +10,13 @@ import 'regime_screen.dart';
 
 /// Everything about the regime that is not one of its days.
 ///
-/// Behind the sliders button in the band (THEME §7), because none of it is what
-/// the Regime tab is opened to do: you open it to look at a training day. A
-/// name, a deload schedule and the order of the days are all things you change
-/// once and then live with.
+/// Behind the sliders button in the bar (THEME §7), because none of it is what
+/// the editor is opened to do: you open it to look at a training day. A name, a
+/// deload schedule and the order of the days are all things you change once and
+/// then live with.
+///
+/// The catalog and the list of regimes used to be in here too. They are on the
+/// Regime index now — neither is a property of this programme.
 Future<void> showRegimeSettings(
   BuildContext context,
   WidgetRef ref,
@@ -38,8 +41,8 @@ class _SettingsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
-    final all = ref.watch(regimeSummariesProvider).valueOrNull ?? const [];
+    final sessions =
+        ref.watch(sessionsForRegimeProvider(regime.id)).valueOrNull ?? const [];
 
     return AppSheet(
       title: 'Regime',
@@ -51,10 +54,17 @@ class _SettingsSheet extends ConsumerWidget {
           title: 'Rename',
           onTap: () async {
             final navigator = Navigator.of(context);
+            final taken = await ref
+                .read(regimeRepositoryProvider)
+                .liveNames(exceptId: regime.id);
+            if (!context.mounted) return;
             final name = await promptForText(
               context,
               title: 'Rename regime',
               initial: regime.name,
+              validate: (value) => taken.contains(value.trim().toLowerCase())
+                  ? 'A regime called ${value.trim()} already exists'
+                  : null,
             );
             if (name == null || name.isEmpty) return;
             await ref
@@ -67,7 +77,8 @@ class _SettingsSheet extends ConsumerWidget {
           icon: Icons.trending_down_rounded,
           title: 'Deload',
           subtitle: regime.deloadEnabled
-              ? 'Every ${regime.deloadAfterCycles} cycles · '
+              ? 'Every ${regime.deloadAfterCycles == 1 ? '' : '${regime.deloadAfterCycles} '}'
+                  'cycle${regime.deloadAfterCycles == 1 ? '' : 's'} · '
                   '${regime.deloadWeightPct}% weight'
               : 'Off — no scheduled light week',
           onTap: () async {
@@ -85,28 +96,6 @@ class _SettingsSheet extends ConsumerWidget {
               await showDayReorder(host, ref, sessions);
             },
           ),
-        AppRow(
-          icon: Icons.fitness_center_rounded,
-          title: 'Exercise catalog',
-          subtitle: 'Every movement, shared by every regime',
-          onTap: () {
-            Navigator.of(context).pop();
-            openExerciseCatalog(host);
-          },
-        ),
-        AppRow(
-          icon: Icons.layers_outlined,
-          title: 'All regimes',
-          // The other regimes are not gone, they are just not active. Saying so
-          // here is the difference between "switching" and "losing" one.
-          subtitle: all.length < 2
-              ? 'Start a second split without losing this one'
-              : '${all.length} programmes · one active at a time',
-          onTap: () {
-            Navigator.of(context).pop();
-            openRegimes(host);
-          },
-        ),
       ],
     );
   }
@@ -134,8 +123,8 @@ class _DeloadSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final regime = ref.watch(activeRegimeProvider).valueOrNull;
-    if (regime == null || regime.id != regimeId) {
+    final regime = ref.watch(regimeByIdProvider(regimeId)).valueOrNull;
+    if (regime == null) {
       return const AppSheet(title: 'Deload', children: []);
     }
     final repo = ref.read(regimeRepositoryProvider);
@@ -158,7 +147,8 @@ class _DeloadSheet extends ConsumerWidget {
         if (regime.deloadEnabled) ...[
           StepperRow(
             label: 'Deload after',
-            value: '${regime.deloadAfterCycles} cycles',
+            value: '${regime.deloadAfterCycles} '
+                'cycle${regime.deloadAfterCycles == 1 ? '' : 's'}',
             onDecrement: regime.deloadAfterCycles > 1
                 ? () => repo.updateRegime(regime.id,
                     deloadAfterCycles: Value(regime.deloadAfterCycles - 1))

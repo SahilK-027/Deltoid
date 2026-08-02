@@ -42,8 +42,13 @@ Never "simplify" this to a plain most-recent lookup.
 ## Domain model
 
 ```
-Regime  ──  the programme (PPL, Upper/Lower). Any number of them exist at
-            once; exactly one is active. Creating one never deletes another.
+Regime  ──  the programme (PPL, Upper/Lower). Up to six exist at once;
+            exactly one is active. Creating one never deletes another.
+            Names are unique among live regimes (trimmed, case-insensitive):
+            the name and the colour are all a History row has to identify it.
+            Six is the size of the identity palette: a regime owns a hue
+            (`identityIndex`), no two live regimes share one, and a deleted
+            regime hands its slot back. The seventh create is refused.
   └─ Session  ──  one training day template, ordered ("Push 1" … "Leg 2")
        └─ SessionExercise  ──  an exercise slot: order, target sets, rep range
 

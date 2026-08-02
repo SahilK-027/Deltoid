@@ -968,6 +968,18 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
     requiredDuringInsert: false,
     defaultValue: const Constant(80),
   );
+  static const VerificationMeta _identityIndexMeta = const VerificationMeta(
+    'identityIndex',
+  );
+  @override
+  late final GeneratedColumn<int> identityIndex = GeneratedColumn<int>(
+    'identity_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -993,6 +1005,7 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
     deloadAfterCycles,
     deloadSetDelta,
     deloadWeightPct,
+    identityIndex,
     createdAt,
   ];
   @override
@@ -1084,6 +1097,15 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
         ),
       );
     }
+    if (data.containsKey('identity_index')) {
+      context.handle(
+        _identityIndexMeta,
+        identityIndex.isAcceptableOrUnknown(
+          data['identity_index']!,
+          _identityIndexMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1143,6 +1165,10 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
         DriftSqlType.int,
         data['${effectivePrefix}deload_weight_pct'],
       )!,
+      identityIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}identity_index'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -1175,6 +1201,16 @@ class Regime extends DataClass implements Insertable<Regime> {
 
   /// Percentage of the last working weight prefilled during a deload cycle.
   final int deloadWeightPct;
+
+  /// Which of the identity hues this regime wears, as an index into
+  /// `DeltoidColors.identity`.
+  ///
+  /// Stored rather than hashed off the id. A hash collides — two regimes out of
+  /// six share a colour about a third of the time — and the mark is the thing
+  /// History and Today are scanned by, so two programmes wearing the same one
+  /// is the one failure it cannot have. A live regime holds its slot; deleting
+  /// one hands the slot back.
+  final int identityIndex;
   final int createdAt;
   const Regime({
     required this.id,
@@ -1188,6 +1224,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     required this.deloadAfterCycles,
     required this.deloadSetDelta,
     required this.deloadWeightPct,
+    required this.identityIndex,
     required this.createdAt,
   });
   @override
@@ -1206,6 +1243,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     map['deload_after_cycles'] = Variable<int>(deloadAfterCycles);
     map['deload_set_delta'] = Variable<int>(deloadSetDelta);
     map['deload_weight_pct'] = Variable<int>(deloadWeightPct);
+    map['identity_index'] = Variable<int>(identityIndex);
     map['created_at'] = Variable<int>(createdAt);
     return map;
   }
@@ -1225,6 +1263,7 @@ class Regime extends DataClass implements Insertable<Regime> {
       deloadAfterCycles: Value(deloadAfterCycles),
       deloadSetDelta: Value(deloadSetDelta),
       deloadWeightPct: Value(deloadWeightPct),
+      identityIndex: Value(identityIndex),
       createdAt: Value(createdAt),
     );
   }
@@ -1246,6 +1285,7 @@ class Regime extends DataClass implements Insertable<Regime> {
       deloadAfterCycles: serializer.fromJson<int>(json['deloadAfterCycles']),
       deloadSetDelta: serializer.fromJson<int>(json['deloadSetDelta']),
       deloadWeightPct: serializer.fromJson<int>(json['deloadWeightPct']),
+      identityIndex: serializer.fromJson<int>(json['identityIndex']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
     );
   }
@@ -1264,6 +1304,7 @@ class Regime extends DataClass implements Insertable<Regime> {
       'deloadAfterCycles': serializer.toJson<int>(deloadAfterCycles),
       'deloadSetDelta': serializer.toJson<int>(deloadSetDelta),
       'deloadWeightPct': serializer.toJson<int>(deloadWeightPct),
+      'identityIndex': serializer.toJson<int>(identityIndex),
       'createdAt': serializer.toJson<int>(createdAt),
     };
   }
@@ -1280,6 +1321,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     int? deloadAfterCycles,
     int? deloadSetDelta,
     int? deloadWeightPct,
+    int? identityIndex,
     int? createdAt,
   }) => Regime(
     id: id ?? this.id,
@@ -1293,6 +1335,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     deloadAfterCycles: deloadAfterCycles ?? this.deloadAfterCycles,
     deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
     deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
+    identityIndex: identityIndex ?? this.identityIndex,
     createdAt: createdAt ?? this.createdAt,
   );
   Regime copyWithCompanion(RegimesCompanion data) {
@@ -1316,6 +1359,9 @@ class Regime extends DataClass implements Insertable<Regime> {
       deloadWeightPct: data.deloadWeightPct.present
           ? data.deloadWeightPct.value
           : this.deloadWeightPct,
+      identityIndex: data.identityIndex.present
+          ? data.identityIndex.value
+          : this.identityIndex,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1334,6 +1380,7 @@ class Regime extends DataClass implements Insertable<Regime> {
           ..write('deloadAfterCycles: $deloadAfterCycles, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
+          ..write('identityIndex: $identityIndex, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1352,6 +1399,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     deloadAfterCycles,
     deloadSetDelta,
     deloadWeightPct,
+    identityIndex,
     createdAt,
   );
   @override
@@ -1369,6 +1417,7 @@ class Regime extends DataClass implements Insertable<Regime> {
           other.deloadAfterCycles == this.deloadAfterCycles &&
           other.deloadSetDelta == this.deloadSetDelta &&
           other.deloadWeightPct == this.deloadWeightPct &&
+          other.identityIndex == this.identityIndex &&
           other.createdAt == this.createdAt);
 }
 
@@ -1384,6 +1433,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
   final Value<int> deloadAfterCycles;
   final Value<int> deloadSetDelta;
   final Value<int> deloadWeightPct;
+  final Value<int> identityIndex;
   final Value<int> createdAt;
   final Value<int> rowid;
   const RegimesCompanion({
@@ -1398,6 +1448,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     this.deloadAfterCycles = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
+    this.identityIndex = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1413,6 +1464,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     this.deloadAfterCycles = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
+    this.identityIndex = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
@@ -1428,6 +1480,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     Expression<int>? deloadAfterCycles,
     Expression<int>? deloadSetDelta,
     Expression<int>? deloadWeightPct,
+    Expression<int>? identityIndex,
     Expression<int>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -1443,6 +1496,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
       if (deloadAfterCycles != null) 'deload_after_cycles': deloadAfterCycles,
       if (deloadSetDelta != null) 'deload_set_delta': deloadSetDelta,
       if (deloadWeightPct != null) 'deload_weight_pct': deloadWeightPct,
+      if (identityIndex != null) 'identity_index': identityIndex,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1460,6 +1514,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     Value<int>? deloadAfterCycles,
     Value<int>? deloadSetDelta,
     Value<int>? deloadWeightPct,
+    Value<int>? identityIndex,
     Value<int>? createdAt,
     Value<int>? rowid,
   }) {
@@ -1475,6 +1530,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
       deloadAfterCycles: deloadAfterCycles ?? this.deloadAfterCycles,
       deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
       deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
+      identityIndex: identityIndex ?? this.identityIndex,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1516,6 +1572,9 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     if (deloadWeightPct.present) {
       map['deload_weight_pct'] = Variable<int>(deloadWeightPct.value);
     }
+    if (identityIndex.present) {
+      map['identity_index'] = Variable<int>(identityIndex.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1539,6 +1598,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
           ..write('deloadAfterCycles: $deloadAfterCycles, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
+          ..write('identityIndex: $identityIndex, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7302,6 +7362,7 @@ typedef $$RegimesTableCreateCompanionBuilder =
       Value<int> deloadAfterCycles,
       Value<int> deloadSetDelta,
       Value<int> deloadWeightPct,
+      Value<int> identityIndex,
       Value<int> createdAt,
       Value<int> rowid,
     });
@@ -7318,6 +7379,7 @@ typedef $$RegimesTableUpdateCompanionBuilder =
       Value<int> deloadAfterCycles,
       Value<int> deloadSetDelta,
       Value<int> deloadWeightPct,
+      Value<int> identityIndex,
       Value<int> createdAt,
       Value<int> rowid,
     });
@@ -7445,6 +7507,11 @@ class $$RegimesTableFilterComposer
 
   ColumnFilters<int> get deloadWeightPct => $composableBuilder(
     column: $table.deloadWeightPct,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get identityIndex => $composableBuilder(
+    column: $table.identityIndex,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7593,6 +7660,11 @@ class $$RegimesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get identityIndex => $composableBuilder(
+    column: $table.identityIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7646,6 +7718,11 @@ class $$RegimesTableAnnotationComposer
 
   GeneratedColumn<int> get deloadWeightPct => $composableBuilder(
     column: $table.deloadWeightPct,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get identityIndex => $composableBuilder(
+    column: $table.identityIndex,
     builder: (column) => column,
   );
 
@@ -7771,6 +7848,7 @@ class $$RegimesTableTableManager
                 Value<int> deloadAfterCycles = const Value.absent(),
                 Value<int> deloadSetDelta = const Value.absent(),
                 Value<int> deloadWeightPct = const Value.absent(),
+                Value<int> identityIndex = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RegimesCompanion(
@@ -7785,6 +7863,7 @@ class $$RegimesTableTableManager
                 deloadAfterCycles: deloadAfterCycles,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
+                identityIndex: identityIndex,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -7801,6 +7880,7 @@ class $$RegimesTableTableManager
                 Value<int> deloadAfterCycles = const Value.absent(),
                 Value<int> deloadSetDelta = const Value.absent(),
                 Value<int> deloadWeightPct = const Value.absent(),
+                Value<int> identityIndex = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RegimesCompanion.insert(
@@ -7815,6 +7895,7 @@ class $$RegimesTableTableManager
                 deloadAfterCycles: deloadAfterCycles,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
+                identityIndex: identityIndex,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

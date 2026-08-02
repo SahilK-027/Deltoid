@@ -143,3 +143,13 @@ extension SkipReasonX on SkipReason {
         SkipReason.other => 'Other',
       };
 }
+
+/// How many identity hues exist, and therefore how many regimes can be live at
+/// once.
+///
+/// The mark on a regime is what History and Today are scanned by, so two
+/// programmes must never wear the same one. That makes the palette a hard
+/// limit rather than a wrap-around: six slots, one per live regime, handed back
+/// when a regime is deleted. Kept here rather than in the theme so the
+/// repository can enforce it without importing a colour.
+const identitySlots = 6;

@@ -5,15 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/repositories/regime_repository.dart';
+import '../../domain/enums.dart';
+import '../log/widgets/exercise_sheets.dart';
 import 'regime_screen.dart';
 import 'regime_setup.dart';
 
-/// Every programme, not just the one being trained.
+/// The Regimes tab: every programme, and the catalog they are all built from.
 ///
-/// Regimes were always additive — creating one only moves the active flag — but
-/// with the list hidden behind a sheet the old ones looked deleted. They are
-/// first-class rows here: switch between them, rename, delete, and see how much
-/// was trained under each.
+/// The tab used to open straight into the active regime's editor, which made
+/// the other regimes look deleted — they were two sheets deep behind a sliders
+/// button, next to the catalog. This is the index of the section instead:
+/// what exists, which one is being trained, and the shared list of movements.
+/// One tap in and you are on the same editor as before, now scoped to the
+/// regime you tapped rather than to whichever one is active.
 class RegimesScreen extends ConsumerWidget {
   const RegimesScreen({super.key});
 
@@ -22,59 +26,122 @@ class RegimesScreen extends ConsumerWidget {
     final summaries = ref.watch(regimeSummariesProvider).valueOrNull;
     final c = context.c;
 
+    // No status line under the title: the `Active regime` heading below says
+    // which one is being trained, and the band saying it too is the same fact
+    // twice, 40pt apart.
+    const header = HeaderBand(
+      child: PageHeader(title: 'Regimes', topGap: Space.xxl),
+    );
+
+    if (summaries == null) {
+      return Scaffold(
+        body: Column(
+          children: [
+            header,
+            const Expanded(child: Center(child: CircularProgressIndicator())),
+          ],
+        ),
+      );
+    }
+
+    // Which one is being trained is said by the heading it sits under, not by
+    // a badge on the row. A pill in the trailing slot is a chip one row wide
+    // and no other, so the title beside it wraps where its neighbours don't and
+    // the column bends around whichever regime happens to be active.
+    final live = [for (final s in summaries) if (s.regime.isActive) s];
+    final library = [for (final s in summaries) if (!s.regime.isActive) s];
+    final full = summaries.length >= identitySlots;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Regimes')),
-      body: summaries == null
-          ? const Center(child: CircularProgressIndicator())
-          : summaries.isEmpty
-              ? EmptyState(
-                  icon: Icons.tune,
-                  title: 'No regimes yet',
-                  message: 'Build your own split, or start from a template and '
-                      'edit it into shape.',
-                  action: PrimaryButton(
-                    label: 'Create regime',
-                    onPressed: () => createRegimeFlow(context, ref),
+      body: Column(
+        children: [
+          header,
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: Space.huge),
+              children: [
+                const SizedBox(height: Space.lg),
+                if (live.isNotEmpty) ...[
+                  const Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: Space.gutter),
+                    child: SectionHeader('Active regime'),
                   ),
-                )
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          Space.gutter, Space.sm, Space.gutter, Space.lg),
-                      child: Text(
-                        'One is active at a time. Switching keeps every past '
-                        'workout intact and still attached to the programme it '
-                        'was run under.',
-                        style: context.t.bodyMedium,
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.only(bottom: Space.lg),
-                        itemCount: summaries.length,
-                        separatorBuilder: (_, _) =>
-                            Divider(height: 1, color: c.border),
-                        itemBuilder: (context, i) => _RegimeRow(
-                          summary: summaries[i],
-                          total: summaries.length,
+                  for (final s in live)
+                    _RegimeRow(summary: s, total: summaries.length),
+                  const SizedBox(height: Space.section),
+                ],
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Space.gutter),
+                  child: SectionHeader(
+                    'Regime library',
+                    subtitle: full
+                        ? 'Full — $identitySlots regimes is the limit. Delete '
+                            'one to add another.'
+                        : live.isEmpty
+                            ? 'One is trained at a time. Nothing is active yet.'
+                            : 'Not being trained. Every workout logged under '
+                                'one stays attached to it.',
+                    // `New` stays, full or not. A control that vanishes at the
+                    // limit leaves you looking for the button rather than
+                    // reading the reason — the sheet it opens is where the
+                    // limit is explained, with nothing in it to pick.
+                    actionLabel: summaries.isEmpty ? null : 'New',
+                    onAction:
+                        summaries.isEmpty ? null : () => _create(context, ref),
+                  ),
+                ),
+                if (library.isEmpty)
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: Space.gutter),
+                    child: Column(
+                      children: [
+                        EmptyBox(
+                          icon: Icons.tune,
+                          message: summaries.isEmpty
+                              ? 'Build your own split, or start from a template '
+                                  'and edit it into shape.'
+                              : 'Nothing else yet. A second split can be built '
+                                  'without losing the one you are mid-cycle on.',
                         ),
-                      ),
+                        if (summaries.isEmpty) ...[
+                          const SizedBox(height: Space.lg),
+                          PrimaryButton(
+                            label: 'Create regime',
+                            onPressed: () => createRegimeFlow(context, ref),
+                          ),
+                        ],
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          Space.gutter, Space.sm, Space.gutter, Space.md),
-                      child: SafeArea(
-                        top: false,
-                        child: PrimaryButton(
-                          label: 'New regime',
-                          icon: Icons.add_rounded,
-                          onPressed: () => _create(context, ref),
-                        ),
-                      ),
+                  )
+                else
+                  for (var i = 0; i < library.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: c.border),
+                    _RegimeRow(
+                      summary: library[i],
+                      total: summaries.length,
                     ),
                   ],
+                const SizedBox(height: Space.section),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: Space.gutter),
+                  child: SectionHeader('Movements'),
                 ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Space.gutter),
+                  child: ListCard(
+                    inset: Space.lg,
+                    children: [_CatalogRow()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -88,13 +155,32 @@ class RegimesScreen extends ConsumerWidget {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        content: const Text('Added — you are still training the old one'),
+        content: const Text('Added to the library — still training the old one'),
         action: SnackBarAction(
-          label: 'Train it',
+          label: 'Activate',
           onPressed: () =>
               ref.read(regimeRepositoryProvider).setActiveRegime(id),
         ),
       ),
+    );
+  }
+}
+
+/// The catalog, which belongs to no single regime — which is exactly why it
+/// sits out here rather than inside one.
+class _CatalogRow extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final all = ref.watch(exerciseCatalogProvider).valueOrNull;
+
+    return AppRow(
+      icon: Icons.fitness_center_rounded,
+      title: 'Exercise catalog',
+      subtitle: all == null
+          ? 'Every movement, shared by every regime'
+          : '${all.length} movement${all.length == 1 ? '' : 's'}, shared by '
+              'every regime',
+      onTap: () => openExerciseCatalog(context),
     );
   }
 }
@@ -112,40 +198,42 @@ class _RegimeRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final regime = summary.regime;
-    final active = regime.isActive;
 
     final facts = [
       '${summary.sessionCount} day${summary.sessionCount == 1 ? '' : 's'}',
       '${summary.workoutCount} logged',
-      if (regime.deloadEnabled)
-        'deload every ${regime.deloadAfterCycles}'
+      // Every 6 *what*. The unit is the whole fact here: a cycle is one pass
+      // through all the days, not a week, and the bare number read as days.
+      if (!regime.deloadEnabled)
+        'no deload'
+      else if (regime.deloadAfterCycles == 1)
+        'deload every cycle'
       else
-        'no deload',
+        'deload every ${regime.deloadAfterCycles} cycles',
     ];
 
     return AppRow(
-      // The identity mark History already scans by, on the row that owns it.
+      // The identity mark History already scans by, on the row that owns it —
+      // the same stack, solid, on every row. A regime is a stack of days
+      // whether or not it is the one being trained, and both attempts at
+      // marking the active one here (a bolt, then the 16% wash on the rest)
+      // said what the `Active regime` heading already says. The wash was also
+      // the only translucent fill in the app.
       leading: IconTile(
-        active ? Icons.bolt_rounded : Icons.layers_outlined,
-        color: c.identityFor(regime.id),
-        solid: active,
+        Icons.layers_outlined,
+        color: c.identityAt(regime.identityIndex),
       ),
       title: regime.name,
       subtitle: facts.join('  ·  '),
-      onTap: active ? null : () => _activate(context, ref),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (active) ...[
-            const Pill('Active'),
-            const SizedBox(width: Space.sm),
-          ],
-          CircleIconButton(
-            icon: Icons.more_horiz_rounded,
-            fill: Colors.transparent,
-            onTap: () => _showActions(context, ref),
-          ),
-        ],
+      // A tap opens the programme, active or not. Activating one is a decision,
+      // not a side effect of looking at it — it lives in the ⋯ sheet.
+      onTap: () => openRegimeEditor(context, regime.id),
+      // One control, the same width on every row. `Active` is said by the
+      // section heading above instead.
+      trailing: CircleIconButton(
+        icon: Icons.more_horiz_rounded,
+        fill: Colors.transparent,
+        onTap: () => _showActions(context, ref),
       ),
     );
   }
@@ -163,8 +251,10 @@ class _RegimeRow extends ConsumerWidget {
           if (!active)
             AppRow(
               icon: Icons.play_circle_outline,
-              title: 'Train this one',
-              subtitle: 'Today and Regime switch to it',
+              // Names the state it produces. "Train this one" described the
+              // consequence and left you to work out what it did to the row.
+              title: 'Activate regime',
+              subtitle: 'Workouts run off this programme from now on',
               onTap: () {
                 Navigator.of(sheet).pop();
                 _activate(context, ref);
@@ -175,10 +265,18 @@ class _RegimeRow extends ConsumerWidget {
             title: 'Rename',
             onTap: () async {
               final navigator = Navigator.of(sheet);
+              final taken = await ref
+                  .read(regimeRepositoryProvider)
+                  .liveNames(exceptId: summary.regime.id);
+              if (!context.mounted) return;
               final name = await promptForText(
                 context,
                 title: 'Rename regime',
                 initial: summary.regime.name,
+                validate: (value) =>
+                    taken.contains(value.trim().toLowerCase())
+                        ? 'A regime called ${value.trim()} already exists'
+                        : null,
               );
               if (name == null || name.isEmpty) return;
               await ref

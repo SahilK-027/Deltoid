@@ -11,9 +11,7 @@ import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'exercise_catalog_screen.dart';
-import 'regime_setup.dart';
 import 'regime_settings.dart';
-import 'regimes_screen.dart';
 import 'session_slot_screen.dart';
 
 final regimeRepositoryProvider = Provider<RegimeRepository>(
@@ -49,88 +47,94 @@ final sessionSlotsProvider = StreamProvider.family<
       ]);
 });
 
-/// The programme editor, and the only screen it takes.
+/// One programme, opened from the Regime index.
 ///
 /// A training day is a **tab**, not a row you push into (THEME §7): switching
 /// days is a context change, and the vertical list it replaced put a screen
 /// between you and the thing you came to edit. Everything about the regime
-/// itself — its name, deload, the order of its days, the catalog, the other
-/// regimes — is behind the one sliders button in the band, because none of it
-/// is what you open this tab to do.
-class RegimeScreen extends ConsumerStatefulWidget {
-  const RegimeScreen({super.key});
+/// itself — its name, its deload, the order of its days — is behind the one
+/// sliders button in the bar, because none of it is what you open a programme
+/// to do.
+///
+/// Scoped to [regimeId], not to the active regime: a programme you are not
+/// training is still a programme you can edit, and that is the whole point of
+/// keeping the old ones.
+class RegimeEditorScreen extends ConsumerStatefulWidget {
+  const RegimeEditorScreen({super.key, required this.regimeId});
+
+  final String regimeId;
 
   @override
-  ConsumerState<RegimeScreen> createState() => _RegimeScreenState();
+  ConsumerState<RegimeEditorScreen> createState() => _RegimeEditorScreenState();
 }
 
-class _RegimeScreenState extends ConsumerState<RegimeScreen> {
+class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
   int _day = 0;
 
   @override
   Widget build(BuildContext context) {
-    final regime = ref.watch(activeRegimeProvider).valueOrNull;
-    final sessions = ref.watch(activeSessionsProvider).valueOrNull ?? const [];
-    final status = ref.watch(cycleStatusProvider).valueOrNull;
+    final async = ref.watch(regimeByIdProvider(widget.regimeId));
+    final regime = async.valueOrNull;
+    final sessions =
+        ref.watch(sessionsForRegimeProvider(widget.regimeId)).valueOrNull ??
+            const [];
+    final c = context.c;
 
-    // The masthead is the screen, not a decoration on top of its content: a
-    // first launch used to open on a bare empty state with nothing saying which
-    // tab you were standing in — the one screen in the app whose header
-    // appeared only once it had data.
+    // Deleted out from under the screen — reachable, since the index behind it
+    // can delete a regime while this is open.
     if (regime == null) {
       return Scaffold(
-        body: Column(
-          children: [
-            const HeaderBand(
-              child: PageHeader(title: 'Regime', topGap: Space.xxl),
-            ),
-            Expanded(
-              child: EmptyState(
-                icon: Icons.tune,
-                title: 'No regime yet',
-                message: 'Build your own split, or start from a template and '
-                    'edit it into shape.',
-                action: PrimaryButton(
-                  label: 'Create regime',
-                  onPressed: () => createRegimeFlow(context, ref),
-                ),
-              ),
-            ),
-          ],
-        ),
+        appBar: AppBar(title: const Text('Regime')),
+        body: async.hasValue
+            ? const EmptyState(
+                icon: Icons.delete_outline,
+                title: 'Deleted',
+                message: 'This regime is no longer there.',
+              )
+            : const Center(child: CircularProgressIndicator()),
       );
     }
+
+    // The cycle belongs to the programme being trained. A regime you are not
+    // training has no cycle in flight, and a line about one would be about
+    // somebody else's.
+    final status =
+        regime.isActive ? ref.watch(cycleStatusProvider).valueOrNull : null;
 
     // A day deleted out from under the strip must not leave the body pointing
     // past the end of it.
     final day = sessions.isEmpty ? 0 : _day.clamp(0, sessions.length - 1);
 
     return Scaffold(
+      // Pushed, so it wears the bar rather than a masthead (THEME §5). The
+      // cycle line and the day strip go in a `surface` block directly under it,
+      // sharing its colour so the two read as one header.
+      appBar: AppBar(
+        title: Text(regime.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_rounded),
+            tooltip: 'Regime settings',
+            onPressed: () => showRegimeSettings(context, ref, regime),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          HeaderBand(
+          Container(
+            width: double.infinity,
+            color: c.surface,
             child: Column(
               children: [
-                PageHeader(
-                  // The screen names itself; the regime's own name is the
-                  // eyebrow above it, the slot a date takes on Today.
-                  title: 'Regime',
-                  eyebrow: regime.name,
-                  belowGap: Space.sm,
-                  actions: [
-                    CircleIconButton(
-                      icon: Icons.tune_rounded,
-                      tooltip: 'Regime settings',
-                      onTap: () => showRegimeSettings(context, ref, regime),
-                    ),
-                  ],
-                  below: status == null
-                      ? null
-                      : _CycleLine(status: status, sessions: sessions),
-                ),
+                if (status != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                        Space.gutter, 0, Space.gutter, Space.lg),
+                    child: _CycleLine(status: status, sessions: sessions),
+                  ),
                 // No strip at all until there is a day in it: an `Add day +`
-                // tab alone under the masthead is a tab bar with no tabs, and
-                // the empty state below already asks for the same thing.
+                // tab alone under the bar is a tab bar with no tabs, and the
+                // empty state below already asks for the same thing.
                 if (sessions.isNotEmpty)
                   UnderlineTabs(
                     labels: [for (final s in sessions) s.name],
@@ -156,6 +160,7 @@ class _RegimeScreenState extends ConsumerState<RegimeScreen> {
                   )
                 : _DayBody(
                     key: ValueKey(sessions[day].id),
+                    regimeId: regime.id,
                     session: sessions[day],
                   ),
           ),
@@ -317,8 +322,9 @@ Future<void> _showCycleSheet(
 /// One training day: what is in it, and the three things you do to the day
 /// itself.
 class _DayBody extends ConsumerWidget {
-  const _DayBody({super.key, required this.session});
+  const _DayBody({super.key, required this.regimeId, required this.session});
 
+  final String regimeId;
   final Session session;
 
   @override
@@ -384,6 +390,7 @@ class _DayBody extends ConsumerWidget {
           for (var i = 0; i < slots.length; i++) ...[
             if (i > 0) Divider(height: 1, color: c.border),
             _SlotRow(
+              regimeId: regimeId,
               sessionId: session.id,
               slot: slots[i].slot,
               exercise: slots[i].exercise,
@@ -481,11 +488,13 @@ class _DayBody extends ConsumerWidget {
 /// for.
 class _SlotRow extends StatelessWidget {
   const _SlotRow({
+    required this.regimeId,
     required this.sessionId,
     required this.slot,
     required this.exercise,
   });
 
+  final String regimeId;
   final String sessionId;
   final SessionExercise slot;
   final Exercise exercise;
@@ -513,8 +522,11 @@ class _SlotRow extends StatelessWidget {
       ),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) =>
-              SessionSlotScreen(sessionId: sessionId, slotId: slot.id),
+          builder: (_) => SessionSlotScreen(
+            regimeId: regimeId,
+            sessionId: sessionId,
+            slotId: slot.id,
+          ),
         ),
       ),
     );
@@ -663,11 +675,16 @@ Future<void> addSessionPrompt(
 /// so a stray tap can't create a day called "".
 ///
 /// Returns the trimmed text, or null when dismissed.
+/// [validate] returns the reason the current text can't be saved, or null when
+/// it can. Shown under the field and the confirm stays off — a name that is
+/// already taken is said while you are still typing it, not after the sheet
+/// closes and a snackbar tells you the work was thrown away.
 Future<String?> promptForText(
   BuildContext context, {
   required String title,
   String? hint,
   String initial = '',
+  String? Function(String value)? validate,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -675,7 +692,12 @@ Future<String?> promptForText(
     showDragHandle: false,
     builder: (sheet) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
-      child: _NamePromptSheet(title: title, hint: hint, initial: initial),
+      child: _NamePromptSheet(
+        title: title,
+        hint: hint,
+        initial: initial,
+        validate: validate,
+      ),
     ),
   );
 }
@@ -685,11 +707,13 @@ class _NamePromptSheet extends StatefulWidget {
     required this.title,
     required this.hint,
     required this.initial,
+    this.validate,
   });
 
   final String title;
   final String? hint;
   final String initial;
+  final String? Function(String value)? validate;
 
   @override
   State<_NamePromptSheet> createState() => _NamePromptSheetState();
@@ -706,18 +730,26 @@ class _NamePromptSheetState extends State<_NamePromptSheet> {
 
   void _submit() {
     final value = _controller.text.trim();
-    if (value.isEmpty) return;
+    if (value.isEmpty || _error != null) return;
     Navigator.of(context).pop(value);
+  }
+
+  String? get _error {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return null;
+    return widget.validate?.call(value);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final error = _error;
     return AppSheet(
       title: widget.title,
       footer: PrimaryButton(
         label: 'Save',
-        onPressed: _controller.text.trim().isEmpty ? null : _submit,
+        onPressed:
+            _controller.text.trim().isEmpty || error != null ? null : _submit,
       ),
       children: [
         TextField(
@@ -749,16 +781,26 @@ class _NamePromptSheetState extends State<_NamePromptSheet> {
             contentPadding: const EdgeInsets.all(Space.lg),
           ),
         ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.sm),
+            child: Text(
+              error,
+              style: context.t.bodySmall?.copyWith(color: c.negative),
+            ),
+          ),
       ],
     );
   }
 }
 
-/// The catalog and the regime switcher, which the settings sheet points at.
+/// The catalog, which the Regime index points at.
 void openExerciseCatalog(BuildContext context) => Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const ExerciseCatalogScreen()),
     );
 
-void openRegimes(BuildContext context) => Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const RegimesScreen()),
+/// One programme, pushed off the Regime index.
+void openRegimeEditor(BuildContext context, String regimeId) =>
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => RegimeEditorScreen(regimeId: regimeId)),
     );

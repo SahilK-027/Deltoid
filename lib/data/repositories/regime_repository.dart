@@ -19,6 +19,33 @@ class RegimeSummary {
   final int workoutCount;
 }
 
+/// Thrown when every identity hue is spoken for.
+///
+/// A colour per live regime is the rule the mark depends on, so the cap is a
+/// refusal rather than a wrap-around: six programmes at a time, and the seventh
+/// waits for one to be deleted.
+class RegimeSlotsFullException implements Exception {
+  const RegimeSlotsFullException();
+
+  @override
+  String toString() =>
+      'RegimeSlotsFullException: all $identitySlots identity slots are taken';
+}
+
+/// Thrown when a name is already on a live regime.
+///
+/// A regime is identified on screen by its name and its colour, and nothing
+/// else — History says "PPL", Today says "PPL". Two of them called `PPL` is a
+/// history you cannot read, whichever one you meant.
+class RegimeNameTakenException implements Exception {
+  const RegimeNameTakenException(this.name);
+
+  final String name;
+
+  @override
+  String toString() => 'RegimeNameTakenException: $name is already in use';
+}
+
 /// Edits to the programme itself: regimes, their sessions, and the exercise
 /// slots inside them.
 ///
@@ -38,16 +65,83 @@ class RegimeRepository {
   Future<String> createRegime(String name, {bool activate = true}) async {
     final id = newId();
     await db.transaction(() async {
+      if (await isNameTaken(name)) throw RegimeNameTakenException(name);
+      final slot = await nextIdentitySlot();
+      if (slot == null) throw const RegimeSlotsFullException();
       if (activate) await _deactivateAll();
       await db.into(db.regimes).insert(
             RegimesCompanion.insert(
               id: Value(id),
               name: name,
               isActive: Value(activate),
+              identityIndex: Value(slot),
             ),
           );
     });
     return id;
+  }
+
+  /// Whether a live regime already answers to this name.
+  ///
+  /// Trimmed and case-insensitive: `ppl` and `PPL ` are the same programme to
+  /// everyone except a string comparison. [exceptId] lets a rename keep its own
+  /// name — saving `PPL` on the regime already called `PPL` is a no-op, not a
+  /// collision. Deleted regimes don't hold a name; they are gone from every
+  /// screen that shows one.
+  Future<bool> isNameTaken(String name, {String? exceptId}) async {
+    final wanted = name.trim().toLowerCase();
+    if (wanted.isEmpty) return false;
+
+    final query = db.select(db.regimes)..where((t) => t.deletedAt.isNull());
+    final live = await query.get();
+    return live.any(
+      (r) => r.id != exceptId && r.name.trim().toLowerCase() == wanted,
+    );
+  }
+
+  /// Every live regime's name, trimmed and lowercased — what a prompt checks
+  /// its field against while it is being typed.
+  Future<Set<String>> liveNames({String? exceptId}) async {
+    final query = db.select(db.regimes)..where((t) => t.deletedAt.isNull());
+    final live = await query.get();
+    return {
+      for (final r in live)
+        if (r.id != exceptId) r.name.trim().toLowerCase(),
+    };
+  }
+
+  /// The lowest identity hue no live regime is wearing, or null when all
+  /// [identitySlots] are taken.
+  ///
+  /// Lowest-free rather than next-in-sequence: deleting the green one and
+  /// creating another should give the new regime green back, not walk the
+  /// counter off the end of a palette that has six colours in it.
+  Future<int?> nextIdentitySlot() async {
+    final taken = await liveIdentitySlots();
+    for (var i = 0; i < identitySlots; i++) {
+      if (!taken.contains(i)) return i;
+    }
+    return null;
+  }
+
+  Future<Set<int>> liveIdentitySlots() async {
+    final query = db.select(db.regimes)..where((t) => t.deletedAt.isNull());
+    final live = await query.get();
+    return {for (final r in live) r.identityIndex};
+  }
+
+  /// How many regimes can still be created. Watched by the Regimes screen so
+  /// the `New` action can say why it is off before it is tapped.
+  Stream<int> watchFreeIdentitySlots() {
+    final query = db.select(db.regimes)..where((t) => t.deletedAt.isNull());
+    return query.watch().map((live) {
+      final taken = {for (final r in live) r.identityIndex};
+      var free = 0;
+      for (var i = 0; i < identitySlots; i++) {
+        if (!taken.contains(i)) free++;
+      }
+      return free;
+    });
   }
 
   Future<void> setActiveRegime(String regimeId) async {
@@ -179,6 +273,11 @@ class RegimeRepository {
     Value<int> deloadSetDelta = const Value.absent(),
     Value<int> deloadWeightPct = const Value.absent(),
   }) async {
+    // A rename is the other way two regimes end up with one name, and it is
+    // the easier one to reach: the create flow at least asks for a new name.
+    if (name.present && await isNameTaken(name.value, exceptId: regimeId)) {
+      throw RegimeNameTakenException(name.value);
+    }
     await (db.update(db.regimes)..where((t) => t.id.equals(regimeId))).write(
       RegimesCompanion(
         name: name,
