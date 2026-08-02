@@ -83,7 +83,7 @@ class _SettingsSheet extends ConsumerWidget {
               : 'Off — no scheduled light week',
           onTap: () async {
             Navigator.of(context).pop();
-            await showDeloadSettings(host, ref, regime.id);
+            await showDeloadSettings(host, regime.id);
           },
         ),
         if (sessions.length > 1)
@@ -92,8 +92,11 @@ class _SettingsSheet extends ConsumerWidget {
             title: 'Re-order days',
             subtitle: 'The order one cycle runs in',
             onTap: () async {
+              // Read *before* the pop: this sheet is about to be disposed, and
+              // everything it hands on has to be able to outlive it.
+              final repo = ref.read(regimeRepositoryProvider);
               Navigator.of(context).pop();
-              await showDayReorder(host, ref, sessions);
+              await showDayReorder(host, repo, sessions);
             },
           ),
       ],
@@ -103,9 +106,10 @@ class _SettingsSheet extends ConsumerWidget {
 
 /// Deload is configured here and nowhere else: on, how often, and how much
 /// lighter. The app suggests; it never forces.
+/// No [WidgetRef] parameter: the sheet it opens is a `ConsumerWidget` with a
+/// ref of its own, and the caller's was already disposed by the time this ran.
 Future<void> showDeloadSettings(
   BuildContext context,
-  WidgetRef ref,
   String regimeId,
 ) {
   return showModalBottomSheet<void>(

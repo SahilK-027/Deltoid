@@ -182,22 +182,20 @@ class _NavItem extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
-      // A **circle**, and no highlight at all.
+      // The Android 12 ripple, bounded to the destination.
       //
-      // This was an unbounded rectangle sized to the bar, and it looked like
-      // exactly what it was: a lit box a cell and a half wide, with a hard
-      // edge, sitting behind the labels. Two separate mistakes in one control —
-      // `highlightShape: rectangle` paints a filled rect for as long as the
-      // finger is down, which is the pill this bar explicitly does not have,
-      // and a radius taken from the bar's width made the splash a wash across
-      // its neighbours rather than a ripple under the thumb.
-      //
-      // What is left is one circle, centred on the destination, a little wider
-      // than the icon it starts from, fading as it grows.
-      containedInkWell: false,
-      highlightShape: BoxShape.circle,
-      radius: 42,
-      splashFactory: InkRipple.splashFactory,
+      // Three shapes were tried here. A rectangle sized to the whole bar was a
+      // lit box a cell and a half wide with a hard edge — the pill this bar
+      // explicitly does not have, arriving by accident. A hard circle was
+      // honest but read as a blob under the icon rather than as the surface
+      // responding. `InkSparkle` is the one that looks like the thing it is:
+      // a soft radial wash filling the destination's own rectangle, falling
+      // off at the edges instead of stopping at them, and — the part that
+      // matters most here — **it plays to completion**, so switching tab does
+      // not cut its own feedback short.
+      containedInkWell: true,
+      highlightShape: BoxShape.rectangle,
+      splashFactory: InkSparkle.splashFactory,
       splashColor: c.textPrimary.withValues(alpha: 0.12),
       // The press state is the ripple. A highlight underneath it is a second
       // shape doing the same job, and it is the one that leaves an edge.

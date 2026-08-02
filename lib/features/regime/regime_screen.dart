@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../core/widgets/reorder_sheet.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../domain/cycle_engine.dart';
@@ -444,18 +445,17 @@ class _DayBody extends ConsumerWidget {
     WidgetRef ref,
     List<({SessionExercise slot, Exercise exercise})> slots,
   ) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
-      builder: (_) => _ReorderSheet(
-        title: 'Re-order exercises',
-        subtitle: session.name,
-        labels: [for (final s in slots) s.exercise.name],
-        ids: [for (final s in slots) s.slot.id],
-        onCommit: (ids) =>
-            ref.read(regimeRepositoryProvider).reorderSessionExercises(ids),
-      ),
+    // Looked up now, while this widget is certainly alive, and used later from
+    // a sheet that outlives the frame it was opened on.
+    final repo = ref.read(regimeRepositoryProvider);
+    return showReorderSheet(
+      context,
+      title: 'Re-order exercises',
+      subtitle: session.name,
+      items: [
+        for (final s in slots) (id: s.slot.id, label: s.exercise.name),
+      ],
+      onCommit: repo.reorderSessionExercises,
     );
   }
 
@@ -549,105 +549,26 @@ String targetLabel(SessionExercise slot) {
   return '${slot.targetSets} × $range';
 }
 
-/// Explicit move controls rather than a drag handle, and in a sheet rather than
-/// in the list.
-///
-/// `ReorderableDragStartListener` is an immediate vertical drag: nested in a
-/// scrollable it competed with the page and lost, so a normal-speed drag
-/// scrolled instead of reordering and there was no auto-scroll to carry a row
-/// past the fold. A reorder should never depend on how fast your thumb moves.
-class _ReorderSheet extends StatefulWidget {
-  const _ReorderSheet({
-    required this.title,
-    required this.subtitle,
-    required this.labels,
-    required this.ids,
-    required this.onCommit,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<String> labels;
-  final List<String> ids;
-  final ValueChanged<List<String>> onCommit;
-
-  @override
-  State<_ReorderSheet> createState() => _ReorderSheetState();
-}
-
-class _ReorderSheetState extends State<_ReorderSheet> {
-  late final _order = [
-    for (var i = 0; i < widget.ids.length; i++)
-      (id: widget.ids[i], label: widget.labels[i]),
-  ];
-
-  void _move(int from, int delta) {
-    final to = (from + delta).clamp(0, _order.length - 1);
-    if (to == from) return;
-    setState(() => _order.insert(to, _order.removeAt(from)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return AppSheet(
-      title: widget.title,
-      subtitle: widget.subtitle,
-      contentPadding: const EdgeInsets.only(bottom: Space.md),
-      footer: PrimaryButton(
-        label: 'Save order',
-        onPressed: () {
-          widget.onCommit([for (final e in _order) e.id]);
-          Navigator.of(context).pop();
-        },
-      ),
-      children: [
-        for (var i = 0; i < _order.length; i++)
-          AppRow(
-            title: _order[i].label,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleIconButton(
-                  icon: Icons.keyboard_arrow_up_rounded,
-                  size: 36,
-                  tint: i == 0 ? c.textTertiary : null,
-                  onTap: i == 0 ? null : () => _move(i, -1),
-                ),
-                const SizedBox(width: Space.sm),
-                CircleIconButton(
-                  icon: Icons.keyboard_arrow_down_rounded,
-                  size: 36,
-                  tint: i == _order.length - 1 ? c.textTertiary : null,
-                  onTap:
-                      i == _order.length - 1 ? null : () => _move(i, 1),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 /// Re-orders the days of a regime. Opened from the regime settings sheet, since
 /// the tab strip is where you *read* the order and not where you change it.
+///
+/// Takes the **repository**, not a [WidgetRef]. The settings sheet closes
+/// itself before opening this one, so by the time `Save order` is tapped the
+/// widget that owned that ref has been disposed and reading through it throws
+/// `Cannot use "ref" after the widget was disposed` — from a gesture handler,
+/// where the only symptom is that the button does nothing. A repository is a
+/// plain object: it outlives the widget that looked it up.
 Future<void> showDayReorder(
   BuildContext context,
-  WidgetRef ref,
+  RegimeRepository repo,
   List<Session> sessions,
 ) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
-    builder: (_) => _ReorderSheet(
-      title: 'Re-order days',
-      subtitle: 'The order one cycle runs in',
-      labels: [for (final s in sessions) s.name],
-      ids: [for (final s in sessions) s.id],
-      onCommit: (ids) => ref.read(regimeRepositoryProvider).reorderSessions(ids),
-    ),
+  return showReorderSheet(
+    context,
+    title: 'Re-order days',
+    subtitle: 'The order one cycle runs in',
+    items: [for (final s in sessions) (id: s.id, label: s.name)],
+    onCommit: repo.reorderSessions,
   );
 }
 

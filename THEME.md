@@ -275,6 +275,12 @@ rules came out of it:
 A row is the exception, and only because a row *is* a rectangle: `InkRow` keeps
 a faint one because the shape it fills is the shape you pressed.
 
+**The ripple is `InkSparkle`** — the Android 12 one: a soft radial wash bounded
+to the thing you pressed, falling off at its edges rather than stopping at
+them, and it **plays to completion** after the finger has gone, so changing tab
+does not cut the bar's own feedback short. `InkRipple`'s hard circle was honest
+and read as a blob under the icon.
+
 **Scrolling is damped, everywhere.** `AppScrollBehavior` puts
 `BouncingScrollPhysics` on every list on every platform and drops the
 overscroll glow with it. Android's clamping physics stops a list dead at the end
@@ -846,6 +852,22 @@ that pair then marks it everywhere — the card tile, history rows, the day tabs
 Cheap to build, and it is most of why their history list scans so well. Worth
 adopting for our regimes: `Regime.colorIndex` + `Regime.glyph`, chosen in the
 create sheet, rendered through `IconTile`.
+
+**Re-ordering is a drag, everywhere** — `showReorderSheet`. A training day's
+exercises, a regime's days and today's log all open the same sheet: numbered
+rows, a drag handle on the right, one `Save order` under them.
+
+It was ⌃ / ⌄ buttons per row, on a note saying an immediate vertical drag
+competes with the page scroll and loses. That is true of a drag started from
+anywhere on the row and false of one started from a **handle** — the handle
+owns the gesture, the rest of the row still scrolls, and `ReorderableListView`
+brings its own auto-scroll to carry a row past the fold. Two directions is a
+fine control for moving something once and a bad one for arranging six things,
+which is what you opened the sheet to do.
+
+The order is committed on **Save**, not per move: a re-order is one decision
+made out of several movements, and writing each one pushes a stream update into
+everything watching underneath.
 
 **Two-button footers** — when a screen genuinely ends in two actions, stack
 them: secondary (`surfaceHigh`) above, primary (white) below, both full width.

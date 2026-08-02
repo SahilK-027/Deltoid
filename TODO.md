@@ -372,7 +372,7 @@ the wakelock, audio ducking, and the share sheet.
   than the longest; and the bodyweight screen built every month row eagerly —
   six hundred of them to show eight.
 
-**276 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**283 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and

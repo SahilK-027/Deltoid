@@ -600,8 +600,11 @@ class InkRow extends StatelessWidget {
                 HapticFeedback.mediumImpact();
                 onLongPress!();
               },
-        // Explicit, because the theme turns splashes off globally.
-        splashFactory: InkRipple.splashFactory,
+        // Explicit, because the theme turns splashes off globally. `InkSparkle`
+        // is the Android 12 ripple: a soft radial wash bounded to the row,
+        // which falls off at the edges rather than stopping at them, and plays
+        // to completion after the finger has gone.
+        splashFactory: InkSparkle.splashFactory,
         // Tuned for charcoal. Material's default is `onSurface` at 12%, which
         // on `#1F1F1F` is a grey smear; a low-alpha white spreads as light
         // rather than as dirt, and reads on the light theme as a shadow.

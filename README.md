@@ -248,6 +248,15 @@ correctly and the UI freezes forever, with no error anywhere. Use
 `db.watchQuery(...)` from `lib/data/db/watch.dart`, which is built on
 `tableUpdates`.
 
+**Never capture a `WidgetRef` in a callback that outlives its widget.** A sheet
+that closes itself before opening the next one — the regime settings sheet does
+exactly this — leaves its `ref` disposed, and `ref.read` from the second
+sheet's Save button then throws `Cannot use "ref" after the widget was
+disposed`. It surfaces as an exception from a gesture handler, so the visible
+symptom is a button that does nothing at all. Read the repository *before*
+popping and pass that: a repository is a plain object and outlives the widget
+that looked it up.
+
 **`CrossAxisAlignment.stretch` in an unbounded Row.** Inside a `ListView` a
 Row's cross axis is unbounded; `stretch` there is a layout error that silently
 blanked most of the Progress screen with nothing in logcat. Use

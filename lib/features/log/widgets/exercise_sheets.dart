@@ -165,7 +165,7 @@ Future<void> showExerciseMenu(
   ExerciseEntry entry, {
   required int index,
   required int total,
-  required ValueChanged<int> onMove,
+  required VoidCallback onReorder,
 }) async {
   final repo = ref.read(trainingRepositoryProvider);
 
@@ -278,42 +278,21 @@ Future<void> showExerciseMenu(
             navigator.pop();
           },
         ),
-        // Drag-to-reorder went away with the vertical list; moving an exercise
-        // is an explicit step so it can't happen by accident while turning
-        // pages. Buttons, not rows: it is a pair of directions, not an action.
+        // One row that opens the whole order, rather than a pair of buttons
+        // that nudge this one exercise a place at a time. Two directions is a
+        // fine control for moving something *once*; it is a bad one for
+        // arranging six movements, which is what you are actually doing when
+        // you open this — and the rail's own long-press drag already exists for
+        // the single nudge.
         if (total > 1)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.lg, Space.lg, Space.xs),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SecondaryButton(
-                    label: 'Move earlier',
-                    icon: Icons.arrow_back_rounded,
-                    onPressed: index == 0
-                        ? null
-                        : () {
-                            Navigator.of(sheetContext).pop();
-                            onMove(-1);
-                          },
-                  ),
-                ),
-                const SizedBox(width: Space.sm),
-                Expanded(
-                  child: SecondaryButton(
-                    label: 'Move later',
-                    icon: Icons.arrow_forward_rounded,
-                    onPressed: index >= total - 1
-                        ? null
-                        : () {
-                            Navigator.of(sheetContext).pop();
-                            onMove(1);
-                          },
-                  ),
-                ),
-              ],
-            ),
+          AppRow(
+            icon: Icons.swap_vert_rounded,
+            title: 'Re-order exercises',
+            subtitle: 'Drag them into the order you are training them',
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              onReorder();
+            },
           ),
       ],
     ),

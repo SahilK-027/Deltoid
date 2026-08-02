@@ -12,6 +12,7 @@ import '../../core/providers.dart';
 import '../../core/rest_alert.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../core/widgets/reorder_sheet.dart';
 import '../../core/widgets/ticking.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
@@ -377,7 +378,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                           rowKeyFor: _rowKey,
                           onToggleDone: _toggleDone,
                           onNextExercise: () => _goToPage(index + 1),
-                          onMove: (delta) => _move(detail, index, delta),
+                          onReorder: () => _reorderExercises(detail),
                         );
                       },
                     ),
@@ -828,17 +829,39 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     });
   }
 
-  /// Moves an exercise one place earlier or later, following it with the page
-  /// so the movement you were looking at stays in front of you.
-  void _move(WorkoutDetail detail, int index, int delta) {
-    final target = index + delta;
-    if (target < 0 || target >= detail.entries.length) return;
-
-    final ids = detail.entries.map((e) => e.workoutExercise.id).toList();
-    ids.insert(target, ids.removeAt(index));
-    setState(() => _pendingOrder = ids);
-    ref.read(trainingRepositoryProvider).reorderWorkoutExercises(ids);
-    _goToPage(target);
+  /// Arranges today's exercises, by dragging them.
+  ///
+  /// This was `Move earlier` / `Move later` on the ⋮ sheet — one nudge per
+  /// visit, with the sheet closing between each. Two directions is a fine
+  /// control for moving something once and a bad one for arranging six
+  /// movements, which is what you have opened it to do. The rail's long-press
+  /// drag still covers the single nudge.
+  Future<void> _reorderExercises(WorkoutDetail detail) async {
+    final current = [for (final e in detail.entries) e.workoutExercise.id];
+    // Looked up while this widget is certainly alive. A `ref` read from inside
+    // a callback that fires after the owning widget is gone throws from a
+    // gesture handler, where the only symptom is a button that does nothing.
+    final repo = ref.read(trainingRepositoryProvider);
+    await showReorderSheet(
+      context,
+      title: 'Re-order exercises',
+      subtitle: detail.session?.name ?? 'Today',
+      items: [
+        for (final e in detail.entries)
+          (id: e.workoutExercise.id, label: e.exercise.name),
+      ],
+      onCommit: (ids) {
+        if (!mounted) return;
+        // Follow the exercise that was in front of you, wherever it landed.
+        final was = current.isEmpty
+            ? null
+            : current[_page.clamp(0, current.length - 1)];
+        setState(() => _pendingOrder = ids);
+        repo.reorderWorkoutExercises(ids);
+        final landed = was == null ? -1 : ids.indexOf(was);
+        if (landed >= 0) _goToPage(landed);
+      },
+    );
   }
 
   /// The order the last move put things in, held until the database agrees.
@@ -1184,7 +1207,7 @@ class _ExercisePage extends ConsumerWidget {
     required this.rowKeyFor,
     required this.onToggleDone,
     required this.onNextExercise,
-    required this.onMove,
+    required this.onReorder,
   });
 
   final int index;
@@ -1205,7 +1228,7 @@ class _ExercisePage extends ConsumerWidget {
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
   final VoidCallback onNextExercise;
-  final ValueChanged<int> onMove;
+  final VoidCallback onReorder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1278,7 +1301,7 @@ class _ExercisePage extends ConsumerWidget {
                 entry,
                 index: index,
                 total: total,
-                onMove: onMove,
+                onReorder: onReorder,
               ),
             ),
           ],
