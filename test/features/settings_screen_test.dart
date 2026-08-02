@@ -105,8 +105,15 @@ void main() {
 
       expect(find.text('Units'), findsOneWidget);
       expect(find.text('Kilograms'), findsOneWidget);
+      expect(find.text('Pounds'), findsOneWidget);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
+
       expect(find.text('Appearance'), findsOneWidget);
       expect(find.text('System'), findsOneWidget);
+      expect(find.text('Light'), findsOneWidget);
+      expect(find.text('Dark'), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
     });
   });

@@ -250,6 +250,10 @@ class SettingsScreen extends ConsumerWidget {
 
 /// The latest weight, and one tap to log today's.
 ///
+/// One row, not a card with a 30sp figure in it: this is a number you glance
+/// at on the way to logging the next one, and at display size it took the same
+/// vertical room as the whole Data section under it.
+///
 /// Tapping opens the log sheet on today — prefilled when today already has an
 /// entry, so a second weighing corrects rather than duplicates (the table is
 /// keyed by day, so it would have overwritten either way; this says so).
@@ -266,47 +270,34 @@ class _BodyweightCard extends ConsumerWidget {
     final latest = log.isEmpty ? null : log.first;
     final loggedToday = latest != null && latest.dayKey == today;
 
-    return AppCard(
-      onTap: () => logBodyweightPrompt(
-        context,
-        ref,
-        date: loggedToday ? dateFromDayKey(latest.dayKey) : null,
-        initial: loggedToday ? latest.weightKg : null,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  latest == null
-                      ? 'Not logged'
-                      : '${formatInUnit(latest.weightKg, unit)} ${unit.label}',
-                  style: context.t.displaySmall,
-                ),
-                const SizedBox(height: Space.xs),
-                Text(
-                  latest == null
-                      ? 'Needed to score bodyweight and BW+ lifts'
-                      : loggedToday
-                          ? 'Logged today  ·  ${log.length} entries'
-                          : 'Last entry '
-                              '${DateFormat('d MMM yyyy').format(dateFromDayKey(latest.dayKey))}'
-                              '  ·  ${log.length} entries',
-                  style: context.t.bodySmall,
-                ),
-              ],
-            ),
+    return ListCard(
+      inset: Space.lg,
+      children: [
+        AppRow(
+          icon: Icons.monitor_weight_outlined,
+          title: latest == null
+              ? 'Not logged'
+              : '${formatInUnit(latest.weightKg, unit)} ${unit.label}',
+          subtitle: latest == null
+              ? 'Needed to score bodyweight and BW+ lifts'
+              : loggedToday
+                  ? 'Logged today  ·  ${log.length} entries'
+                  : 'Last entry '
+                      '${DateFormat('d MMM').format(dateFromDayKey(latest.dayKey))}'
+                      '  ·  ${log.length} entries',
+          onTap: () => logBodyweightPrompt(
+            context,
+            ref,
+            date: loggedToday ? dateFromDayKey(latest.dayKey) : null,
+            initial: loggedToday ? latest.weightKg : null,
           ),
-          const SizedBox(width: Space.md),
-          Icon(
+          trailing: Icon(
             loggedToday ? Icons.edit_outlined : Icons.add,
             size: 20,
             color: c.textTertiary,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -319,10 +310,9 @@ class _BodyweightCard extends ConsumerWidget {
 /// to tell which is which afterwards. The keypad's ± step follows this too —
 /// 2.5 kg is a pair of plates, and so is 5 lb.
 ///
-/// The control is the app's own segmented pill, not a card of hand-rolled
-/// `AnimatedContainer`s: this screen had drawn its own version of a primitive
-/// that already existed, in an accent the rest of the app reserves for the
-/// selected segment of exactly this control.
+/// Rows with radios, not a segmented pill: a pill fits the labels and nothing
+/// else, and the unit is the one setting here that changes what every number
+/// in the app means. A row has the width to say so.
 class _UnitPicker extends ConsumerWidget {
   const _UnitPicker();
 
@@ -330,18 +320,28 @@ class _UnitPicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
-    return SegmentedPill<WeightUnit>(
-      expand: true,
-      value: current,
-      onChanged: (unit) => setWeightUnit(ref.read(databaseProvider), unit),
-      segments: const [
-        (value: WeightUnit.kg, label: 'Kilograms'),
-        (value: WeightUnit.lb, label: 'Pounds'),
+    return ListCard(
+      inset: Space.lg,
+      children: [
+        for (final unit in WeightUnit.values)
+          AppRow(
+            title: switch (unit) {
+              WeightUnit.kg => 'Kilograms',
+              WeightUnit.lb => 'Pounds',
+            },
+            trailing: AppRadio(selected: unit == current),
+            onTap: () => setWeightUnit(ref.read(databaseProvider), unit),
+          ),
       ],
     );
   }
 }
 
+/// Three miniatures of the app, side by side.
+///
+/// Named modes in a segmented track ask you to remember what "System" did last
+/// time; the tiles show it. System is drawn as both halves at once, which is
+/// the only honest picture of a setting that is neither.
 class _ThemePicker extends ConsumerWidget {
   const _ThemePicker();
 
@@ -349,15 +349,169 @@ class _ThemePicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.dark;
 
-    return SegmentedPill<ThemeMode>(
-      expand: true,
-      value: current,
-      onChanged: (mode) => setThemeMode(ref.read(databaseProvider), mode),
-      segments: const [
-        (value: ThemeMode.system, label: 'System'),
-        (value: ThemeMode.light, label: 'Light'),
-        (value: ThemeMode.dark, label: 'Dark'),
+    return Row(
+      children: [
+        for (final mode in ThemeMode.values) ...[
+          if (mode != ThemeMode.values.first) const SizedBox(width: Space.md),
+          Expanded(
+            child: _ThemeTile(
+              mode: mode,
+              selected: mode == current,
+              onTap: () => setThemeMode(ref.read(databaseProvider), mode),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({
+    required this.mode,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ThemeMode mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Pressable(
+      onTap: onTap,
+      scale: 0.97,
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: Motion.fast,
+            curve: Motion.curve,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.md + 3),
+              border: Border.all(
+                color: selected ? c.accent : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.md),
+              child: AspectRatio(
+                aspectRatio: 1.1,
+                child: switch (mode) {
+                  ThemeMode.light => const _ThemeMiniature(DeltoidColors.light),
+                  ThemeMode.dark => const _ThemeMiniature(DeltoidColors.dark),
+                  // Both halves, split on the diagonal the way the OS setting
+                  // itself is neither one nor the other.
+                  ThemeMode.system => const Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _ThemeMiniature(DeltoidColors.dark),
+                        ClipPath(
+                          clipper: _DiagonalClipper(),
+                          child: _ThemeMiniature(DeltoidColors.light),
+                        ),
+                      ],
+                    ),
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.sm),
+          Text(
+            switch (mode) {
+              ThemeMode.system => 'System',
+              ThemeMode.light => 'Light',
+              ThemeMode.dark => 'Dark',
+            },
+            style: context.t.titleSmall?.copyWith(
+              color: selected ? c.textPrimary : c.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The top-left triangle, so the System tile shows light over dark without
+/// either half being a rectangle you could mistake for the whole thing.
+class _DiagonalClipper extends CustomClipper<Path> {
+  const _DiagonalClipper();
+
+  @override
+  Path getClip(Size size) => Path()
+    ..lineTo(size.width, 0)
+    ..lineTo(0, size.height)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+/// A page of the app at thumbnail size: a heading, the chart series as dots,
+/// and cards. Not a screenshot — a screenshot at 90pt is grey mush, and this
+/// has to survive being looked at for half a second.
+class _ThemeMiniature extends StatelessWidget {
+  const _ThemeMiniature(this.palette);
+
+  final DeltoidColors palette;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget block({double width = double.infinity, double height = 10}) =>
+        Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: palette.surfaceHigh,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+
+    return Container(
+      color: palette.bg,
+      padding: const EdgeInsets.all(Space.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Aa',
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: Space.xs),
+          Row(
+            children: [
+              for (final colour in palette.series.take(4)) ...[
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration:
+                      BoxDecoration(shape: BoxShape.circle, color: colour),
+                ),
+                const SizedBox(width: 3),
+              ],
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+          block(height: 12),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: block()),
+              const SizedBox(width: 4),
+              Expanded(child: block()),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

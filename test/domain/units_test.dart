@@ -68,4 +68,34 @@ void main() {
 
     expect(WeightUnit.lb.display(out.single.weight!), 180);
   });
+
+  group('formatDeltaInUnit', () {
+    test('a move the app can show is signed', () {
+      expect(formatDeltaInUnit(77, 76, WeightUnit.kg), '+1');
+      expect(formatDeltaInUnit(75.5, 76, WeightUnit.kg), '−0.5');
+    });
+
+    test('no change is nothing, not "+0"', () {
+      expect(formatDeltaInUnit(76, 76, WeightUnit.kg), isNull);
+    });
+
+    test('a move too small to display is nothing either', () {
+      // Both weights show as 76.5, so a signed zero would be the row claiming
+      // a change it is not showing.
+      expect(formatDeltaInUnit(76.4, 76.6, WeightUnit.kg), isNull);
+    });
+
+    test('pounds round to the pound, and say so in pounds', () {
+      expect(
+        formatDeltaInUnit(WeightUnit.lb.toKg(170), WeightUnit.lb.toKg(168),
+            WeightUnit.lb),
+        '+2',
+      );
+      expect(
+        formatDeltaInUnit(WeightUnit.lb.toKg(168.2), WeightUnit.lb.toKg(168),
+            WeightUnit.lb),
+        isNull,
+      );
+    });
+  });
 }

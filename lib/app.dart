@@ -28,6 +28,13 @@ class DeltoidApp extends ConsumerWidget {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: mode,
+      // Switch outright rather than cross-fade. `MaterialApp` otherwise
+      // lerps every colour in the tree for 200ms, which on a screen of cards,
+      // charts and a heatmap is a long grey wash through the midpoint of two
+      // palettes — it reads as the app struggling, not as a transition. A
+      // theme change is a state change, and §4's motion budget covers things
+      // that travel, not the entire surface of the app changing what it is.
+      themeAnimationStyle: AnimationStyle.noAnimation,
       home: const _Boot(),
     );
   }

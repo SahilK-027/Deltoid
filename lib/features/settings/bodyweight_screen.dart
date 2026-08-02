@@ -161,8 +161,9 @@ class _EntryRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
-    final delta =
-        previous == null ? null : entry.weightKg - previous!.weightKg;
+    final delta = previous == null
+        ? null
+        : formatDeltaInUnit(entry.weightKg, previous!.weightKg, unit);
 
     return AppRow(
       title: DateFormat('EEE d MMM').format(dateFromDayKey(entry.dayKey)),
@@ -175,9 +176,9 @@ class _EntryRow extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (delta != null && delta.abs() >= 0.05) ...[
+          if (delta != null) ...[
             Text(
-              '${delta > 0 ? '+' : '−'}${formatInUnit(delta.abs(), unit)}',
+              delta,
               style: context.t.labelSmall?.copyWith(color: c.textTertiary),
             ),
             const SizedBox(width: Space.md),

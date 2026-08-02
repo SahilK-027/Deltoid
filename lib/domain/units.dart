@@ -77,6 +77,20 @@ String formatInUnit(double kg, WeightUnit unit) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
+/// The move from [previousKg] to [kg], as it will actually be *shown* — or
+/// null when both round to the same displayed figure.
+///
+/// Comparing the raw kilograms was wrong in the one direction that matters:
+/// two weights 0.2 apart differ, so the row printed a signed delta, and then
+/// formatting rounded it to the display increment and it came out as "+0". A
+/// change too small for the app to show is not a change the app should claim.
+String? formatDeltaInUnit(double kg, double previousKg, WeightUnit unit) {
+  final difference = unit.display(kg) - unit.display(previousKg);
+  if (difference.abs() < unit.increment / 2) return null;
+  final magnitude = formatInUnit(unit.toKg(difference.abs()), unit);
+  return '${difference > 0 ? '+' : '−'}$magnitude';
+}
+
 /// Smallest sensible display precision, used where a raw double would show
 /// fifteen decimals of floating point noise.
 double roundToDecimals(double v, int places) {

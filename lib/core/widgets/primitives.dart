@@ -996,6 +996,49 @@ class IconTile extends StatelessWidget {
   }
 }
 
+/// The §5 radio: selected is a filled disc with a dark dot punched out of it,
+/// unselected a 2px ring in `textTertiary`. No accent hue, and no Material
+/// `Radio`, whose ripple and 48pt slop belong to a different design language.
+///
+/// It is the trailing control of an [AppRow] — a list of rows that are one
+/// choice each, where a [SegmentedPill] would put three words in a track and
+/// lose the room to say what each one means.
+class AppRadio extends StatelessWidget {
+  const AppRadio({super.key, required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AnimatedContainer(
+      duration: Motion.fast,
+      curve: Motion.curve,
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? c.accent : Colors.transparent,
+        border: Border.all(
+          color: selected ? c.accent : c.textTertiary,
+          width: 2,
+        ),
+      ),
+      child: selected
+          ? Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: c.onAccent,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
 /// One number and what it means. Built for a row of siblings, so captions line
 /// up across tiles even when one wraps.
 class StatTile extends StatelessWidget {
