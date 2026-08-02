@@ -53,8 +53,7 @@ these.
 
 1. **Chrome is monochrome. Colour is data.** Buttons, chips, nav, headers,
    selection states — white, black and grey. Hue is reserved for things that
-   *mean* something: a chart series, a PR badge, an RIR rating, a deload, a
-   destructive action. A blue button and a blue chart line in one screen make
+   *mean* something: a chart series, a deload, a destructive action. A blue button and a blue chart line in one screen make
    the button look like data and the data look tappable.
 2. **Depth is surface colour, not decoration.** Two greys and a hairline. No
    card borders, no drop shadows, no gradients, no glows.
@@ -145,10 +144,9 @@ the light theme the six are **fills and marks — never text, never a hairline.*
 Where a hue must carry text on both themes, use `textPrimary` and let the hue be
 the shape behind it.
 
-Red is deliberately not in the six. `negative` and the failure end of the effort
-ramp are the one signal that must never be read as information, so it stays out
-of the palette everything else draws from — and it is allowed to shout where the
-six are not.
+Red is deliberately not in the six. `negative` is the one signal that must never
+be read as information, so it stays out of the palette everything else draws
+from — and it is allowed to shout where the six are not.
 
 **A filled mark's glyph is the fill's own hue, taken down.** Not white, not
 black — `#FF8B66` carries `#9E2600`, `#5DBA86` carries `#275C3E`. A tile is one
@@ -182,9 +180,6 @@ tile.
 | `series[]` | `cyan · blue · yellow · green · lavender` | Categorical, in order |
 | `identity[]` | the six, in order | Regime marks, on the Regimes screen only |
 | `heatOn` | `blue #689FFA` | A day you trained; the session tile |
-
-**RIR / effort scale** (a diverging ramp, used only on effort ratings):
-`0–1 #F83446` · `2–3 orange` · `4–5 green` · `6+ blue` · unknown `#3A3A3A`.
 
 ### Light
 
@@ -675,29 +670,8 @@ Shoulders  ::::::::::::::::::::   0 sets
 - No axis, no gridlines, no legend. A bar list whose longest bar is the maximum
   needs none of them, and they are what turn six rows into a chart nobody reads.
 
-### The hero pager
-
-The first block of the landing screen may hold **more than one card, swiped
-horizontally**, with a dot indicator beneath: today's session first, the week's
-muscle volume second. It is the one place in the app where a horizontal gesture
-carries content rather than navigation, and it exists because Today's first
-screenful is the most contested space in the app — two answers that are both
-"what should I do", and neither is worth pushing the other below the fold.
-
-Rules: **two pages, at most three.** The first page is always the action —
-start, resume, or what is next — because a landing screen that opens on a
-statistic makes you swipe to use the app. Dots are `textTertiary`, active
-`textPrimary`, 6dp, centred under the card. The pager takes the height of its
-tallest page so the dots do not move as you swipe.
-
-This does not license horizontal gestures anywhere else. The log screen owns
-its axis (README invariant 4) and nothing inside it may take one.
-
 ### Badges
 
-- **PR / record** — icon + value inline in `label` size, in `positive`.
-- **RIR** — a filled circle from the RIR ramp, 26dp, overlapping the
-  bottom-right corner of the field it belongs to.
 - **Status pill** — radius 999, tint at 14% alpha of the semantic colour,
   text in that colour at `micro`.
 
@@ -755,10 +729,10 @@ should not be the loudest thing on screen while there is still work to do. The
 two never show at once.
 
 **Numeric keypad** — `surfaceSunken` bed. Digits are bare white `24sp` glyphs
-with no key background; utility keys (`RIR`, keyboard, ±, backspace) are
+with no key background; utility keys (keyboard, ±, backspace) are
 `surfaceHigh` rounded rects; the confirm/advance key is white with a dark glyph.
-Above the digits sits the effort strip (the RIR circles) and, for a barbell
-lift, the **plate view**: a small bar diagram with coloured plate slabs, a
+Above the digits, for a barbell
+lift, sits the **plate view**: a small bar diagram with coloured plate slabs, a
 legend of `count × plate`, and one plain sentence —
 `10 kg on both sides + 20 kg bar weight = 40 kg`.
 
@@ -816,7 +790,7 @@ The closest thing to our Regime screen, and the pattern is worth taking whole:
   overflow on the right; below it, the targets. Blocks are separated by
   full-width hairlines, not by cards.
 - **Targets** — they render one card per planned week, scrolling horizontally,
-  each listing set rows as `index chip · 8–10 reps · RIR badge`.
+  each listing set rows as `index chip · 8–10 reps · effort badge`.
 
 **We do not do the week cards.** Deltoid has no periodised plan and no smart
 progression: a slot has target sets and a rep range, and what actually happens
@@ -832,7 +806,7 @@ it is the same design with our data in it.
 
 **Target editor** — a sheet, not a screen. Header `✕ · exercise name + scope
 subtitle`, then a small table with `label` column headers
-(`Set · Reps min · Reps max · RIR`), one row per set: index chip, two
+(`Set · Reps min · Reps max`), one row per set: index chip, two
 `surfaceHigh` fields whose placeholder is the literal word `Optional`, trailing
 badge. A circular `+` below the last row adds a set. Under the table, toggle
 rows (title + one line of `body` + switch). Bottom: white **Save**, with a plain
@@ -883,10 +857,10 @@ Rules for any creation surface:
 **History list** — no cards. Date group header in `section` on the page
 background, then entries: identity tile (colour-coded rounded square) + session
 name in `title` + programme name in `body` + a one-line ellipsized exercise list
-+ a row of muscle chips that clips at the right edge + chevron.
++ chevron.
 
 **Workout detail** — full-bleed rows, edge-to-edge dividers, one row per
-exercise: thumbnail, name in `title`, summary lines in `body`, PR badges inline,
+exercise: name in `title`, summary lines in `body`,
 caret. Expanding reveals set rows: index chip + `60 kg × 8` in `valueSm`, inset
 dividers.
 

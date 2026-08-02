@@ -121,9 +121,10 @@ assets/
   audio/           rest_done.mp3 — the end-of-rest tone
 ```
 
-Four tabs: **Today** (next session, heatmap), **History**, **Progress** (one
-exercise, one chart), **Regime** (sessions, exercise catalog, deload config).
-Settings behind the gear on Today.
+Four tabs: **Workouts** (next session, heatmap — the landing screen the code
+still calls `today`), **Regime** (the regime library, the programme editor, the
+exercise catalog, deload config), **History** (the session feed, the
+per-exercise index, and the charts Progress used to hold), **Settings**.
 
 Today reads top to bottom as one thought: how long since the last session, the
 one session to start, then the record. Three rules about it, all learned the
@@ -329,15 +330,18 @@ The design language every screen implements is **[THEME.md](THEME.md)**.
 
 Deliberately absent, and should stay that way: social features, macros /
 nutrition, AI coaching, an exercise GIF library, Apple Health / Google Fit,
-1RM testing protocols, streaks, levels, muscle maps, motivational copy.
+1RM testing protocols, streaks, levels, muscle maps, motivational copy, and
+**effort / RIR ratings** — a number you rate yourself with after the set, which
+is one more thing to answer at the bar and nothing downstream reads.
 
-**A volume dashboard and a PR feed** were on that list and have come off it,
-under the same test the plate view passed: no new screen, no question asked.
-Weekly sets per muscle is one bar list on a page you already open, normalised
-to your own biggest muscle rather than to a target this app has no business
-inventing. Records appear inline on the day that earned them. What stays ruled
-out is the thing that made them non-goals — a dashboard you navigate *to*, a
-feed to scroll, targets to fail against.
+**A volume dashboard** was on that list and has come off it, under the same test
+the plate view passed: no new screen, no question asked. Weekly sets per muscle
+is one bar list on a page you already open, normalised to your own biggest
+muscle rather than to a target this app has no business inventing. What stays
+ruled out is the thing that made it a non-goal — a dashboard you navigate *to*,
+a feed to scroll, targets to fail against. **A PR feed stays out**, and so does
+a PR badge: a record is a number you can already read on the day it was set, and
+`beatsPrevious` already says "you beat last time" where it matters, at the bar.
 
 The app should stay small enough to open mid-set and understand at a glance.
 When in doubt, don't add the screen.

@@ -375,7 +375,7 @@ the wakelock, audio ducking, and the share sheet.
   than the longest; and the bodyweight screen built every month row eagerly —
   six hundred of them to show eight.
 
-**283 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**291 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and
@@ -397,17 +397,18 @@ repository integration against real in-memory SQLite.
 Agreed but unspecified. Each carries the decision that blocks it. Check the
 README's **Non-goals** first — these are here because they survived that check.
 
-- **Weekly sets per muscle.** Pure aggregation over a rolling seven days —
-  `domain/`, no database. *Decide first:* working sets only (yes), direct muscle
-  only (yes — there is no secondary column), deload weeks counted or not (follow
-  `domain/consistency.dart`, which already chose once).
-
-- **The hero becomes a two-page pager**, with the muscle bars as page two —
-  THEME §5 → Muscle volume bars and The hero pager. Page one is always the
-  action.
+- **Weekly sets per muscle** — the bar list in THEME §5 → Muscle volume bars.
+  Pure aggregation over a rolling seven days — `domain/`, no database. *Decide
+  first:* working sets only (yes), direct muscle only (yes — there is no
+  secondary column), deload weeks counted or not (follow
+  `domain/consistency.dart`, which already chose once) — and **where it goes**.
+  The hero pager was the answer and it is gone (a landing screen you swipe to
+  use), so the bars need a home that is a page you already open.
 
 - **Muscle chip on every exercise**, making the catalog filterable by tapping
-  what you can see. Lands with step 5's filter chips.
+  what you can see. Step 5 shipped the filter strip above the list; what is left
+  is the chip *on the row* being the thing you tap — today the row says the
+  muscle as text in its subtitle.
 
 - **Isometric holds.** The only item here needing a **migration**: a set is
   `weight × reps` and a hold is `load × seconds`, which touches `SetLog`, the

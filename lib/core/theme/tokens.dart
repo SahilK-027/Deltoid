@@ -41,7 +41,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.info,
     required this.series,
     required this.identity,
-    required this.effort,
     required this.heatEmpty,
     required this.heatOn,
     required this.shadow,
@@ -122,9 +121,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// white glyph on them rather than colour on charcoal.
   final List<Color> identity;
 
-  /// Effort / RIR ramp, index 0..6+: red at failure, blue at "plenty left".
-  final List<Color> effort;
-
   /// Heatmap: unworked day, then increasing intensity.
   final Color heatEmpty;
 
@@ -169,9 +165,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// They are fills and marks on the light theme, never text and never a
   /// hairline — see the note in THEME §2.
   ///
-  /// Red has no entry: `negative` and the failure end of the effort ramp are
-  /// the one signal that must never be mistaken for information, and it stays
-  /// out of the palette everything else is drawn from.
+  /// Red has no entry: `negative` is the one signal that must never be mistaken
+  /// for information, and it stays out of the palette everything else is drawn
+  /// from.
   static const orange = Color(0xFFFF8B66);
   static const blue = Color(0xFF689FFA);
   static const yellow = Color(0xFFFDD35F);
@@ -208,7 +204,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     info: blue,
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
-    effort: [red, red, orange, orange, green, green, blue],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
     // #222222 the grid dissolved into the card and the pattern — the whole
     // point of the section — could only be read where it was filled.
@@ -244,7 +239,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     info: blue,
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
-    effort: [red, red, orange, orange, green, green, blue],
     heatEmpty: Color(0xFFE7E7E7),
     heatOn: blue,
     shadow: Color(0x1A000000),
@@ -260,12 +254,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// The modulo is for a row that predates the column or came back from a
   /// restore written against a longer palette. It never fires in normal use.
   Color identityAt(int slot) => identity[slot.abs() % identity.length];
-
-  /// Colour for a reps-in-reserve rating. Null (unrated) stays neutral.
-  Color effortFor(int? rir) {
-    if (rir == null) return surfaceHighest;
-    return effort[rir.clamp(0, effort.length - 1)];
-  }
 
   @override
   DeltoidColors copyWith({
@@ -293,7 +281,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     Color? info,
     List<Color>? series,
     List<Color>? identity,
-    List<Color>? effort,
     Color? heatEmpty,
     Color? heatOn,
     Color? shadow,
@@ -323,7 +310,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       info: info ?? this.info,
       series: series ?? this.series,
       identity: identity ?? this.identity,
-      effort: effort ?? this.effort,
       heatEmpty: heatEmpty ?? this.heatEmpty,
       heatOn: heatOn ?? this.heatOn,
       shadow: shadow ?? this.shadow,
@@ -362,7 +348,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       info: c(info, other.info),
       series: l(series, other.series),
       identity: l(identity, other.identity),
-      effort: l(effort, other.effort),
       heatEmpty: c(heatEmpty, other.heatEmpty),
       heatOn: c(heatOn, other.heatOn),
       shadow: c(shadow, other.shadow),
