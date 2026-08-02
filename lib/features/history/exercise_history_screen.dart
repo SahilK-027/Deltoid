@@ -75,7 +75,11 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
           // The metric strip pins under the bar while the chart scrolls away
           // beneath it (THEME §5): the thing you change stays reachable, the
           // thing you read does not hold half the screen for ever.
-          Container(
+          // Not for a hold. Neither metric is a thing a plank has, so the
+          // screen measures it in seconds throughout and does not offer a
+          // choice between two answers it cannot give.
+          if (!(exercise?.measureMode.isHold ?? false))
+            Container(
             width: double.infinity,
             color: context.c.surface,
             padding: const EdgeInsets.fromLTRB(
@@ -138,7 +142,10 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
             separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
             itemBuilder: (context, i) {
               if (i == 0) {
-                return ExerciseTrend(exerciseId: widget.exerciseId);
+                return ExerciseTrend(
+                  exerciseId: widget.exerciseId,
+                  measure: exercise?.measureMode ?? MeasureMode.reps,
+                );
               }
               i -= 1;
               if (i == rows.length) {
@@ -264,7 +271,12 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _headline(performance, metric, unit),
+                      _headline(
+                        performance,
+                        metric,
+                        unit,
+                        exercise?.measureMode ?? MeasureMode.reps,
+                      ),
                       style: context.t.titleMedium,
                     ),
                     const SizedBox(height: Space.xxs),
@@ -358,7 +370,13 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
     ExercisePerformance p,
     ExerciseMetric metric,
     WeightUnit unit,
+    MeasureMode measure,
   ) {
+    // A hold's headline is the clock. There is no e1RM to switch to, and the
+    // load is often zero, so the longest set is the whole answer.
+    if (measure.isHold) {
+      return p.topSetReps == null ? '—' : formatCount(p.topSetReps, measure);
+    }
     final value = switch (metric) {
       ExerciseMetric.e1rm => p.best1RM,
       ExerciseMetric.heaviest => p.topSetLoad,
@@ -372,7 +390,7 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
 
   /// `22.5×8`, with the set type appended when it is not a plain working set.
   static String _setLabel(SetLog set, Exercise? exercise, WeightUnit unit) {
-    final reps = set.reps ?? 0;
+    final reps = formatCount(set.reps, exercise?.measureMode ?? MeasureMode.reps);
     final tag = set.setType.shortLabel;
     final suffix = tag.isEmpty ? '' : ' $tag';
 
@@ -456,7 +474,9 @@ class _ExpandedSetLine extends StatelessWidget {
             ),
           ),
           Text(
-            '${set.reps ?? 0} reps',
+            exercise?.measureMode.isHold ?? false
+                ? 'held ${formatCount(set.reps, MeasureMode.hold)}'
+                : '${set.reps ?? 0} reps',
             style: context.t.labelMedium?.copyWith(color: c.textSecondary),
           ),
         ],

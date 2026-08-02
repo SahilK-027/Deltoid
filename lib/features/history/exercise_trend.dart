@@ -7,6 +7,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
 import '../../data/repositories/training_repository.dart';
+import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/units.dart';
 import 'history_screen.dart' show formatWeight;
@@ -45,6 +46,24 @@ extension ExerciseMetricX on ExerciseMetric {
       };
 }
 
+/// What a hold is measured by, whichever metric is selected: the clock.
+///
+/// Neither metric applies to a plank — there is no 1RM and the load is usually
+/// nothing — so rather than draw an empty chart under a pill that offers two
+/// wrong answers, the whole screen switches to seconds and the pill is hidden.
+double? metricValue(
+  ProgressPoint p,
+  ExerciseMetric metric,
+  MeasureMode measure,
+) =>
+    measure.isHold ? p.topSetReps?.toDouble() : metric.valueOf(p);
+
+String metricFormat(double v, WeightUnit unit, MeasureMode measure) =>
+    measure.isHold ? '${v.round()}s' : formatWeight(v, unit);
+
+String metricLabel(ExerciseMetric metric, MeasureMode measure) =>
+    measure.isHold ? 'longest hold' : metric.label.toLowerCase();
+
 final exerciseMetricProvider =
     StateProvider<ExerciseMetric>((ref) => ExerciseMetric.e1rm);
 
@@ -62,9 +81,14 @@ final exerciseProgressProvider =
 /// the performances beneath rather than pinning: it is a summary, not a
 /// control.
 class ExerciseTrend extends ConsumerWidget {
-  const ExerciseTrend({super.key, required this.exerciseId});
+  const ExerciseTrend({
+    super.key,
+    required this.exerciseId,
+    this.measure = MeasureMode.reps,
+  });
 
   final String exerciseId;
+  final MeasureMode measure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -91,19 +115,29 @@ class ExerciseTrend extends ConsumerWidget {
           onChanged: (w) => ref.read(chartRangeProvider.notifier).state = w,
         ),
         const SizedBox(height: Space.lg),
-        _Chart(points: points, metric: metric),
+        _Chart(points: points, metric: metric, measure: measure),
         const SizedBox(height: Space.lg),
-        _Summary(all: all, windowed: points, metric: metric),
+        _Summary(
+          all: all,
+          windowed: points,
+          metric: metric,
+          measure: measure,
+        ),
       ],
     );
   }
 }
 
 class _Chart extends ConsumerWidget {
-  const _Chart({required this.points, required this.metric});
+  const _Chart({
+    required this.points,
+    required this.metric,
+    required this.measure,
+  });
 
   final List<ProgressPoint> points;
   final ExerciseMetric metric;
+  final MeasureMode measure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -125,12 +159,12 @@ class _Chart extends ConsumerWidget {
     // bodyweight ever logged have no load and no e1RM, and plotting them at 0
     // drew a flat line along the axis and called it a year of training.
     final scored =
-        points.where((p) => metric.valueOf(p) != null).toList();
+        points.where((p) => metricValue(p, metric, measure) != null).toList();
     if (scored.length < 2) {
       return EmptyBox(
         icon: Icons.timeline,
         message: scored.isEmpty
-            ? 'Nothing here to measure as ${metric.label.toLowerCase()}.'
+            ? 'Nothing here to measure as ${metricLabel(metric, measure)}.'
             : 'One session so far — a second one gives this a trend.',
       );
     }
@@ -169,13 +203,15 @@ class _Chart extends ConsumerWidget {
             color: palette[i % palette.length],
             spots: [
               for (final p in bySession[names[i]]!)
-                FlSpot(trendX(p.dayKey), metric.valueOf(p)!),
+                FlSpot(trendX(p.dayKey), metricValue(p, metric, measure)!),
             ],
           ),
       ],
-      formatValue: (v) => formatWeight(v, unit),
-      tooltip: (v) => '${formatWeight(v, unit)} ${unit.label} '
-          '${metric.label.toLowerCase()}',
+      formatValue: (v) => metricFormat(v, unit, measure),
+      tooltip: (v) => measure.isHold
+          ? '${metricFormat(v, unit, measure)} held'
+          : '${formatWeight(v, unit)} ${unit.label} '
+              '${metric.label.toLowerCase()}',
     );
   }
 }
@@ -185,29 +221,35 @@ class _Summary extends ConsumerWidget {
     required this.all,
     required this.windowed,
     required this.metric,
+    required this.measure,
   });
 
   final List<ProgressPoint> all;
   final List<ProgressPoint> windowed;
   final ExerciseMetric metric;
+  final MeasureMode measure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final real = windowed.where((p) => !p.isDeload).toList();
-    final stalled = stalledSessions([for (final p in real) metric.valueOf(p)]);
+    final stalled = stalledSessions(
+      [for (final p in real) metricValue(p, metric, measure)],
+    );
 
     final best = all
         .where((p) => !p.isDeload)
-        .map(metric.valueOf)
+        .map((p) => metricValue(p, metric, measure))
         .whereType<double>()
         .fold<double?>(null, (a, b) => a == null || b > a ? b : a);
 
     // A percentage change needs two points. With one, "+0.0%" reads as
     // "no progress" when the truth is "not enough data yet".
-    final first = real.length >= 2 ? metric.valueOf(real.first) : null;
-    final last = real.length >= 2 ? metric.valueOf(real.last) : null;
+    final first =
+        real.length >= 2 ? metricValue(real.first, metric, measure) : null;
+    final last =
+        real.length >= 2 ? metricValue(real.last, metric, measure) : null;
     final delta = (first != null && last != null && first > 0)
         ? (last - first) / first * 100
         : null;
@@ -217,9 +259,9 @@ class _Summary extends ConsumerWidget {
       children: [
         Expanded(
           child: StatTile(
-            value: best == null ? '—' : formatWeight(best, unit),
-            unit: best == null ? null : unit.label,
-            label: 'best ${metric.label.toLowerCase()}',
+            value: best == null ? '—' : metricFormat(best, unit, measure),
+            unit: best == null || measure.isHold ? null : unit.label,
+            label: 'best ${metricLabel(metric, measure)}',
           ),
         ),
         Expanded(

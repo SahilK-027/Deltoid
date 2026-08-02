@@ -35,6 +35,7 @@ void main() {
           equipment: Equipment.barbell,
           loadMode: LoadMode.total,
           barKind: BarKind.none,
+          measureMode: MeasureMode.reps,
           archived: false,
           formVideoUrls: const [],
         ),

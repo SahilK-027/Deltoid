@@ -1278,6 +1278,7 @@ class TrainingRepository {
           final sets = setsByWe[we.id] ?? const <SetLog>[];
           final score = scorePerformance(
             mode: exercise.loadMode,
+            measure: exercise.measureMode,
             bodyweightKg: bodyweightOn(workout.dayKey, bodyweight),
             sets: [
               for (final s in sets)
@@ -1375,6 +1376,7 @@ class TrainingRepository {
     for (final p in performances) {
       final score = scorePerformance(
         mode: exercise.loadMode,
+        measure: exercise.measureMode,
         bodyweightKg: bodyweightOn(p.dayKey, bodyweight),
         sets: [
           for (final s in p.sets)

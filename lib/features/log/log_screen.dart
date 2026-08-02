@@ -24,6 +24,7 @@ import 'log_providers.dart';
 import 'session_summary_screen.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
+import 'widgets/hold_pad.dart';
 import 'widgets/rest_timer.dart';
 import 'widgets/set_row.dart';
 
@@ -53,6 +54,12 @@ class LogScreen extends ConsumerStatefulWidget {
 
 class _LogScreenState extends ConsumerState<LogScreen> {
   EditTarget? _editing;
+
+  /// Set when the hold pad has been sent away in favour of the digits, for a
+  /// hold that was timed on the gym clock or is being corrected hours later.
+  /// Cleared on every focus change: the stopwatch is the answer for the next
+  /// set even when it was not for this one.
+  bool _typeHold = false;
 
   /// The keypad's in-progress text, held in a notifier rather than in state.
   ///
@@ -454,6 +461,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     _flushWrite();
     setState(() {
       _editing = EditTarget(set.id, field);
+      _typeHold = false;
       _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
         SetField.added => _fmtLoadIn(set.addedWeight),
@@ -501,6 +509,29 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       SetField.reps => ghost?.reps?.toString() ?? '',
     };
 
+    // A hold is timed, not typed: the count field on an isometric movement
+    // gets a stopwatch in the keypad's slot unless the digits were asked for.
+    if (target.field == SetField.reps &&
+        entry.exercise.measureMode.isHold &&
+        !_typeHold) {
+      return HoldPad(
+        current: set.reps,
+        previous: ghost?.reps,
+        onStop: (seconds) {
+          _commit(seconds.toString(), target);
+          _flushWrite();
+          // The same path leaving a reps field takes: it ticks the set, keeps
+          // the rest it was given and moves on.
+          _advance(detail, cells, target);
+        },
+        onType: () => setState(() => _typeHold = true),
+        onDismiss: () {
+          _flushWrite();
+          setState(() => _editing = null);
+        },
+      );
+    }
+
     final isLast = cells.isNotEmpty && cells.last == target;
     // The key has to name what it does. On a reps field with nothing typed and
     // no ghost to borrow from, "Done" completes nothing at all.
@@ -523,7 +554,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
       nextLabel: needsReps
-          ? 'Reps?'
+          ? (entry.exercise.measureMode.isHold ? 'Secs?' : 'Reps?')
           : isLast
           ? 'Done'
           : 'Next',
@@ -1331,7 +1362,11 @@ class _ExercisePage extends ConsumerWidget {
           // fill of its own per field.
           Column(
             children: [
-              SetTableHeader(loadMode: entry.exercise.loadMode, unit: unit),
+              SetTableHeader(
+                loadMode: entry.exercise.loadMode,
+                measure: entry.exercise.measureMode,
+                unit: unit,
+              ),
               for (final group in groups)
                 _SetGroup(
                   group: group,

@@ -104,6 +104,16 @@ class $ExercisesTable extends Exercises
         requiredDuringInsert: true,
       ).withConverter<LoadMode>($ExercisesTable.$converterloadMode);
   @override
+  late final GeneratedColumnWithTypeConverter<MeasureMode, String> measureMode =
+      GeneratedColumn<String>(
+        'measure_mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('reps'),
+      ).withConverter<MeasureMode>($ExercisesTable.$convertermeasureMode);
+  @override
   late final GeneratedColumnWithTypeConverter<BarKind, String> barKind =
       GeneratedColumn<String>(
         'bar_kind',
@@ -169,6 +179,7 @@ class $ExercisesTable extends Exercises
     muscle,
     equipment,
     loadMode,
+    measureMode,
     barKind,
     starterKey,
     formVideoUrls,
@@ -291,6 +302,12 @@ class $ExercisesTable extends Exercises
           data['${effectivePrefix}load_mode'],
         )!,
       ),
+      measureMode: $ExercisesTable.$convertermeasureMode.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}measure_mode'],
+        )!,
+      ),
       barKind: $ExercisesTable.$converterbarKind.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -329,6 +346,8 @@ class $ExercisesTable extends Exercises
       const EnumNameConverter<Equipment>(Equipment.values);
   static JsonTypeConverter2<LoadMode, String, String> $converterloadMode =
       const EnumNameConverter<LoadMode>(LoadMode.values);
+  static JsonTypeConverter2<MeasureMode, String, String> $convertermeasureMode =
+      const EnumNameConverter<MeasureMode>(MeasureMode.values);
   static JsonTypeConverter2<BarKind, String, String> $converterbarKind =
       const EnumNameConverter<BarKind>(BarKind.values);
   static JsonTypeConverter2<List<String>, String, String>
@@ -345,6 +364,12 @@ class Exercise extends DataClass implements Insertable<Exercise> {
   final MuscleGroup muscle;
   final Equipment equipment;
   final LoadMode loadMode;
+
+  /// Whether a set of this is counted in reps or in seconds held. Defaults to
+  /// `reps`, which is the honest answer for every row that existed before the
+  /// column did — the catalog is movements, and a plank has to be said out
+  /// loud to be one.
+  final MeasureMode measureMode;
 
   /// Which bar this is loaded on, for the plate view. `none` — the default —
   /// means the movement has no bar and gets no plate maths.
@@ -369,6 +394,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     required this.muscle,
     required this.equipment,
     required this.loadMode,
+    required this.measureMode,
     required this.barKind,
     this.starterKey,
     required this.formVideoUrls,
@@ -399,6 +425,11 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     {
       map['load_mode'] = Variable<String>(
         $ExercisesTable.$converterloadMode.toSql(loadMode),
+      );
+    }
+    {
+      map['measure_mode'] = Variable<String>(
+        $ExercisesTable.$convertermeasureMode.toSql(measureMode),
       );
     }
     {
@@ -434,6 +465,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       muscle: Value(muscle),
       equipment: Value(equipment),
       loadMode: Value(loadMode),
+      measureMode: Value(measureMode),
       barKind: Value(barKind),
       starterKey: starterKey == null && nullToAbsent
           ? const Value.absent()
@@ -467,6 +499,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       loadMode: $ExercisesTable.$converterloadMode.fromJson(
         serializer.fromJson<String>(json['loadMode']),
       ),
+      measureMode: $ExercisesTable.$convertermeasureMode.fromJson(
+        serializer.fromJson<String>(json['measureMode']),
+      ),
       barKind: $ExercisesTable.$converterbarKind.fromJson(
         serializer.fromJson<String>(json['barKind']),
       ),
@@ -497,6 +532,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       'loadMode': serializer.toJson<String>(
         $ExercisesTable.$converterloadMode.toJson(loadMode),
       ),
+      'measureMode': serializer.toJson<String>(
+        $ExercisesTable.$convertermeasureMode.toJson(measureMode),
+      ),
       'barKind': serializer.toJson<String>(
         $ExercisesTable.$converterbarKind.toJson(barKind),
       ),
@@ -519,6 +557,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     MuscleGroup? muscle,
     Equipment? equipment,
     LoadMode? loadMode,
+    MeasureMode? measureMode,
     BarKind? barKind,
     Value<String?> starterKey = const Value.absent(),
     List<String>? formVideoUrls,
@@ -534,6 +573,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     muscle: muscle ?? this.muscle,
     equipment: equipment ?? this.equipment,
     loadMode: loadMode ?? this.loadMode,
+    measureMode: measureMode ?? this.measureMode,
     barKind: barKind ?? this.barKind,
     starterKey: starterKey.present ? starterKey.value : this.starterKey,
     formVideoUrls: formVideoUrls ?? this.formVideoUrls,
@@ -551,6 +591,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       muscle: data.muscle.present ? data.muscle.value : this.muscle,
       equipment: data.equipment.present ? data.equipment.value : this.equipment,
       loadMode: data.loadMode.present ? data.loadMode.value : this.loadMode,
+      measureMode: data.measureMode.present
+          ? data.measureMode.value
+          : this.measureMode,
       barKind: data.barKind.present ? data.barKind.value : this.barKind,
       starterKey: data.starterKey.present
           ? data.starterKey.value
@@ -575,6 +618,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           ..write('muscle: $muscle, ')
           ..write('equipment: $equipment, ')
           ..write('loadMode: $loadMode, ')
+          ..write('measureMode: $measureMode, ')
           ..write('barKind: $barKind, ')
           ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
@@ -595,6 +639,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     muscle,
     equipment,
     loadMode,
+    measureMode,
     barKind,
     starterKey,
     formVideoUrls,
@@ -614,6 +659,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           other.muscle == this.muscle &&
           other.equipment == this.equipment &&
           other.loadMode == this.loadMode &&
+          other.measureMode == this.measureMode &&
           other.barKind == this.barKind &&
           other.starterKey == this.starterKey &&
           other.formVideoUrls == this.formVideoUrls &&
@@ -631,6 +677,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
   final Value<MuscleGroup> muscle;
   final Value<Equipment> equipment;
   final Value<LoadMode> loadMode;
+  final Value<MeasureMode> measureMode;
   final Value<BarKind> barKind;
   final Value<String?> starterKey;
   final Value<List<String>> formVideoUrls;
@@ -647,6 +694,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     this.muscle = const Value.absent(),
     this.equipment = const Value.absent(),
     this.loadMode = const Value.absent(),
+    this.measureMode = const Value.absent(),
     this.barKind = const Value.absent(),
     this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
@@ -664,6 +712,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     required MuscleGroup muscle,
     required Equipment equipment,
     required LoadMode loadMode,
+    this.measureMode = const Value.absent(),
     this.barKind = const Value.absent(),
     this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
@@ -684,6 +733,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Expression<String>? muscle,
     Expression<String>? equipment,
     Expression<String>? loadMode,
+    Expression<String>? measureMode,
     Expression<String>? barKind,
     Expression<String>? starterKey,
     Expression<String>? formVideoUrls,
@@ -701,6 +751,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       if (muscle != null) 'muscle': muscle,
       if (equipment != null) 'equipment': equipment,
       if (loadMode != null) 'load_mode': loadMode,
+      if (measureMode != null) 'measure_mode': measureMode,
       if (barKind != null) 'bar_kind': barKind,
       if (starterKey != null) 'starter_key': starterKey,
       if (formVideoUrls != null) 'form_video_urls': formVideoUrls,
@@ -720,6 +771,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Value<MuscleGroup>? muscle,
     Value<Equipment>? equipment,
     Value<LoadMode>? loadMode,
+    Value<MeasureMode>? measureMode,
     Value<BarKind>? barKind,
     Value<String?>? starterKey,
     Value<List<String>>? formVideoUrls,
@@ -737,6 +789,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       muscle: muscle ?? this.muscle,
       equipment: equipment ?? this.equipment,
       loadMode: loadMode ?? this.loadMode,
+      measureMode: measureMode ?? this.measureMode,
       barKind: barKind ?? this.barKind,
       starterKey: starterKey ?? this.starterKey,
       formVideoUrls: formVideoUrls ?? this.formVideoUrls,
@@ -782,6 +835,11 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
         $ExercisesTable.$converterloadMode.toSql(loadMode.value),
       );
     }
+    if (measureMode.present) {
+      map['measure_mode'] = Variable<String>(
+        $ExercisesTable.$convertermeasureMode.toSql(measureMode.value),
+      );
+    }
     if (barKind.present) {
       map['bar_kind'] = Variable<String>(
         $ExercisesTable.$converterbarKind.toSql(barKind.value),
@@ -819,6 +877,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
           ..write('muscle: $muscle, ')
           ..write('equipment: $equipment, ')
           ..write('loadMode: $loadMode, ')
+          ..write('measureMode: $measureMode, ')
           ..write('barKind: $barKind, ')
           ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
@@ -6778,6 +6837,7 @@ typedef $$ExercisesTableCreateCompanionBuilder =
       required MuscleGroup muscle,
       required Equipment equipment,
       required LoadMode loadMode,
+      Value<MeasureMode> measureMode,
       Value<BarKind> barKind,
       Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
@@ -6796,6 +6856,7 @@ typedef $$ExercisesTableUpdateCompanionBuilder =
       Value<MuscleGroup> muscle,
       Value<Equipment> equipment,
       Value<LoadMode> loadMode,
+      Value<MeasureMode> measureMode,
       Value<BarKind> barKind,
       Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
@@ -6905,6 +6966,12 @@ class $$ExercisesTableFilterComposer
         column: $table.loadMode,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnWithTypeConverterFilters<MeasureMode, MeasureMode, String>
+  get measureMode => $composableBuilder(
+    column: $table.measureMode,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 
   ColumnWithTypeConverterFilters<BarKind, BarKind, String> get barKind =>
       $composableBuilder(
@@ -7038,6 +7105,11 @@ class $$ExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get measureMode => $composableBuilder(
+    column: $table.measureMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get barKind => $composableBuilder(
     column: $table.barKind,
     builder: (column) => ColumnOrderings(column),
@@ -7099,6 +7171,12 @@ class $$ExercisesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<LoadMode, String> get loadMode =>
       $composableBuilder(column: $table.loadMode, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<MeasureMode, String> get measureMode =>
+      $composableBuilder(
+        column: $table.measureMode,
+        builder: (column) => column,
+      );
 
   GeneratedColumnWithTypeConverter<BarKind, String> get barKind =>
       $composableBuilder(column: $table.barKind, builder: (column) => column);
@@ -7211,6 +7289,7 @@ class $$ExercisesTableTableManager
                 Value<MuscleGroup> muscle = const Value.absent(),
                 Value<Equipment> equipment = const Value.absent(),
                 Value<LoadMode> loadMode = const Value.absent(),
+                Value<MeasureMode> measureMode = const Value.absent(),
                 Value<BarKind> barKind = const Value.absent(),
                 Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
@@ -7227,6 +7306,7 @@ class $$ExercisesTableTableManager
                 muscle: muscle,
                 equipment: equipment,
                 loadMode: loadMode,
+                measureMode: measureMode,
                 barKind: barKind,
                 starterKey: starterKey,
                 formVideoUrls: formVideoUrls,
@@ -7245,6 +7325,7 @@ class $$ExercisesTableTableManager
                 required MuscleGroup muscle,
                 required Equipment equipment,
                 required LoadMode loadMode,
+                Value<MeasureMode> measureMode = const Value.absent(),
                 Value<BarKind> barKind = const Value.absent(),
                 Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
@@ -7261,6 +7342,7 @@ class $$ExercisesTableTableManager
                 muscle: muscle,
                 equipment: equipment,
                 loadMode: loadMode,
+                measureMode: measureMode,
                 barKind: barKind,
                 starterKey: starterKey,
                 formVideoUrls: formVideoUrls,

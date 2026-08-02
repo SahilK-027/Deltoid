@@ -241,6 +241,7 @@ class SessionSummaryScreen extends ConsumerWidget {
         for (final entry in detail.entries)
           (
             mode: entry.exercise.loadMode,
+            measure: entry.exercise.measureMode,
             sets: [
               for (final set in entry.sets)
                 if (set.isDone)
@@ -572,23 +573,28 @@ class _EntryRow extends ConsumerWidget {
   static String _top(List<SetLog> done, Exercise exercise, WeightUnit unit) {
     final counted = done.where((s) => s.setType != SetType.warmup).toList();
     final pool = counted.isEmpty ? [...done] : counted;
-    pool.sort((a, b) => ((b.weight ?? b.addedWeight) ?? 0)
-        .compareTo((a.weight ?? a.addedWeight) ?? 0));
+    // A hold's best set is its longest, not its heaviest — the load on a plank
+    // rarely moves and sorting by it picks an arbitrary one of five.
+    final measure = exercise.measureMode;
+    pool.sort(measure.isHold
+        ? (a, b) => (b.reps ?? 0).compareTo(a.reps ?? 0)
+        : (a, b) => ((b.weight ?? b.addedWeight) ?? 0)
+            .compareTo((a.weight ?? a.addedWeight) ?? 0));
     final set = pool.first;
+    final count = formatCount(set.reps, measure);
 
     if (exercise.loadMode == LoadMode.bodyweight) {
-      return 'Bodyweight × ${set.reps ?? 0}';
+      return 'Bodyweight × $count';
     }
     if (exercise.loadMode == LoadMode.bodyweightPlus) {
       final added = set.addedWeight;
       return added == null || added == 0
-          ? 'Bodyweight × ${set.reps ?? 0}'
-          : 'BW + ${formatWeight(added, unit)} ${unit.label} × ${set.reps ?? 0}';
+          ? 'Bodyweight × $count'
+          : 'BW + ${formatWeight(added, unit)} ${unit.label} × $count';
     }
     final weight = set.weight;
-    if (weight == null) return '${set.reps ?? 0} reps';
+    if (weight == null) return measure.isHold ? count : '$count reps';
     final perSide = exercise.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight, unit)} ${unit.label}$perSide '
-        '× ${set.reps ?? 0}';
+    return '${formatWeight(weight, unit)} ${unit.label}$perSide × $count';
   }
 }

@@ -15,6 +15,7 @@ class StarterExercise {
     required this.equipment,
     required this.loadMode,
     this.barKind = BarKind.none,
+    this.measureMode = MeasureMode.reps,
   });
 
   final String key;
@@ -29,6 +30,10 @@ class StarterExercise {
   /// editable, and the two that ship as EZ bars (curls, skullcrushers) are the
   /// two most likely to be done on a straight bar instead.
   final BarKind barKind;
+
+  /// Reps for everything but the plank, which is the one movement in this
+  /// catalog nobody counts repetitions of.
+  final MeasureMode measureMode;
 }
 
 /// One exercise slot in a template session.
@@ -412,6 +417,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.core,
     equipment: Equipment.bodyweight,
     loadMode: LoadMode.bodyweight,
+    measureMode: MeasureMode.hold,
   ),
 ];
 

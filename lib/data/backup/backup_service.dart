@@ -119,7 +119,11 @@ class BackupService {
       // the picker. A default for anything added after v1 keeps old files
       // restorable; add one here whenever a column is added to this table.
       table: db.exercises,
-      parse: (row) => Exercise.fromJson({'barKind': BarKind.none.name, ...row}),
+      parse: (row) => Exercise.fromJson({
+        'barKind': BarKind.none.name,
+        'measureMode': MeasureMode.reps.name,
+        ...row,
+      }),
       clear: () => db.delete(db.exercises).go(),
     ),
     _TableCodec(

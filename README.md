@@ -58,7 +58,8 @@ Cycle  ──  one full pass through every Session in the Regime.
 
 Workout  ──  one Session actually performed, on a day, inside a Cycle
   └─ WorkoutExercise  ──  a SNAPSHOT, not a pointer to the template
-       └─ SetLog  ──  weight, reps, type, added weight, rest, note
+       └─ SetLog  ──  weight, reps (or seconds held), type, added weight,
+                      rest, note
 ```
 
 **Three levels of note, and they never leak into each other:**
@@ -86,6 +87,7 @@ change never rewrites a logged workout.
 | `WorkoutExercise` / `SetLog` are **snapshots**          | Reordering or swapping mid-workout must never rewrite what you did in March. Same reason switching regimes creates a new `Regime` instead of editing sessions in place.                                                                                                              |
 | `_cyclesSinceDeload(beforeIndex:)` is **exclusive**     | A `CycleStatus` describes a cycle by what came _before_ it. Counting the cycle itself makes the deload land one cycle early. This was a real bug.                                                                                                                                    |
 | `LoadMode` decides what a number means                  | `22.5` on a dumbbell is 45kg of load; `73` on a pec deck is 73kg. Without it every comparison downstream is garbage.                                                                                                                                                                 |
+| `MeasureMode` decides what the **count** means          | `set_logs.reps` holds reps *or* seconds, read through the exercise's `MeasureMode` exactly as `weight` is read through `LoadMode`. Comparisons carry over unchanged (a longer hold at the same load beats last time); arithmetic that assumes reps does not — a hold has **no e1RM** and contributes **nothing to session volume**, because kg × seconds is a different unit. It is on the exercise, not the set: a plank is never sometimes reps. |
 | Warmups / drops / rest-pause are excluded from progress | `scorePerformance` only counts `working` and `amrap`. Including the rest is how naive logs claim progress that isn't there.                                                                                                                                                          |
 | `estimated1RM` caps reps at 12                          | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison uses `beatsPrevious` instead, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win. |
 | The log screen owns the **horizontal axis**             | It's a `PageView`, one exercise per page. The **set row** is the one exception: a drag that starts on a row slides it left to uncover that row's delete, and the page turns from everywhere else. Nothing else inside the log may claim a horizontal gesture. |
@@ -225,12 +227,21 @@ adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app
   (missing namespace). `file_selector` is used instead — don't swap it back.
 - Regenerate drift code after **any** change to `tables.dart`:
   `dart run build_runner build`.
-- **`schemaVersion` is 6, and `onUpgrade` is real** — v2 added
+- **`schemaVersion` is 7, and `onUpgrade` is real** — v2 added
   `set_logs.parent_set_id`, v3 `exercises.bar_kind`, v4 re-mapped a dropped
   `bar_kind` value, v5 added `regimes.identity_index`, v6 indexed
-  `bodyweight_logs.day_key`. A **column** change means three edits, not one:
+  `bodyweight_logs.day_key`, v7 added `exercises.measure_mode` (reps or a
+  timed hold) and backfilled the seeded Plank onto it. A **column** change
+  means three edits, not one:
   the column in `tables.dart`, the `from < n` step in
   `data/db/database.dart`, and **a default in the backup codec** for that table.
+  Every step is written to **survive being right twice** — `addColumnIfMissing`
+  and `CREATE INDEX IF NOT EXISTS`, not `m.addColumn` / `m.createIndex`. A phone
+  that has run a later build and is then given an earlier one comes back with
+  the structure in place and the version stamp behind it, and the bare form
+  throws `duplicate column name` / `index … already exists` on launch, before
+  any screen, with no way back into the app. `test/data/migration_test.dart`
+  runs a full upgrade over a database that already has everything.
   The last one is the easy one to miss and the expensive one to get wrong:
   `Exercise.fromJson` is generated against today's columns and reads every one
   of them unconditionally, so a file exported before the column existed throws

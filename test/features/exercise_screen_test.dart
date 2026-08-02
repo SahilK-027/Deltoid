@@ -106,7 +106,12 @@ void main() {
 
     expect(createAction(tester), isNotNull);
 
-    await tester.tap(find.widgetWithText(PrimaryButton, 'Create exercise'));
+    // The button is the foot of a scrolling form, and the form is longer than
+    // a test phone.
+    final create = find.widgetWithText(PrimaryButton, 'Create exercise');
+    await tester.ensureVisible(create);
+    await settle(tester);
+    await tester.tap(create);
     await settle(tester);
 
     final made = await (db.select(db.exercises)
@@ -214,6 +219,24 @@ void main() {
       final after = await (db.select(db.exercises)
         ..where((t) => t.id.equals(exercise.id))).getSingle();
       expect(after.muscle, MuscleGroup.back);
+    });
+
+    testWidgets('a movement can be refiled as a timed hold', (tester) async {
+      final exercise = await anExercise();
+      await pumpExisting(tester, exercise.id);
+
+      // The row states the answer rather than hiding behind `Choose` — reps is
+      // what a movement is unless it is a plank.
+      expect(find.text('Repetitions'), findsOneWidget);
+
+      await tester.tap(find.text('Measured in'));
+      await settle(tester);
+      await tester.tap(find.text('Timed hold').last);
+      await settle(tester);
+
+      final after = await (db.select(db.exercises)
+        ..where((t) => t.id.equals(exercise.id))).getSingle();
+      expect(after.measureMode, MeasureMode.hold);
     });
 
     testWidgets('picking the value it already has asks nothing', (

@@ -28,6 +28,13 @@ class Exercises extends Table with SyncColumns {
   TextColumn get equipment => textEnum<Equipment>()();
   TextColumn get loadMode => textEnum<LoadMode>()();
 
+  /// Whether a set of this is counted in reps or in seconds held. Defaults to
+  /// `reps`, which is the honest answer for every row that existed before the
+  /// column did — the catalog is movements, and a plank has to be said out
+  /// loud to be one.
+  TextColumn get measureMode =>
+      textEnum<MeasureMode>().withDefault(const Constant('reps'))();
+
   /// Which bar this is loaded on, for the plate view. `none` — the default —
   /// means the movement has no bar and gets no plate maths.
   TextColumn get barKind =>

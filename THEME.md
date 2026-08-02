@@ -620,6 +620,15 @@ An existing row **saves as you go**. A new one holds a draft behind one
 `Create exercise` button, because a half-filled movement abandoned by a
 back-swipe should not be in the catalog.
 
+**Every question shows `Choose` until it is answered — except `Measured in`.**
+That row shows `Reps`, because reps is not a guess: it is what a movement *is*
+unless it is a plank, and making it a fourth required answer puts a question in
+front of every new exercise to hear the same word back. Changing it, or any of
+`Muscle` / `Equipment` / `Bar`, on a movement that already exists **asks first**
+(§ dialog), naming both ends of the change in bold. `How the weight is entered`
+and `Measured in` ask the harder version, counting the logged sets they are
+about to have re-read.
+
 **The notice.** A stated limit or consequence: `warningMuted` ground, a hairline
 of `warning` at 45%, `warning_amber_rounded` and the title in `warning` yellow,
 and the sentence itself in `textPrimary`. `NoticeBox`.
@@ -764,7 +773,11 @@ under it, and a load summary pill on the right.
 **Action chips** — the horizontally scrolling chip row described above.
 
 **Set table** — a header row of `label` columns (`Set · Last time · kg · Reps ·
-✓`), then one row per set. **On the page, not in a card**: the index column
+✓`), then one row per set. The second heading is **`Secs` on a timed hold**,
+and it is the only thing that changes: a hold's numbers are seconds, the
+heading is where every column's unit is said, and `45` under `Reps` is a claim
+nobody makes, and a hold's count cell opens a **stopwatch instead of the
+keypad** (below). **On the page, not in a card**: the index column
 starts on the page gutter, so it shares a vertical with the exercise name, the
 rail above it and everything else on the screen. Load and reps are equal-width
 expanding columns.
@@ -794,6 +807,26 @@ Above the digits, for a barbell
 lift, sits the **plate view**: a small bar diagram with coloured plate slabs, a
 legend of `count × plate`, and one plain sentence —
 `10 kg on both sides + 20 kg bar weight = 40 kg`.
+
+**Hold pad** — the keypad's replacement in the same docked slot when the field
+is a **timed hold's** count. A plank is a number you find out, not one you
+know, and typing it means reading a clock somewhere else and copying it.
+
+- The clock in `value` at 44sp, `m:ss` — the one place minutes earn the colon,
+  because it is being watched second by second. The table still stores and
+  prints bare seconds.
+- **Counts up, with last time marked**: a 4pt bar filling toward the previous
+  hold, `accent` under it and `positive` past it, with the clock turning
+  `positive` at the same moment. Never a countdown — a hold is the one thing
+  here where the instruction is "as long as you can", and a target you stop at
+  is the wrong shape for it.
+- **One key**: `Start hold`, then `Stop` in `accent`, in the place `Next` sits.
+  Stopping writes the seconds, ticks the set and starts rest — the same thing
+  leaving a reps field does, because it is the same moment. A stop inside the
+  first second writes nothing: that is a mis-tap, not a one-second plank.
+- **`Type it`** returns the digits, for a hold timed on the gym clock or fixed
+  hours later. It disappears while the clock runs, and comes back for the next
+  set — the stopwatch is the answer even when it was not this time.
 
 ---
 

@@ -16,6 +16,56 @@ enum LoadMode {
   bodyweightPlus,
 }
 
+/// What the second number on a set counts.
+///
+/// A plank is `load × seconds`, not `load × reps`, and the difference is not a
+/// set type: a movement is one or the other for its whole life. Held on the
+/// **exercise** for the same reason [LoadMode] is — a plank is never sometimes
+/// reps, and a set typed under one meaning must never be read back under the
+/// other.
+///
+/// The `reps` column carries both. That column has always meant "the count, as
+/// entered, interpreted by the exercise" the way `weight` means "the number, as
+/// entered, interpreted by [LoadMode]" — so a hold's seconds live there and
+/// every comparison that already worked on reps (last time's ghost, the
+/// beats-previous check, prefill) works on seconds unchanged. What does *not*
+/// carry over is arithmetic that assumes reps: kg × seconds is not volume, and
+/// a plank has no estimated 1RM. See [scorePerformance].
+enum MeasureMode {
+  /// Repetitions. The default, and what almost everything is.
+  reps,
+
+  /// Seconds held. Planks, hangs, L-sits, wall sits.
+  hold,
+}
+
+extension MeasureModeX on MeasureMode {
+  /// For the picker on the exercise screen.
+  String get label => switch (this) {
+        MeasureMode.reps => 'Reps',
+        MeasureMode.hold => 'Timed hold',
+      };
+
+  /// The set table's second column heading.
+  String get columnLabel => switch (this) {
+        MeasureMode.reps => 'Reps',
+        MeasureMode.hold => 'Secs',
+      };
+
+  bool get isHold => this == MeasureMode.hold;
+}
+
+/// A count with its unit attached: `8` reps, `45s` held.
+///
+/// Seconds are printed raw rather than as `0:45`. A hold is typed on the same
+/// keypad as reps and read at arm's length mid-set, and a colon in a column of
+/// bare numbers is one more thing to parse for a number that is almost always
+/// under two minutes.
+String formatCount(int? count, MeasureMode mode) {
+  final n = count ?? 0;
+  return mode.isHold ? '${n}s' : '$n';
+}
+
 enum Equipment { barbell, dumbbell, machine, cable, bodyweight, band, other }
 
 /// The bar a movement is loaded on, and what it weighs empty.

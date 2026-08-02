@@ -366,6 +366,58 @@ a device before the next starts.
       storage is kilograms either way), but every widget holding a weight
       rebuilds, and the shell keeps all four tabs alive.
 
+- [x] **Isometric holds** _(not yet driven)_ — the last of the three, and the
+      one that needed a **migration**: `exercises.measure_mode` at schema v7,
+      defaulted to `reps`, with the seeded Plank backfilled onto `hold` the way
+      v3 backfilled bar kinds.
+
+      **The migration was the part that bit.** Launching on a phone that had
+      already run a later build threw `index idx_bodyweight_day already
+      exists` — the v6 step's bare `CREATE INDEX` against a database that had
+      the index and a stamp behind it, which takes the app out before any
+      screen. Every column step is `addColumnIfMissing` now and the index is
+      `IF NOT EXISTS`; `test/data/migration_test.dart` runs the whole upgrade
+      over a database that already has everything, and fails on the old form.
+
+      **The count column carries both.** `set_logs.reps` already meant "the
+      number, as entered, interpreted by the exercise" — that is what
+      `LoadMode` does to `weight` — so a hold's seconds live there and no set
+      table changes. Everything comparative comes along free: the ghost, prefill
+      and `beatsPrevious` all read "more at the same load is better", which is
+      as true of seconds as of reps. What does **not** come along is arithmetic
+      that assumes reps, and both cases are decisions:
+
+      - **No e1RM.** Epley on 62 seconds would report a plank as a 2.5×
+        bodyweight single, so `scorePerformance` returns null and the exercise's
+        history screen drops the metric pill entirely rather than offering two
+        answers it cannot give. It measures seconds throughout instead — chart,
+        tooltip, best-ever tile.
+      - **No session volume.** kg × seconds is a different unit from kg × reps;
+        adding three minutes of plank to a day's tonnage would have multiplied
+        it by eleven in the test that pins this. A hold is counted where holds
+        are real work — the weekly set count, unchanged.
+
+      A hold's **top set is its longest**, not its heaviest: the load on a plank
+      does not move, so sorting by it picked an arbitrary set of five.
+
+      **A hold is timed, not typed.** The count cell on an isometric movement
+      opens a **stopwatch in the keypad's slot** instead of ten digits: start,
+      stop, and the stop writes the seconds, ticks the set and starts rest —
+      the same path leaving a reps field takes, because it is the same moment.
+      It counts *up* with last time marked on a bar rather than counting down
+      to it, and the clock turns green the second it is passed; a countdown
+      makes last time a ceiling, and "as long as you can" is the instruction on
+      the one movement in the app where that is true. `Type it` returns the
+      digits for a hold timed on the gym clock, and comes back for the next set.
+
+      **The rest of it** is one word in three places, because the numbers
+      underneath are already right: the set table's second heading says `Secs`,
+      the keypad's dead-end key says `Secs?`, and a logged set reads `45s`. The
+      exercise screen gains a `Measured in` row — the only picker there that
+      shows a real default instead of `Choose`, since reps is what a movement is
+      unless it is a plank. Changing it on something with history asks first, in
+      the shape `Load mode` asks: nothing is rewritten, but every logged count
+      is re-read.
 - [ ] **7 · Reconciliation** — light theme on every screen (only checked at
       token level), empty states, motion, and THEME corrected where the build
       taught us something the audit didn't.
@@ -425,7 +477,7 @@ the wakelock, audio ducking, and the share sheet.
   than the longest; and the bodyweight screen built every month row eagerly —
   six hundred of them to show eight.
 
-**317 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**335 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and
@@ -447,9 +499,6 @@ repository integration against real in-memory SQLite.
 Agreed but unspecified. Each carries the decision that blocks it. Check the
 README's **Non-goals** first — these are here because they survived that check.
 
-- **Isometric holds.** The only item here needing a **migration**: a set is
-  `weight × reps` and a hold is `load × seconds`, which touches `SetLog`, the
-  keypad, `effectiveLoad`, `estimated1RM` (a plank has no 1RM), prefill and the
-  set row. *Decide first:* a new `SetType`, or a `MeasureMode` on the
-  **exercise**? Exercise-level is almost certainly right — a plank is never
-  sometimes reps.
+Nothing. The three that were here — the volume bars, the muscle chip and
+isometric holds — are built; Supabase sync is under **Blocked**, waiting on a
+URL and a key rather than on a decision.

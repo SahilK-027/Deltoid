@@ -87,6 +87,14 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   Equipment? _equipment;
   LoadMode? _loadMode;
   BarKind? _barKind;
+
+  /// Not in [_complete], unlike every other field on this screen. Reps is not a
+  /// guess: it is what a movement is unless it is a plank, and the row states
+  /// it rather than hiding behind `Choose`. Making it a fourth required answer
+  /// would put a question in front of every new exercise to hear `Reps` back
+  /// ninety-nine times in a hundred.
+  MeasureMode _measureMode = MeasureMode.reps;
+
   String? _notes;
   bool _saving = false;
 
@@ -154,6 +162,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     final equipment = exercise?.equipment ?? _equipment;
     final loadMode = exercise?.loadMode ?? _loadMode;
     final barKind = exercise?.barKind ?? _barKind;
+    final measure = exercise?.measureMode ?? _measureMode;
     final notes = exercise?.notes ?? _notes;
 
     return Scaffold(
@@ -363,6 +372,14 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                     },
                   ),
                 AppRow(
+                  title: 'Measured in',
+                  subtitle: measure.isHold
+                      ? 'Seconds held — no reps, and no estimated 1RM'
+                      : 'Repetitions',
+                  trailing: _Value(measure.label),
+                  onTap: () => _editMeasure(exercise, measure),
+                ),
+                AppRow(
                   title: notes == null || notes.isEmpty ? 'Add a cue' : 'Cue',
                   subtitle: notes == null || notes.isEmpty
                       ? 'Applies wherever this exercise appears'
@@ -457,6 +474,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     Equipment? equipment,
     LoadMode? loadMode,
     BarKind? barKind,
+    MeasureMode? measureMode,
     Object? notes = _unset,
   }) {
     if (exercise == null) {
@@ -466,6 +484,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
         if (equipment != null) _equipment = equipment;
         if (loadMode != null) _loadMode = loadMode;
         if (barKind != null) _barKind = barKind;
+        if (measureMode != null) _measureMode = measureMode;
         if (notes != _unset) _notes = notes as String?;
       });
       return;
@@ -478,6 +497,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           equipment == null ? const Value.absent() : Value(equipment),
       loadMode: loadMode == null ? const Value.absent() : Value(loadMode),
       barKind: barKind == null ? const Value.absent() : Value(barKind),
+      measureMode:
+          measureMode == null ? const Value.absent() : Value(measureMode),
       notes: notes == _unset
           ? const Value.absent()
           : Value(notes as String?),
@@ -602,6 +623,48 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     );
   }
 
+  /// The second field that is not a label: it decides what the count on every
+  /// set of this movement *is*. Flipping it does not rewrite a single row —
+  /// eight stays eight — it changes whether eight means eight reps or eight
+  /// seconds, which moves the chart, the column heading and the e1RM the same
+  /// way [_editLoadMode] moves the load. Same shape of question, for the same
+  /// reason: no migration, but not a mis-tap either.
+  Future<void> _editMeasure(Exercise? exercise, MeasureMode current) async {
+    final picked = await _pick<MeasureMode>(
+      context,
+      title: 'Measured in',
+      values: MeasureMode.values,
+      current: current,
+      labelOf: (v) => v.label,
+      helperOf: (v) => v.isHold
+          ? 'A plank or a hang: the set is seconds held, and there is no 1RM '
+              'to estimate.'
+          : 'The set is a count of reps. Almost everything.',
+    );
+    if (picked == null || picked == current) return;
+
+    if (exercise != null) {
+      final affected =
+          await ref.read(trainingRepositoryProvider).loggedSetCount(exercise.id);
+      if (affected > 0) {
+        if (!mounted) return;
+        final ok = await confirmAction(
+          context,
+          title: 'Change what its sets count?',
+          message: '$affected logged ${affected == 1 ? 'set' : 'sets'} will be '
+              're-read as ${picked.isHold ? 'seconds held' : 'reps'}. '
+              '${picked.isHold ? 'Its estimated 1RM and its share of session '
+                  'volume go away — a hold has neither.' : 'It gets an '
+                  'estimated 1RM and counts toward session volume again.'}',
+          confirmLabel: 'Change it',
+          destructive: false,
+        );
+        if (!ok) return;
+      }
+    }
+    _apply(exercise, measureMode: picked);
+  }
+
   Future<void> _create() async {
     setState(() => _saving = true);
     final navigator = Navigator.of(context);
@@ -612,6 +675,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       equipment: _equipment!,
       loadMode: _loadMode!,
       barKind: _barKind ?? BarKind.none,
+      measureMode: _measureMode,
       notes: (_notes?.trim().isEmpty ?? true) ? null : _notes!.trim(),
     );
     final row = await (db.select(db.exercises)..where((t) => t.id.equals(id)))

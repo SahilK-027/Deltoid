@@ -618,7 +618,8 @@ class _SetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_load(set, exercise, unit)} × ${set.reps ?? 0}',
+                  '${_load(set, exercise, unit)} × '
+                  '${formatCount(set.reps, exercise.measureMode)}',
                   style: context.t.labelLarge,
                 ),
                 if (set.note != null && set.note!.isNotEmpty)

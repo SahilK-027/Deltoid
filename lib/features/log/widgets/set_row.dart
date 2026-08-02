@@ -34,10 +34,20 @@ Color setTypeColour(BuildContext context, SetType type) => switch (type) {
 /// column and a chunk of the width of a field you have to read a number out of
 /// at arm's length.
 class SetTableHeader extends StatelessWidget {
-  const SetTableHeader({super.key, required this.loadMode, required this.unit});
+  const SetTableHeader({
+    super.key,
+    required this.loadMode,
+    required this.unit,
+    this.measure = MeasureMode.reps,
+  });
 
   final LoadMode loadMode;
   final WeightUnit unit;
+
+  /// Names the second column: `Reps`, or `Secs` for a hold. The heading is the
+  /// only place the unit is said, so a hold's table needs nothing else to be
+  /// read correctly — the numbers under it are seconds and say so up top.
+  final MeasureMode measure;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +81,11 @@ class SetTableHeader extends StatelessWidget {
           // expanding load column, which on a phone made one field twice the
           // other for no reason a reader could see.
           Expanded(
-            child: Text('Reps', style: label, textAlign: TextAlign.center),
+            child: Text(
+              measure.columnLabel,
+              style: label,
+              textAlign: TextAlign.center,
+            ),
           ),
           const SizedBox(width: Space.sm),
           SizedBox(

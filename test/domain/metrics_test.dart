@@ -42,11 +42,12 @@ void main() {
   });
 
   group('sessionVolume', () {
-    List<({LoadMode mode, List<ScoredSet> sets})> one(
+    List<({LoadMode mode, MeasureMode measure, List<ScoredSet> sets})> one(
       LoadMode mode,
-      List<ScoredSet> sets,
-    ) =>
-        [(mode: mode, sets: sets)];
+      List<ScoredSet> sets, {
+      MeasureMode measure = MeasureMode.reps,
+    }) =>
+        [(mode: mode, measure: measure, sets: sets)];
 
     test('a bodyweight session is not a session of nothing', () {
       // The bug: volume read `weight` off the row, which is null on every
@@ -178,6 +179,76 @@ void main() {
       );
       expect(score.isEmpty, isTrue);
       expect(score.best1RM, isNull);
+    });
+  });
+
+  group('a hold is scored on the clock', () {
+    List<ScoredSet> plank() => const [
+          ScoredSet(type: SetType.working, reps: 45),
+          ScoredSet(type: SetType.working, reps: 62),
+          ScoredSet(type: SetType.working, reps: 50),
+        ];
+
+    test('the top set is the longest, not the heaviest', () {
+      final score = scorePerformance(
+        mode: LoadMode.bodyweight,
+        measure: MeasureMode.hold,
+        bodyweightKg: 80,
+        sets: plank(),
+      );
+      // Every set carries the same 80kg of body, so "heaviest" picks one at
+      // random — the 62-second hold is the performance.
+      expect(score.topSetReps, 62);
+      expect(score.totalReps, 157);
+    });
+
+    test('a plank has no estimated 1RM', () {
+      final score = scorePerformance(
+        mode: LoadMode.bodyweight,
+        measure: MeasureMode.hold,
+        bodyweightKg: 80,
+        sets: plank(),
+      );
+      expect(score.best1RM, isNull);
+      // Epley on seconds would answer anyway, and loudly: 80 × (1 + 12/30).
+      expect(estimated1RM(load: 80, reps: 62), isNotNull);
+    });
+
+    test('kg × seconds is not volume', () {
+      final score = scorePerformance(
+        mode: LoadMode.bodyweight,
+        measure: MeasureMode.hold,
+        bodyweightKg: 80,
+        sets: plank(),
+      );
+      expect(score.volume, 0);
+    });
+
+    test('a session total leaves holds out of it', () {
+      final total = sessionVolume(
+        bodyweightKg: 80,
+        exercises: [
+          (
+            mode: LoadMode.total,
+            measure: MeasureMode.reps,
+            sets: const [ScoredSet(type: SetType.working, weight: 60, reps: 5)],
+          ),
+          (
+            mode: LoadMode.bodyweight,
+            measure: MeasureMode.hold,
+            sets: plank(),
+          ),
+        ],
+      );
+      // The squat, and nothing from three minutes of plank: 80 × 157 would
+      // have been eleven times the day's real tonnage.
+      expect(total, 300);
+    });
+
+    test('seconds are printed with their unit, reps without', () {
+      expect(formatCount(45, MeasureMode.hold), '45s');
+      expect(formatCount(8, MeasureMode.reps), '8');
+      expect(formatCount(null, MeasureMode.hold), '0s');
     });
   });
 

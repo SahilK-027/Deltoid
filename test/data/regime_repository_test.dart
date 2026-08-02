@@ -395,4 +395,52 @@ void main() {
     await repo.updateRegime(first, name: const Value('PPL'));
     expect((await living()).map((r) => r.name), ['PPL', 'Upper / Lower']);
   });
+
+  group('how a movement is measured', () {
+    Future<Exercise> byName(String name) =>
+        (db.select(db.exercises)..where((t) => t.name.equals(name)))
+            .getSingle();
+
+    test('the plank ships as a hold and everything else as reps', () async {
+      expect((await byName('Plank')).measureMode, MeasureMode.hold);
+      expect((await byName('Barbell Bench Press')).measureMode,
+          MeasureMode.reps);
+    });
+
+    test('a movement the user creates is reps unless they say otherwise',
+        () async {
+      final id = await repo.createExercise(
+        name: 'Hollow hold',
+        muscle: MuscleGroup.core,
+        equipment: Equipment.bodyweight,
+        loadMode: LoadMode.bodyweight,
+      );
+      final made =
+          await (db.select(db.exercises)..where((t) => t.id.equals(id)))
+              .getSingle();
+      expect(made.measureMode, MeasureMode.reps);
+
+      await repo.updateExercise(id, measureMode: const Value(MeasureMode.hold));
+      expect((await byName('Hollow hold')).measureMode, MeasureMode.hold);
+    });
+
+    test('the backfill only touches rows this app seeded', () async {
+      // The v7 migration hands the seeded plank its hold. A movement the user
+      // created carries no starter key and is nobody's to reinterpret, even
+      // when it is called the same thing.
+      final id = await repo.createExercise(
+        name: 'Plank (rings)',
+        muscle: MuscleGroup.core,
+        equipment: Equipment.bodyweight,
+        loadMode: LoadMode.bodyweight,
+      );
+      await backfillSeededMeasureModes(db);
+
+      expect((await byName('Plank')).measureMode, MeasureMode.hold);
+      final mine =
+          await (db.select(db.exercises)..where((t) => t.id.equals(id)))
+              .getSingle();
+      expect(mine.measureMode, MeasureMode.reps);
+    });
+  });
 }

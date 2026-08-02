@@ -96,20 +96,34 @@ class PerformanceScore {
 
   /// Best estimated 1RM across working sets — the fairest single number for
   /// "did I get stronger", since it credits both weight and reps.
+  ///
+  /// Null for a [MeasureMode.hold]: a plank has no one-rep max, and a formula
+  /// fed seconds would answer anyway.
   final double? best1RM;
 
   final int workingSets;
+
+  /// Reps across working sets — or seconds, for a hold. The caller knows which
+  /// from the exercise's [MeasureMode] and labels it accordingly.
   final int totalReps;
 
-  /// Load × reps across working sets.
+  /// Load × reps across working sets. Zero for a hold: kg × seconds is a
+  /// different unit, and summing it in would inflate every total it reaches.
   final double volume;
 
   bool get isEmpty => workingSets == 0;
 }
 
+/// [measure] decides what the count on each set means, and therefore which of
+/// these numbers exist at all. A hold has a top load and a longest hold, and
+/// nothing else: Epley on seconds would report a 45-second plank as a 2.5×
+/// bodyweight single, and kg × seconds is not volume in the same unit as
+/// kg × reps, so adding it into a session total would quietly inflate it.
+/// Both come back null / zero rather than wrong — see [PerformanceScore].
 PerformanceScore scorePerformance({
   required List<ScoredSet> sets,
   required LoadMode mode,
+  MeasureMode measure = MeasureMode.reps,
   double? bodyweightKg,
 }) {
   double? topLoad;
@@ -133,14 +147,25 @@ PerformanceScore scorePerformance({
 
     count++;
     reps += s.reps ?? 0;
-    if (load != null && s.reps != null) volume += load * s.reps!;
+    if (!measure.isHold && load != null && s.reps != null) {
+      volume += load * s.reps!;
+    }
 
-    if (load != null && (topLoad == null || load > topLoad)) {
+    // A hold's top set is the longest one, not the heaviest: a plank carries
+    // the same load every week and the whole progression is in the clock.
+    if (measure.isHold) {
+      if (topReps == null || (s.reps ?? 0) > topReps) {
+        topReps = s.reps;
+        topLoad = load;
+      }
+    } else if (load != null && (topLoad == null || load > topLoad)) {
       topLoad = load;
       topReps = s.reps;
     }
-    final e = estimated1RM(load: load, reps: s.reps);
-    if (e != null && (best == null || e > best)) best = e;
+    if (!measure.isHold) {
+      final e = estimated1RM(load: load, reps: s.reps);
+      if (e != null && (best == null || e > best)) best = e;
+    }
   }
 
   return PerformanceScore(
@@ -167,12 +192,18 @@ PerformanceScore scorePerformance({
 /// Bodyweight sets contribute nothing when [bodyweightKg] is null, because it
 /// is unknown rather than zero. A caller that gets 0 back should say so with a
 /// dash, not print a total that quietly dropped half the session.
+///
+/// Holds contribute nothing either, for a different reason: kg × seconds is
+/// not the unit this figure is in. Three minutes of plank is real work and
+/// this number is not the place it gets counted — the weekly set count is.
 double sessionVolume({
-  required List<({LoadMode mode, List<ScoredSet> sets})> exercises,
+  required List<({LoadMode mode, MeasureMode measure, List<ScoredSet> sets})>
+      exercises,
   double? bodyweightKg,
 }) {
   var total = 0.0;
   for (final e in exercises) {
+    if (e.measure.isHold) continue;
     for (final s in e.sets) {
       final load = effectiveLoad(
         mode: e.mode,

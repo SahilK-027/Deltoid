@@ -29,6 +29,7 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
               equipment: e.equipment,
               loadMode: e.loadMode,
               barKind: Value(e.barKind),
+              measureMode: Value(e.measureMode),
               starterKey: Value(e.key),
             ),
           );
@@ -113,6 +114,7 @@ Future<String> createRegimeFromTemplate(
               equipment: starter.equipment,
               loadMode: starter.loadMode,
               barKind: Value(starter.barKind),
+              measureMode: Value(starter.measureMode),
               starterKey: Value(key),
             ),
           );
@@ -176,6 +178,26 @@ Future<void> backfillSeededBarKinds(AppDatabase db) async {
                 t.barKind.equalsValue(BarKind.none),
           ))
         .write(ExercisesCompanion(barKind: Value(starter.barKind)));
+  }
+}
+
+/// Gives the rows we seeded ourselves the measure they are actually done in.
+///
+/// The same argument as [backfillSeededBarKinds], one column later: `reps` is
+/// the right default for a row nobody has been asked about, and wrong for the
+/// Plank this app put in the catalog itself. Only touches rows still carrying
+/// their `starterKey` and still on the default, so a movement the user has
+/// already answered for — or created — is left alone.
+Future<void> backfillSeededMeasureModes(AppDatabase db) async {
+  for (final starter in starterExercises) {
+    if (starter.measureMode == MeasureMode.reps) continue;
+    await (db.update(db.exercises)
+          ..where(
+            (t) =>
+                t.starterKey.equals(starter.key) &
+                t.measureMode.equalsValue(MeasureMode.reps),
+          ))
+        .write(ExercisesCompanion(measureMode: Value(starter.measureMode)));
   }
 }
 
