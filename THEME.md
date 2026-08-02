@@ -452,6 +452,24 @@ its own — Workouts had the session in there and the header ran half the screen
 with the first real section beginning somewhere in the middle of it, unmarked.
 Pin the band, scroll the content.
 
+**One noun, one screen.** An exercise is looked at, edited and created on the
+same page — `ExerciseScreen`. It was three shapes: a read-only slot screen whose
+`General` section handed off to an `Edit` sheet, that sheet (dropdowns, text
+fields, its own header and its own Save), and the same sheet again for `New
+exercise`. Editing a movement looked nothing like looking at one.
+
+The page is **sections, not a form**: `Overrides` — only when you arrived from a
+training day, because nowhere else has a day for them to be true in — then
+`General`, always. Every field is an ordinary row you tap, opening one question
+at a time, which is how every other setting in this app is changed. No dropdown:
+a Material menu drops over the page with no room to say what an option *means*,
+and `How the weight is entered` is the field that decides how every set ever
+logged is read.
+
+An existing row **saves as you go**. A new one holds a draft behind one
+`Create exercise` button, because a half-filled movement abandoned by a
+back-swipe should not be in the catalog.
+
 **The notice.** A stated limit or consequence: `warningMuted` ground, a hairline
 of `warning` at 45%, `warning_amber_rounded` and the title in `warning` yellow,
 and the sentence itself in `textPrimary`. `NoticeBox`.

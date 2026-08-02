@@ -8,6 +8,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
+import 'exercise_screen.dart';
 
 /// Exercises taken out of circulation. Archiving is reversible, so there has to
 /// be somewhere to reverse it from — without this the row is simply gone.
@@ -180,7 +181,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                 action: PrimaryButton(
                   label: q.isEmpty ? 'Add exercise' : 'Create "$q"',
                   onPressed: () =>
-                      showExerciseEditor(context, initialName: _query.trim()),
+                      createExerciseFlow(context, initialName: _query.trim()),
                 ),
               ),
             )
@@ -201,7 +202,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                         '${e.muscle.label} · ${e.equipment.label} · '
                         '${loadModeLabel(e.loadMode)}',
                     chevron: true,
-                    onTap: () => showExerciseEditor(context, existing: e),
+                    onTap: () => openExercise(context, exerciseId: e.id),
                   );
                 },
               ),
@@ -220,7 +221,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                   label: 'New exercise',
                   icon: Icons.add_rounded,
                   onPressed: () =>
-                      showExerciseEditor(context, initialName: _query.trim()),
+                      createExerciseFlow(context, initialName: _query.trim()),
                 ),
               ),
             ),

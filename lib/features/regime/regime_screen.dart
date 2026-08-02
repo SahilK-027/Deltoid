@@ -12,7 +12,7 @@ import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'exercise_catalog_screen.dart';
 import 'regime_settings.dart';
-import 'session_slot_screen.dart';
+import 'exercise_screen.dart';
 
 final regimeRepositoryProvider = Provider<RegimeRepository>(
   (ref) => RegimeRepository(ref.watch(databaseProvider)),
@@ -520,14 +520,12 @@ class _SlotRow extends StatelessWidget {
               size: 20, color: context.c.textTertiary),
         ],
       ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SessionSlotScreen(
-            regimeId: regimeId,
-            sessionId: sessionId,
-            slotId: slot.id,
-          ),
-        ),
+      onTap: () => openExercise(
+        context,
+        exerciseId: exercise.id,
+        regimeId: regimeId,
+        sessionId: sessionId,
+        slotId: slot.id,
       ),
     );
   }

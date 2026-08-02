@@ -203,6 +203,42 @@ a device before the next starts.
       restore died on the first regime. The codec defaults it, and the restore
       deals the slots out afterwards, exactly as the migration does. A file
       that already carries slots keeps them.
+
+      **An exercise is one screen now, wherever you came from.** There were
+      three shapes for one noun: the slot screen, read-only, whose `General`
+      section handed off to an `Edit` sheet; that sheet, the last form in the
+      app — dropdowns, text fields, its own header, its own Save; and the same
+      sheet again titled `New exercise`. So editing a movement looked nothing
+      like looking at one, and creating one looked like neither.
+
+      `exercise_screen.dart` is the noun's page. `Overrides` renders only when
+      it was opened from a training day; `General` always, as rows that open one
+      question at a time rather than a form. Dropdowns are gone — a Material
+      menu has no room to say what an option means, and `How the weight is
+      entered` is the field that re-reads every set ever logged. Existing rows
+      save as you go; a new one holds a draft behind `Create exercise`, so a
+      back-swipe out of a half-filled form leaves nothing in the catalog. The
+      picker's "nothing found, make it" path pushes the same screen.
+
+      **Creating one answers every question.** The fields shipped pre-set to
+      chest / machine / total load, which is a guess wearing the clothes of an
+      answer — tap Create without reading and a cable fly is filed as a chest
+      machine, and load mode is the field that decides how every set ever logged
+      against it is read. Each row shows `Choose` in `textTertiary` until it is
+      answered and `Create exercise` stays off until all of them are. `Bar`
+      counts only under a total load, since that is the only load a bar can be
+      subtracted from and the row is not on screen otherwise. The cue stays
+      optional: it is a note in your own words about a movement you may not have
+      performed yet, and requiring one means inventing something to type.
+      Equipment no longer pre-fills load mode and bar for the same reason it no
+      longer pre-fills them on an existing row — a guess that satisfies a
+      required field is indistinguishable from an answer once the sheet
+      closes.
+
+      `session_slot_screen.dart` is gone, and so are `showExerciseEditor`, its
+      sheet and its `_Dropdown`. Name collisions are checked in the name prompt
+      itself now, the way regime names are.
+
 - [ ] **6 · Settings, bodyweight, all-time heatmap** — **built, not yet driven.**
 
       **Bodyweight is one tap.** It had never once been logged through the UI:
