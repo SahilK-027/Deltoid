@@ -317,56 +317,59 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
         label: 'Save',
         onPressed: _value == null ? null : _save,
       ),
+      // Full-width rows with the field carrying its own gutter, which is how
+      // every other sheet that mixes the two is built. A card in here would be
+      // a panel inside a panel.
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
-        TextField(
-          controller: _controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textInputAction: TextInputAction.done,
-          onChanged: (_) => setState(() {}),
-          onSubmitted: (_) => _save(),
-          style: context.t.displaySmall?.copyWith(fontFeatures: tabular),
-          cursorColor: c.textPrimary,
-          decoration: InputDecoration(
-            suffixText: widget.unit.label,
-            suffixStyle: context.t.titleSmall?.copyWith(color: c.textSecondary),
-            filled: true,
-            fillColor: c.surfaceHigh,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              Space.lg, Space.lg, Space.lg, Space.sm),
+          child: TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _save(),
+            style: context.t.displaySmall?.copyWith(fontFeatures: tabular),
+            cursorColor: c.textPrimary,
+            decoration: InputDecoration(
+              suffixText: widget.unit.label,
+              suffixStyle:
+                  context.t.titleSmall?.copyWith(color: c.textSecondary),
+              filled: true,
+              fillColor: c.surfaceHigh,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.md),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.md),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(Radii.md),
+                borderSide: BorderSide(color: c.textPrimary, width: 2),
+              ),
+              contentPadding: const EdgeInsets.all(Space.lg),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide(color: c.textPrimary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(Space.lg),
           ),
         ),
-        const SizedBox(height: Space.lg),
-        ListCard(
-          inset: Space.lg,
-          children: [
-            // Weighing yourself and logging it are rarely the same moment.
-            AppRow(
-              title: DateFormat('EEE d MMM yyyy').format(_day),
-              icon: Icons.calendar_today_outlined,
-              onTap: _pickDay,
-              chevron: true,
-            ),
-            if (_editing)
-              AppRow(
-                title: 'Delete this weight',
-                icon: Icons.delete_outline,
-                tint: c.negative,
-                onTap: _delete,
-              ),
-          ],
+        // Weighing yourself and logging it are rarely the same moment.
+        AppRow(
+          title: DateFormat('EEE d MMM yyyy').format(_day),
+          icon: Icons.calendar_today_outlined,
+          onTap: _pickDay,
+          chevron: true,
         ),
+        if (_editing)
+          AppRow(
+            title: 'Delete this weight',
+            icon: Icons.delete_outline,
+            tint: c.negative,
+            onTap: _delete,
+          ),
       ],
     );
   }

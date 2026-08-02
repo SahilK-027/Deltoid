@@ -136,34 +136,30 @@ class SettingsScreen extends ConsumerWidget {
 
     final destination = await showModalBottomSheet<_ExportTo>(
       context: context,
+      isScrollControlled: true,
+      // `SheetHeader` draws its own grab handle, tighter than the framework's.
       showDragHandle: false,
       builder: (sheet) => AppSheet(
         title: 'Export backup',
         subtitle: 'Every workout, in one file',
-        contentPadding: const EdgeInsets.fromLTRB(
-            Space.gutter, Space.lg, Space.gutter, Space.lg),
+        // Full-bleed rows, as every other action sheet in the app: a card in
+        // here is a panel inside a panel, and the gutter double-insets rows
+        // that already carry their own padding.
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
         children: [
-          ListCard(
-            inset: Space.lg,
-            children: [
-              if (canSaveToDownloads)
-                AppRow(
-                  icon: Icons.download_outlined,
-                  title: 'Save to Downloads',
-                  subtitle: 'Into $downloadsFolder, where a file manager can '
-                      'find it',
-                  chevron: true,
-                  onTap: () =>
-                      Navigator.of(sheet).pop(_ExportTo.downloads),
-                ),
-              AppRow(
-                icon: Icons.ios_share,
-                title: 'Share',
-                subtitle: 'Hand it to Drive, iCloud or anything else',
-                chevron: true,
-                onTap: () => Navigator.of(sheet).pop(_ExportTo.share),
-              ),
-            ],
+          if (canSaveToDownloads)
+            AppRow(
+              icon: Icons.download_outlined,
+              title: 'Save to Downloads',
+              subtitle: 'Into $downloadsFolder, where a file manager can '
+                  'find it',
+              onTap: () => Navigator.of(sheet).pop(_ExportTo.downloads),
+            ),
+          AppRow(
+            icon: Icons.ios_share,
+            title: 'Share',
+            subtitle: 'Hand it to Drive, iCloud or anything else',
+            onTap: () => Navigator.of(sheet).pop(_ExportTo.share),
           ),
         ],
       ),
