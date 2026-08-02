@@ -204,7 +204,7 @@ class _Parts extends StatelessWidget {
                       sets: part.sets,
                       max: max,
                       hue: hue,
-                      height: 9,
+                      height: 8,
                     ),
                   ),
                   const SizedBox(width: Space.sm),
@@ -228,7 +228,7 @@ class _Parts extends StatelessWidget {
 /// answer: a rest day and an untrained muscle are the same absence, and two
 /// greys eight points apart say they are not.
 ///
-/// Barely rounded (2), not pilled: six pill-ended bars stacked at 12pt read as
+/// Barely rounded (2), not pilled: six pill-ended bars stacked at 10pt read as
 /// six lozenges of different lengths, and a full radius eats the short ones — a
 /// one-set bar is about as wide as its own two end caps. 2 takes the mechanical
 /// edge off without making the length hard to compare.
@@ -237,7 +237,7 @@ class _Bar extends StatelessWidget {
     required this.sets,
     required this.max,
     required this.hue,
-    this.height = 12,
+    this.height = 10,
   });
 
   final int sets;

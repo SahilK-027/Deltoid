@@ -690,7 +690,7 @@ Shoulders  ::::::::::::::::::::   0 sets
 - Rows are the **six `MuscleRegion` values, in order, never re-sorted** — chest,
   back, shoulders, arms, legs, core.
 - The bar is normalised to the **largest region that week**, not to a target.
-- Bar: **height 12, radius 2, one hue per region** — the six, in `MuscleRegion`
+- Bar: **height 10, radius 2, one hue per region** — the six, in `MuscleRegion`
   order — on a **`surfaceHighest`** track that shows the full width so an empty
   week is still a row rather than a gap. (`data` for every bar and a
   `surfaceHigh` track were the original spec. Six bars of one colour make a
