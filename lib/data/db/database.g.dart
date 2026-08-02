@@ -6735,6 +6735,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_set_logs_parent',
     'CREATE INDEX idx_set_logs_parent ON set_logs (workout_exercise_id)',
   );
+  late final Index idxBodyweightDay = Index(
+    'idx_bodyweight_day',
+    'CREATE INDEX idx_bodyweight_day ON bodyweight_logs (day_key)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6759,6 +6763,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxWorkoutExercisesWorkout,
     idxWorkoutExercisesExercise,
     idxSetLogsParent,
+    idxBodyweightDay,
   ];
 }
 

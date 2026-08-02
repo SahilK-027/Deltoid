@@ -91,6 +91,39 @@ String? formatDeltaInUnit(double kg, double previousKg, WeightUnit unit) {
   return '${difference > 0 ? '+' : '−'}$magnitude';
 }
 
+/// What a bodyweight is shown to, in display units.
+///
+/// Bodyweight is the one figure in the app that is not plates. Every other
+/// weight rounds to [WeightUnitX.increment] because it has to be loadable on a
+/// bar — half a kilo is the smallest microplate — but nobody loads
+/// themselves. A scale reads a tenth, so typing 76.4 and being shown 76.5 was
+/// the app telling you your own weight is wrong — twice over: once in the
+/// figure, and again in the sheet, which prefilled the rounded number so
+/// correcting anything else about the entry silently moved the weight.
+const bodyweightIncrement = 0.1;
+
+/// A stored bodyweight as a display number, to the tenth.
+double displayBodyweight(double kg, WeightUnit unit) =>
+    roundToDecimals(unit.fromKg(kg), 1);
+
+/// As [formatInUnit], at bodyweight's precision. Trailing zeros still go: 76.0
+/// reads `76`.
+String formatBodyweight(double kg, WeightUnit unit) {
+  final v = displayBodyweight(kg, unit);
+  if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+  return v.toStringAsFixed(1);
+}
+
+/// As [formatDeltaInUnit], at bodyweight's precision — and null for the same
+/// reason: a difference too small to show is not a change to claim.
+String? formatBodyweightDelta(double kg, double previousKg, WeightUnit unit) {
+  final difference =
+      displayBodyweight(kg, unit) - displayBodyweight(previousKg, unit);
+  if (difference.abs() < bodyweightIncrement / 2) return null;
+  final magnitude = formatBodyweight(unit.toKg(difference.abs()), unit);
+  return '${difference > 0 ? '+' : '−'}$magnitude';
+}
+
 /// Smallest sensible display precision, used where a raw double would show
 /// fifteen decimals of floating point noise.
 double roundToDecimals(double v, int places) {

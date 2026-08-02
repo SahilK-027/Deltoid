@@ -200,7 +200,7 @@ class _NavItem extends StatelessWidget {
       // destination's centre rather than the exact touch point — symmetric
       // under the icon, which is the look we want anyway.
       containedInkWell: false,
-      radius: MediaQuery.sizeOf(context).width * 0.62,
+      radius: MediaQuery.sizeOf(context).width * 0.48,
       splashFactory: const _NavSplashFactory(),
       // Read at the centre only. The gradient has thrown most of this away by
       // a third of the way out, so it can be brighter than a flat splash.

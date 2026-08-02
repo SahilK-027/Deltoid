@@ -14,7 +14,6 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
-import '../../data/db/database.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 
@@ -30,9 +29,9 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final log = ref.watch(bodyweightHistoryProvider).valueOrNull ?? const [];
+    final bodyweight = ref.watch(bodyweightSummaryProvider).valueOrNull ??
+        (latest: null, count: 0);
     final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
-    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final c = context.c;
 
     return Scaffold(
@@ -48,7 +47,7 @@ class SettingsScreen extends ConsumerWidget {
               eyebrow: 'On this device',
             ),
           ),
-          Expanded(child: _body(context, ref, log, lastBackup, unit, c)),
+          Expanded(child: _body(context, ref, bodyweight, lastBackup, c)),
         ],
       ),
     );
@@ -57,9 +56,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget _body(
     BuildContext context,
     WidgetRef ref,
-    List<BodyweightLog> log,
+    BodyweightSummary bodyweight,
     DateTime? lastBackup,
-    WeightUnit unit,
     DeltoidColors c,
   ) {
     return ListView(
@@ -68,8 +66,8 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           SectionHeader(
             'Bodyweight',
-            actionLabel: log.isEmpty ? null : 'History',
-            onAction: log.isEmpty
+            actionLabel: bodyweight.latest == null ? null : 'History',
+            onAction: bodyweight.latest == null
                 ? null
                 : () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -81,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
           // screen with a `+` in its bar — three taps to type a number you are
           // asked for daily, which is why it had never once been logged
           // through the UI. Tapping the figure is the log; the past is a link.
-          _BodyweightCard(log: log, unit: unit),
+          _BodyweightCard(bodyweight: bodyweight),
           const SizedBox(height: Space.section),
           const SectionHeader('Data'),
           ListCard(
@@ -411,16 +409,23 @@ class _ProgressSheet extends StatelessWidget {
 /// entry, so a second weighing corrects rather than duplicates (the table is
 /// keyed by day, so it would have overwritten either way; this says so).
 class _BodyweightCard extends ConsumerWidget {
-  const _BodyweightCard({required this.log, required this.unit});
+  const _BodyweightCard({required this.bodyweight});
 
-  final List<BodyweightLog> log;
-  final WeightUnit unit;
+  /// The newest entry and the number of them — the two figures this card
+  /// shows. It used to be handed every row in the table to work them out.
+  final BodyweightSummary bodyweight;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    // Watched *here*, not at the top of the screen. It was one line in
+    // `SettingsScreen.build`, which made switching kg to lb rebuild the whole
+    // page — masthead, every section, the three painted theme miniatures — to
+    // change the two words in this row and the tick in the units card. This is
+    // the screen the switch is on, so it is the one that hitched.
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final today = dayKeyOf(DateTime.now());
-    final latest = log.isEmpty ? null : log.first;
+    final latest = bodyweight.latest;
     final loggedToday = latest != null && latest.dayKey == today;
 
     return ListCard(
@@ -430,14 +435,14 @@ class _BodyweightCard extends ConsumerWidget {
           icon: Icons.monitor_weight_outlined,
           title: latest == null
               ? 'Not logged'
-              : '${formatInUnit(latest.weightKg, unit)} ${unit.label}',
+              : '${formatBodyweight(latest.weightKg, unit)} ${unit.label}',
           subtitle: latest == null
               ? 'Needed to score bodyweight and BW+ lifts'
               : loggedToday
-                  ? 'Logged today  ·  ${log.length} entries'
+                  ? 'Logged today  ·  ${bodyweight.count} entries'
                   : 'Last entry '
                       '${DateFormat('d MMM').format(dateFromDayKey(latest.dayKey))}'
-                      '  ·  ${log.length} entries',
+                      '  ·  ${bodyweight.count} entries',
           onTap: () => logBodyweightPrompt(
             context,
             ref,

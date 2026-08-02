@@ -32,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +76,13 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             await m.addColumn(regimes, regimes.identityIndex);
             await backfillIdentityIndexes(this);
+          }
+          // v6: bodyweight is the one table with a row per *day* rather than
+          // per session, so it is the one that reaches five figures on its own.
+          // Every query the bodyweight screen makes is a range on the day, and
+          // all of them were table scans.
+          if (from < 6) {
+            await m.createIndex(idxBodyweightDay);
           }
         },
         beforeOpen: (details) async {

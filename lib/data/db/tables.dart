@@ -187,6 +187,13 @@ class SetLogs extends Table with SyncColumns {
 
 /// Needed to make bodyweight lifts comparable over time: 7 pull-ups at 70kg
 /// and 7 at 76kg are not the same lift.
+///
+/// Indexed on the day, because this is the one table with a row *per day*:
+/// every other table grows with sessions, and this one grows whether you train
+/// or not. Fifty years of it is 18 000 rows, and the bodyweight screen asks it
+/// three questions — a month's days, a chart window, the newest entry — all of
+/// which were full scans until this existed.
+@TableIndex(name: 'idx_bodyweight_day', columns: {#dayKey})
 class BodyweightLogs extends Table with SyncColumns {
   IntColumn get dayKey => integer()();
   RealColumn get weightKg => real()();

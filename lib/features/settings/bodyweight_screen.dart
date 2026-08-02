@@ -11,55 +11,142 @@ import '../../core/widgets/calendar.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
 import '../../data/db/database.dart';
+import '../../data/db/watch.dart';
 import '../../domain/units.dart';
 
-/// Every bodyweight entry, newest first.
+/// One month of the log, summarised — never its entries.
 ///
-/// Unlimited on purpose. Settings used to read a query capped at 30, which was
-/// fine as a readout and wrong the moment entries became editable: a typo from
-/// two months ago was unreachable, and bodyweight silently scales the score of
-/// every bodyweight and weighted lift. It also made the count under the figure
-/// stop at "30 logged" forever.
-final bodyweightHistoryProvider =
-    StreamProvider<List<BodyweightLog>>((ref) {
-  final db = ref.watch(databaseProvider);
-  final query = db.select(db.bodyweightLogs)
-    ..where((t) => t.deletedAt.isNull())
-    ..orderBy([
-      (t) => OrderingTerm(expression: t.dayKey, mode: OrderingMode.desc)
-    ]);
-  return query.watch();
+/// [ym] is the day key with the day dropped: `202608`. It is the month's
+/// identity everywhere, including as the key of the provider that loads its
+/// days.
+typedef BodyweightMonth = ({
+  int ym,
+  String label,
+  int count,
+  double averageKg,
 });
 
-/// One month of entries under its own heading.
-typedef BodyweightMonth = ({String label, List<BodyweightLog> entries});
+String monthLabel(int ym) =>
+    DateFormat('MMMM yyyy').format(DateTime(ym ~/ 100, ym % 100));
 
-/// Groups a newest-first log by calendar month.
+/// Every month with a weigh-in in it, newest first, averaged **in SQLite**.
 ///
-/// A flat list of two hundred dated rows has nothing to hold on to — the year
-/// is repeated on every line and the gap where you stopped weighing yourself
-/// is invisible. Months give the list its headings and, missing, say the same
-/// thing by absence.
-List<BodyweightMonth> groupByMonth(List<BodyweightLog> log) {
-  final months = <BodyweightMonth>[];
-  for (final entry in log) {
-    final label =
-        DateFormat('MMMM yyyy').format(dateFromDayKey(entry.dayKey));
-    if (months.isEmpty || months.last.label != label) {
-      months.add((label: label, entries: [entry]));
-    } else {
-      months.last.entries.add(entry);
-    }
-  }
-  return months;
-}
+/// This screen used to hold the entire table in memory and group it in Dart:
+/// one row per day for as long as you have owned the app. At fifty years that
+/// is 18 250 rows — a hundred milliseconds to fetch and map, and another
+/// hundred to group, because grouping formatted a month label *per row*. Both
+/// ran on the UI isolate, both re-ran on every weigh-in, and together they are
+/// what made opening this screen a wait. `GROUP BY` does the same work in
+/// eight, and the count and average are exactly what a closed month shows.
+///
+/// A month's *days* are a separate query, made when the month is opened
+/// ([bodyweightMonthProvider]).
+final bodyweightMonthsProvider = StreamProvider<List<BodyweightMonth>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchQuery([db.bodyweightLogs], () async {
+    final rows = await db.customSelect(
+      'SELECT day_key / 100 AS ym, AVG(weight_kg) AS avg_kg, COUNT(*) AS n '
+      'FROM bodyweight_logs WHERE deleted_at IS NULL '
+      'GROUP BY ym ORDER BY ym DESC',
+      readsFrom: {db.bodyweightLogs},
+    ).get();
+    return [
+      for (final r in rows)
+        (
+          ym: r.read<int>('ym'),
+          label: monthLabel(r.read<int>('ym')),
+          count: r.read<int>('n'),
+          averageKg: r.read<double>('avg_kg'),
+        ),
+    ];
+  });
+});
+
+/// The newest weight and how many there are — the two figures Settings shows
+/// and the two the header of this screen leads with.
+typedef BodyweightSummary = ({BodyweightLog? latest, int count});
+
+/// Settings read the whole table for this. It wanted one row and a number.
+final bodyweightSummaryProvider = StreamProvider<BodyweightSummary>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchQuery([db.bodyweightLogs], () async {
+    final latest = await (db.select(db.bodyweightLogs)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.dayKey, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    final count = await db.customSelect(
+      'SELECT COUNT(*) AS n FROM bodyweight_logs WHERE deleted_at IS NULL',
+      readsFrom: {db.bodyweightLogs},
+    ).getSingle();
+    return (latest: latest, count: count.read<int>('n'));
+  });
+});
+
+/// The entries the chart is drawing, oldest first — the window, not the log.
+///
+/// The chart never showed more than a year, and the widest window on daily
+/// weighing is 366 points. Filtering the other 17 884 in Dart on every rebuild
+/// was work to throw away.
+final bodyweightRangeProvider = StreamProvider.autoDispose
+    .family<List<BodyweightLog>, TrendWindow>((ref, window) {
+  final db = ref.watch(databaseProvider);
+  return db.watchQuery([db.bodyweightLogs], () {
+    return (db.select(db.bodyweightLogs)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.dayKey.isBiggerOrEqualValue(window.fromDayKey) &
+              t.dayKey.isSmallerOrEqualValue(window.toDayKey))
+          ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
+        .get();
+  });
+});
+
+/// One month's days, newest first, and the entry immediately before them.
+///
+/// [before] is what keeps a month's first row from losing its delta at the
+/// seam: the change it shows is against the last weigh-in of the month before,
+/// wherever that is.
+typedef BodyweightDays = ({List<BodyweightLog> entries, BodyweightLog? before});
+
+/// Loaded when a month is opened, dropped when it is closed — `autoDispose`,
+/// because a fifty-year log opened month by month should not accumulate.
+final bodyweightMonthProvider =
+    StreamProvider.autoDispose.family<BodyweightDays, int>((ref, ym) {
+  final db = ref.watch(databaseProvider);
+  final first = ym * 100;
+  final last = ym * 100 + 31;
+  return db.watchQuery([db.bodyweightLogs], () async {
+    final entries = await (db.select(db.bodyweightLogs)
+          ..where((t) =>
+              t.deletedAt.isNull() &
+              t.dayKey.isBiggerOrEqualValue(first) &
+              t.dayKey.isSmallerOrEqualValue(last))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.dayKey, mode: OrderingMode.desc)
+          ]))
+        .get();
+    final before = await (db.select(db.bodyweightLogs)
+          ..where((t) =>
+              t.deletedAt.isNull() & t.dayKey.isSmallerThanValue(first))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.dayKey, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    return (entries: entries, before: before);
+  });
+});
 
 class BodyweightScreen extends ConsumerWidget {
   const BodyweightScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final log = ref.watch(bodyweightHistoryProvider).valueOrNull;
+    final months = ref.watch(bodyweightMonthsProvider).valueOrNull;
+    final summary = ref.watch(bodyweightSummaryProvider).valueOrNull;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
     return Scaffold(
@@ -75,9 +162,9 @@ class BodyweightScreen extends ConsumerWidget {
           const SizedBox(width: Space.sm),
         ],
       ),
-      body: log == null
+      body: months == null || summary == null
           ? const Center(child: CircularProgressIndicator())
-          : log.isEmpty
+          : summary.latest == null
               ? EmptyState(
                   icon: Icons.monitor_weight_outlined,
                   title: 'No weights logged',
@@ -88,7 +175,12 @@ class BodyweightScreen extends ConsumerWidget {
                     child: const Text('Log bodyweight'),
                   ),
                 )
-              : _MonthList(log: log, unit: unit),
+              : _MonthList(
+                  months: months,
+                  latest: summary.latest!,
+                  total: summary.count,
+                  unit: unit,
+                ),
     );
   }
 }
@@ -101,9 +193,16 @@ class BodyweightScreen extends ConsumerWidget {
 /// on top now, and the past is a month at a time, collapsed: `March 2026 ·
 /// 76.4 avg · −0.8`, opening to its days when you want one.
 class _MonthList extends StatefulWidget {
-  const _MonthList({required this.log, required this.unit});
+  const _MonthList({
+    required this.months,
+    required this.latest,
+    required this.total,
+    required this.unit,
+  });
 
-  final List<BodyweightLog> log;
+  final List<BodyweightMonth> months;
+  final BodyweightLog latest;
+  final int total;
   final WeightUnit unit;
 
   @override
@@ -111,45 +210,39 @@ class _MonthList extends StatefulWidget {
 }
 
 class _MonthListState extends State<_MonthList> {
-  /// The current month, open. Every other month is a summary until asked —
-  /// the days you might correct are the ones you just logged.
-  final _open = <String>{};
+  /// The months that are open, by [BodyweightMonth.ym]. Every other month is a
+  /// summary until asked — the days you might correct are the ones you just
+  /// logged — and only an open month's days are ever queried.
+  final _open = <int>{};
   bool _seeded = false;
 
   /// How far back the chart looks. Not a filter on the list: the list is the
   /// record, the chart is the reading.
   TrendWindow _window = const TrendWindow.rolling(ChartRange.threeMonths);
 
-  /// Months, and where each one starts in the flat log. Recomputed only when
-  /// the log itself changes — grouping two thousand entries on every expand
-  /// was work done to answer a question nobody had asked again.
-  List<BodyweightMonth> _months = const [];
-  List<int> _starts = const [];
+  /// Years there is something to look at, for the picker. Derived from the
+  /// month summaries, which is at most one entry per month rather than one per
+  /// weigh-in, and recomputed only when those change.
+  List<int> _years = const [];
 
   @override
   void initState() {
     super.initState();
-    _group();
+    _sync();
   }
 
   @override
   void didUpdateWidget(_MonthList old) {
     super.didUpdateWidget(old);
-    if (!identical(old.log, widget.log)) _group();
+    if (!identical(old.months, widget.months)) _sync();
   }
 
-  void _group() {
-    _months = groupByMonth(widget.log);
-    final starts = <int>[];
-    var offset = 0;
-    for (final month in _months) {
-      starts.add(offset);
-      offset += month.entries.length;
-    }
-    _starts = starts;
-    if (!_seeded && _months.isNotEmpty) {
+  void _sync() {
+    _years = {for (final m in widget.months) m.ym ~/ 100}.toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (!_seeded && widget.months.isNotEmpty) {
       _seeded = true;
-      _open.add(_months.first.label);
+      _open.add(widget.months.first.ym);
     }
   }
 
@@ -166,7 +259,7 @@ class _MonthListState extends State<_MonthList> {
       padding: const EdgeInsets.fromLTRB(
           Space.gutter, Space.lg, Space.gutter, Space.huge),
       // Two headers and the chart, then a card per month.
-      itemCount: _months.length + 2,
+      itemCount: widget.months.length + 2,
       itemBuilder: (context, i) {
         if (i == 0) {
           return Column(
@@ -174,7 +267,8 @@ class _MonthListState extends State<_MonthList> {
             children: [
               const SectionHeader('Trend'),
               _TrendCard(
-                log: widget.log,
+                latest: widget.latest,
+                years: _years,
                 unit: unit,
                 window: _window,
                 onWindow: (w) => setState(() => _window = w),
@@ -187,24 +281,24 @@ class _MonthListState extends State<_MonthList> {
           return SectionHeader(
             'By month',
             trailing: Text(
-              '${widget.log.length} logged',
+              '${widget.total} logged',
               style: context.t.bodySmall,
             ),
           );
         }
 
         final m = i - 2;
-        final month = _months[m];
-        final open = _open.contains(month.label);
+        final month = widget.months[m];
+        final last = m == widget.months.length - 1;
+        final open = _open.contains(month.ym);
         return Padding(
           // The hairline between months, drawn as a gap: one card each, so a
           // month that is closed costs one row and nothing else.
-          padding: EdgeInsets.only(bottom: m == _months.length - 1 ? 0 : 1),
+          padding: EdgeInsets.only(bottom: last ? 0 : 1),
           child: ClipRRect(
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(m == 0 ? Radii.xl : 0),
-              bottom:
-                  Radius.circular(m == _months.length - 1 ? Radii.xl : 0),
+              bottom: Radius.circular(last ? Radii.xl : 0),
             ),
             child: ColoredBox(
               color: context.c.surface,
@@ -212,11 +306,11 @@ class _MonthListState extends State<_MonthList> {
                 children: [
                   _MonthRow(
                     month: month,
-                    previous: m + 1 < _months.length ? _months[m + 1] : null,
+                    previous: last ? null : widget.months[m + 1],
                     unit: unit,
                     open: open,
                     onTap: () => setState(() {
-                      open ? _open.remove(month.label) : _open.add(month.label);
+                      open ? _open.remove(month.ym) : _open.add(month.ym);
                     }),
                   ),
                   // Animated to its height rather than appearing: the days are
@@ -229,18 +323,7 @@ class _MonthListState extends State<_MonthList> {
                     alignment: Alignment.topCenter,
                     child: !open
                         ? const SizedBox(width: double.infinity)
-                        : _MonthDays(
-                            entries: month.entries,
-                            // The entry before each one in time, wherever it
-                            // lives — a month's first row still reads against
-                            // the last of the month before it rather than
-                            // losing its delta at the seam.
-                            previousOf: (i) =>
-                                _starts[m] + i + 1 < widget.log.length
-                                    ? widget.log[_starts[m] + i + 1]
-                                    : null,
-                            unit: unit,
-                          ),
+                        : _MonthDays(ym: month.ym, unit: unit),
                   ),
                 ],
               ),
@@ -259,20 +342,23 @@ class _MonthListState extends State<_MonthList> {
 /// `Fri 31 Jul` in the same type, on the same ground, with the same divider
 /// between them, so a list of five months and twenty days read as twenty-five
 /// peers. A child has to look like a child.
-class _MonthDays extends StatelessWidget {
-  const _MonthDays({
-    required this.entries,
-    required this.previousOf,
-    required this.unit,
-  });
+/// Its days are queried when it opens and dropped when it closes, so the cost
+/// of this screen is the months you are looking at rather than every weighing
+/// you have ever recorded. Nothing is drawn until they arrive: a month is
+/// thirty rows off an indexed key, and a spinner for that flashes.
+class _MonthDays extends ConsumerWidget {
+  const _MonthDays({required this.ym, required this.unit});
 
-  final List<BodyweightLog> entries;
-  final BodyweightLog? Function(int index) previousOf;
+  final int ym;
   final WeightUnit unit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
+    final days = ref.watch(bodyweightMonthProvider(ym)).valueOrNull;
+    if (days == null) return const SizedBox(width: double.infinity);
+
+    final entries = days.entries;
     return Container(
       color: c.surfaceHigh,
       child: Column(
@@ -285,7 +371,10 @@ class _MonthDays extends StatelessWidget {
               ),
             _EntryRow(
               entry: entries[i],
-              previous: previousOf(i),
+              // The entry before this one in time — the last of the month
+              // before, once the list runs out — so a month's first row keeps
+              // its delta at the seam.
+              previous: i + 1 < entries.length ? entries[i + 1] : days.before,
               unit: unit,
             ),
           ],
@@ -318,21 +407,18 @@ class _MonthRow extends StatelessWidget {
   final bool open;
   final VoidCallback onTap;
 
-  static double _average(BodyweightMonth m) =>
-      m.entries.fold(0.0, (sum, e) => sum + e.weightKg) / m.entries.length;
-
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final average = _average(month);
-    final before = previous == null ? null : _average(previous!);
-    final delta =
-        before == null ? null : formatDeltaInUnit(average, before, unit);
+    // Both averages came out of `AVG(weight_kg)`; nothing here reads a row.
+    final average = month.averageKg;
+    final delta = previous == null
+        ? null
+        : formatBodyweightDelta(average, previous!.averageKg, unit);
 
     return AppRow(
       title: month.label,
-      subtitle: '${month.entries.length} '
-          'weigh-in${month.entries.length == 1 ? '' : 's'}',
+      subtitle: '${month.count} weigh-in${month.count == 1 ? '' : 's'}',
       onTap: onTap,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -345,7 +431,7 @@ class _MonthRow extends StatelessWidget {
             const SizedBox(width: Space.md),
           ],
           Text(
-            '${formatInUnit(average, unit)} ${unit.label}',
+            '${formatBodyweight(average, unit)} ${unit.label}',
             style: context.t.titleSmall?.copyWith(fontFeatures: tabular),
           ),
           const SizedBox(width: Space.sm),
@@ -369,37 +455,40 @@ class _MonthRow extends StatelessWidget {
 /// Weight over time, on the same chart and the same range control as an
 /// exercise's history — `1W 1M 3M 1Y` and a year picker, not a second dialect
 /// (`3m 6m 1y All`) invented for this one screen.
-class _TrendCard extends StatelessWidget {
+class _TrendCard extends ConsumerWidget {
   const _TrendCard({
-    required this.log,
+    required this.latest,
+    required this.years,
     required this.unit,
     required this.window,
     required this.onWindow,
   });
 
-  /// Newest first, as the provider gives it.
-  final List<BodyweightLog> log;
+  /// The newest weigh-in, which the card leads with whatever the window is.
+  final BodyweightLog latest;
+
+  /// Years there is something to look at, for the picker.
+  final List<int> years;
 
   final WeightUnit unit;
   final TrendWindow window;
   final ValueChanged<TrendWindow> onWindow;
 
   @override
-  Widget build(BuildContext context) {
-    // Oldest first, which is the direction a chart reads.
-    final points = [
-      for (final e in log.reversed)
-        if (window.contains(e.dayKey)) e,
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Oldest first, which is the direction a chart reads — and the query
+    // already returns only the window, so this is at most a year of days.
+    final points = ref.watch(bodyweightRangeProvider(window)).valueOrNull;
+    if (points == null) {
+      return const AppCard(
+        child: SizedBox(height: 260, child: Center(child: SizedBox.shrink())),
+      );
+    }
 
-    final latest = log.first;
     final change = points.length < 2
         ? null
-        : formatDeltaInUnit(points.last.weightKg, points.first.weightKg, unit);
-
-    // Only years there is something to look at.
-    final years = {for (final e in log) e.dayKey ~/ 10000}.toList()
-      ..sort((a, b) => b.compareTo(a));
+        : formatBodyweightDelta(
+            points.last.weightKg, points.first.weightKg, unit);
 
     return AppCard(
       child: Column(
@@ -412,7 +501,7 @@ class _TrendCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                formatInUnit(latest.weightKg, unit),
+                formatBodyweight(latest.weightKg, unit),
                 style: context.t.displaySmall,
               ),
               const SizedBox(width: Space.xs),
@@ -449,8 +538,8 @@ class _TrendCard extends StatelessWidget {
                   ],
                 ),
               ],
-              formatValue: (v) => formatInUnit(unit.toKg(v), unit),
-              tooltip: (v) => '${formatInUnit(unit.toKg(v), unit)} '
+              formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
+              tooltip: (v) => '${formatBodyweight(unit.toKg(v), unit)} '
                   '${unit.label}',
             ),
           const SizedBox(height: Space.lg),
@@ -486,7 +575,7 @@ class _EntryRow extends ConsumerWidget {
     final c = context.c;
     final delta = previous == null
         ? null
-        : formatDeltaInUnit(entry.weightKg, previous!.weightKg, unit);
+        : formatBodyweightDelta(entry.weightKg, previous!.weightKg, unit);
 
     return Pressable(
       scale: 0.99,
@@ -515,7 +604,7 @@ class _EntryRow extends ConsumerWidget {
               const SizedBox(width: Space.md),
             ],
             Text(
-              '${formatInUnit(entry.weightKg, unit)} ${unit.label}',
+              '${formatBodyweight(entry.weightKg, unit)} ${unit.label}',
               style: context.t.labelLarge,
             ),
           ],
@@ -594,7 +683,7 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
   late final TextEditingController _controller = TextEditingController(
     text: widget.initial == null
         ? ''
-        : formatInUnit(widget.initial!, widget.unit),
+        : formatBodyweight(widget.initial!, widget.unit),
   );
   late DateTime _day = widget.date ?? DateTime.now();
 

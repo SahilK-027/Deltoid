@@ -1,5 +1,7 @@
+import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
+import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/features/settings/bodyweight_screen.dart';
@@ -197,36 +199,82 @@ void main() {
     });
   });
 
-  group('groupByMonth', () {
-    BodyweightLog entry(int dayKey) => BodyweightLog(
-          id: '$dayKey',
-          updatedAt: 0,
-          deviceId: 'test',
-          dirty: false,
-          dayKey: dayKey,
-          weightKg: 76,
-        );
+  /// The log is summarised in SQLite and read a month at a time, so what used
+  /// to be a grouping function is now four queries. Fifty years of daily
+  /// weighing is 18 250 rows: holding them all to show eight month rows was
+  /// what made this screen slow to open.
+  group('the log is summarised, not loaded', () {
+    Future<void> log(int dayKey, double kg) => TrainingRepository(db)
+        .logBodyweight(dateFromDayKey(dayKey), kg);
 
-    test('an empty log has no months', () {
-      expect(groupByMonth(const []), isEmpty);
+    test('an empty log has no months', () async {
+      expect(await container.read(bodyweightMonthsProvider.future), isEmpty);
+      final summary = await container.read(bodyweightSummaryProvider.future);
+      expect(summary.latest, isNull);
+      expect(summary.count, 0);
     });
 
-    test('a month keeps its entries in the order it was given them', () {
-      final months = groupByMonth([
-        entry(20260803),
-        entry(20260801),
-        entry(20260728),
-      ]);
+    test('a month is its count and its average, newest first', () async {
+      await log(20260803, 76.4);
+      await log(20260801, 76.6);
+      await log(20260728, 77.0);
+
+      final months = await container.read(bodyweightMonthsProvider.future);
 
       expect(months.map((m) => m.label), ['August 2026', 'July 2026']);
-      expect(months.first.entries.map((e) => e.dayKey), [20260803, 20260801]);
-      expect(months.last.entries.single.dayKey, 20260728);
+      expect(months.first.ym, 202608);
+      expect(months.first.count, 2);
+      expect(months.first.averageKg, closeTo(76.5, 1e-9));
+      expect(months.last.count, 1);
     });
 
-    test('the same month a year apart is two months, not one', () {
-      final months = groupByMonth([entry(20260801), entry(20250801)]);
+    test('the same month a year apart is two months, not one', () async {
+      await log(20260801, 76);
+      await log(20250801, 78);
 
+      final months = await container.read(bodyweightMonthsProvider.future);
       expect(months.map((m) => m.label), ['August 2026', 'August 2025']);
+    });
+
+    test('a month loads only its own days, and the one before them', () async {
+      await log(20260803, 76.4);
+      await log(20260801, 76.6);
+      await log(20260728, 77.0);
+
+      final august = await container.read(bodyweightMonthProvider(202608).future);
+
+      expect(august.entries.map((e) => e.dayKey), [20260803, 20260801]);
+      // The seam: August's oldest row still has something to read against.
+      expect(august.before?.dayKey, 20260728);
+
+      final july = await container.read(bodyweightMonthProvider(202607).future);
+      expect(july.entries.single.dayKey, 20260728);
+      expect(july.before, isNull);
+    });
+
+    test('the chart asks for its window, not for the log', () async {
+      final today = DateTime.now();
+      await TrainingRepository(db)
+          .logBodyweight(today.subtract(const Duration(days: 2)), 76);
+      await TrainingRepository(db)
+          .logBodyweight(today.subtract(const Duration(days: 200)), 80);
+
+      final window = await container.read(
+        bodyweightRangeProvider(const TrendWindow.rolling(ChartRange.month))
+            .future,
+      );
+
+      expect(window.length, 1);
+      expect(window.single.weightKg, 76);
+    });
+
+    test('the summary is the newest weight and how many there are', () async {
+      await log(20260801, 76.6);
+      await log(20260803, 76.4);
+
+      final summary = await container.read(bodyweightSummaryProvider.future);
+      expect(summary.latest?.dayKey, 20260803);
+      expect(summary.count, 2);
     });
   });
 }

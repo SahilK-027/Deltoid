@@ -430,6 +430,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                     set: done[i],
                     exercise: entry.exercise,
                     index: _workingIndex(done, i),
+                    unit: unit,
                   ),
                 ],
                 // Three different kinds of thing used to sit here as three
@@ -570,21 +571,26 @@ class _NoteBlock extends StatelessWidget {
 }
 
 /// One logged set: index chip, then the load and reps as one phrase.
-class _SetLine extends ConsumerWidget {
+class _SetLine extends StatelessWidget {
   const _SetLine({
     required this.set,
     required this.exercise,
     required this.index,
+    required this.unit,
   });
 
   final SetLog set;
   final Exercise exercise;
   final int index;
 
+  /// Handed down, not watched. See `_ExpandedSetLine` in
+  /// `exercise_history_screen.dart`: one listener per set is one listener per
+  /// set to wake when the unit changes.
+  final WeightUnit unit;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final c = context.c;
-    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final short = set.setType.shortLabel;
 
     return Padding(

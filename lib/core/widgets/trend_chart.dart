@@ -44,12 +44,16 @@ class TrendWindow {
   /// Set when the window is a whole calendar year.
   final int? year;
 
-  bool contains(int dayKey) {
-    final y = year;
-    if (y != null) return dayKey ~/ 10000 == y;
-    return dayKey >=
-        dayKeyOf(DateTime.now().subtract(Duration(days: range!.days)));
-  }
+  bool contains(int dayKey) =>
+      dayKey >= fromDayKey && dayKey <= toDayKey;
+
+  /// The window as day-key bounds, so a query can ask for it rather than a
+  /// screen filtering everything it has ever stored.
+  int get fromDayKey => year != null
+      ? year! * 10000
+      : dayKeyOf(DateTime.now().subtract(Duration(days: range!.days)));
+
+  int get toDayKey => year != null ? year! * 10000 + 1231 : 99999999;
 
   @override
   bool operator ==(Object other) =>

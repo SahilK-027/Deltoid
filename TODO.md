@@ -239,7 +239,7 @@ a device before the next starts.
       sheet and its `_Dropdown`. Name collisions are checked in the name prompt
       itself now, the way regime names are.
 
-- [ ] **6 · Settings, bodyweight, all-time heatmap** — **built, not yet driven.**
+- [x] **6 · Settings, bodyweight, all-time heatmap** _(driven on the device)_
 
       **Bodyweight is one tap.** It had never once been logged through the UI:
       it was behind a cog, then behind a card that pushed a screen with a `+`
@@ -297,11 +297,14 @@ a device before the next starts.
       rule, and `seed_years_test.dart` now asserts progress never goes
       backwards.
 
-      **Still open here**: a weight is rounded to the display increment, which
-      is 0.5 kg because that is the smallest pair of plates. A scale reads
-      0.1, and bodyweight is the one figure in the app that is not plates —
-      typing 76.4 stores and shows 76.5. Wants a decision before this is
-      driven.
+      **Bodyweight shows tenths**, and is the one weight in the app that does.
+      Storage was always exact; the display rounded to the 0.5 kg plate
+      increment, so 76.4 came back as 76.5 — in the figure, in the trend, and
+      in the sheet, which prefilled the rounded number so correcting the *date*
+      of an entry moved its weight. `formatBodyweight` /
+      `formatBodyweightDelta` in `domain/units.dart`, covered in
+      `units_test.dart`. Loads still round to the plates: that number has to be
+      loadable on a bar, and this one does not.
 
       **The all-time heatmap is done**, out of order, because thirty years of
       seeded data made it unusable: it was eleven thousand widgets — a

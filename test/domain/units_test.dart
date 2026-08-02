@@ -98,4 +98,38 @@ void main() {
       );
     });
   });
+
+  group('bodyweight is not plates', () {
+    test('a tenth survives the round trip', () {
+      // The whole point: 76.4 is what the scale said, so 76.4 is what the
+      // screen and the correction sheet have to say back.
+      expect(formatBodyweight(76.4, WeightUnit.kg), '76.4');
+      expect(formatBodyweight(76.45, WeightUnit.kg), '76.5');
+      expect(formatInUnit(76.4, WeightUnit.kg), '76.5'); // the load rule
+    });
+
+    test('trailing zeros still go', () {
+      expect(formatBodyweight(76, WeightUnit.kg), '76');
+      expect(formatBodyweight(76.0, WeightUnit.kg), '76');
+    });
+
+    test('pounds are shown to the tenth too', () {
+      expect(
+        formatBodyweight(WeightUnit.lb.toKg(168.4), WeightUnit.lb),
+        '168.4',
+      );
+    });
+
+    test('a tenth of a kilo is a delta worth printing', () {
+      // formatDeltaInUnit swallows this one — under half a plate step.
+      expect(formatBodyweightDelta(76.4, 76.3, WeightUnit.kg), '+0.1');
+      expect(formatBodyweightDelta(76.3, 76.4, WeightUnit.kg), '−0.1');
+      expect(formatDeltaInUnit(76.4, 76.3, WeightUnit.kg), isNull);
+    });
+
+    test('below a tenth is still nothing, not "+0"', () {
+      expect(formatBodyweightDelta(76.42, 76.4, WeightUnit.kg), isNull);
+      expect(formatBodyweightDelta(76.4, 76.4, WeightUnit.kg), isNull);
+    });
+  });
 }

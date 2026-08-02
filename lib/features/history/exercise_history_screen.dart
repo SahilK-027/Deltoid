@@ -341,6 +341,7 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
                             set: done[i],
                             position: i,
                             exercise: exercise,
+                            unit: unit,
                           ),
                       ],
                     ),
@@ -406,21 +407,27 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
 
 /// One set inside an expanded card: what it was, what it weighed, and anything
 /// written about it at the time.
-class _ExpandedSetLine extends ConsumerWidget {
+class _ExpandedSetLine extends StatelessWidget {
   const _ExpandedSetLine({
     required this.set,
     required this.position,
     required this.exercise,
+    required this.unit,
   });
 
   final SetLog set;
   final int position;
   final Exercise? exercise;
 
+  /// Handed down from the card, not watched here. A set line watching the unit
+  /// itself makes every set in every expanded performance its own listener, so
+  /// switching kg to lb wakes hundreds of elements one at a time instead of
+  /// rebuilding the card that owns them.
+  final WeightUnit unit;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final c = context.c;
-    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final type = set.setType.shortLabel;
 
     return Padding(

@@ -224,9 +224,11 @@ adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app
   (missing namespace). `file_selector` is used instead — don't swap it back.
 - Regenerate drift code after **any** change to `tables.dart`:
   `dart run build_runner build`.
-- **`schemaVersion` is 3, and `onUpgrade` is real now** — v2 added
-  `set_logs.parent_set_id`, v3 added `exercises.bar_kind`. A schema change means
-  three edits, not one: the column in `tables.dart`, the `from < n` step in
+- **`schemaVersion` is 6, and `onUpgrade` is real** — v2 added
+  `set_logs.parent_set_id`, v3 `exercises.bar_kind`, v4 re-mapped a dropped
+  `bar_kind` value, v5 added `regimes.identity_index`, v6 indexed
+  `bodyweight_logs.day_key`. A **column** change means three edits, not one:
+  the column in `tables.dart`, the `from < n` step in
   `data/db/database.dart`, and **a default in the backup codec** for that table.
   The last one is the easy one to miss and the expensive one to get wrong:
   `Exercise.fromJson` is generated against today's columns and reads every one
@@ -235,7 +237,9 @@ adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app
   file picker. `backup/backup_service.dart` spreads a default map under each
   restored exercise row for exactly this reason, and
   `test/data/backup_service_test.dart` restores a payload with the column
-  stripped out to keep it honest.
+  stripped out to keep it honest. An **index-only** migration (v6) is the one
+  case that skips the third edit: nothing new is stored, so nothing can be
+  missing from a file exported before it.
 
 ---
 
