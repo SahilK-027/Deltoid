@@ -397,16 +397,6 @@ repository integration against real in-memory SQLite.
 Agreed but unspecified. Each carries the decision that blocks it. Check the
 README's **Non-goals** first — these are here because they survived that check.
 
-- **Records on the summary screen.** The end of a session never says what was
-  *beaten*. `beatsPrevious` answers it live in the log, but the summary opens
-  after `completeWorkout`, when the ghosts are gone, so it means re-resolving
-  prefill on that screen. Cheap to fold into step 4.
-
-- **All-time PRs.** *Decide first:* per exercise across all sessions, or per
-  session-slot? Global is what "my best bench" means to a person; session-scoped
-  is the thesis of this app. Step 4's chart may answer it and make the badge
-  redundant.
-
 - **Weekly sets per muscle.** Pure aggregation over a rolling seven days —
   `domain/`, no database. *Decide first:* working sets only (yes), direct muscle
   only (yes — there is no secondary column), deload weeks counted or not (follow

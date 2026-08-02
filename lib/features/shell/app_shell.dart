@@ -281,16 +281,18 @@ class _NavSplash extends InteractiveInkFeature {
     required this.radius,
     super.onRemoved,
   }) {
-    // Two clocks. The wash keeps growing for as long as the finger is down and
-    // then some — cutting the growth on release is what makes a ripple look
-    // like it flinched — while the fade is driven separately by confirm and
-    // cancel.
-    _grow = AnimationController(duration: _growDuration, vsync: controller.vsync)
+    // One clock, and the finger does not drive it.
+    //
+    // Two clocks meant the fade could only start once the finger came off, so
+    // the wash sat at full radius waiting — a visible hitch between the growth
+    // and the fade, and a total length that depended on how long the tap was
+    // held. Here the growth and the fade are two curves read off the same `t`
+    // and they overlap: the wash is already dimming while it is still moving
+    // out. Every press plays the identical animation over `_duration`,
+    // whether it was a flick or a long hold.
+    _anim = AnimationController(duration: _duration, vsync: controller.vsync)
       ..addListener(controller.markNeedsPaint)
-      ..forward();
-    _fade = AnimationController(duration: _fadeInDuration, vsync: controller.vsync)
-      ..addListener(controller.markNeedsPaint)
-      ..addStatusListener(_onFadeStatus)
+      ..addStatusListener(_onStatus)
       ..forward();
 
     controller.addInkFeature(this);
@@ -298,47 +300,43 @@ class _NavSplash extends InteractiveInkFeature {
 
   /// Long enough to cross the bar without looking like it is chasing the
   /// finger; the tab switch itself lands well before it finishes.
-  static const Duration _growDuration = Duration(milliseconds: 620);
-  static const Duration _fadeInDuration = Duration(milliseconds: 90);
-  static const Duration _fadeOutDuration = Duration(milliseconds: 340);
+  static const Duration _duration = Duration(milliseconds: 420);
+
+  /// Full strength by here, then straight into the fade. Fading from the very
+  /// first frame would wash out the moment the finger lands, which is the one
+  /// moment the bar has to look like it felt the tap.
+  static const double _peak = 0.18;
 
   final double radius;
-  late final AnimationController _grow;
-  late final AnimationController _fade;
-  bool _fadingOut = false;
+  late final AnimationController _anim;
 
-  void _onFadeStatus(AnimationStatus status) {
-    if (_fadingOut && status == AnimationStatus.dismissed) dispose();
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) dispose();
   }
 
-  void _fadeOut() {
-    if (_fadingOut) return;
-    _fadingOut = true;
-    _fade
-      ..duration = _fadeOutDuration
-      ..reverse();
-  }
+  // The press no longer ends the animation — it runs to `_duration` either way.
+  @override
+  void confirm() {}
 
   @override
-  void confirm() => _fadeOut();
-
-  @override
-  void cancel() => _fadeOut();
+  void cancel() {}
 
   @override
   void dispose() {
-    _grow.dispose();
-    _fade.dispose();
+    _anim.dispose();
     super.dispose();
   }
 
   @override
   void paintFeature(Canvas canvas, Matrix4 transform) {
-    final double t = Curves.easeOutCubic.transform(_grow.value);
+    final double v = _anim.value;
+    final double t = Curves.easeOutCubic.transform(v);
     final double r = radius * t;
     if (r <= 0) return;
 
-    final double f = _fade.value;
+    final double f = v < _peak
+        ? Curves.easeOut.transform(v / _peak)
+        : Curves.easeInOut.transform(1.0 - (v - _peak) / (1.0 - _peak));
     final int alpha = (color.a * 255.0 * f).round();
     if (alpha <= 0) return;
     final Color core = color.withAlpha(alpha);
@@ -348,7 +346,7 @@ class _NavSplash extends InteractiveInkFeature {
     // strength only at the centre, half of it a third of the way out, gone at
     // the rim.
     //
-    // It also has to **flatten as it fades**. The circle never shrinks — `_grow`
+    // It also has to **flatten as it fades**. The circle never shrinks — `_anim`
     // only ever runs forward — but a steep falloff losing alpha *looks* like it
     // does: the dim outer ring crosses under the eye's floor first, so the
     // visible edge walks back towards the centre while the real one is still

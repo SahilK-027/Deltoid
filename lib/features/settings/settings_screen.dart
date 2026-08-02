@@ -488,6 +488,7 @@ class _UnitPicker extends ConsumerWidget {
               WeightUnit.lb => 'Pounds',
             },
             trailing: AppRadio(selected: unit == current),
+            ink: false,
             onTap: () => setWeightUnit(ref.read(databaseProvider), unit),
           ),
       ],

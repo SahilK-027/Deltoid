@@ -659,24 +659,19 @@ Weekly sets per muscle, and the one chart in this app that is a *list*: one row
 per muscle, name on the left, a horizontal bar, the count on the right.
 
 ```
-Legs     ████████████████████  12 sets
-Chest    ██████████             6 sets
-Arms     ██████████████         8 sets
+Legs       ████████████████████  12 sets
+Chest      ██████████::::::::::   6 sets
+Arms       ██████████████::::::   8 sets
+Shoulders  ::::::::::::::::::::   0 sets
 ```
 
 - Rows are in **`MuscleGroup` order and never re-sorted** — chest, back,
-  shoulders, arms, legs, core. A list that reorders itself as you train puts
-  chest in a different place every week, so reading it means finding the row
-  first; fixed, the position *is* the label and a gap is visible at a glance.
-  Sorting by count would make the biggest bar first, which is the one fact the
-  bar lengths already tell you.
+  shoulders, arms, legs, core.
 - The bar is normalised to the **largest muscle that week**, not to a target.
-  This app has no volume targets and inventing one would be advice, not a
-  measurement (README non-goals).
 - Bar: `data`, height 8, radius 4, on a `surfaceHigh` track that shows the full
   width so an empty week is still a row rather than a gap.
 - Name in `body`, count in `valueSm` with `sets` in `micro` beside it. A muscle
-  trained zero times prints `— sets` and an empty track (rule 4).
+  trained zero times prints `0 sets` and an empty track (rule 4).
 - No axis, no gridlines, no legend. A bar list whose longest bar is the maximum
   needs none of them, and they are what turn six rows into a chart nobody reads.
 

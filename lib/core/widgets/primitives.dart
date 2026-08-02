@@ -474,6 +474,7 @@ class AppRow extends StatelessWidget {
     this.onTap,
     this.tint,
     this.chevron = false,
+    this.ink = true,
   });
 
   final String title;
@@ -492,6 +493,11 @@ class AppRow extends StatelessWidget {
 
   /// Adds the standard chevron. Ignored when [trailing] is set.
   final bool chevron;
+
+  /// Set false where the row's own trailing control is the feedback — a radio
+  /// that snaps under the finger says "taken" faster than a wash crossing the
+  /// row, and the two together read as two answers to one tap.
+  final bool ink;
 
   @override
   Widget build(BuildContext context) {
@@ -556,7 +562,7 @@ class AppRow extends StatelessWidget {
     );
 
     if (onTap == null) return row;
-    return InkRow(onTap: onTap, child: row);
+    return InkRow(onTap: onTap, ink: ink, child: row);
   }
 }
 
@@ -576,11 +582,16 @@ class InkRow extends StatelessWidget {
     required this.child,
     required this.onTap,
     this.onLongPress,
+    this.ink = true,
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+
+  /// False keeps the press highlight and the haptic but drops the spreading
+  /// wash, for rows whose own control already answers the tap.
+  final bool ink;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +615,7 @@ class InkRow extends StatelessWidget {
         // is the Android 12 ripple: a soft radial wash bounded to the row,
         // which falls off at the edges rather than stopping at them, and plays
         // to completion after the finger has gone.
-        splashFactory: InkSparkle.splashFactory,
+        splashFactory: ink ? InkSparkle.splashFactory : NoSplash.splashFactory,
         // Tuned for charcoal. Material's default is `onSurface` at 12%, which
         // on `#1F1F1F` is a grey smear; a low-alpha white spreads as light
         // rather than as dirt, and reads on the light theme as a shadow.
