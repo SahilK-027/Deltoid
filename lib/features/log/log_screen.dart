@@ -61,6 +61,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// set even when it was not for this one.
   bool _typeHold = false;
 
+  /// The focused cell counts seconds rather than reps, so its buffer is a
+  /// clock's digits (`225` → `2:25`) and everything reading that buffer has to
+  /// convert rather than parse. Set in [_focus] and true for exactly one field
+  /// type: the count column of a movement measured in time.
+  bool _timeField = false;
+
   /// The keypad's in-progress text, held in a notifier rather than in state.
   ///
   /// It used to be a plain field passed down as a widget parameter, so every
@@ -459,13 +465,19 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   void _focus(SetLog set, SetField field) {
     _flushWrite();
+    final located = _detail == null ? null : _locate(_detail!, set.id);
+    final isTime = field == SetField.reps &&
+        (located?.$1.exercise.measureMode.isHold ?? false);
     setState(() {
       _editing = EditTarget(set.id, field);
       _typeHold = false;
+      _timeField = isTime;
       _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
         SetField.added => _fmtLoadIn(set.addedWeight),
-        SetField.reps => set.reps?.toString() ?? '',
+        SetField.reps => isTime
+            ? digitsFromSeconds(set.reps ?? 0)
+            : set.reps?.toString() ?? '',
       };
     });
     _revealRow(set.id);
@@ -506,7 +518,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     final hint = switch (target.field) {
       SetField.weight => _fmtLoadIn(ghost?.weight),
       SetField.added => _fmtLoadIn(ghost?.addedWeight),
-      SetField.reps => ghost?.reps?.toString() ?? '',
+      SetField.reps => ghost?.reps == null
+          ? ''
+          : entry.exercise.measureMode.isHold
+              ? digitsFromSeconds(ghost!.reps!)
+              : '${ghost!.reps}',
     };
 
     // A hold is timed, not typed: the count field on an isometric movement
@@ -518,7 +534,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         current: set.reps,
         previous: ghost?.reps,
         onStop: (seconds) {
-          _commit(seconds.toString(), target);
+          _commit(digitsFromSeconds(seconds), target);
           _flushWrite();
           // The same path leaving a reps field takes: it ticks the set, keeps
           // the rest it was given and moves on.
@@ -543,6 +559,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     return SetKeypad(
       field: target.field,
       unit: _unit,
+      // The count field only. A weighted plank still types its load in
+      // kilograms on the same keypad.
+      isTime: _timeField,
       buffer: _buffer,
       // Only for a load that *is* the bar. On `perSide` the number is one
       // dumbbell, and on bodyweight-plus it is what hangs off a belt — neither
@@ -554,7 +573,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       hint: hint.isEmpty ? null : hint,
       onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
       nextLabel: needsReps
-          ? (entry.exercise.measureMode.isHold ? 'Secs?' : 'Reps?')
+          ? (entry.exercise.measureMode.isHold ? 'Time?' : 'Reps?')
           : isLast
           ? 'Done'
           : 'Next',
@@ -564,7 +583,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           key,
           field: target.field,
           unit: _unit,
-          hint: double.tryParse(hint),
+          isTime: _timeField,
+          hint: _timeField
+              ? secondsFromDigits(hint).toDouble()
+              : double.tryParse(hint),
         );
         _commit(next, target);
       },
@@ -609,7 +631,15 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       case SetField.added:
         repo.updateSet(pending.target.setId, addedWeight: Value(parsed));
       case SetField.reps:
-        repo.updateSet(pending.target.setId, reps: Value(typed?.round()));
+        // A clock buffer is digits, not a number: `225` is 145 seconds, and
+        // `int.parse` would store it as two hundred and twenty-five.
+        final count = _timeField
+            ? secondsFromDigits(pending.value)
+            : typed?.round();
+        repo.updateSet(
+          pending.target.setId,
+          reps: Value(count == 0 ? null : count),
+        );
     }
   }
 
@@ -621,7 +651,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (from.field == SetField.reps) {
       // Read the buffer, not the row: the write for this keystroke may still be
       // in flight, and a stale row would silently skip marking the set done.
-      var reps = int.tryParse(_buffer.value) ?? 0;
+      var reps = _timeField
+          ? secondsFromDigits(_buffer.value)
+          : int.tryParse(_buffer.value) ?? 0;
       // A weight with no reps used to do nothing at all while the key said
       // "Done": the keypad simply closed. Fall back to last time's reps, which
       // is what adopting the ghost would have written anyway; with no ghost to
@@ -636,7 +668,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           );
           if (ghost?.reps != null) {
             reps = ghost!.reps!;
-            _commit(reps.toString(), from);
+            _commit(
+              _timeField ? digitsFromSeconds(reps) : reps.toString(),
+              from,
+            );
             _flushWrite();
           }
         }
@@ -1640,7 +1675,7 @@ class _SetGroup extends ConsumerWidget {
     // taller than the rest and slid every chip out of line with its row.
     //
     // No row wash. A completed set is said by its fields and its checkbox
-    // (THEME §6); a full-width band behind the row was the loudest thing in
+    // (THEME → Components); a full-width band behind the row was the loudest thing in
     // the table, and the table is mostly completed rows by the end.
     return Column(
       children: [
@@ -1693,6 +1728,7 @@ class _SetGroup extends ConsumerWidget {
                     child: SetRow(
                       set: group.sets[k],
                       loadMode: entry.exercise.loadMode,
+                      measure: entry.exercise.measureMode,
                       unit: unit,
                       ghost: _ghostFor(prefill, entry.sets, group.positions[k]),
                       editing: editing,

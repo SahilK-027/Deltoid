@@ -96,14 +96,41 @@ class _HoldPadState extends State<HoldPad> {
                 children: [
                   // Only while the clock is stopped. Offering "type it" mid-set
                   // is offering to throw the running clock away.
+                  //
+                  // A pill rather than bare text: it is the one control on this
+                  // pad that is not the clock, and a word on its own beside a
+                  // 44sp readout does not read as something you can press.
                   if (_startedAt == null)
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        foregroundColor: c.textSecondary,
+                    Material(
+                      color: c.surfaceHigh,
+                      borderRadius: BorderRadius.circular(999),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: widget.onType,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: Space.md,
+                            vertical: Space.xs,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.keyboard_outlined,
+                                size: 16,
+                                color: c.textSecondary,
+                              ),
+                              const SizedBox(width: Space.xs),
+                              Text(
+                                'Type it',
+                                style: context.t.bodySmall?.copyWith(
+                                  color: c.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      onPressed: widget.onType,
-                      child: const Text('Type it'),
                     ),
                   const Spacer(),
                   SizedBox(

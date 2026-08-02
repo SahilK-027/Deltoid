@@ -49,21 +49,28 @@ extension MeasureModeX on MeasureMode {
   /// The set table's second column heading.
   String get columnLabel => switch (this) {
         MeasureMode.reps => 'Reps',
-        MeasureMode.hold => 'Secs',
+        MeasureMode.hold => 'Time',
       };
 
   bool get isHold => this == MeasureMode.hold;
 }
 
-/// A count with its unit attached: `8` reps, `45s` held.
+/// Seconds as a clock: `0:02`, `0:24`, `2:25`.
 ///
-/// Seconds are printed raw rather than as `0:45`. A hold is typed on the same
-/// keypad as reps and read at arm's length mid-set, and a colon in a column of
-/// bare numbers is one more thing to parse for a number that is almost always
-/// under two minutes.
+/// A hold is stored as a count of seconds and read as a time. `145` is a
+/// number you have to convert in your head standing up from a plank; `2:25` is
+/// the number the stopwatch was showing when you stopped it, and the two have
+/// to match or the log disagrees with the clock that wrote it.
+String formatClock(int seconds) {
+  final m = seconds ~/ 60;
+  final s = seconds % 60;
+  return '$m:${s.toString().padLeft(2, '0')}';
+}
+
+/// A count in the form its exercise is measured in: `8` reps, `2:25` held.
 String formatCount(int? count, MeasureMode mode) {
   final n = count ?? 0;
-  return mode.isHold ? '${n}s' : '$n';
+  return mode.isHold ? formatClock(n) : '$n';
 }
 
 enum Equipment { barbell, dumbbell, machine, cable, bodyweight, band, other }

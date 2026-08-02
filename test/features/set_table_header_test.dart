@@ -5,9 +5,9 @@ import 'package:deltoid/features/log/widgets/set_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The heading is the only place the second column's unit is said, so a hold's
-/// table is read correctly or not at all off this one word: `45` under `Reps`
-/// is a claim nobody makes.
+/// The heading names what the second column holds, and the clock in the cells
+/// under it does the rest: `2:25` under `Time` cannot be misread as a rep
+/// count.
 void main() {
   Future<void> pump(WidgetTester tester, MeasureMode measure) async {
     await tester.pumpWidget(
@@ -24,9 +24,9 @@ void main() {
     );
   }
 
-  testWidgets('a hold counts seconds, and says so', (tester) async {
+  testWidgets('a hold is measured in time, and says so', (tester) async {
     await pump(tester, MeasureMode.hold);
-    expect(find.text('Secs'), findsOneWidget);
+    expect(find.text('Time'), findsOneWidget);
     expect(find.text('Reps'), findsNothing);
   });
 

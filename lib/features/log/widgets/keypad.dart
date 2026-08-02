@@ -3,24 +3,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../domain/enums.dart';
 import '../../../domain/units.dart';
 import 'plate_view.dart';
 
 enum SetField { weight, reps, added }
 
 extension SetFieldX on SetField {
-  String labelIn(WeightUnit unit) => switch (this) {
-    SetField.weight => 'Weight (${unit.label})',
-    SetField.reps => 'Reps',
-    SetField.added => 'Added (${unit.label})',
-  };
-
   bool get isDecimal => this != SetField.reps;
 
   /// One rep, or one pair of plates — 2.5 kg on a kilo bar, 5 lb on a pound
   /// one. A 2.5 lb step is not a thing any gym stocks.
-  double stepIn(WeightUnit unit) => this == SetField.reps ? 1 : unit.step;
+  ///
+  /// A timed hold steps by **half a minute**, which is the unit a hold is
+  /// actually adjusted in: nobody plans a plank thirty-one seconds long, and a
+  /// one-second step would need thirty taps to say what one says.
+  double stepIn(WeightUnit unit, {bool isTime = false}) {
+    if (this != SetField.reps) return unit.step;
+    return isTime ? 30 : 1;
+  }
 }
+
+/// A clock field's buffer is the digits typed, filling from the right the way
+/// every timer on the phone does: `2` is `0:02`, `25` is `0:25`, `225` is
+/// `2:25`. Four digits maximum, so the field tops out at `99:59` — and a digit
+/// that would push the seconds past `59` is refused rather than stored as a
+/// time that cannot exist.
+int secondsFromDigits(String digits) {
+  if (digits.isEmpty) return 0;
+  final padded = digits.padLeft(3, '0');
+  final minutes = int.parse(padded.substring(0, padded.length - 2));
+  final seconds = int.parse(padded.substring(padded.length - 2));
+  return minutes * 60 + seconds;
+}
+
+String digitsFromSeconds(int seconds) {
+  if (seconds <= 0) return '';
+  final m = seconds ~/ 60;
+  final s = seconds % 60;
+  final raw = m == 0 ? '$s' : '$m${s.toString().padLeft(2, '0')}';
+  return raw;
+}
+
+/// What a clock buffer reads as while it is being typed.
+String formatDigits(String digits) =>
+    digits.isEmpty ? '' : formatClock(secondsFromDigits(digits));
 
 /// A docked numeric pad instead of the OS keyboard.
 ///
@@ -41,10 +68,15 @@ class SetKeypad extends StatelessWidget {
     this.onUseHint,
     this.nextLabel = 'Next',
     this.barKg,
+    this.isTime = false,
   });
 
   final SetField field;
   final WeightUnit unit;
+
+  /// The count field of a timed hold: digits fill a clock from the right and
+  /// the step keys move by half a minute.
+  final bool isTime;
 
   /// Current buffer, shown in the readout. A notifier rather than a value so
   /// a keystroke repaints this row and the cell being typed into, and nothing
@@ -106,7 +138,7 @@ class SetKeypad extends StatelessWidget {
                         foregroundColor: c.textSecondary,
                       ),
                       onPressed: onUseHint,
-                      child: Text('Last: $hint'),
+                      child: Text('Last: ${isTime ? formatDigits(hint!) : hint}'),
                     ),
                   const Spacer(),
                   SizedBox(
@@ -152,6 +184,7 @@ class SetKeypad extends StatelessWidget {
               _KeyGrid(
                 field: field,
                 unit: unit,
+                isTime: isTime,
                 onKey: onKey,
                 onNext: onNext,
                 nextLabel: nextLabel,
@@ -168,6 +201,7 @@ class _KeyGrid extends StatelessWidget {
   const _KeyGrid({
     required this.field,
     required this.unit,
+    required this.isTime,
     required this.onKey,
     required this.onNext,
     required this.nextLabel,
@@ -175,16 +209,21 @@ class _KeyGrid extends StatelessWidget {
 
   final SetField field;
   final WeightUnit unit;
+  final bool isTime;
   final ValueChanged<String> onKey;
   final VoidCallback onNext;
   final String nextLabel;
 
   @override
   Widget build(BuildContext context) {
-    final step = field.stepIn(unit);
-    final stepLabel = step == step.roundToDouble()
-        ? step.toStringAsFixed(0)
-        : step.toStringAsFixed(1);
+    final step = field.stepIn(unit, isTime: isTime);
+    // A time steps by a time: `+0:30`, not `+30`, so the key says the same
+    // thing the field it is changing says.
+    final stepLabel = isTime
+        ? formatClock(step.round())
+        : step == step.roundToDouble()
+            ? step.toStringAsFixed(0)
+            : step.toStringAsFixed(1);
 
     return Column(
       children: [
@@ -306,7 +345,9 @@ String applyKey(
   required SetField field,
   WeightUnit unit = WeightUnit.kg,
   double? hint,
+  bool isTime = false,
 }) {
+  if (isTime) return _applyTimeKey(buffer, key, hint: hint);
   switch (key) {
     case '⌫':
       return buffer.isEmpty ? buffer : buffer.substring(0, buffer.length - 1);
@@ -342,6 +383,47 @@ String applyKey(
       return candidate;
   }
 }
+
+/// The same keypad, typing a clock.
+///
+/// Digits fill from the right — `2` · `25` · `225` reads `0:02` · `0:25` ·
+/// `2:25` — because that is how every timer on the phone is typed, and a hold
+/// is a time you read off a clock rather than a count you tallied. A digit that
+/// would push the seconds past `59` is refused: `0:75` is not a time, and
+/// silently carrying it into `1:15` would change a number the user is watching
+/// as they type it.
+///
+/// `+` / `−` move by half a minute and are done in **seconds**, not digits, so
+/// `0:45 + 0:30` is `1:15` rather than a fourth digit appearing.
+String _applyTimeKey(String buffer, String key, {double? hint}) {
+  switch (key) {
+    case '⌫':
+      return buffer.isEmpty ? buffer : buffer.substring(0, buffer.length - 1);
+    case '.':
+      return buffer;
+    case '+':
+    case '-':
+      final current = buffer.isEmpty
+          ? (hint?.round() ?? 0)
+          : secondsFromDigits(buffer);
+      final raw = key == '+' ? current + 30 : current - 30;
+      if (raw <= 0) return '';
+      return digitsFromSeconds(raw > maxHoldSeconds ? maxHoldSeconds : raw);
+    default:
+      final candidate = buffer == '0' ? key : buffer + key;
+      if (candidate.length > 4) return buffer;
+      // The last two digits are the seconds, and there is no 75th second.
+      if (candidate.length >= 2) {
+        final tail = int.parse(candidate.substring(candidate.length - 2));
+        if (tail > 59) return buffer;
+      }
+      return candidate;
+  }
+}
+
+/// `99:59`. Four digits is the field's width, and an hour-long hold is not a
+/// set — it is a walk.
+const maxHoldSeconds = 99 * 60 + 59;
 
 /// The largest number a field will accept.
 ///

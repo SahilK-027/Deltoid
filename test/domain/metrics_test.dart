@@ -245,10 +245,13 @@ void main() {
       expect(total, 300);
     });
 
-    test('seconds are printed with their unit, reps without', () {
-      expect(formatCount(45, MeasureMode.hold), '45s');
+    test('a hold reads as a clock and reps read as a count', () {
+      // The number the stopwatch was showing when it stopped, not a figure to
+      // convert standing up from a plank.
+      expect(formatCount(45, MeasureMode.hold), '0:45');
+      expect(formatCount(145, MeasureMode.hold), '2:25');
       expect(formatCount(8, MeasureMode.reps), '8');
-      expect(formatCount(null, MeasureMode.hold), '0s');
+      expect(formatCount(null, MeasureMode.hold), '0:00');
     });
   });
 

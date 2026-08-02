@@ -13,7 +13,15 @@ import '../../../domain/units.dart';
 import '../log_screen.dart';
 import 'keypad.dart';
 
-export 'keypad.dart' show SetField, SetFieldX, SetKeypad, applyKey;
+export 'keypad.dart'
+    show
+        SetField,
+        SetFieldX,
+        SetKeypad,
+        applyKey,
+        digitsFromSeconds,
+        formatDigits,
+        secondsFromDigits;
 
 /// The colour a set type is marked in.
 ///
@@ -44,15 +52,15 @@ class SetTableHeader extends StatelessWidget {
   final LoadMode loadMode;
   final WeightUnit unit;
 
-  /// Names the second column: `Reps`, or `Secs` for a hold. The heading is the
-  /// only place the unit is said, so a hold's table needs nothing else to be
-  /// read correctly — the numbers under it are seconds and say so up top.
+  /// Names the second column: `Reps`, or `Time` for a hold. The heading is the
+  /// only place a column's unit is said, and the clock in the cells under it
+  /// does the rest — `2:25` cannot be mistaken for a rep count.
   final MeasureMode measure;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // `label`, the role THEME §3 gives table headers, and sentence case:
+    // `label`, the role THEME → Type gives table headers, and sentence case:
     // the spec's own header row reads `Set · kg · Reps · ✓`.
     final label = context.t.bodySmall?.copyWith(color: c.textTertiary);
     // The gutter is the page's, so the SET column starts on the same vertical
@@ -109,6 +117,7 @@ class SetRow extends StatelessWidget {
     required this.set,
     required this.loadMode,
     required this.unit,
+    this.measure = MeasureMode.reps,
     required this.ghost,
     required this.editing,
     required this.buffer,
@@ -129,6 +138,10 @@ class SetRow extends StatelessWidget {
   final SetLog set;
   final LoadMode loadMode;
   final WeightUnit unit;
+
+  /// Decides what the count column holds — reps, or a clock.
+  final MeasureMode measure;
+
   final PastSet? ghost;
   final EditTarget? editing;
   final ValueListenable<String> buffer;
@@ -202,6 +215,7 @@ class SetRow extends StatelessWidget {
             child: _ValueCell(
               unit: unit,
               field: SetField.reps,
+              isTime: measure.isHold,
               value: set.reps?.toDouble(),
               ghost: ghost?.reps?.toDouble(),
               done: set.isDone,
@@ -406,6 +420,7 @@ class _ValueCell extends StatefulWidget {
   const _ValueCell({
     required this.field,
     required this.unit,
+    this.isTime = false,
     required this.value,
     required this.ghost,
     required this.done,
@@ -419,6 +434,10 @@ class _ValueCell extends StatefulWidget {
 
   /// Reps are unitless; weights are stored in kg and shown in this.
   final WeightUnit unit;
+
+  /// A hold's count is seconds, and is read as `2:25` — in the cell, in the
+  /// ghost behind it, and while it is being typed.
+  final bool isTime;
 
   final double? value;
   final double? ghost;
@@ -464,7 +483,13 @@ class _ValueCellState extends State<_ValueCell> {
     if (!widget.active) return _build(context, _fmt(widget.value, widget));
     return ValueListenableBuilder<String>(
       valueListenable: widget.buffer,
-      builder: (context, buffer, _) => _build(context, buffer),
+      // A clock buffer holds the digits typed so far, not a number: `225` is
+      // shown as `2:25` from the third keystroke, the way the field will read
+      // once it is written.
+      builder: (context, buffer, _) => _build(
+        context,
+        widget.isTime ? formatDigits(buffer) : buffer,
+      ),
     );
   }
 
@@ -484,7 +509,7 @@ class _ValueCellState extends State<_ValueCell> {
     // A logged set steps back: its numbers are settled, and the row you are
     // working on has to be the brightest thing in the table. The wash that used
     // to say "done" ran the width of the card and was the loudest band on the
-    // screen — this and the solid checkbox carry it instead (THEME §6).
+    // screen — this and the solid checkbox carry it instead (THEME → Components).
     final valueColour = !hasValue
         ? c.textTertiary
         : (widget.done ? c.textSecondary : c.textPrimary);
@@ -543,6 +568,7 @@ class _ValueCellState extends State<_ValueCell> {
 
   static String _fmt(double? v, _ValueCell cell) {
     if (v == null) return '';
+    if (cell.isTime) return formatClock(v.round());
     if (cell.field == SetField.reps) {
       return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
     }
