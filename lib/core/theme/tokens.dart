@@ -103,6 +103,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
 
   /// Identity marks for regimes and sessions — a colour per regime, so history
   /// rows and cards can be scanned by shape rather than read.
+  ///
+  /// A step darker than the six hues, because these are filled shapes with a
+  /// white glyph on them rather than colour on charcoal.
   final List<Color> identity;
 
   /// Effort / RIR ramp, index 0..6+: red at failure, blue at "plenty left".
@@ -125,6 +128,53 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// depth in this app is surface colour.
   final Color shadow;
 
+  /// The six hues, named once.
+  ///
+  /// Every semantic colour on the dark theme that is not red is one of these,
+  /// so a chart series, a regime's mark and the deload amber are the same six
+  /// tones wherever they turn up rather than six near-misses that happened to
+  /// be picked one screen at a time. They are tuned for charcoal — the light
+  /// theme keeps its own darker set, because a #fdd35f on white is not a
+  /// colour, it is a smudge.
+  ///
+  /// Red has no entry: `negative` and the failure end of the effort ramp are
+  /// the one signal that must never be mistaken for information, and it stays
+  /// out of the palette everything else is drawn from.
+  static const orange = Color(0xFFFF8B66);
+  static const blue = Color(0xFF689FFA);
+  static const yellow = Color(0xFFFDD35F);
+  static const green = Color(0xFF5DBA86);
+  static const lavender = Color(0xFFBE8CFF);
+  static const cyan = Color(0xFF77D4E3);
+
+  /// The same six, one step down, for anything that fills a shape and knocks a
+  /// **white glyph** out of it — the identity tile on a regime, a session, a
+  /// history row.
+  ///
+  /// The six above are tuned to sit *on* charcoal, where a light tone is the
+  /// point. Fill a 44pt tile with one and put a white icon on top and the icon
+  /// is gone: they are the brightest thing on the screen and white is barely
+  /// brighter. A fifth off each keeps the hue — a regime's mark is still
+  /// recognisably "the orange one" — and gives the glyph something to sit
+  /// against.
+  ///
+  /// Kept as their own constants rather than computed with `withValues` at the
+  /// call site, so the darker set is a decision written down once and not a
+  /// multiplication that drifts screen by screen.
+  /// A fifth off is enough for five of them. Yellow and cyan are the two the
+  /// eye reads as brightest to begin with, and at a fifth they left white at
+  /// 2.3:1 and 2.7:1 — a glyph you can see is there and cannot name. They go
+  /// down about a third instead, which puts every mark past 3:1 against white
+  /// and keeps the seven distinguishable from each other, which is the only
+  /// job an identity colour has.
+  static const orangeDeep = Color(0xFFCC6F52);
+  static const blueDeep = Color(0xFF537FC8);
+  static const yellowDeep = Color(0xFFAE8B37);
+  static const greenDeep = Color(0xFF4A956B);
+  static const lavenderDeep = Color(0xFF9870CC);
+  static const cyanDeep = Color(0xFF4A8F9B);
+  static const redDeep = Color(0xFFC82A38);
+
   static const dark = DeltoidColors(
     bg: Color(0xFF131313),
     surfaceSunken: Color(0xFF0D0D0D),
@@ -140,45 +190,40 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     onAccent: Color(0xFF121212),
     accentMuted: Color(0xFF2B2B2B),
     accentSurface: Color(0xFF242424),
-    deload: Color(0xFFFFD15E),
+    deload: yellow,
     deloadMuted: Color(0xFF3A3117),
-    positive: Color(0xFF5DBA87),
+    positive: green,
     negative: Color(0xFFF83446),
-    data: Color(0xFF5EC8D8),
-    info: Color(0xFF2F7BFF),
-    series: [
-      Color(0xFF5EC8D8),
-      Color(0xFF2F7BFF),
-      Color(0xFFFFD15E),
-      Color(0xFF5DBA87),
-      Color(0xFFB98CFF),
-    ],
+    data: cyan,
+    info: blue,
+    series: [cyan, blue, yellow, green, lavender],
     identity: [
-      Color(0xFFF83446),
-      Color(0xFFFF7A45),
-      Color(0xFFFFC53D),
-      Color(0xFF5DBA87),
-      Color(0xFF2F7BFF),
-      Color(0xFF9254DE),
-      Color(0xFF13A8A8),
+      redDeep,
+      orangeDeep,
+      yellowDeep,
+      greenDeep,
+      blueDeep,
+      lavenderDeep,
+      cyanDeep,
     ],
     effort: [
       Color(0xFFF83446),
       Color(0xFFF83446),
-      Color(0xFFFFAA33),
-      Color(0xFFFFAA33),
-      Color(0xFF5DBA87),
-      Color(0xFF5DBA87),
-      Color(0xFF2F7BFF),
+      orange,
+      orange,
+      green,
+      green,
+      blue,
     ],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
     // #222222 the grid dissolved into the card and the pattern — the whole
     // point of the section — could only be read where it was filled.
     heatEmpty: Color(0xFF2F2F2F),
-    // Light, not saturated: a year of these is most of the screen, and a wall
-    // of full-strength `info` blue is a wall. This reads as "on" against the
-    // rest days without shouting.
-    heatOn: Color(0xFF6FA8F5),
+    // The palette's blue, not a lighter cousin of it. This used to be #6FA8F5
+    // precisely because `info` was a saturated #2F7BFF and a year of those is a
+    // wall; the blue is light enough now to read as "on" without shouting, and
+    // a token one nudge off another token is a bug waiting to be noticed.
+    heatOn: blue,
     shadow: Color(0x66000000),
   );
 

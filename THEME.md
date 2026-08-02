@@ -114,26 +114,48 @@ is the single biggest thing that separates "designed" from "themed".
 
 ### Data / semantic — the only hues
 
+**Six hues and a red.** Every semantic colour on the dark theme is one of
+`orange #FF8B66` · `blue #689FFA` · `yellow #FDD35F` · `green #5DBA86` ·
+`lavender #BE8CFF` · `cyan #77D4E3`, named on `DeltoidColors` and referenced by
+name. Never write a hex at a call site: a chart series, a regime's mark and the
+deload amber have to be the same six tones wherever they appear, not six
+near-misses picked one screen at a time.
+
+Red is deliberately not in that set. `negative` and the failure end of the
+effort ramp are the one signal that must never be read as information, so it
+stays out of the palette everything else draws from.
+
+**Colour on charcoal, and colour under a glyph, are two different jobs.** The
+six are tuned to sit *on* `bg` — light, so they read against it. An identity
+tile fills a shape with one and knocks a **white** glyph out of it, and there
+the same tone leaves the icon invisible. Identity marks use the deep set
+(`orangeDeep`, `blueDeep`, …), same hue, a fifth off — a third for yellow and
+cyan, which the eye reads brightest and which at a fifth still left the glyph
+under 3:1.
+
 | Token | Hex | Use |
 | --- | --- | --- |
-| `data` | `#5EC8D8` | Default chart series, sparklines |
-| `positive` | `#5DBA87` | Success, completed, "you beat last time" |
-| `deload` | `#FFD15E` | Deload identity, caution |
+| `data` | `cyan #77D4E3` | Default chart series, sparklines |
+| `positive` | `green #5DBA86` | Success, completed, "you beat last time" |
+| `deload` | `yellow #FDD35F` | Deload identity, caution |
 | `negative` | `#F83446` | Destructive fill, delete swipe panel |
-| `info` | `#2F7BFF` | Second series, heatmap ramp, identity tiles |
-| `series[]` | `#5EC8D8 · #2F7BFF · #FFD15E · #5DBA87 · #B98CFF` | Categorical, in order |
+| `info` | `blue #689FFA` | Second series, heatmap ramp, identity tiles |
+| `series[]` | `cyan · blue · yellow · green · lavender` | Categorical, in order |
+| `identity[]` | the six **one step down**, plus a deep red: `#C82A38 · #CC6F52 · #AE8B37 · #4A956B · #537FC8 · #9870CC · #4A8F9B` | Regime and session marks |
+| `heatOn` | `blue #689FFA` | A day you trained |
 
 **RIR / effort scale** (a diverging ramp, used only on effort ratings):
-`0–1 #F83446` · `2–3 #FFAA33` · `4–5 #5DBA87` · `6+ #2F7BFF` · unknown `#3A3A3A`.
+`0–1 #F83446` · `2–3 orange` · `4–5 green` · `6+ blue` · unknown `#3A3A3A`.
 
 ### Light
 
 Mirror by inverting the neutral ramp, not by tinting:
 `bg #F4F4F4` · `surface #FFFFFF` · `surfaceHigh #EDEDED` · `surfaceHighest #E0E0E0`
 · `border #E4E4E4` · text `#111111 / #5F5F5F / #8C8C8C` · `accent #111111`
-(black buttons, white labels). Data colours darken:
-`data #0E8FA6` · `positive #12855F` · `deload #B07206` · `negative #C33A2E` ·
-`info #2563EB`.
+(black buttons, white labels). Data colours darken, and **do not take the six
+hues**: they are tuned for charcoal, and `#FDD35F` on white is not a colour, it
+is a smudge. `data #0E8FA6` · `positive #12855F` · `deload #B07206` ·
+`negative #C33A2E` · `info #2563EB`.
 
 ---
 
