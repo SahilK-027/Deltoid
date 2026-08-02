@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -133,6 +135,9 @@ class _NavBar extends StatelessWidget {
     return Material(
       color: c.surface,
       shape: Border(top: BorderSide(color: c.border)),
+      // The ripple is wider than one destination on purpose (see `_NavItem`),
+      // so the bar has to clip: unclipped it would wash over the screen above.
+      clipBehavior: Clip.hardEdge,
       child: SafeArea(
         top: false,
         child: SizedBox(
@@ -182,21 +187,24 @@ class _NavItem extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
-      // The Android 12 ripple, bounded to the destination.
+      // The ripple belongs to the *bar*, not to the destination.
       //
-      // Three shapes were tried here. A rectangle sized to the whole bar was a
-      // lit box a cell and a half wide with a hard edge — the pill this bar
-      // explicitly does not have, arriving by accident. A hard circle was
-      // honest but read as a blob under the icon rather than as the surface
-      // responding. `InkSparkle` is the one that looks like the thing it is:
-      // a soft radial wash filling the destination's own rectangle, falling
-      // off at the edges instead of stopping at them, and — the part that
-      // matters most here — **it plays to completion**, so switching tab does
-      // not cut its own feedback short.
-      containedInkWell: true,
-      highlightShape: BoxShape.rectangle,
-      splashFactory: InkSparkle.splashFactory,
-      splashColor: c.textPrimary.withValues(alpha: 0.12),
+      // Bounded to the cell it read as a lit box one fifth of the bar wide with
+      // a hard edge — the pill this bar explicitly does not have, arriving by
+      // accident. Unbounded, with a radius the width of the screen, it is what
+      // it should be: a wash that starts under the tapped icon and carries
+      // across the whole bar, thinning out as it goes. It is clipped to the bar
+      // by the `Material` above.
+      //
+      // `containedInkWell: false` also means the splash originates at the
+      // destination's centre rather than the exact touch point — symmetric
+      // under the icon, which is the look we want anyway.
+      containedInkWell: false,
+      radius: MediaQuery.sizeOf(context).width * 0.62,
+      splashFactory: const _NavSplashFactory(),
+      // Read at the centre only. The gradient has thrown most of this away by
+      // a third of the way out, so it can be brighter than a flat splash.
+      splashColor: c.textPrimary.withValues(alpha: 0.3),
       // The press state is the ripple. A highlight underneath it is a second
       // shape doing the same job, and it is the one that leaves an edge.
       highlightColor: Colors.transparent,
@@ -227,5 +235,141 @@ class _NavItem extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// The bar's ripple: a radial *gradient* wash, not a flat disc.
+///
+/// `InkRipple` and `InkSparkle` both paint a solid circle of one colour. Grown
+/// wide enough to cross the bar — which is the look this bar wants — a solid
+/// circle stops being a ripple and becomes the whole bar changing brightness
+/// at once. The wash below is opaque at the tapped destination and falls to
+/// nothing by the time it reaches the far end, so the bar reads as *responding
+/// under the finger* even though the light travels the full width.
+class _NavSplashFactory extends InteractiveInkFeatureFactory {
+  const _NavSplashFactory();
+
+  @override
+  InteractiveInkFeature create({
+    required MaterialInkController controller,
+    required RenderBox referenceBox,
+    required Offset position,
+    required Color color,
+    required TextDirection textDirection,
+    bool containedInkWell = false,
+    RectCallback? rectCallback,
+    BorderRadius? borderRadius,
+    ShapeBorder? customBorder,
+    double? radius,
+    VoidCallback? onRemoved,
+  }) {
+    return _NavSplash(
+      controller: controller,
+      referenceBox: referenceBox,
+      color: color,
+      radius: radius ?? referenceBox.size.width * 4,
+      onRemoved: onRemoved,
+    );
+  }
+}
+
+class _NavSplash extends InteractiveInkFeature {
+  _NavSplash({
+    required super.controller,
+    required super.referenceBox,
+    required super.color,
+    required this.radius,
+    super.onRemoved,
+  }) {
+    // Two clocks. The wash keeps growing for as long as the finger is down and
+    // then some — cutting the growth on release is what makes a ripple look
+    // like it flinched — while the fade is driven separately by confirm and
+    // cancel.
+    _grow = AnimationController(duration: _growDuration, vsync: controller.vsync)
+      ..addListener(controller.markNeedsPaint)
+      ..forward();
+    _fade = AnimationController(duration: _fadeInDuration, vsync: controller.vsync)
+      ..addListener(controller.markNeedsPaint)
+      ..addStatusListener(_onFadeStatus)
+      ..forward();
+
+    controller.addInkFeature(this);
+  }
+
+  /// Long enough to cross the bar without looking like it is chasing the
+  /// finger; the tab switch itself lands well before it finishes.
+  static const Duration _growDuration = Duration(milliseconds: 620);
+  static const Duration _fadeInDuration = Duration(milliseconds: 90);
+  static const Duration _fadeOutDuration = Duration(milliseconds: 340);
+
+  final double radius;
+  late final AnimationController _grow;
+  late final AnimationController _fade;
+  bool _fadingOut = false;
+
+  void _onFadeStatus(AnimationStatus status) {
+    if (_fadingOut && status == AnimationStatus.dismissed) dispose();
+  }
+
+  void _fadeOut() {
+    if (_fadingOut) return;
+    _fadingOut = true;
+    _fade
+      ..duration = _fadeOutDuration
+      ..reverse();
+  }
+
+  @override
+  void confirm() => _fadeOut();
+
+  @override
+  void cancel() => _fadeOut();
+
+  @override
+  void dispose() {
+    _grow.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  void paintFeature(Canvas canvas, Matrix4 transform) {
+    final double t = Curves.easeOutCubic.transform(_grow.value);
+    final double r = radius * t;
+    if (r <= 0) return;
+
+    final double f = _fade.value;
+    final int alpha = (color.a * 255.0 * f).round();
+    if (alpha <= 0) return;
+    final Color core = color.withAlpha(alpha);
+    final Offset center = referenceBox.size.center(Offset.zero);
+
+    // The falloff, not the radius, is what stops this reading as a flash: full
+    // strength only at the centre, half of it a third of the way out, gone at
+    // the rim.
+    //
+    // It also has to **flatten as it fades**. The circle never shrinks — `_grow`
+    // only ever runs forward — but a steep falloff losing alpha *looks* like it
+    // does: the dim outer ring crosses under the eye's floor first, so the
+    // visible edge walks back towards the centre while the real one is still
+    // moving out. Easing the mid stop out to the rim as `f` falls means the
+    // last thing on screen is a flat disc dissolving in place, which is what
+    // lifting a finger should look like.
+    final double mid = ui.lerpDouble(0.98, 0.35, f)!;
+    final double midAlpha = ui.lerpDouble(1.0, 0.45, f)!;
+    final Paint paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          core,
+          core.withAlpha((alpha * midAlpha).round()),
+          core.withAlpha(0),
+        ],
+        stops: [0.0, mid, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: r));
+
+    canvas.save();
+    canvas.transform(transform.storage);
+    canvas.drawCircle(center, r, paint);
+    canvas.restore();
   }
 }
