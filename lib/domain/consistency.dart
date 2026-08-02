@@ -25,7 +25,12 @@ class Consistency {
   /// Sessions completed inside [windowDays].
   final int sessions;
 
-  /// Sessions completed since Monday of the current week.
+  /// **Days trained** since Monday of the current week — not sessions.
+  ///
+  /// It counted sessions, and read `6 this week` beside a grid with four cells
+  /// filled in it: two of those days held a second session, which the grid
+  /// cannot show and this line was not asking about. The line is printed
+  /// `4 of 7 this week`, and a day is either trained or it is not.
   ///
   /// Deliberately a calendar week rather than a rolling seven days: the number
   /// answers "how am I doing this week", and a rolling window makes that answer
@@ -95,7 +100,7 @@ Consistency computeConsistency({
 
   return Consistency(
     sessions: sessions,
-    thisWeek: completedDayKeys.where((k) => k >= startOfWeek).length,
+    thisWeek: completedDayKeys.where((k) => k >= startOfWeek).toSet().length,
     windowDays: windowDays,
     historyDays: historyDays,
     perWeek: historyDays < consistencyMinDays

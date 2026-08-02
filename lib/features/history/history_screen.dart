@@ -160,32 +160,62 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
   @override
   Widget build(BuildContext context) {
     final feed = ref.watch(workoutFeedProvider);
+    final filter = ref.watch(historyFilterProvider);
 
-    return feed.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Space.xxxl),
-          child: Text('Could not load history.\n\n$e',
-              textAlign: TextAlign.center, style: context.t.bodyMedium),
+    // The chip row is part of the list, above it: it belongs to the feed, not
+    // to the masthead, which holds the screen's name and nothing else (§5).
+    return Column(
+      children: [
+        const _FeedFilterBar(),
+        Expanded(
+          child: feed.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(Space.xxxl),
+                child: Text('Could not load history.\n\n$e',
+                    textAlign: TextAlign.center, style: context.t.bodyMedium),
+              ),
+            ),
+            data: (page) => _list(context, page, filter),
+          ),
         ),
-      ),
-      data: (page) {
-        if (page.isEmpty) {
-          return const EmptyState(
-            icon: Icons.history_toggle_off,
-            title: 'Your log starts here',
-            message: 'Finish a session and it shows up here — tap any day to '
-                'see exactly what you did.',
-          );
-        }
+      ],
+    );
+  }
 
-        final rows = _withMonthHeaders(page.items);
+  Widget _list(BuildContext context, PagedHistory<WorkoutSummary> page,
+      HistoryFilter filter) {
+    if (page.isEmpty) {
+      // An empty *filter* is not an empty history, and offering "finish a
+      // session and it shows up here" to someone with 200 logged days reads as
+      // the app having lost them.
+      return filter.isEmpty
+          ? const EmptyState(
+              icon: Icons.history_toggle_off,
+              title: 'Your log starts here',
+              message: 'Finish a session and it shows up here — tap any day to '
+                  'see exactly what you did.',
+            )
+          : EmptyState(
+              icon: Icons.filter_alt_off_outlined,
+              title: 'Nothing matches',
+              message: 'No logged day fits what you have picked.',
+              action: SecondaryButton(
+                label: 'Clear filter',
+                onPressed: () => ref
+                    .read(historyFilterProvider.notifier)
+                    .state = const HistoryFilter(),
+              ),
+            );
+    }
 
-        // No cards and no gutter: the rows run edge to edge under a spoken
-        // date heading, which is what lets a year of training be scanned by
-        // the tiles and the day names alone (§8).
-        return ListView.builder(
+    final rows = _withMonthHeaders(page.items);
+
+    // No cards and no gutter: the rows run edge to edge under a spoken
+    // date heading, which is what lets a year of training be scanned by
+    // the tiles and the day names alone (§8).
+    return ListView.builder(
           controller: _controller,
           padding: const EdgeInsets.only(bottom: Space.huge),
           itemCount: rows.length + 1,
@@ -196,21 +226,21 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
               // The count sits on the right of its month, where scanning back
               // through a year answers "how much did I train that month"
               // without reading the rows under it.
+              // A month is a section like any other, so it is a
+              // `SectionHeader` — same 20sp, same 12 underneath, same gutter as
+              // `Consistency` on Workouts or `Data` in Settings. It was a
+              // hand-rolled row for long enough to drift a few points off all
+              // of them.
               _MonthHeader(:final label, :final count) => Padding(
                   padding: EdgeInsets.fromLTRB(
                     Space.gutter,
                     i == 0 ? Space.lg : Space.section,
                     Space.gutter,
-                    Space.md,
+                    0,
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Text(label, style: context.t.headlineSmall),
-                      ),
-                      Text('$count', style: context.t.bodySmall),
-                    ],
+                  child: SectionHeader(
+                    label,
+                    trailing: Text('$count', style: context.t.bodySmall),
                   ),
                 ),
               // The rule separates one day from the next, so it belongs
@@ -226,8 +256,6 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
             };
           },
         );
-      },
-    );
   }
 
   /// Groups by calendar month, which is how anyone actually looks backwards.
@@ -273,6 +301,113 @@ class _MonthHeader extends _FeedRow {
 class _SummaryRow extends _FeedRow {
   const _SummaryRow(this.summary);
   final WorkoutSummary summary;
+}
+
+/// The feed's filter: which training day, and whether to show only the light
+/// weeks.
+///
+/// Chips rather than a bar of dropdowns, and the same chips the catalog filters
+/// with (§5): unselected is `surfaceHigh`, a live filter is the `accent` fill,
+/// and a caret means it opens a picker. There is no date range — the list is
+/// ordered by date and scrolling is the range control; two date fields would
+/// ask you to type the answer the list is already showing.
+class _FeedFilterBar extends ConsumerWidget {
+  const _FeedFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(historyFilterProvider);
+    final sessions = ref.watch(loggedSessionsProvider).valueOrNull ?? const [];
+
+    // Nothing to filter with until there is more than one day in history. A
+    // control that can only ever return the same list is furniture.
+    if (sessions.length < 2 && !filter.deloadOnly && filter.sessionId == null) {
+      return const SizedBox(height: Space.sm);
+    }
+
+    final picked = () {
+      for (final s in sessions) {
+        if (s.sessionId == filter.sessionId) return s;
+      }
+      return null;
+    }();
+
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(
+            Space.gutter, Space.md, Space.gutter, 0),
+        children: [
+          AppChip(
+            // The chip states the filter when there is one, and the question
+            // when there isn't — a chip reading `Session` beside a list that is
+            // already filtered says nothing about what you are looking at.
+            label: picked?.name ?? 'All days',
+            icon: Icons.calendar_view_week_rounded,
+            selected: filter.sessionId != null,
+            caret: true,
+            onTap: () => _pickSession(context, ref, sessions, filter),
+          ),
+          const SizedBox(width: Space.sm),
+          AppChip(
+            label: 'Deloads',
+            icon: Icons.trending_down_rounded,
+            selected: filter.deloadOnly,
+            onTap: () => ref.read(historyFilterProvider.notifier).state =
+                filter.copyWith(deloadOnly: !filter.deloadOnly),
+          ),
+          if (!filter.isEmpty) ...[
+            const SizedBox(width: Space.sm),
+            AppChip(
+              label: 'Clear',
+              icon: Icons.close_rounded,
+              onTap: () => ref.read(historyFilterProvider.notifier).state =
+                  const HistoryFilter(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickSession(
+    BuildContext context,
+    WidgetRef ref,
+    List<LoggedSession> sessions,
+    HistoryFilter filter,
+  ) async {
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder: (sheet) => AppSheet(
+        title: 'Training day',
+        subtitle: 'Days you have actually logged',
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
+        children: [
+          AppRow(
+            title: 'All days',
+            onTap: () => Navigator.of(sheet).pop(''),
+            trailing: AppRadio(selected: filter.sessionId == null),
+          ),
+          for (final s in sessions)
+            AppRow(
+              title: s.name,
+              // Two regimes can both own a `Push 1`, and the count is the
+              // reason to pick one row over another.
+              subtitle: '${s.regimeName} · ${s.workouts} logged',
+              onTap: () => Navigator.of(sheet).pop(s.sessionId),
+              trailing: AppRadio(selected: filter.sessionId == s.sessionId),
+            ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    ref.read(historyFilterProvider.notifier).state = chosen.isEmpty
+        ? filter.copyWith(clearSession: true)
+        : filter.copyWith(sessionId: chosen);
+  }
 }
 
 class _FeedFooter extends StatelessWidget {
@@ -458,20 +593,10 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-              Space.gutter, Space.sm, Space.gutter, Space.md),
-          child: TextField(
+          padding: searchFieldPadding,
+          child: SearchField(
+            hint: 'Search exercises',
             onChanged: (v) => setState(() => _query = v),
-            decoration: InputDecoration(
-              hintText: 'Search exercises',
-              prefixIcon: Icon(Icons.search, size: 20, color: c.textTertiary),
-              filled: true,
-              fillColor: c.surfaceHigh,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(Radii.md),
-                borderSide: BorderSide.none,
-              ),
-            ),
           ),
         ),
         Expanded(

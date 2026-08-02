@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/calendar.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
@@ -112,7 +113,10 @@ class _SessionPickRow extends StatelessWidget {
                 const SizedBox(width: Space.xs),
                 Text('done this cycle', style: context.t.labelSmall),
               ] else if (isNext)
-                Text('NEXT UP', style: context.t.labelSmall)
+                // Sentence case, like `done this cycle` two lines up. An
+                // uppercase micro-label is what makes a screen look like a
+                // template (THEME §3) — uppercase belongs to the masthead.
+                Text('Next up', style: context.t.labelSmall)
               else
                 Icon(
                   Icons.chevron_right_rounded,
@@ -200,15 +204,24 @@ Future<void> _logPastSession(
     return;
   }
 
-  final picked =
-      await showModalBottomSheet<({String sessionId, DateTime date})>(
-        context: context,
-        isScrollControlled: true,
-        // `AppSheet` draws its own grab handle, tighter than the framework's.
-        showDragHandle: false,
-        builder: (sheet) => _BackfillSheet(sessions: sessions),
-      );
+  final picked = await showModalBottomSheet<_BackfillResult>(
+    context: context,
+    isScrollControlled: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
+    builder: (sheet) => _BackfillSheet(sessions: sessions),
+  );
   if (picked == null || !context.mounted) return;
+
+  // Tapping a day that is already logged and asking to see it: this flow ends
+  // there, on the record rather than on a second copy of it.
+  final existing = picked.workoutId;
+  if (existing != null) {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => WorkoutDetailScreen(workoutId: existing)),
+    );
+    return;
+  }
 
   final navigator = Navigator.of(context);
   final messenger = ScaffoldMessenger.of(context);
@@ -218,11 +231,12 @@ Future<void> _logPastSession(
     // Which cycle a backfill lands in is decided by its date, not by today, so
     // say which one. Otherwise it is invisible until a deload arrives early and
     // nobody knows why.
-    final cycle = await repo.cycleCovering(regimeId, picked.date);
+    final date = picked.date!;
+    final cycle = await repo.cycleCovering(regimeId, date);
     final id = await repo.startWorkout(
       regimeId: regimeId,
-      sessionId: picked.sessionId,
-      at: picked.date,
+      sessionId: picked.sessionId!,
+      at: date,
     );
     messenger.showSnackBar(
       SnackBar(
@@ -248,28 +262,115 @@ Future<void> _logPastSession(
 
 /// The day picker and the session list in one sheet. Defaults to yesterday —
 /// the overwhelmingly common case is remembering one day late.
-class _BackfillSheet extends StatefulWidget {
+/// What the backfill sheet came back with: a session to write on a day, or a
+/// workout that day already holds and you asked to see.
+class _BackfillResult {
+  const _BackfillResult.log({required this.sessionId, required this.date})
+      : workoutId = null;
+  const _BackfillResult.open(this.workoutId)
+      : sessionId = null,
+        date = null;
+
+  final String? sessionId;
+  final DateTime? date;
+  final String? workoutId;
+}
+
+class _BackfillSheet extends ConsumerStatefulWidget {
   const _BackfillSheet({required this.sessions});
 
   final List<Session> sessions;
 
   @override
-  State<_BackfillSheet> createState() => _BackfillSheetState();
+  ConsumerState<_BackfillSheet> createState() => _BackfillSheetState();
 }
 
-class _BackfillSheetState extends State<_BackfillSheet> {
+class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   DateTime _date = DateTime.now().subtract(const Duration(days: 1));
 
+  /// Every day ever logged, so the calendar can ring them.
+  ///
+  /// Read in `build`, not in the handler that opens the picker: `fullHeatmapProvider`
+  /// is `autoDispose`, so watching it from a callback subscribes at the moment
+  /// of the tap and hands back the loading value — which is how the rings and
+  /// the already-logged prompt shipped doing nothing at all.
+  Map<int, HeatDay> _logged = const {};
+
   Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2015),
-      lastDate: now,
-      helpText: 'When did you train it?',
+    final c = context.c;
+    final logged = _logged;
+    // Back to the first day ever logged, not to a constant. The floor was
+    // 2015, which silently refused every day of a history that starts before
+    // it — and a picker that cannot reach the data is worse than no picker.
+    final earliest = logged.keys.isEmpty
+        ? null
+        : dateFromDayKey(logged.keys.reduce((a, b) => a < b ? a : b));
+
+    final picked = await pickDay(
+      context,
+      initial: _date,
+      first: earliest,
+      last: DateTime.now(),
+      title: 'When did you train it?',
+      // Blue for a day you trained, orange for a light week — the same two
+      // colours the heatmap and the history rows use, so a calendar of
+      // identical white numbers stops being the one place in the app that
+      // cannot show you the gap you are trying to fill.
+      marks: {
+        for (final entry in logged.entries)
+          entry.key: entry.value.isDeload ? c.deload : c.heatOn,
+      },
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked == null || !mounted) return;
+
+    final already = logged[dayKeyOf(picked)];
+    if (already == null || already.workoutIds.isEmpty) {
+      setState(() => _date = picked);
+      return;
+    }
+
+    // A day that is already logged is ambiguous — you either came to read it or
+    // to add the session you also did that day — so it asks rather than
+    // guessing. Guessing "log another" is how a tap meant to check Tuesday
+    // ends with a second Tuesday in history.
+    final open = await _confirmTrainedDay(picked, already);
+    if (open == null || !mounted) return;
+    if (open) {
+      Navigator.of(context).pop(_BackfillResult.open(already.workoutIds.last));
+    } else {
+      setState(() => _date = picked);
+    }
+  }
+
+  /// True to open what is there, false to log another, null to back out.
+  Future<bool?> _confirmTrainedDay(DateTime day, HeatDay logged) {
+    final count = logged.workouts;
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder: (sheet) => AppSheet(
+        title: DateFormat('EEEE d MMMM').format(day),
+        subtitle: count == 1
+            ? 'Already logged'
+            : '$count sessions already logged',
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
+        children: [
+          AppRow(
+            icon: Icons.visibility_outlined,
+            title: 'See that workout',
+            subtitle: 'What you actually did',
+            onTap: () => Navigator.of(sheet).pop(true),
+          ),
+          AppRow(
+            icon: Icons.add_circle_outline,
+            title: 'Log another session',
+            subtitle: 'A second session on the same day',
+            onTap: () => Navigator.of(sheet).pop(false),
+          ),
+        ],
+      ),
+    );
   }
 
   String get _label {
@@ -290,6 +391,7 @@ class _BackfillSheetState extends State<_BackfillSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    _logged = ref.watch(fullHeatmapProvider).valueOrNull?.days ?? const {};
     return AppSheet(
       title: 'Log a past session',
       children: [
@@ -324,7 +426,9 @@ class _BackfillSheetState extends State<_BackfillSheet> {
           _SessionPickRow(
             session: s,
             onTap: () =>
-                Navigator.of(context).pop((sessionId: s.id, date: _date)),
+                Navigator.of(context).pop(
+                  _BackfillResult.log(sessionId: s.id, date: _date),
+                ),
           ),
       ],
     );
@@ -806,7 +910,7 @@ class _ResumeHero extends ConsumerWidget {
             const SizedBox(width: Space.sm),
             Expanded(
               child: Text(
-                stale ? 'LEFT OPEN' : 'IN PROGRESS',
+                stale ? 'Left open' : 'In progress',
                 style: context.t.labelSmall?.copyWith(color: mark),
               ),
             ),
@@ -1265,15 +1369,6 @@ class _ConsistencyCard extends StatelessWidget {
       children: [
         SectionHeader(
           'Consistency',
-          // The three figures used to be a row of stat tiles inside the card,
-          // above the grid. They are one short sentence, and 70pt of card was
-          // what pushed the grid — the section's whole point — under the fold.
-          //
-          // Always a sentence, dashes and all: dropping the line on a fresh
-          // install made this header a different height than the same header
-          // one session later, so the grid under it moved the first time you
-          // finished a workout.
-          subtitle: _summary(data.consistency),
           actionLabel: hasHistory ? 'All time' : null,
           onAction: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const HistoryHeatmapScreen()),
@@ -1292,13 +1387,22 @@ class _ConsistencyCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ConsistencyHeatmap(days: data.days),
+              const SizedBox(height: Space.md),
+              // The figures sit *under the grid they describe*, not in the
+              // heading. As a subtitle they made this section start at a
+              // different distance from its card than every other heading on
+              // the app, and they were read a line away from the thing they
+              // are about.
+              //
+              // Always a sentence, dashes and all: dropping the line on a fresh
+              // install would move the grid the first time you finish a
+              // workout.
+              Text(_summary(data.consistency), style: context.t.bodySmall),
               // No legend here. It is reference material rather than something
               // you read at a glance, and the screen this card opens carries it
               // in full.
-              // "Nothing logged yet" is what the dashes in the section
-              // subtitle already say; this only adds where it will land.
               if (!hasHistory) ...[
-                const SizedBox(height: Space.md),
+                const SizedBox(height: Space.xs),
                 Text(
                   'Finish a session and it lands here, and in History.',
                   style: context.t.bodyMedium,
@@ -1318,11 +1422,18 @@ class _ConsistencyCard extends StatelessWidget {
   static String _summary(Consistency c) {
     final perWeek = c.perWeek;
     if (c.isEmpty) {
-      return ['— this week', '— per week', 'nothing logged yet'].join('  ·  ');
+      return ['— of 7 this week', 'avg. — per week', 'nothing logged yet']
+          .join('  ·  ');
     }
     return [
-      '${c.thisWeek} this week',
-      perWeek == null ? '— per week' : '${perWeek.toStringAsFixed(1)} per week',
+      // Out of seven, because that is what the row of cells beside it shows —
+      // a bare `4` next to a week of squares invites you to count them to find
+      // out what it is four of.
+      '${c.thisWeek} of 7 this week',
+      // Whole sessions. `5.3 per week` is a decimal on a count of things you
+      // either did or did not do, and it is rounded **down**: the app never
+      // reports a session it cannot point at.
+      perWeek == null ? '— per week' : 'avg. ${perWeek.floor()} per week',
       // The window is only worth naming once it *is* a window. "1 in 1 day"
       // was the app dividing by the length of its own history and reporting
       // the result as a habit.

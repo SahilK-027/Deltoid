@@ -39,8 +39,15 @@ class SettingsScreen extends ConsumerWidget {
       body: Column(
         children: [
           // A tab now, not a screen pushed from a cog, so it wears the masthead
-          // every other destination wears.
-          const HeaderBand(child: PageHeader(title: 'Settings', topGap: Space.xxl)),
+          // every other destination wears — eyebrow included. A title alone on
+          // the band made this the only tab whose header was one line, which is
+          // what made it read as a screen from a different app.
+          const HeaderBand(
+            child: PageHeader(
+              title: 'Settings',
+              eyebrow: 'On this device',
+            ),
+          ),
           Expanded(child: _body(context, ref, log, lastBackup, unit, c)),
         ],
       ),
@@ -75,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
           // asked for daily, which is why it had never once been logged
           // through the UI. Tapping the figure is the log; the past is a link.
           _BodyweightCard(log: log, unit: unit),
-          const SizedBox(height: Space.xxl),
+          const SizedBox(height: Space.section),
           const SectionHeader('Data'),
           ListCard(
             inset: Space.lg,
@@ -105,19 +112,21 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: Space.xxl),
+          const SizedBox(height: Space.section),
           const SectionHeader('Units'),
           const _UnitPicker(),
-          const SizedBox(height: Space.xxl),
+          const SizedBox(height: Space.section),
           const SectionHeader('Appearance'),
           const _ThemePicker(),
-          const SizedBox(height: Space.xxl),
+          const SizedBox(height: Space.section),
           const SectionHeader('About'),
           AppCard(
             child: Text(
-              'Deltoid keeps everything on this device. Sessions carry their '
-              'own history, so the same exercise progresses independently in '
-              'each one.',
+              // Not "everything stays on this device" — the masthead's eyebrow
+              // says that, and a fact stated twice on one screen is the rule
+              // this app breaks most often (THEME rule 6).
+              'Sessions carry their own history, so the same exercise '
+              'progresses independently in each one.',
               style: context.t.bodySmall,
             ),
           ),

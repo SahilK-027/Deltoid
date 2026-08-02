@@ -42,7 +42,9 @@ class SetTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final label = context.t.labelSmall?.copyWith(color: c.textTertiary);
+    // `label`, the role THEME §3 gives table headers, and sentence case:
+    // the spec's own header row reads `Set · kg · Reps · ✓`.
+    final label = context.t.bodySmall?.copyWith(color: c.textTertiary);
     // The gutter is the page's, so the SET column starts on the same vertical
     // as the exercise name above it. The table used to sit in a card, inset a
     // second time by the card's own padding, and lined up with nothing.
@@ -52,14 +54,14 @@ class SetTableHeader extends StatelessWidget {
         children: [
           SizedBox(
             width: SetRow.indexColumn,
-            child: Text('SET', style: label),
+            child: Text('Set', style: label),
           ),
           const SizedBox(width: Space.sm),
           Expanded(
             child: Text(
               loadMode == LoadMode.bodyweight
-                  ? 'LOAD'
-                  : unit.label.toUpperCase(),
+                  ? 'Load'
+                  : unit.label,
               style: label,
               textAlign: TextAlign.center,
             ),
@@ -69,7 +71,7 @@ class SetTableHeader extends StatelessWidget {
           // expanding load column, which on a phone made one field twice the
           // other for no reason a reader could see.
           Expanded(
-            child: Text('REPS', style: label, textAlign: TextAlign.center),
+            child: Text('Reps', style: label, textAlign: TextAlign.center),
           ),
           const SizedBox(width: Space.sm),
           SizedBox(

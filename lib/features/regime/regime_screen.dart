@@ -343,11 +343,14 @@ class _DayBody extends ConsumerWidget {
         // about what you train, and it sits at the foot now with the other
         // destructive rows in this cluster.
         SizedBox(
-          height: 60,
+          // 16 under the header block, like the first thing on every other
+          // screen, and no slack under the chips: the heading below brings its
+          // own 16.
+          height: 56,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(
-                Space.gutter, Space.md, Space.gutter, Space.xs),
+                Space.gutter, Space.lg, Space.gutter, 0),
             children: [
               AppChip(
                 label: 'Rename',
@@ -759,25 +762,7 @@ class _NamePromptSheetState extends State<_NamePromptSheet> {
           onSubmitted: (_) => _submit(),
           style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
           cursorColor: c.textPrimary,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            hintStyle: context.t.bodyLarge?.copyWith(color: c.textTertiary),
-            filled: true,
-            fillColor: c.surfaceHigh,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide(color: c.textPrimary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(Space.lg),
-          ),
+          decoration: InputDecoration(hintText: widget.hint),
         ),
         if (error != null)
           Padding(

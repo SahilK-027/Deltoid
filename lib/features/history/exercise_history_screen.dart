@@ -131,15 +131,12 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
           return ListView.separated(
             controller: _controller,
             padding: const EdgeInsets.fromLTRB(
-                Space.gutter, Space.md, Space.gutter, Space.huge),
+                Space.gutter, Space.lg, Space.gutter, Space.huge),
             itemCount: rows.length + 2,
             separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
             itemBuilder: (context, i) {
               if (i == 0) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: Space.xl),
-                  child: ExerciseTrend(exerciseId: widget.exerciseId),
-                );
+                return ExerciseTrend(exerciseId: widget.exerciseId);
               }
               i -= 1;
               if (i == rows.length) {
@@ -168,8 +165,11 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
               }
               final row = rows[i];
               if (row.heading != null) {
+                // 20 here plus the separator's 8 above it is the 28 between
+                // sections everywhere else — this list is the one place the
+                // gap is built out of two pieces.
                 return Padding(
-                  padding: const EdgeInsets.only(top: Space.lg),
+                  padding: const EdgeInsets.only(top: Space.xl),
                   child: SectionHeader(row.heading!),
                 );
               }

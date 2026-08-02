@@ -48,6 +48,14 @@ class _PressableState extends State<Pressable> {
 
   @override
   Widget build(BuildContext context) {
+    // A `Pressable` with nothing to do is not a `Pressable` — it is its child.
+    //
+    // It used to build the detector anyway, opaque, which made it a hole in
+    // whatever it sat inside: `LinkAction('Change')` inside a tappable row
+    // swallowed every tap that landed on the word `Change`, so the one part of
+    // the row that names the action was the one part that did not perform it.
+    if (!_enabled) return widget.child;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _set(true),
@@ -196,21 +204,40 @@ class HeaderBand extends StatelessWidget {
   }
 }
 
-/// A spoken heading that divides a page into parts, with an optional underlined
-/// link on the right. Sits on the page background — never inside a card.
+/// A spoken heading that divides a page into parts, with an optional link or
+/// one small figure on the right. Sits on the page background — never inside a
+/// card.
+///
+/// **Every heading on a page background is this widget**, so that the type, the
+/// 12 under it and the alignment of whatever sits on its right are decided in
+/// one place. History's month headings were a hand-rolled `Row` of
+/// `headlineSmall` plus a count for exactly as long as it took for its padding
+/// to drift from everyone else's.
+///
+/// **One line.** There is no subtitle slot: a heading that carries a sentence
+/// is a different height than the heading above it, so no two sections on a
+/// page start at the same distance from their content. What the sentence says
+/// belongs to the thing it describes — inside the card, where it is read with
+/// the numbers rather than above them.
 class SectionHeader extends StatelessWidget {
   const SectionHeader(
     this.title, {
     super.key,
     this.actionLabel,
     this.onAction,
-    this.subtitle,
-  });
+    this.trailing,
+  }) : assert(
+          trailing == null || actionLabel == null,
+          'A heading has one thing on its right: a link or a figure.',
+        );
 
   final String title;
-  final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// A figure that belongs to the heading rather than to the rows under it —
+  /// a month's session count. Not a control; use [actionLabel] for that.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -220,30 +247,19 @@ class SectionHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: context.t.headlineSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: Space.xxs),
-                  Text(
-                    subtitle!,
-                    style: context.t.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
+            child: Text(
+              title,
+              style: context.t.headlineSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (actionLabel != null) ...[
             const SizedBox(width: Space.sm),
             LinkAction(actionLabel!, onTap: onAction),
+          ] else if (trailing != null) ...[
+            const SizedBox(width: Space.sm),
+            trailing!,
           ],
         ],
       ),
@@ -297,29 +313,60 @@ class LinkAction extends StatelessWidget {
   }
 }
 
-/// Uppercase eyebrow above a group. Kept for the few places a group needs a
-/// whisper rather than a heading; prefer [SectionHeader].
-class SectionLabel extends StatelessWidget {
-  const SectionLabel(this.text, {super.key, this.trailing});
+// `SectionLabel` — an uppercase eyebrow over a group — was here, unused by any
+// screen, and it contradicted the rule the type scale is built on: uppercase
+// appears in exactly two places, the page title and the page eyebrow (THEME
+// §3). A component nothing calls is a second answer to a question
+// [SectionHeader] already answers.
 
-  final String text;
-  final Widget? trailing;
+/// The one search box. Three screens filter a list of exercises and each one
+/// drew its own — different glyph, different hint colour, one of them with no
+/// focused outline at all.
+///
+/// Everything about how it looks comes from `inputDecorationTheme`; this only
+/// adds the glyph and the text size, which is `bodyLarge` because a search box
+/// is typed into.
+class SearchField extends StatelessWidget {
+  const SearchField({
+    super.key,
+    required this.hint,
+    required this.onChanged,
+    this.controller,
+    this.autofocus = false,
+  });
+
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final TextEditingController? controller;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Space.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(text.toUpperCase(), style: context.t.labelSmall),
-          ),
-          ?trailing,
-        ],
+    final c = context.c;
+    return TextField(
+      controller: controller,
+      autofocus: autofocus,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
+      cursorColor: c.textPrimary,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(Icons.search_rounded, size: 20, color: c.textTertiary),
       ),
     );
   }
 }
+
+/// The gap a search box sits in, above the list it filters. The same on a
+/// screen and in a sheet — the box is the first thing under whatever header is
+/// there, and 12 is the gap in both.
+const searchFieldPadding = EdgeInsets.fromLTRB(
+  Space.gutter,
+  Space.md,
+  Space.gutter,
+  Space.md,
+);
 
 // ─── Surfaces ───────────────────────────────────────────────────────────────
 
@@ -1434,29 +1481,12 @@ class _NoteSheetState extends State<_NoteSheet> {
           textCapitalization: TextCapitalization.sentences,
           style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
           cursorColor: c.textPrimary,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            hintStyle: context.t.bodyLarge?.copyWith(color: c.textTertiary),
-            filled: true,
-            // `surfaceHigh` is this app's input fill, and `surfaceHighest` is
-            // what a focused one goes to (§5). The field was on
-            // `surfaceSunken` — the keypad's bed — which on a `surface` sheet
-            // read as a hole rather than as somewhere to type.
-            fillColor: c.surfaceHigh,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide(color: c.textPrimary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(Space.lg),
-          ),
+          // Fill, radius, focused outline and padding all come from
+          // `inputDecorationTheme` — `surfaceHigh` for the fill, and a white
+          // 2px outline when focused. This field was on `surfaceSunken` once,
+          // the keypad's bed, which on a `surface` sheet read as a hole rather
+          // than as somewhere to type.
+          decoration: InputDecoration(hintText: widget.hint),
         ),
       ],
     );

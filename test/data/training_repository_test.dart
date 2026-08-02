@@ -1245,6 +1245,57 @@ void main() {
     expect(mine.every((s) => s.workout.sessionId == push1.id), isTrue);
   });
 
+  test('a deload filter narrows the feed to the light weeks', () async {
+    await writeHistory(6);
+    final ids = (await repo.workoutFeed(limit: 50))
+        .take(2)
+        .map((s) => s.workout.id)
+        .toList();
+    for (final id in ids) {
+      await (db.update(db.workouts)..where((t) => t.id.equals(id)))
+          .write(const WorkoutsCompanion(isDeload: Value(true)));
+    }
+
+    final deloads = await repo.workoutFeed(limit: 50, deloadOnly: true);
+    expect(deloads.map((s) => s.workout.id).toList()..sort(), ids..sort());
+  });
+
+  test('a filtered feed still pages by keyset, without gaps or repeats',
+      () async {
+    // Two of every session, so a single day's filter still spans pages.
+    await writeHistory(30);
+    final push1 = await sessionNamed('Push 1');
+
+    final seen = <String>[];
+    var page = await repo.workoutFeed(limit: 2, sessionId: push1.id);
+    while (page.isNotEmpty) {
+      seen.addAll(page.map((s) => s.workout.id));
+      page = await repo.workoutFeed(
+        limit: 2,
+        sessionId: push1.id,
+        olderThan: page.last.cursor,
+      );
+    }
+
+    expect(seen, hasLength(5));
+    expect(seen.toSet(), hasLength(5));
+  });
+
+  test('the filter only offers days that appear in history', () async {
+    await writeHistory(3);
+    final logged = await repo.loggedSessions();
+
+    // Three workouts, three of the six days trained — the other three are not
+    // on offer, because picking one would return an empty list.
+    expect(logged, hasLength(3));
+    expect(logged.every((s) => s.workouts == 1), isTrue);
+    expect(logged.every((s) => s.regimeName == ppl.name), isTrue);
+
+    // Most recently trained first.
+    final days = logged.map((s) => s.lastDayKey).toList();
+    expect(days, [...days]..sort((a, b) => b.compareTo(a)));
+  });
+
   test('exercise history pages, newest first, keeping session identity',
       () async {
     final regime = await activeRegime();

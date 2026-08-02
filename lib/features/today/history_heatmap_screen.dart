@@ -75,7 +75,7 @@ class _Years extends StatelessWidget {
       itemBuilder: (context, i) {
         if (i == 0) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: Space.xl),
+            padding: const EdgeInsets.only(bottom: Space.section),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -97,10 +97,16 @@ class _Years extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // The count as a figure on the heading's right, the way History
+              // states a month's — not as a subtitle, which would make this
+              // heading taller than every other one in the app.
               SectionHeader(
                 '$year',
-                subtitle: '${byYear[year] ?? 0} session'
-                    '${(byYear[year] ?? 0) == 1 ? '' : 's'}',
+                trailing: Text(
+                  '${byYear[year] ?? 0} session'
+                  '${(byYear[year] ?? 0) == 1 ? '' : 's'}',
+                  style: context.t.bodySmall,
+                ),
               ),
               AppCard(
                 // Shy of even at the bottom: the month strip is 18dp tall for

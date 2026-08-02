@@ -3,13 +3,22 @@ import '../../domain/consistency.dart';
 
 /// One day on the consistency heatmap.
 class HeatDay {
-  const HeatDay({required this.workouts, required this.isDeload});
+  const HeatDay({
+    required this.workouts,
+    required this.isDeload,
+    this.workoutIds = const [],
+  });
 
   final int workouts;
 
   /// Deload days render in a different hue — an easy week should be visibly an
   /// easy week, not a gap in the record.
   final bool isDeload;
+
+  /// What was logged that day, oldest first. Carried so a day picked on the
+  /// calendar can open the workout it already holds instead of only offering to
+  /// write a second one.
+  final List<String> workoutIds;
 }
 
 class HeatmapData {
@@ -33,6 +42,7 @@ HeatmapData buildHeatmap(List<Workout> completed) {
     days[w.dayKey] = HeatDay(
       workouts: (existing?.workouts ?? 0) + 1,
       isDeload: (existing?.isDeload ?? false) || w.isDeload,
+      workoutIds: [...?existing?.workoutIds, w.id],
     );
   }
 

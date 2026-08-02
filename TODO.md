@@ -340,16 +340,26 @@ the wakelock, audio ducking, and the share sheet.
   **multiple regimes**, **programme editor**, **exercise catalog** (archive,
   never delete).
 - **History** — paged session feed + per-exercise index. The Notion-style table
-  was deleted in step 3.
+  was deleted in step 3. The feed filters by training day and by deload, in the
+  query rather than over the loaded page, so keyset paging still holds
+  (README invariant 5); the picker only offers days that appear in history.
 - **Progress** — e1RM over time, one line per session slot, stall detection,
   deload weeks excluded. Rebuilt in step 4.
 - **Consistency heatmap** — eighteen weeks on Today, all-time view behind it.
 - **Backup** — export / restore / auto-export, round-trip tested.
 - **Bodyweight log** — schema, repository, interpolation, its own screen, and
-  since step 6 one tap from Settings to log or correct a weight.
+  since step 6 one tap from Settings to log or correct a weight. The screen is a
+  trend chart over the app's one range control, then one collapsed row per month
+  (average and change) opening to its days on `surfaceHigh` — a year of daily weights was 365 rows and
+  could not answer the question it was opened with.
+- **The day picker** — `core/widgets/calendar.dart`, a month grid in a dialog,
+  used by backfill, the bodyweight log and re-dating a workout. Material's
+  `showDatePicker` was the one surface the theme could not reach. Backfill rings
+  every day already logged (blue, or orange for a deload) and asks, on a day
+  that has one, whether you came to read it or to add to it.
 - Light / dark / system theme, adaptive launcher icon.
 
-**243 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**274 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
 budget, the programme editor and Settings pumped against a real database, and

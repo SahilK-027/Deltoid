@@ -498,7 +498,6 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final all = ref.watch(exerciseCatalogProvider).valueOrNull ?? const [];
     final q = _query.trim().toLowerCase();
     final filtered = all
@@ -522,34 +521,11 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
           children: [
             const SheetHeader(title: 'Exercises'),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  Space.gutter, Space.md, Space.gutter, Space.md),
-              child: TextField(
+              padding: searchFieldPadding,
+              child: SearchField(
+                hint: 'Search exercises',
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
-                style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
-                cursorColor: c.textPrimary,
-                decoration: InputDecoration(
-                  hintText: 'Search exercises',
-                  hintStyle:
-                      context.t.bodyLarge?.copyWith(color: c.textTertiary),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      size: 20, color: c.textTertiary),
-                  filled: true,
-                  fillColor: c.surfaceHigh,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(Radii.md),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(Radii.md),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(Radii.md),
-                    borderSide: BorderSide(color: c.textPrimary, width: 2),
-                  ),
-                ),
               ),
             ),
             if (present.length > 1)

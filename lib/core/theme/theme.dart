@@ -197,14 +197,17 @@ ThemeData buildTheme(Brightness brightness) {
         ),
       ),
     ),
+    // Every field in the app is this one. It used to be declared at each of the
+    // seven call sites, which is how the exercise search in History ended up
+    // without a focused outline, without the hint colour and with a different
+    // magnifying glass than the identical field in the catalog.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: c.surfaceHigh,
-      hintStyle: text.bodyMedium?.copyWith(color: c.textTertiary),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: Space.lg,
-        vertical: Space.md,
-      ),
+      // Matches the size the text in a field is set at, so the hint does not
+      // shrink the moment you start typing over it.
+      hintStyle: text.bodyLarge?.copyWith(color: c.textTertiary),
+      contentPadding: const EdgeInsets.all(Space.lg),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.md),
         borderSide: BorderSide.none,

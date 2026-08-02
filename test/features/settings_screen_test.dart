@@ -126,7 +126,7 @@ void main() {
       expect(find.text('No weights logged'), findsOneWidget);
     });
 
-    testWidgets('entries sit under their month, newest first, with deltas', (
+    testWidgets('months are summaries; the newest one is open', (
       tester,
     ) async {
       final repo = TrainingRepository(db);
@@ -135,13 +135,40 @@ void main() {
       await pump(tester, const BodyweightScreen());
 
       expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('August 2026'));
+      await tester.pumpAndSettle();
       expect(find.text('August 2026'), findsOneWidget);
       expect(find.text('July 2026'), findsOneWidget);
+
+      // The current month is open, so its days are on screen.
       expect(find.text('Sat 1 Aug'), findsOneWidget);
-      // Against the entry before it in time, across the month boundary.
-      expect(find.text('+1'), findsOneWidget);
-      // The oldest entry has nothing to compare against.
-      expect(find.textContaining('−'), findsNothing);
+      // Every older month is one row until it is asked for — this is the whole
+      // point of the screen: a year is twelve rows, not 365.
+      expect(find.text('Tue 28 Jul'), findsNothing);
+
+      // The chart leads the screen, so the older months are below the fold.
+      await tester.ensureVisible(find.text('July 2026'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('July 2026'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tue 28 Jul'), findsOneWidget);
+    });
+
+    testWidgets('a month row states what it averaged and which way it went', (
+      tester,
+    ) async {
+      final repo = TrainingRepository(db);
+      await repo.logBodyweight(DateTime(2026, 7, 20), 75.0);
+      await repo.logBodyweight(DateTime(2026, 7, 28), 75.0);
+      await repo.logBodyweight(DateTime(2026, 8, 1), 76.0);
+      await pump(tester, const BodyweightScreen());
+
+      await tester.ensureVisible(find.text('July 2026'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 weigh-ins'), findsOneWidget);
+      expect(find.text('1 weigh-in'), findsOneWidget);
+      // August averaged 76 against July's 75.
+      expect(find.text('+1'), findsWidgets);
     });
 
     testWidgets('a row opens the sheet that corrects and deletes it', (
@@ -150,6 +177,8 @@ void main() {
       await TrainingRepository(db).logBodyweight(DateTime(2026, 8, 1), 76.0);
       await pump(tester, const BodyweightScreen());
 
+      await tester.ensureVisible(find.text('Sat 1 Aug'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Sat 1 Aug'));
       for (var i = 0; i < 20; i++) {
         await tester.pump(const Duration(milliseconds: 16));

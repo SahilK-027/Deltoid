@@ -299,7 +299,31 @@ saved workout), never for decoration. Trailing chevron `textTertiary` at 18.
 ### Section header
 
 `section` type on the page background — no card, no uppercase. Optional trailing
-**text link**, vertically centred with the title. 12 below it.
+**text link** *or* one small figure (a month's session count), vertically
+centred with the title. 12 below it, and **28 between one section and the
+next** — `Space.section`, not "about 24".
+
+**Every heading on a page background is `SectionHeader`.** Not a `Row` of
+`headlineSmall` that happens to look like one: History's month headings were
+hand-rolled for exactly as long as it took their padding to drift off every
+other heading in the app. If a heading needs something on its right that is not
+a link, it gets a `trailing` slot — it does not get rebuilt.
+
+**A heading is one line. There is no subtitle.** Two of them had one and the
+cost was the same both times: `Consistency` and `Regime library` started their
+content 20pt lower than the headings above them, so no two sections on a page
+began at the same distance from what they head. The sentence goes **inside the
+card**, under the thing it describes — the consistency figures now sit beneath
+the grid they count, which is also where they are read. A figure that belongs
+to the heading itself (a month's, a year's session count) goes in `trailing`,
+on the title's line.
+
+**A section's rows sit in a `ListCard`.** The card's edge lands 12 under the
+heading; full-bleed rows put the first line of text 28 under it with nothing in
+between, so a page mixing the two has sections that visibly start at different
+heights — which is what made `Active regime` look wrong next to `Movements`.
+Full-bleed rows are for a screen that is *nothing but* rows under date
+headings (History §8), never for one section of a page.
 
 ### Toggles, radios, checkboxes
 
@@ -364,6 +388,40 @@ alert lands in the middle of the screen while the row that summoned it sits at
 the bottom, and it fights the keyboard for the same space. Dialogs are for
 *names*: one line, no scrolling, nothing to lose.
 
+### The day picker
+
+A month grid in a **dialog** (`pickDay`), never `showDatePicker`. Material's
+dialog is the one surface the language cannot reach: it arrives centred, with
+its own type scale, its own ripples, a landscape header and an accent taken from
+the `ColorScheme`. Three screens asked "which past day?" and all three answered
+it in a different app.
+
+The one picker in the app that is **read before it is tapped**, which is why it
+is not a sheet — a sheet puts the month you are reading at the bottom of the
+screen, under your thumb.
+
+`‹ March 2026 ›` in `title` across the top, the name itself opening a year grid;
+weekday initials in `label` `textTertiary`; 38dp day circles. **Six rows,
+always** — a month wants four, five or six depending on where its first day
+falls, and sizing to the month made every page turn a resize.
+
+Three states stack on one circle, ranked so none hides another:
+
+- **A ring in the day's own colour for a day you trained** — `heatOn` blue,
+  `deload` orange, the same two the heatmap and the history rows use. Without
+  it the calendar is the one surface in the app that cannot show you the gap you
+  opened it to fill.
+- **`accent` fill** for the day currently chosen. A trained day keeps its
+  coloured ring around the fill.
+- **`textTertiary` ring** for today.
+
+A day outside the range is `textTertiary` and dead — **shown, not removed**, so
+the month keeps its shape and the hole says why.
+
+**Picking a day that is already logged asks rather than guesses**: see what is
+there, or log another session on it. Guessing "log another" is how a tap meant
+to check Tuesday ends with a second Tuesday in history.
+
 ### Dialogs (confirmations)
 
 Bottom-anchored card, not a centred alert. `surface`, radius 24, padding 20.
@@ -396,6 +454,21 @@ stays a grid.
 
 ### Charts
 
+**There is one chart** — `TrendChart` in `core/widgets/trend_chart.dart` — and
+**one range control** above it, `TrendRangeBar`: `1W · 1M · 3M · 1Y` as chips,
+then a year picker where `All` used to be. The plot was written a second time
+for bodyweight and came back with a different range control (`3m 6m 1y All` in
+a segmented pill), no edge suppression and no calendar-aware tick spacing, so it
+printed `Dec 19Jul 26` and `330 Jul` on top of themselves. A chart is a
+language, not a widget you write per screen.
+
+- **Both axes drop their edge ticks.** A label at `min` or `max` has half a line
+  of room and prints over its neighbour.
+- **Tick spacing is calendar-shaped**: a week, a fortnight, a month, a quarter,
+  a year. Ticks every 97 days label three different months and read as noise.
+- Y bounds are the data plus air, snapped to a round step — **never anchored at
+  zero**, which draws a year of bodyweight as a flat line an inch off the
+  bottom. The air stops at zero when nothing in the series is negative.
 - Dashed horizontal gridlines only, `border`; **no vertical gridlines, no chart
   border**.
 - Y labels on the **right**, `label` size, `textSecondary`. X labels below the
@@ -430,6 +503,14 @@ once the other way round and both were wrong:
   at the far end of the screen, so that made the one screen you land on the
   only one whose masthead never says where you are. The date is the eyebrow
   above it, which is the slot it always half-occupied.
+
+**Every destination's masthead is two lines: an eyebrow over the title.** The
+eyebrow states what the page holds — the date on Workouts, the span on History,
+the inventory on Regimes (`3 regimes · 3 slots free`), where it lives on
+Settings. Regimes and Settings were a bare 30sp word on a short band, and next
+to the other two tabs they read as screens from a different app. A tab with no
+honest eyebrow yet (the count hasn't loaded) takes the wider `24` top gap until
+it has one, rather than printing a number nothing measured.
 
 **Only a destination gets a masthead.** `pageTitle` at 30sp belongs to the four
 tabs — Workouts, Regime, History, Settings. Everything you *push* wears the app
@@ -665,6 +746,13 @@ enabled button that shows an error when tapped.
 **Naming** — a single text field in a sheet, `surfaceSunken` fill, focused with
 a 2px white outline, with the confirm button directly under it. No screen push
 for one string.
+
+**Fields are declared once, in `inputDecorationTheme`.** Fill, radius, focused
+outline, hint colour and insets are the theme's; a call site passes a hint, a
+prefix or a suffix and nothing else. Seven fields each carried their own copy of
+that block, which is how the exercise search in History ended up with no focused
+outline, no hint colour and a different magnifying glass than the identical
+field in the catalog. A list filtered by typing uses `SearchField`.
 
 ### The programme editor
 

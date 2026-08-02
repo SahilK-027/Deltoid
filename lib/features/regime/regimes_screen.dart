@@ -24,13 +24,22 @@ class RegimesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(regimeSummariesProvider).valueOrNull;
-    final c = context.c;
 
     // No status line under the title: the `Active regime` heading below says
     // which one is being trained, and the band saying it too is the same fact
     // twice, 40pt apart.
-    const header = HeaderBand(
-      child: PageHeader(title: 'Regimes', topGap: Space.xxl),
+    //
+    // The eyebrow states the inventory instead — the one fact about this page
+    // that no row on it carries — so the band is the two-line masthead every
+    // other tab wears rather than a lone 30sp word on a strip of surface. It
+    // waits for the count the same way History's does: no honest eyebrow yet,
+    // so the title takes the wider top gap until there is one (THEME §4).
+    final header = HeaderBand(
+      child: PageHeader(
+        title: 'Regimes',
+        eyebrow: _inventory(summaries),
+        topGap: summaries == null ? Space.xxl : Space.md,
+      ),
     );
 
     if (summaries == null) {
@@ -50,7 +59,6 @@ class RegimesScreen extends ConsumerWidget {
     // the column bends around whichever regime happens to be active.
     final live = [for (final s in summaries) if (s.regime.isActive) s];
     final library = [for (final s in summaries) if (!s.regime.isActive) s];
-    final full = summaries.length >= identitySlots;
 
     return Scaffold(
       body: Column(
@@ -67,22 +75,33 @@ class RegimesScreen extends ConsumerWidget {
                         EdgeInsets.symmetric(horizontal: Space.gutter),
                     child: SectionHeader('Active regime'),
                   ),
-                  for (final s in live)
-                    _RegimeRow(summary: s, total: summaries.length),
+                  // In a card, like `Movements` below it and every list in
+                  // Settings. Full-bleed rows put the first line of text 28
+                  // under the heading with nothing in between, so this section
+                  // opened at a visibly different distance than the one under
+                  // it — a card's edge lands at 12 and the row reads from
+                  // there.
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: Space.gutter),
+                    child: ListCard(
+                      inset: Space.lg,
+                      children: [
+                        for (final s in live)
+                          _RegimeRow(summary: s, total: summaries.length),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: Space.section),
                 ],
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: Space.gutter),
+                  // No second line. What the library is needs no explaining
+                  // once the heading above it says `Active regime`, and the
+                  // eyebrow already states how many slots are left.
                   child: SectionHeader(
                     'Regime library',
-                    subtitle: full
-                        ? 'Full — $identitySlots regimes is the limit. Delete '
-                            'one to add another.'
-                        : live.isEmpty
-                            ? 'One is trained at a time. Nothing is active yet.'
-                            : 'Not being trained. Every workout logged under '
-                                'one stays attached to it.',
                     // `New` stays, full or not. A control that vanishes at the
                     // limit leaves you looking for the button rather than
                     // reading the reason — the sheet it opens is where the
@@ -92,38 +111,38 @@ class RegimesScreen extends ConsumerWidget {
                         summaries.isEmpty ? null : () => _create(context, ref),
                   ),
                 ),
-                if (library.isEmpty)
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: Space.gutter),
-                    child: Column(
-                      children: [
-                        EmptyBox(
-                          icon: Icons.tune,
-                          message: summaries.isEmpty
-                              ? 'Build your own split, or start from a template '
-                                  'and edit it into shape.'
-                              : 'Nothing else yet. A second split can be built '
-                                  'without losing the one you are mid-cycle on.',
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Space.gutter),
+                  child: library.isEmpty
+                      ? Column(
+                          children: [
+                            EmptyBox(
+                              icon: Icons.tune,
+                              message: summaries.isEmpty
+                                  ? 'Build your own split, or start from a '
+                                      'template and edit it into shape.'
+                                  : 'Nothing else yet. A second split can be '
+                                      'built without losing the one you are '
+                                      'mid-cycle on.',
+                            ),
+                            if (summaries.isEmpty) ...[
+                              const SizedBox(height: Space.lg),
+                              PrimaryButton(
+                                label: 'Create regime',
+                                onPressed: () => createRegimeFlow(context, ref),
+                              ),
+                            ],
+                          ],
+                        )
+                      : ListCard(
+                          inset: Space.lg,
+                          children: [
+                            for (final s in library)
+                              _RegimeRow(summary: s, total: summaries.length),
+                          ],
                         ),
-                        if (summaries.isEmpty) ...[
-                          const SizedBox(height: Space.lg),
-                          PrimaryButton(
-                            label: 'Create regime',
-                            onPressed: () => createRegimeFlow(context, ref),
-                          ),
-                        ],
-                      ],
-                    ),
-                  )
-                else
-                  for (var i = 0; i < library.length; i++) ...[
-                    if (i > 0) Divider(height: 1, color: c.border),
-                    _RegimeRow(
-                      summary: library[i],
-                      total: summaries.length,
-                    ),
-                  ],
+                ),
                 const SizedBox(height: Space.section),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: Space.gutter),
@@ -143,6 +162,20 @@ class RegimesScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// `3 regimes · 3 slots free` — what the page holds, which is the eyebrow's
+  /// job on every tab that has one (Workouts prints the date, History the span
+  /// it covers).
+  ///
+  /// Null until the query lands: a header that prints `0 regimes` for one frame
+  /// is the same fabricated number rule 4 exists to stop.
+  static String? _inventory(List<RegimeSummary>? summaries) {
+    if (summaries == null) return null;
+    final n = summaries.length;
+    final free = identitySlots - n;
+    return '$n regime${n == 1 ? '' : 's'} · '
+        '${free == 0 ? 'no slots left' : '$free slot${free == 1 ? '' : 's'} free'}';
   }
 
   /// Builds a regime without switching to it, and says so in the one place a

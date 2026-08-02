@@ -181,13 +181,19 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               style: context.t.bodyMedium,
             ),
           ),
-          const SizedBox(height: Space.xl),
+          // 16 between a header block and the first section under it, as on
+          // every other screen that pins one.
+          const SizedBox(height: Space.lg),
 
           // ── Overrides, only when opened from a day ───────────────────────
           if (widget.fromDay && entry != null) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-              child: SectionHeader('Overrides', subtitle: '$dayName only'),
+              // No subtitle. Which day these belong to is printed in the
+              // header block at the top of the page, and a heading that
+              // carries a second line starts its card 20pt lower than
+              // `General` starts its own.
+              child: const SectionHeader('Overrides'),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
@@ -233,12 +239,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           // ── General, always ──────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-            child: SectionHeader(
-              'General',
-              subtitle: widget.isNew
-                  ? 'The exercise itself'
-                  : 'The exercise itself, everywhere it appears',
-            ),
+            child: const SectionHeader('General'),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
@@ -874,24 +875,12 @@ class _RepField extends StatelessWidget {
           textAlign: TextAlign.center,
           style: context.t.labelLarge,
           cursorColor: c.textPrimary,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: 'Optional',
-            hintStyle: context.t.bodyMedium?.copyWith(color: c.textTertiary),
-            filled: true,
-            fillColor: c.surfaceHigh,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(Radii.md),
-              borderSide: BorderSide(color: c.textPrimary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(vertical: Space.md),
+            // The one field that overrides the theme's insets: it is a narrow
+            // centred cell in a table, and 16 of horizontal padding either side
+            // leaves no room for three digits.
+            contentPadding: EdgeInsets.symmetric(vertical: Space.md),
           ),
         ),
       ],

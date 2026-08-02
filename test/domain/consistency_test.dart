@@ -83,8 +83,11 @@ void main() {
       expect(c.thisWeek, 2, reason: '4 days ago is last Sunday');
     });
 
-    test('two sessions in one day count twice here too', () {
-      expect(of([1, 1]).thisWeek, 2);
+    test('two sessions in one day are one day trained', () {
+      // The window count is a rate and counts both; this one is a row of days
+      // on a grid, and that grid has one cell for the pair.
+      expect(of([1, 1]).sessions, 2);
+      expect(of([1, 1]).thisWeek, 1);
     });
 
     test('a fresh Monday starts at zero rather than carrying Sunday over', () {

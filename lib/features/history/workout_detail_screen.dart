@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/calendar.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
@@ -222,13 +223,12 @@ class WorkoutDetailScreen extends ConsumerWidget {
     WorkoutDetail detail,
   ) async {
     final current = dateFromDayKey(detail.workout.dayKey);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current,
-      firstDate: DateTime(2015),
-      // Training in the future is not a thing; a stray tap on next month is.
-      lastDate: DateTime.now(),
-      helpText: 'When was this trained?',
+    // Training in the future is not a thing; a stray tap on next month is —
+    // so `last` stays today and the rest of the month is visible but dead.
+    final picked = await pickDay(
+      context,
+      initial: current,
+      title: 'When was this trained?',
     );
     if (picked == null || !context.mounted) return;
     if (dayKeyOf(picked) == detail.workout.dayKey) return;

@@ -209,6 +209,26 @@ class WorkoutSummary {
   }
 }
 
+/// A training day that appears in history, for the feed's filter.
+class LoggedSession {
+  const LoggedSession({
+    required this.sessionId,
+    required this.name,
+    required this.regimeName,
+    required this.workouts,
+    required this.lastDayKey,
+  });
+
+  final String sessionId;
+  final String name;
+
+  /// Two regimes can both have a `Push 1`, so the row says which.
+  final String regimeName;
+
+  final int workouts;
+  final int lastDayKey;
+}
+
 /// An exercise that has actually been trained, for the history index.
 class ExerciseHistorySummary {
   const ExerciseHistorySummary({
@@ -905,11 +925,22 @@ class TrainingRepository {
     int limit = 20,
     HistoryCursor? olderThan,
     String? sessionId,
+    String? regimeId,
+    bool deloadOnly = false,
   }) async {
     var predicate = db.workouts.status.equalsValue(WorkoutStatus.completed) &
         db.workouts.deletedAt.isNull();
+    // Filters go in the query, never over the loaded page: History pages by
+    // keyset (README invariant 5), and a page filtered after the fact comes
+    // back short, which the feed reads as the end of history.
     if (sessionId != null) {
       predicate = predicate & db.workouts.sessionId.equals(sessionId);
+    }
+    if (regimeId != null) {
+      predicate = predicate & db.workouts.regimeId.equals(regimeId);
+    }
+    if (deloadOnly) {
+      predicate = predicate & db.workouts.isDeload.equals(true);
     }
     if (olderThan != null) predicate = predicate & _olderThan(olderThan);
 
@@ -1020,6 +1051,57 @@ class TrainingRepository {
     ];
     summaries.sort((a, b) => b.lastDayKey.compareTo(a.lastDayKey));
     return summaries;
+  }
+
+  /// The training days that actually appear in completed history, with the
+  /// regime each belongs to and how many times it was logged.
+  ///
+  /// The filter offers these and nothing else. A picker built from the *active*
+  /// regime's sessions would omit every day you trained under the split you
+  /// stopped running, which is precisely the history worth filtering; one built
+  /// from all sessions ever created would offer days that return an empty list.
+  Future<List<LoggedSession>> loggedSessions() async {
+    final logged = db.workouts.id.count();
+    final lastDay = db.workouts.dayKey.max();
+
+    final rows = await (db.selectOnly(db.workouts).join([
+      innerJoin(db.sessions, db.sessions.id.equalsExp(db.workouts.sessionId)),
+      innerJoin(db.regimes, db.regimes.id.equalsExp(db.sessions.regimeId)),
+    ])
+          ..addColumns([
+            db.sessions.id,
+            db.sessions.name,
+            db.regimes.name,
+            logged,
+            lastDay,
+          ])
+          ..where(db.workouts.status.equalsValue(WorkoutStatus.completed) &
+              db.workouts.deletedAt.isNull() &
+              db.sessions.deletedAt.isNull())
+          ..groupBy([db.sessions.id]))
+        .get();
+
+    final sessions = [
+      for (final r in rows)
+        LoggedSession(
+          sessionId: r.read(db.sessions.id)!,
+          name: r.read(db.sessions.name)!,
+          regimeName: r.read(db.regimes.name)!,
+          workouts: r.read(logged) ?? 0,
+          lastDayKey: r.read(lastDay) ?? 0,
+        ),
+    ];
+    // Most recently trained first: the day you want back is nearly always one
+    // you are still running.
+    sessions.sort((a, b) => b.lastDayKey.compareTo(a.lastDayKey));
+    return sessions;
+  }
+
+  Stream<List<LoggedSession>> watchLoggedSessions() {
+    return db.watchQuery(
+      [db.workouts, db.sessions, db.regimes],
+      loggedSessions,
+    );
   }
 
   /// One page of a single exercise's history, newest first.
