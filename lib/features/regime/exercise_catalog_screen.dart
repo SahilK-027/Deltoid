@@ -63,7 +63,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
           }).toList();
 
     // Only the muscles something is actually filed under, in `MuscleGroup`
-    // order so a chip keeps its position as the catalog grows (§5, muscle bars).
+    // order so a chip keeps its position as the catalog grows (THEME → Components → Bar list).
     final present = all == null
         ? const <MuscleGroup>[]
         : [
@@ -101,7 +101,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
             ),
           ),
           // The row bleeds off the right edge — the clipped chip is the scroll
-          // affordance (§5).
+          // affordance (THEME → Components).
           if (present.length > 1)
             SizedBox(
               height: 52,

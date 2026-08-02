@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
 
-/// The component vocabulary from THEME.md §5. Feature code composes these; it
+/// The component vocabulary from THEME.md. Feature code composes these; it
 /// does not draw its own cards, rows, buttons or sheets.
 
 /// Press feedback for anything with a shape: a small scale-down and a dim.
@@ -315,8 +315,8 @@ class LinkAction extends StatelessWidget {
 
 // `SectionLabel` — an uppercase eyebrow over a group — was here, unused by any
 // screen, and it contradicted the rule the type scale is built on: uppercase
-// appears in exactly two places, the page title and the page eyebrow (THEME
-// §3). A component nothing calls is a second answer to a question
+// appears in exactly two places, the page title and the page eyebrow
+// (THEME → Type). A component nothing calls is a second answer to a question
 // [SectionHeader] already answers.
 
 /// The one search box. Three screens filter a list of exercises and each one
@@ -607,7 +607,7 @@ class AppRow extends StatelessWidget {
 /// where the finger landed is the only feedback a flat list can give.
 ///
 /// It is not the app-wide default — `splashFactory` stays [NoSplash] and every
-/// other surface keeps scale-and-dim (THEME §4). This asks for ink explicitly.
+/// other surface keeps scale-and-dim (THEME → Space). This asks for ink explicitly.
 class InkRow extends StatelessWidget {
   const InkRow({
     super.key,
@@ -830,7 +830,7 @@ class AppChip extends StatelessWidget {
   final bool selected;
 
   /// The category's own colour, where the label names a category that already
-  /// has one — a muscle, whose hue is the bar it is counted in (THEME §5).
+  /// has one — a muscle, whose hue is the bar it is counted in (THEME → Components).
   ///
   /// Unselected it is a dot before the label and the pill stays grey: chrome is
   /// monochrome (rule 1), and a list of coloured pills over a list of exercise
@@ -981,8 +981,7 @@ class SegmentedPill<T> extends StatelessWidget {
   }
 }
 
-/// Tabs with a white underline under the live one (THEME §7 day tabs, §8
-/// exercise detail).
+/// Tabs with a white underline under the live one (THEME → Components).
 ///
 /// A strip, not a list: a training day is a context you switch, not an item you
 /// scroll past. It scrolls horizontally and bleeds off the right edge, so the
@@ -1213,7 +1212,8 @@ class IconTile extends StatelessWidget {
   }
 }
 
-/// The §5 radio: selected is a filled disc with a dark dot punched out of it,
+/// The radio from THEME → Components: selected is a filled disc with a dark
+/// dot punched out of it,
 /// unselected a 2px ring in `textTertiary`. No accent hue, and no Material
 /// `Radio`, whose ripple and 48pt slop belong to a different design language.
 ///

@@ -557,7 +557,7 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                         return AppRow(
                           title: e.name,
                           // Tappable here for the same reason as in the catalog
-                          // (§5): the muscle you can see is the filter.
+                          // (THEME → Components): the muscle you can see is the filter.
                           subtitleLeading: AppChip(
                             label: e.muscle.label,
                             dense: true,

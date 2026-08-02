@@ -39,7 +39,7 @@ final exerciseByIdProvider =
 ///   no meaning anywhere else.
 /// * **General**, always — the catalog row itself, as ordinary rows you tap,
 ///   not a form. Every screen in this app edits by opening one question at a
-///   time (THEME §5); this one was the exception.
+///   time (THEME → Components); this one was the exception.
 ///
 /// Existing rows **save as you go**, like every other settings surface here. A
 /// new one holds a draft until `Create`, because a half-filled exercise
@@ -176,7 +176,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
         children: [
           // Which day this is, sharing the bar's surface so the two read as one
           // header — the centred title has room for a name, not for a name and
-          // the day it sits in (§5).
+          // the day it sits in (THEME → Components).
           //
           // The muscle used to sit here too, and it was the same word as the
           // `Muscle` row's own value a few hundred pixels below it — a fact
@@ -908,7 +908,7 @@ class _DeloadWeightRow extends ConsumerWidget {
   }
 }
 
-/// The target editor (THEME §7): a sheet, never a screen.
+/// The target editor (THEME → Composing a screen): a sheet, never a screen.
 ///
 /// Their version is a table with one row per planned set, because their sets
 /// are individually programmed. Ours are not — a slot has a set count and one
@@ -1003,7 +1003,7 @@ class _TargetSheetState extends ConsumerState<_TargetSheet> {
   }
 }
 
-/// One rep bound. The placeholder is the literal word `Optional` (§7): a rep
+/// One rep bound. The placeholder is the literal word `Optional` (THEME → Composing a screen): a rep
 /// range is a target, and a slot is allowed not to have one.
 class _RepField extends StatelessWidget {
   const _RepField({required this.label, required this.controller});

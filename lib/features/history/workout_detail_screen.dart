@@ -135,7 +135,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
                     ),
                   )
                 else ...[
-                  // Count as heading (§7): "6 exercises" says more than the
+                  // Count as heading (THEME → Composing a screen): "6 exercises" says more than the
                   // word does on its own.
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -309,7 +309,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
 ///
 /// Full-bleed, no card: the block is separated from its neighbours by a
 /// hairline, which is what makes a day of six exercises read as one list rather
-/// than six panels (§8).
+/// than six panels (THEME → Components).
 class _ExerciseBlock extends ConsumerStatefulWidget {
   const _ExerciseBlock({required this.entry});
 

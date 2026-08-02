@@ -155,7 +155,8 @@ class TrendSeries {
 double trendX(int dayKey) =>
     dateFromDayKey(dayKey).millisecondsSinceEpoch / 86400000;
 
-/// The chart from THEME §5: dashed horizontal gridlines only, labels on the
+/// The chart from THEME → Components: dashed horizontal gridlines only,
+/// labels on the
 /// right, no border, markers while they still mark something, horizontal zoom.
 class TrendChart extends StatelessWidget {
   const TrendChart({
@@ -236,7 +237,7 @@ class TrendChart extends StatelessWidget {
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(),
                 leftTitles: const AxisTitles(),
-                // Right-hand Y labels (THEME §5): the left gutter is where the
+                // Right-hand Y labels (THEME → Components): the left gutter is where the
                 // eye starts a row, and spending it on an axis pushes the plot
                 // off centre on a phone.
                 rightTitles: AxisTitles(

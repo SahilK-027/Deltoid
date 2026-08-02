@@ -1049,7 +1049,7 @@ class TrainingRepository {
     var predicate = db.workouts.status.equalsValue(WorkoutStatus.completed) &
         db.workouts.deletedAt.isNull();
     // Filters go in the query, never over the loaded page: History pages by
-    // keyset (README invariant 5), and a page filtered after the fact comes
+    // keyset (RULES § Data), and a page filtered after the fact comes
     // back short, which the feed reads as the end of history.
     if (sessionId != null) {
       predicate = predicate & db.workouts.sessionId.equals(sessionId);

@@ -46,7 +46,7 @@ class HistoryScreen extends ConsumerWidget {
               // than spare.
               eyebrow: _span(overview),
               // Without the eyebrow the title is the first line under the
-              // status bar, and 12 leaves it sitting on the notch (THEME §4).
+              // status bar, and 12 leaves it sitting on the notch (THEME → Space).
               topGap: _span(overview) == null ? Space.xxl : Space.md,
               belowGap: Space.lg,
               actions: [_TotalStat(overview: overview)],
@@ -163,7 +163,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
     final filter = ref.watch(historyFilterProvider);
 
     // The chip row is part of the list, above it: it belongs to the feed, not
-    // to the masthead, which holds the screen's name and nothing else (§5).
+    // to the masthead, which holds the screen's name and nothing else (THEME → Components).
     return Column(
       children: [
         // The bar arrives once there is more than one day in history, and
@@ -227,7 +227,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
 
     // No cards and no gutter: the rows run edge to edge under a spoken
     // date heading, which is what lets a year of training be scanned by
-    // the tiles and the day names alone (§8).
+    // the tiles and the day names alone (THEME → Components).
     return ListView.builder(
           controller: _controller,
           padding: const EdgeInsets.only(bottom: Space.huge),
@@ -320,7 +320,7 @@ class _SummaryRow extends _FeedRow {
 /// weeks.
 ///
 /// Chips rather than a bar of dropdowns, and the same chips the catalog filters
-/// with (§5): unselected is `surfaceHigh`, a live filter is the `accent` fill,
+/// with (THEME → Components): unselected is `surfaceHigh`, a live filter is the `accent` fill,
 /// and a caret means it opens a picker. There is no date range — the list is
 /// ordered by date and scrolling is the range control; two date fields would
 /// ask you to type the answer the list is already showing.

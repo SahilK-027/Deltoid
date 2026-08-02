@@ -122,8 +122,8 @@ class WeeklyVolume {
   /// The biggest row, which every bar is drawn against. Zero on an empty week.
   ///
   /// Normalised to your own maximum rather than to a target: this app has no
-  /// business inventing a number of sets you are failing to hit (README →
-  /// Non-goals).
+  /// business inventing a number of sets you are failing to hit
+  /// (RULES § Scope).
   int get maxSets => rows.fold(0, (m, r) => r.sets > m ? r.sets : m);
 
   int get totalSets => rows.fold(0, (s, r) => s + r.sets);

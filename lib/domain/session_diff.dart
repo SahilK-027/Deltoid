@@ -1,6 +1,6 @@
 /// What today's session did that the programme doesn't know about yet.
 ///
-/// A workout is a *snapshot* of its session template (README invariant 2), so
+/// A workout is a *snapshot* of its session template (RULES § Data), so
 /// improvising mid-session — adding a movement the rack made available, cutting
 /// one, running them in a different order — changes today and nothing else. That
 /// is the right default: an app that quietly rewrote the programme every time a

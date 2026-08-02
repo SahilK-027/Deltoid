@@ -33,7 +33,7 @@ class RegimesScreen extends ConsumerWidget {
     // that no row on it carries — so the band is the two-line masthead every
     // other tab wears rather than a lone 30sp word on a strip of surface. It
     // waits for the count the same way History's does: no honest eyebrow yet,
-    // so the title takes the wider top gap until there is one (THEME §4).
+    // so the title takes the wider top gap until there is one (THEME → Space).
     final header = HeaderBand(
       child: PageHeader(
         title: 'Regimes',

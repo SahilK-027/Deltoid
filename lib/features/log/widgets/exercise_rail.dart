@@ -16,7 +16,7 @@ import '../../../domain/enums.dart';
 ///
 /// This is the reference's photo-thumbnail rail with the photo removed — it
 /// falls back to exactly this when an exercise has no image, and every one of
-/// ours does (§0: no exercise photography, ever).
+/// ours does (the app ships no exercise photography, ever).
 ///
 /// Long-press any tile to drag the exercise into a different place in the
 /// session.
@@ -172,7 +172,7 @@ class _ExerciseRailState extends State<ExerciseRail> {
                 // Narrow and short of opaque. At 32dp running to full `bg` it
                 // stopped reading as an edge and started reading as a drop
                 // shadow under the `+` beside it — a smudge on a flat theme
-                // that has no shadows in it anywhere (THEME §1).
+                // that has no shadows in it anywhere (THEME → The six rules).
                 Positioned(
                   right: 0,
                   top: 0,

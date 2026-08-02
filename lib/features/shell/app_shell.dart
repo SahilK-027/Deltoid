@@ -86,7 +86,7 @@ class _AppShellState extends State<AppShell>
 
 // `Today` was already lying: the screen backfills a session logged on Tuesday
 // and resumes one left open yesterday, so a tab named after a day shows other
-// days. The page keeps the date as its own title (§9) — only the label moved.
+// days. The page keeps the date as its own title (THEME → Composing a screen) — only the label moved.
 //
 // Settings takes the slot Progress left behind, and not for symmetry:
 // bodyweight logging lives in there and is not a setting. It is data entered

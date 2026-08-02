@@ -62,7 +62,8 @@ PlateLoad? plateLoadFor({
 /// The bar, what is on it, and one sentence saying so.
 ///
 /// Sits above the keypad while a barbell weight is being typed — the moment the
-/// question "what do I actually put on" is being asked. THEME §6.
+/// question "what do I actually put on" is being asked.
+/// THEME → Components → The numeric keypad.
 class PlateView extends StatelessWidget {
   const PlateView({super.key, required this.load, required this.unit});
 
@@ -134,7 +135,7 @@ class PlateView extends StatelessWidget {
     );
   }
 
-  /// The plain sentence THEME §6 asks for, in the order you load a bar:
+  /// The plain sentence the keypad spec asks for, in the order you load a bar:
   /// what goes on each side, then the bar, then the total.
   static String _sentence(PlateLoad load, WeightUnit unit) {
     final u = unit.label;

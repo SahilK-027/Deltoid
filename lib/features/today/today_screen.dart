@@ -116,7 +116,7 @@ class _SessionPickRow extends StatelessWidget {
               ] else if (isNext)
                 // Sentence case, like `done this cycle` two lines up. An
                 // uppercase micro-label is what makes a screen look like a
-                // template (THEME §3) — uppercase belongs to the masthead.
+                // template (THEME → Type) — uppercase belongs to the masthead.
                 Text('Next up', style: context.t.labelSmall)
               else
                 Icon(
@@ -1460,7 +1460,7 @@ class _ConsistencyCard extends StatelessWidget {
   }
 }
 
-/// This week's sets per muscle (THEME §5 → Muscle volume bars).
+/// This week's sets per muscle (THEME → Components → Bar list).
 ///
 /// A section on the page you already open rather than a screen you navigate to
 /// — a volume dashboard came off the non-goals list on exactly that condition,

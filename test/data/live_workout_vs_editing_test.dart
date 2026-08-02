@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// The answer has to be "nothing", and it has to be provable rather than
 /// asserted: `WorkoutExercise` and `SetLog` are snapshots of the template
-/// rather than pointers into it (README invariant 2), and this is the case that
+/// rather than pointers into it (RULES § Data), and this is the case that
 /// invariant exists for.
 void main() {
   final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');

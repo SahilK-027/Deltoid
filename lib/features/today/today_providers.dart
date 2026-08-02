@@ -59,7 +59,8 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
 /// Its own provider rather than a field on [TodayData], and this is the one
 /// place that split is right: `todaySnapshot` is what the screen *is* — a
 /// missing field there is a frame where "no sessions" is indistinguishable from
-/// "not loaded yet" (README). The bars are a section further down that has an
+/// "not loaded yet" (RULES § Data). The bars are a section further down that
+/// has an
 /// honest empty state of its own, so a frame without them costs nothing, and
 /// they are the only thing in the app that reads `set_logs` for Today. Folding
 /// this query into the snapshot would re-run the whole screen's read on every

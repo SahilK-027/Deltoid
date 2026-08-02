@@ -7,7 +7,7 @@ import 'tokens.dart';
 /// with static instances at 400/500/600/700/800.
 const kFontFamily = 'Inter';
 
-/// The type scale from THEME.md §3. Nine roles, and a screen uses a handful.
+/// The type scale from THEME.md. Nine roles, and a screen uses a handful.
 ///
 /// Nothing is larger than [TextTheme.displayLarge] (30, the page title) or
 /// smaller than [TextTheme.labelSmall] (11, nav labels and units). Sizes below

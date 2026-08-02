@@ -5,7 +5,7 @@ import '../../../core/widgets/primitives.dart';
 import '../../../domain/enums.dart';
 import '../../../domain/muscle_volume.dart';
 
-/// Weekly sets per muscle: the one chart in this app that is a list (THEME §5).
+/// Weekly sets per muscle: the one chart in this app that is a list (THEME → Components).
 ///
 /// One row per region, name on the left, a bar in the middle, the count on the
 /// right. No axis, no gridlines, no legend — a bar list whose longest bar *is*
@@ -33,7 +33,7 @@ class _VolumeBarsState extends State<VolumeBars> {
     final rows = widget.volume.rows;
     // Every bar is drawn against the biggest row, not against a target: this
     // app has no business inventing a number of sets you are failing to hit
-    // (README → Non-goals). One set in a week is therefore a full bar, which is
+    // (RULES § Scope). One set in a week is therefore a full bar, which is
     // correct — it is the most you did.
     final max = widget.volume.maxSets;
 

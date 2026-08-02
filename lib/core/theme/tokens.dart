@@ -172,7 +172,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   ///
   /// The cost, stated: on a white card `yellow` is 1.4:1 and `orange` 1.9:1.
   /// They are fills and marks on the light theme, never text and never a
-  /// hairline — see the note in THEME §2.
+  /// hairline — see the note in THEME → Colour.
   ///
   /// Red has no entry: `negative` is the one signal that must never be mistaken
   /// for information, and it stays out of the palette everything else is drawn
@@ -260,7 +260,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// The same closed set the Regimes screen hands out, used here for the same
   /// reason — six fixed categories, one apiece, and the colour *is* the
   /// category. The two never share a screen (a regime's mark is on the Regimes
-  /// screen and nowhere else, THEME §2), so nothing claims a hue means a
+  /// screen and nowhere else, THEME → Colour), so nothing claims a hue means a
   /// programme. `series` will not do: it holds five, and the sixth region would
   /// wrap onto a colour already spoken for.
   Color forRegion(MuscleRegion region) =>

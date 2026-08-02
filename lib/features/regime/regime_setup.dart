@@ -142,7 +142,7 @@ class _TemplateCard extends StatelessWidget {
   }
 }
 
-/// Choice cards (THEME §7): the one genuinely branching decision this app has
+/// Choice cards (THEME → Composing a screen): the one genuinely branching decision this app has
 /// — start from a template, or from nothing — as a stack of outlined cards in a
 /// sheet rather than the first screen of a wizard. There is no radio and no
 /// confirm: picking one *is* the answer, and the next sheet asks the one other
@@ -162,7 +162,7 @@ class _TemplateSheet extends StatelessWidget {
         children: [
           SheetHeader(
             title: 'New regime',
-            // The sheet says what it will make, before it asks anything (§7).
+            // The sheet says what it will make, before it asks anything (THEME → Composing a screen).
             subtitle: full
                 ? 'Nothing to pick until a regime is deleted'
                 : 'A split you can edit freely afterwards',

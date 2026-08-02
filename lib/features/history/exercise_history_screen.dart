@@ -73,7 +73,7 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
       body: Column(
         children: [
           // The metric strip pins under the bar while the chart scrolls away
-          // beneath it (THEME §5): the thing you change stays reachable, the
+          // beneath it (THEME → Components): the thing you change stays reachable, the
           // thing you read does not hold half the screen for ever.
           // Not for a hold. Neither metric is a thing a plank has, so the
           // screen measures it in seconds throughout and does not offer a

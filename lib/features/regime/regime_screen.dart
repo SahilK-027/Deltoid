@@ -50,7 +50,7 @@ final sessionSlotsProvider = StreamProvider.family<
 
 /// One programme, opened from the Regime index.
 ///
-/// A training day is a **tab**, not a row you push into (THEME §7): switching
+/// A training day is a **tab**, not a row you push into (THEME → Composing a screen): switching
 /// days is a context change, and the vertical list it replaced put a screen
 /// between you and the thing you came to edit. Everything about the regime
 /// itself — its name, its deload, the order of its days — is behind the one
@@ -107,7 +107,7 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
     final day = sessions.isEmpty ? 0 : _day.clamp(0, sessions.length - 1);
 
     return Scaffold(
-      // Pushed, so it wears the bar rather than a masthead (THEME §5). The
+      // Pushed, so it wears the bar rather than a masthead (THEME → Components). The
       // cycle line and the day strip go in a `surface` block directly under it,
       // sharing its colour so the two read as one header.
       appBar: AppBar(
@@ -181,7 +181,7 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
 
 /// Where the cycle is, and the way into the two overrides that move it.
 ///
-/// One quiet line in the band (THEME §5): the cycle is the state of things, not
+/// One quiet line in the band (THEME → Components): the cycle is the state of things, not
 /// something the page is about. Everything you can *do* to it — close it early,
 /// call it a deload — is a tap away rather than a pair of buttons taking the top
 /// third of the screen, which is what it used to be.
@@ -372,7 +372,7 @@ class _DayBody extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(
               Space.gutter, Space.lg, Space.gutter, 0),
-          // Count as heading (§7): the number is the useful part of the word.
+          // Count as heading (THEME → Composing a screen): the number is the useful part of the word.
           child: SectionHeader(
             slots.isEmpty
                 ? 'No exercises'
@@ -487,7 +487,7 @@ class _DayBody extends ConsumerWidget {
 /// of those is not a training day you can read, it is a wall, and the card's
 /// only job was to be a second tap target for the target sheet. The sheet is
 /// one row down on the slot screen, which is where the rest of this slot's
-/// settings already live; the figure stays visible here, which is all §9 asked
+/// settings already live; the figure stays visible here, which is what THEME asks for
 /// for.
 class _SlotRow extends StatelessWidget {
   const _SlotRow({
@@ -592,7 +592,7 @@ Future<void> addSessionPrompt(
 ///
 /// A sheet, not a dialog: it rides above the keyboard, where a centred alert
 /// lands in the middle of the screen and then fights the keyboard for the same
-/// space (§5, §7). The confirm sits directly under the field and stays
+/// space (THEME → Components). The confirm sits directly under the field and stays
 /// `surfaceHigh` with a `textTertiary` label until there is something to save,
 /// so a stray tap can't create a day called "".
 ///

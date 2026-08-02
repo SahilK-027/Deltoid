@@ -10,7 +10,7 @@ import 'regime_screen.dart';
 
 /// Everything about the regime that is not one of its days.
 ///
-/// Behind the sliders button in the bar (THEME §7), because none of it is what
+/// Behind the sliders button in the bar (THEME → Composing a screen), because none of it is what
 /// the editor is opened to do: you open it to look at a training day. A name, a
 /// deload schedule and the order of the days are all things you change once and
 /// then live with.

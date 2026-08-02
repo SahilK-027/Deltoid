@@ -150,7 +150,7 @@ class BodyweightScreen extends ConsumerWidget {
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
     return Scaffold(
-      // Pushed, not a destination: the small centred title, not a masthead (§5).
+      // Pushed, not a destination: the small centred title, not a masthead (THEME → Components).
       appBar: AppBar(
         title: const Text('Bodyweight'),
         actions: [
@@ -495,7 +495,7 @@ class _TrendCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // The number leads and the date is the caption: this is a metric
-          // card, not a session (THEME §5, the metric screen).
+          // card, not a session (THEME → Components → Charts).
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
@@ -554,7 +554,7 @@ class _TrendCard extends ConsumerWidget {
 ///
 /// Tapping it opens the same sheet the `+` does, which is where correcting and
 /// deleting both live — a delete button on every row is eighty tap targets for
-/// a thing done twice a year (§7).
+/// a thing done twice a year (THEME → Composing a screen).
 ///
 /// Not an [AppRow]: a row nested under another row has to *read* as nested, so
 /// the date is `body` where its month is `title`, and it starts a column in
@@ -621,7 +621,7 @@ class _EntryRow extends ConsumerWidget {
 ///
 /// A sheet, not a dialog: it is a text field, and a centred `AlertDialog`
 /// opens in the middle of the screen and then fights the keyboard for the same
-/// space (§5).
+/// space (THEME → Components).
 Future<void> logBodyweightPrompt(
   BuildContext context,
   WidgetRef ref, {

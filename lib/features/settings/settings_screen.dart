@@ -261,7 +261,7 @@ class SettingsScreen extends ConsumerWidget {
 
     if (!context.mounted) return;
     // The app's own confirmation, where the dangerous option is the loud one
-    // and the safe option is the quiet one (§5) — this was two equal-weight
+    // and the safe option is the quiet one (THEME → Components) — this was two equal-weight
     // text buttons, with the one that wipes the device on the right.
     final confirmed = await confirmAction(
       context,
@@ -600,7 +600,7 @@ class _ThemeTile extends StatelessWidget {
             // hole in the section rather than as the other choice. The ring is
             // the card, and it is `surface` filled so the mount is visible on
             // both themes; selected takes it to 2px `accent`, which is the
-            // choice-card state from THEME §7.
+            // choice-card state from THEME → Composing a screen.
             padding: EdgeInsets.all(selected ? 3 : 4),
             decoration: BoxDecoration(
               color: c.surface,
