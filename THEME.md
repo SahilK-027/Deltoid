@@ -245,7 +245,10 @@ saved workout), never for decoration. Trailing chevron `textTertiary` at 18.
 - **Switch** — on: `accent` track, `#121212` knob. Off: `surfaceHighest` track,
   `textSecondary` knob. No accent hue.
 - **Radio** — selected: filled white disc with a dark dot. Unselected: 2px
-  `textTertiary` ring.
+  `textTertiary` ring. Built as `AppRadio`, and it is the trailing control of
+  an [AppRow] — one choice per row. Reach for it over a [SegmentedPill] when
+  the choice needs room to say what it means; the pill is for a control that
+  governs the page under it.
 - **Checkbox** — 26 square, radius 6. Checked: white fill, dark tick.
   Unchecked: 2px `textSecondary` outline, transparent.
 
@@ -667,6 +670,7 @@ deliberate departures — keep them when implementing.
 | Prefill is "previous", per exercise | Prefill is session-scoped and says so out loud when it borrows: amber dot on the ⓘ, the session and date inside it | The entire reason this app exists (README) |
 | Programme identity is a colour + glyph you must pick during creation | Same mark, but auto-assigned on create and changeable later | Identity is worth having; a mandatory question about it is not |
 | Rep targets hidden two taps deep behind a card, placeholder `Optional` | Same sheet, but the card shows the target inline (`4 × 8–10`) so it is readable without opening | The target is the point of the slot |
+| Theme is three labelled words in a segmented track | Three miniatures of the app — background, `Aa`, chart series, cards — with System split on the diagonal, over a `title` label | A track asks you to remember what "System" did last time; the tile shows it. The one place in the app where a control renders the *other* palette on purpose |
 | Every screen's masthead prints the screen's name | Same, landing screen included: `Workouts` in `pageTitle`, the date as its eyebrow, the rest gap as a `body` line beneath | This was briefly the other way round — the date as the title, on the grounds that the nav bar already says the name. It made the one screen you open into the only one whose masthead never says where you are, and the nav label answering for it is 11sp at the far end of the screen |
 
 ---

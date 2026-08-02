@@ -123,18 +123,48 @@ a device before the next starts.
       count that could only grow.
 
       **The list layouts**: `ListTile` and two hand-rolled `AnimatedContainer`
-      pickers gone, for `ListCard` + `AppRow` and `SegmentedPill` — this screen
-      had drawn its own version of a primitive that already existed, in the
-      accent the rest of the app reserves for exactly that control. Restore's
-      confirm is `confirmAction` now, rather than two equal-weight text buttons
-      with the one that wipes the device on the right.
+      pickers gone, for `ListCard` + `AppRow`. Restore's confirm is
+      `confirmAction` now, rather than two equal-weight text buttons with the
+      one that wipes the device on the right.
+
+      **The two settings are pictures and radios, not tracks.** Theme is three
+      miniatures of the app — background, heading, chart series, cards — with
+      System split on the diagonal, because a setting that is neither light nor
+      dark has no honest single picture and three words in a track ask you to
+      remember what it did last time. Units are rows with `AppRadio` (§5, built
+      for this): the unit changes what every number in the app means, and a row
+      has the width to say so. Switching theme no longer cross-fades —
+      `MaterialApp` was lerping every colour in the tree for 200ms, which over
+      cards, charts and a heatmap is a long grey wash through the midpoint of
+      two palettes.
+
+      **Backup stops freezing the app.** `jsonEncode` and `jsonDecode` over the
+      whole history are single synchronous calls, and on the UI isolate they
+      took the app with them — no frames, no progress, no way to tell a slow
+      export from a hung one, and a hung restore gets killed halfway, which is
+      the one failure that costs data. Both run in another isolate now (via
+      top-level functions: a closure inside `BackupService` captures `this`,
+      and the FFI database handle cannot cross an isolate boundary). So does
+      the automatic export that fires after every session. Both jobs report
+      `BackupStep`s — phase, detail, and a fraction that is null where a phase
+      genuinely cannot say — onto one progress sheet.
+
+      **Export can save to Downloads.** The share sheet was the only way out,
+      and sharing a backup to yourself is a strange thing to have to do. A
+      choice sheet offers Downloads or Share; the copy lands in
+      `Download/Deltoid_Backup` through MediaStore on Android 10+, and through
+      the public directory below that (`WRITE_EXTERNAL_STORAGE`, capped at
+      API 28). The platform side streams from the path rather than taking the
+      file through the channel as one string.
 
       `settings_screen_test.dart` covers both screens against a real database
-      and the month grouping without one.
+      and the month grouping without one; `units_test.dart` covers the delta
+      rule, and `seed_years_test.dart` now asserts progress never goes
+      backwards.
 
       **Still open here**: a weight is rounded to the display increment, which
       is 0.5 kg because that is the smallest pair of plates. A scale reads
-      0.1, and bodyweight is the one figure in the app that is not plates — 
+      0.1, and bodyweight is the one figure in the app that is not plates —
       typing 76.4 stores and shows 76.5. Wants a decision before this is
       driven.
 

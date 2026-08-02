@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,39 @@ import '../db/database.dart';
 /// read. Import refuses anything newer than it understands rather than
 /// half-restoring a file from the future.
 const backupFormatVersion = 1;
+
+/// Which half of a long job is running, so the screen can say something more
+/// useful than "working".
+enum BackupPhase { reading, encoding, writing, decoding, clearing }
+
+/// A step of a long job: what it is doing, what on, and how far through.
+///
+/// [fraction] is null while a phase genuinely cannot say — a `jsonEncode` of a
+/// hundred thousand rows is one opaque call. A bar that sits still is honest;
+/// one that invents a percentage and then jumps is not.
+typedef BackupStep = ({
+  BackupPhase phase,
+  String detail,
+  int rows,
+  double? fraction,
+});
+
+typedef BackupProgress = void Function(BackupStep step);
+
+/// `set_logs` → `set logs`. The table names are the wire format, not English.
+String _label(String table) => table.replaceAll('_', ' ');
+
+/// JSON in another isolate.
+///
+/// Top-level, and deliberately not methods: a closure written inside
+/// [BackupService] captures the whole enclosing context, `this` included, and
+/// `this` holds an `AppDatabase` wrapping an FFI handle that cannot cross an
+/// isolate boundary — `Isolate.run` fails at the send, not at the JSON.
+Future<String> _encodeOffIsolate(Map<String, dynamic> payload) =>
+    Isolate.run(() => jsonEncode(payload));
+
+Future<Map<String, dynamic>> _decodeOffIsolate(String json) =>
+    Isolate.run(() => jsonDecode(json) as Map<String, dynamic>);
 
 class BackupSummary {
   const BackupSummary({required this.counts, required this.exportedAt});
@@ -156,14 +190,26 @@ class BackupService {
     ),
   ];
 
-  Future<Map<String, dynamic>> buildPayload() async {
+  Future<Map<String, dynamic>> buildPayload({BackupProgress? onProgress}) async {
     final data = <String, dynamic>{};
     final counts = <String, int>{};
 
-    for (final codec in _codecs) {
+    var read = 0;
+    for (var i = 0; i < _codecs.length; i++) {
+      final codec = _codecs[i];
       final rows = await codec.dump();
       data[codec.name] = rows;
       counts[codec.name] = rows.length;
+      read += rows.length;
+      onProgress?.call((
+        phase: BackupPhase.reading,
+        detail: _label(codec.name),
+        rows: read,
+        // The tables are read one at a time and nothing knows the total until
+        // the last one lands, so this half of the job reports how far through
+        // the tables it is rather than a row count out of nothing.
+        fraction: (i + 1) / _codecs.length * 0.5,
+      ));
     }
 
     return {
@@ -192,15 +238,43 @@ class BackupService {
 
   /// Writes a timestamped JSON file into [backupDirectory], ready for the share
   /// sheet — and still there afterwards, whether it was shared or not.
-  Future<File> exportToFile() async {
-    final payload = await buildPayload();
+  ///
+  /// The encode runs in another isolate. It is one synchronous call over the
+  /// whole history, and on the UI isolate it froze the app for as long as it
+  /// took — no frames, no progress, no way to tell a slow export from a hung
+  /// one. The indent went with it: nothing reads this by eye, and pretty
+  /// printing a decade of sets doubled both the time and the file.
+  Future<File> exportToFile({BackupProgress? onProgress}) async {
+    final payload = await buildPayload(onProgress: onProgress);
+    final rows = _totalOf(payload);
+
+    onProgress?.call((
+      phase: BackupPhase.encoding,
+      detail: '$rows rows',
+      rows: rows,
+      fraction: null,
+    ));
+    final contents = await _encodeOffIsolate(payload);
+
     final dir = await backupDirectory();
     final name =
         'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
     final file = File('${dir.path}/$name');
-    await file
-        .writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
+
+    onProgress?.call((
+      phase: BackupPhase.writing,
+      detail: name,
+      rows: rows,
+      fraction: 0.95,
+    ));
+    await file.writeAsString(contents);
     return file;
+  }
+
+  static int _totalOf(Map<String, dynamic> payload) {
+    final counts = payload['counts'];
+    if (counts is! Map) return 0;
+    return counts.values.fold(0, (a, b) => a + (b as num).toInt());
   }
 
   /// Keeps the last [keep] automatic exports in app storage, so a phone that
@@ -212,7 +286,10 @@ class BackupService {
     final payload = await buildPayload();
     final name =
         'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
-    await File('${dir.path}/$name').writeAsString(jsonEncode(payload));
+    // Also off-isolate: this one runs unasked, on the summary screen, right
+    // after a session is saved — the last place a two-second freeze belongs.
+    final contents = await _encodeOffIsolate(payload);
+    await File('${dir.path}/$name').writeAsString(contents);
 
     final files = dir
         .listSync()
@@ -299,15 +376,32 @@ class BackupService {
   /// halfway through it.
   Future<ImportResult> restore(
     String json, {
-    void Function(String table, int rowsWritten)? onProgress,
+    BackupProgress? onProgress,
   }) async {
     final summary = inspect(json);
-    final payload = jsonDecode(json) as Map<String, dynamic>;
+
+    onProgress?.call((
+      phase: BackupPhase.decoding,
+      detail: '${summary.totalRows} rows',
+      rows: 0,
+      fraction: null,
+    ));
+    // Off the UI isolate, for the same reason the export encodes there: this
+    // is one call that runs for as long as the file is big, and the dialog
+    // saying "restoring" cannot paint a frame while it does.
+    final payload = await _decodeOffIsolate(json);
     final data = Map<String, dynamic>.from(payload['data'] as Map);
 
+    final total = summary.totalRows;
     var written = 0;
 
     await db.transaction(() async {
+      onProgress?.call((
+        phase: BackupPhase.clearing,
+        detail: 'making room',
+        rows: 0,
+        fraction: 0,
+      ));
       // Children first so foreign keys hold at every intermediate point.
       for (final codec in _codecs.reversed) {
         await codec.clear();
@@ -327,7 +421,12 @@ class BackupService {
               );
           await db.batch((b) => b.insertAll(codec.table, slice.toList()));
           written += slice.length;
-          onProgress?.call(codec.name, written);
+          onProgress?.call((
+            phase: BackupPhase.writing,
+            detail: _label(codec.name),
+            rows: written,
+            fraction: total == 0 ? null : (written / total).clamp(0.0, 1.0),
+          ));
         }
       }
     });

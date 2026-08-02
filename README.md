@@ -278,6 +278,19 @@ states; a screen with more than one query needs them told apart, or one query.
 plain count below a fortnight of history. Any change belongs in that file,
 tested without a database.
 
+**`Isolate.run` inside a class captures `this`.** Moving the backup's
+`jsonEncode` off the UI isolate failed at the *send*, not the JSON:
+`Isolate.run(() => jsonEncode(payload))` written inside `BackupService` sends
+the whole enclosing context, and that holds an `AppDatabase` wrapping a sqlite3
+FFI handle — "object is unsendable". The two helpers are top-level functions in
+`backup_service.dart` for that reason; keep them there.
+
+**A signed delta has to be computed from what is shown.** Two bodyweights 0.2
+apart differ in kilograms, so the row printed a sign, and then `formatInUnit`
+snapped the difference to the 0.5 the app displays and it read `+0`. Compare
+`unit.display(a)` against `unit.display(b)`, not the raw values —
+`formatDeltaInUnit` does, and returns null when both round to the same figure.
+
 **`formatWeight` also formats computed numbers.** An estimated 1RM is an
 arbitrary double — `55.733333333333334 kg` shipped to the screen before it was
 capped at two decimals.

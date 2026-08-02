@@ -65,10 +65,42 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILES_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "saveToDownloads" -> {
+                        // Off the main thread: this copies a file that can be
+                        // tens of megabytes, and the UI it was started from is
+                        // showing progress that has to keep moving.
+                        Thread {
+                            try {
+                                val location = DownloadsWriter.save(
+                                    applicationContext,
+                                    call.argument<String>("sourcePath")!!,
+                                    call.argument<String>("fileName")!!,
+                                    call.argument<String>("folder")!!,
+                                )
+                                runOnUiThread { result.success(location) }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    result.error(
+                                        "save_failed",
+                                        e.message ?: e.toString(),
+                                        null,
+                                    )
+                                }
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     companion object {
         private const val CHANNEL = "com.deltoid.deltoid/boot"
+        private const val FILES_CHANNEL = "com.deltoid.deltoid/files"
         private const val BOOT_TIMEOUT_MS = 5_000L
     }
 }

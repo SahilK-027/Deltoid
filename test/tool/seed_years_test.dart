@@ -42,13 +42,26 @@ void main() {
     final json = jsonEncode(buildSeedPayload(years: 2, seed: 3));
     final counts = <String, int>{};
 
+    final fractions = <double>[];
     final result = await BackupService(db).restore(
       json,
-      onProgress: (table, rows) => counts[table] = rows,
+      onProgress: (step) {
+        if (step.phase != BackupPhase.writing) return;
+        counts[step.detail] = step.rows;
+        if (step.fraction != null) fractions.add(step.fraction!);
+      },
     );
 
     expect(counts, isNotEmpty, reason: 'progress was never reported');
     expect(counts.values.last, result.rowsWritten);
+    // A bar that goes backwards is worse than no bar.
+    expect(fractions, isNotEmpty);
+    expect(
+      List.of(fractions)..sort(),
+      fractions,
+      reason: 'progress went backwards',
+    );
+    expect(fractions.every((f) => f >= 0 && f <= 1), isTrue);
 
     final sets = await db.select(db.setLogs).get();
     expect(sets.length, greaterThan(500));

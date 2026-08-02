@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Saving a backup into the shared Downloads folder. From Android 10 the
+         MediaStore collection needs no permission at all, so this is declared
+         only for the versions where the public Downloads directory is still a
+         real path we write to directly. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <application
         android:label="Deltoid"
         android:name="${applicationName}"

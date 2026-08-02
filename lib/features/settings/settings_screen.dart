@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show File;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +13,7 @@ import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
+import '../../data/backup/downloads.dart';
 import '../../data/db/database.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
@@ -122,29 +125,94 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  /// Ask where it goes, then write it with the progress on screen.
+  ///
+  /// The share sheet used to be the only way out, and sharing a backup to
+  /// yourself is a strange thing to have to do — every other app that makes a
+  /// file puts it in Downloads.
   Future<void> _export(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final box = context.findRenderObject() as RenderBox?;
+
+    final destination = await showModalBottomSheet<_ExportTo>(
+      context: context,
+      showDragHandle: false,
+      builder: (sheet) => AppSheet(
+        title: 'Export backup',
+        subtitle: 'Every workout, in one file',
+        contentPadding: const EdgeInsets.fromLTRB(
+            Space.gutter, Space.lg, Space.gutter, Space.lg),
+        children: [
+          ListCard(
+            inset: Space.lg,
+            children: [
+              if (canSaveToDownloads)
+                AppRow(
+                  icon: Icons.download_outlined,
+                  title: 'Save to Downloads',
+                  subtitle: 'Into $downloadsFolder, where a file manager can '
+                      'find it',
+                  chevron: true,
+                  onTap: () =>
+                      Navigator.of(sheet).pop(_ExportTo.downloads),
+                ),
+              AppRow(
+                icon: Icons.ios_share,
+                title: 'Share',
+                subtitle: 'Hand it to Drive, iCloud or anything else',
+                chevron: true,
+                onTap: () => Navigator.of(sheet).pop(_ExportTo.share),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (destination == null || !context.mounted) return;
+
+    final File file;
     try {
-      final file = await BackupService(ref.read(databaseProvider)).exportToFile();
-      // The file is kept whether or not the share sheet is used, so say where
-      // it went — a backup you cannot find later is one you have to trust.
-      messenger.showSnackBar(
-        SnackBar(content: Text('Saved to ${file.parent.path}')),
-      );
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: 'Deltoid backup',
-          // iPad needs an anchor for the share popover or it throws.
-          sharePositionOrigin:
-              box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      final result = await _withProgress<File>(
+        context,
+        title: 'Exporting',
+        task: (report) =>
+            BackupService(ref.read(databaseProvider)).exportToFile(
+          onProgress: report,
         ),
       );
+      if (result == null) return;
+      file = result;
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      return;
     }
+
+    if (destination == _ExportTo.downloads) {
+      try {
+        final location = await saveToDownloads(file);
+        messenger.showSnackBar(SnackBar(content: Text('Saved to $location')));
+      } on BackupSaveException catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return;
+    }
+
+    // The file is kept whether or not the share sheet is used, so say where
+    // it went — a backup you cannot find later is one you have to trust.
+    messenger.showSnackBar(
+      SnackBar(content: Text('Saved to ${file.parent.path}')),
+    );
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'Deltoid backup',
+        // iPad needs an anchor for the share popover or it throws.
+        sharePositionOrigin:
+            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
   }
+
 
   Future<void> _restore(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -198,54 +266,127 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (!confirmed) return;
 
-    // A decade of training is a hundred thousand rows. Without something on
-    // screen the app looks hung, and a hung restore gets killed halfway.
-    final progress = ValueNotifier<String>('Starting…');
     if (!context.mounted) return;
-    final navigator = Navigator.of(context);
-    unawaited(showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: const Text('Restoring'),
-          content: ValueListenableBuilder<String>(
-            valueListenable: progress,
-            builder: (context, text, _) => Row(
-              children: [
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: Space.lg),
-                Expanded(child: Text(text)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ));
-
     try {
-      final result = await service.restore(
-        contents,
-        onProgress: (table, rows) =>
-            progress.value = '$rows rows · ${table.replaceAll('_', ' ')}',
+      final result = await _withProgress<ImportResult>(
+        context,
+        title: 'Restoring',
+        task: (report) => service.restore(contents, onProgress: report),
       );
-      navigator.pop();
+      if (result == null) return;
       messenger.showSnackBar(
         SnackBar(content: Text('Restored ${result.rowsWritten} rows')),
       );
     } catch (e) {
-      navigator.pop();
       messenger.showSnackBar(SnackBar(content: Text('Restore failed: $e')));
-    } finally {
-      progress.dispose();
     }
   }
+}
 
+enum _ExportTo { downloads, share }
+
+/// Runs a long backup job behind a sheet that says what it is doing.
+///
+/// A decade of training is a hundred thousand rows. Without something on
+/// screen the app looks hung, and a hung restore gets killed halfway — which
+/// is the one failure mode that costs data. Both jobs report through
+/// [BackupStep], so this is the same sheet either way.
+///
+/// The sheet cannot be dismissed and the barrier does not close it: the
+/// database is mid-transaction, and the way out is for the job to finish.
+/// Errors are rethrown to the caller, which owns the wording.
+Future<T?> _withProgress<T>(
+  BuildContext context, {
+  required String title,
+  required Future<T> Function(BackupProgress report) task,
+}) async {
+  final step = ValueNotifier<BackupStep?>(null);
+  final navigator = Navigator.of(context);
+
+  unawaited(showModalBottomSheet<void>(
+    context: context,
+    isDismissible: false,
+    enableDrag: false,
+    showDragHandle: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: _ProgressSheet(title: title, step: step),
+    ),
+  ));
+
+  try {
+    // The notifier is written from a callback that fires between database
+    // batches, so the bar moves on the frames the work leaves free.
+    return await task((s) => step.value = s);
+  } finally {
+    navigator.pop();
+    step.dispose();
+  }
+}
+
+class _ProgressSheet extends StatelessWidget {
+  const _ProgressSheet({required this.title, required this.step});
+
+  final String title;
+  final ValueListenable<BackupStep?> step;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            Space.xl, Space.xl, Space.xl, Space.xxl),
+        child: ValueListenableBuilder<BackupStep?>(
+          valueListenable: step,
+          builder: (context, current, _) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: context.t.headlineSmall),
+                const SizedBox(height: Space.xs),
+                Text(
+                  switch (current?.phase) {
+                    null => 'Starting…',
+                    BackupPhase.reading => 'Reading ${current!.detail}',
+                    // Named rather than left as a stalled bar: this is the
+                    // phase that takes the longest and reports nothing, and
+                    // silence here is what made the whole thing look hung.
+                    BackupPhase.encoding =>
+                      'Packing ${current!.detail} into one file',
+                    BackupPhase.decoding => 'Reading the file · ${current!.detail}',
+                    BackupPhase.clearing => 'Clearing this device',
+                    BackupPhase.writing =>
+                      '${current!.rows} rows · ${current.detail}',
+                  },
+                  style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
+                ),
+                const SizedBox(height: Space.lg),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(Radii.pill),
+                  child: LinearProgressIndicator(
+                    // Null while a phase genuinely cannot say how far it is,
+                    // where the bar runs indeterminate rather than inventing a
+                    // number and then jumping.
+                    value: current?.fraction,
+                    minHeight: 6,
+                    backgroundColor: c.surfaceHigh,
+                    color: c.accent,
+                  ),
+                ),
+                const SizedBox(height: Space.md),
+                Text(
+                  'Keep the app open until this finishes.',
+                  style: context.t.labelSmall,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
 /// The latest weight, and one tap to log today's.
