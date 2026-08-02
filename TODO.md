@@ -104,10 +104,39 @@ a device before the next starts.
       strip shrink-wrapped, so a regime with one day centred `Legs` and
       `Add day +` in the band while a regime with six had them against the
       gutter; the strip is full width now, whatever is in it.
-- [ ] **6 · Settings, bodyweight, all-time heatmap** — mostly deletion once the
-      list primitives exist. Settings has its masthead already (step 4 made it
-      a tab); what is left is bodyweight coming up out of it to one tap, and
-      the list layouts.
+- [ ] **6 · Settings, bodyweight, all-time heatmap** — **built, not yet driven.**
+
+      **Bodyweight is one tap.** It had never once been logged through the UI:
+      it was behind a cog, then behind a card that pushed a screen with a `+`
+      in its bar — three taps to type a number you are asked for daily.
+      Tapping the figure in Settings *is* the log, prefilled when today already
+      has an entry (the table is keyed by day, so a second weighing corrected
+      rather than duplicated either way; now it says so), and the past is a
+      `History` link on the section header rather than the card's only purpose.
+      The prompt is a sheet, not an `AlertDialog` that opens mid-screen and
+      then fights the keyboard for the same space, and delete moved into it —
+      off every row, as archiving did in step 5.
+
+      The log is grouped by month, and a month's first row still reads its
+      delta against the last entry of the month before it. Settings' peek query
+      is gone with its `limit(30)`, which had been printing "30 logged" for a
+      count that could only grow.
+
+      **The list layouts**: `ListTile` and two hand-rolled `AnimatedContainer`
+      pickers gone, for `ListCard` + `AppRow` and `SegmentedPill` — this screen
+      had drawn its own version of a primitive that already existed, in the
+      accent the rest of the app reserves for exactly that control. Restore's
+      confirm is `confirmAction` now, rather than two equal-weight text buttons
+      with the one that wipes the device on the right.
+
+      `settings_screen_test.dart` covers both screens against a real database
+      and the month grouping without one.
+
+      **Still open here**: a weight is rounded to the display increment, which
+      is 0.5 kg because that is the smallest pair of plates. A scale reads
+      0.1, and bodyweight is the one figure in the app that is not plates — 
+      typing 76.4 stores and shows 76.5. Wants a decision before this is
+      driven.
 
       **The all-time heatmap is done**, out of order, because thirty years of
       seeded data made it unusable: it was eleven thousand widgets — a
@@ -151,14 +180,15 @@ the wakelock, audio ducking, and the share sheet.
   deload weeks excluded. Rebuilt in step 4.
 - **Consistency heatmap** — eighteen weeks on Today, all-time view behind it.
 - **Backup** — export / restore / auto-export, round-trip tested.
-- **Bodyweight log** — schema, repository, interpolation, its own screen. Never
-  logged through the UI, because it is behind a settings cog.
+- **Bodyweight log** — schema, repository, interpolation, its own screen, and
+  since step 6 one tap from Settings to log or correct a weight.
 - Light / dark / system theme, adaptive launcher icon.
 
-**232 tests** — prefill and deload rules, cycle timing, metrics and volume,
+**243 tests** — prefill and deload rules, cycle timing, metrics and volume,
 session diff and template writes, backup round-trip, history paging, keypad,
 the stale-session sweep, Today's single-frame arrival and above-the-fold
-budget, and repository integration against real in-memory SQLite.
+budget, the programme editor and Settings pumped against a real database, and
+repository integration against real in-memory SQLite.
 
 ---
 
