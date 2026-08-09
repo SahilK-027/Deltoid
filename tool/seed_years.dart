@@ -37,8 +37,14 @@ import 'package:deltoid/domain/enums.dart';
 
 const _formatVersion = 1;
 
-/// Must match `AppDatabase.schemaVersion`, or the importer refuses the file.
-const _schemaVersion = 4;
+/// What the generated file claims it was written against.
+///
+/// Must never be *ahead* of `AppDatabase.schemaVersion` — the importer refuses
+/// a backup from a schema it cannot read. Behind is fine and is worth keeping
+/// honest anyway: a file that says 4 is a file the restore path handles by
+/// filling in every column added since, which is the case most worth
+/// exercising.
+const _schemaVersion = 8;
 
 void main(List<String> args) async {
   final positional = args.where((a) => !a.startsWith('--')).toList();

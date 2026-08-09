@@ -234,4 +234,32 @@ void main() {
     expect(past.first.sessionName, 'Push 1');
     expect(past.first.sets.first.weight, 22.5);
   });
+
+  test('a backup from a newer schema is refused rather than half-applied',
+      () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+    // A file written by a build that knows a column, or an enum value, this
+    // one does not. Restoring it clears every table first, so the failure
+    // would land after the old data was gone.
+    payload['schemaVersion'] = db.schemaVersion + 1;
+    final json = jsonEncode(payload);
+
+    expect(() => backup.inspect(json), throwsA(isA<FormatException>()));
+    await expectLater(backup.restore(json), throwsA(isA<FormatException>()));
+    // Nothing was cleared on the way to refusing.
+    expect((await db.select(db.workouts).get()).length, 1);
+  });
+
+  test('a backup from an older schema still restores', () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+    payload['schemaVersion'] = 1;
+
+    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(fresh.close);
+    await BackupService(fresh).restore(jsonEncode(payload));
+
+    expect((await fresh.select(fresh.workouts).get()).length, 1);
+  });
 }

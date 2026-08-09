@@ -379,6 +379,22 @@ class BackupService {
       );
     }
 
+    // The schema the file was written against, which until now was recorded
+    // and never read. Older is fine and is the case the default map under each
+    // restored row exists for. *Newer* is not: a column this build has never
+    // heard of is dropped silently, and an enum value it cannot parse throws
+    // halfway through the write — after the tables have been cleared, inside a
+    // transaction, with the user's only copy in the file picker. Refusing is
+    // the answer the tooling has claimed all along.
+    final schema = decoded['schemaVersion'];
+    if (schema is int && schema > db.schemaVersion) {
+      throw FormatException(
+        'This backup was written by a newer version of Deltoid '
+        '(schema $schema, this build reads ${db.schemaVersion}). Update the '
+        'app before restoring it.',
+      );
+    }
+
     final counts = decoded['counts'];
     return BackupSummary(
       counts: {
