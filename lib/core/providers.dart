@@ -25,6 +25,10 @@ final appInitProvider = FutureProvider<void>((ref) async {
   // "finish the one you are in". Only the ones with nothing logged in them go —
   // see [TrainingRepository.sweepAbandonedWorkouts].
   await ref.watch(trainingRepositoryProvider).sweepAbandonedWorkouts();
+  // A phone that ran a build where `ensureOpenCycle` was not a transaction can
+  // be carrying two or three open cycles for one regime — see
+  // [TrainingRepository.healDuplicateOpenCycles]. Nothing else notices.
+  await ref.watch(trainingRepositoryProvider).healDuplicateOpenCycles();
 });
 
 /// The regime being trained. Exactly one row is active at a time, but the query

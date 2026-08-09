@@ -255,14 +255,20 @@ class RegimeRepository {
     );
   }
 
+  /// Only the row that is actually active.
+  ///
+  /// This used to rewrite every regime in the table, tombstoned ones included —
+  /// six rows re-stamped and marked dirty to turn one flag off. Harmless while
+  /// the writes stay on this phone; once they are a push, switching programmes
+  /// would ship the whole shelf every time.
   Future<void> _deactivateAll() async {
-    await db.update(db.regimes).write(
-          RegimesCompanion(
-            isActive: const Value(false),
-            updatedAt: Value(nowMs()),
-            dirty: const Value(true),
-          ),
-        );
+    await (db.update(db.regimes)..where((t) => t.isActive.equals(true))).write(
+      RegimesCompanion(
+        isActive: const Value(false),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
   }
 
   Future<void> updateRegime(
@@ -293,21 +299,32 @@ class RegimeRepository {
 
   // ── Sessions ──────────────────────────────────────────────────────────
 
+  /// One past the highest position, in a transaction.
+  ///
+  /// Not the number of live rows: a deleted session is tombstoned and nothing
+  /// renumbers behind it, so counting handed the new row a position a surviving
+  /// one still held — and two rows on one `orderIndex` leave the programme's
+  /// order to whichever way SQLite breaks the tie.
   Future<String> addSession(String regimeId, String name) async {
-    final existing = await (db.select(db.sessions)
-          ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
-        .get();
     final id = newId();
-    await db.into(db.sessions).insert(
-          SessionsCompanion.insert(
-            id: Value(id),
-            regimeId: regimeId,
-            name: name,
-            orderIndex: existing.length,
-          ),
-        );
+    await db.transaction(() async {
+      final existing = await (db.select(db.sessions)
+            ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
+          .get();
+      await db.into(db.sessions).insert(
+            SessionsCompanion.insert(
+              id: Value(id),
+              regimeId: regimeId,
+              name: name,
+              orderIndex: _nextIndex([for (final s in existing) s.orderIndex]),
+            ),
+          );
+    });
     return id;
   }
+
+  static int _nextIndex(List<int> taken) =>
+      taken.fold<int>(-1, (m, i) => i > m ? i : m) + 1;
 
   Future<void> renameSession(String sessionId, String name) async {
     await (db.update(db.sessions)..where((t) => t.id.equals(sessionId))).write(
@@ -348,19 +365,23 @@ class RegimeRepository {
 
   // ── Exercise slots ────────────────────────────────────────────────────
 
+  /// Appended past the highest position rather than at the live count — see
+  /// [addSession] for why the two are not the same number.
   Future<String> addExerciseToSession(String sessionId, String exerciseId) async {
-    final existing = await (db.select(db.sessionExercises)
-          ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
-        .get();
     final id = newId();
-    await db.into(db.sessionExercises).insert(
-          SessionExercisesCompanion.insert(
-            id: Value(id),
-            sessionId: sessionId,
-            exerciseId: exerciseId,
-            orderIndex: existing.length,
-          ),
-        );
+    await db.transaction(() async {
+      final existing = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
+          .get();
+      await db.into(db.sessionExercises).insert(
+            SessionExercisesCompanion.insert(
+              id: Value(id),
+              sessionId: sessionId,
+              exerciseId: exerciseId,
+              orderIndex: _nextIndex([for (final s in existing) s.orderIndex]),
+            ),
+          );
+    });
     return id;
   }
 

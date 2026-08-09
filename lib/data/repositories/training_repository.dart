@@ -326,7 +326,17 @@ class TrainingRepository {
 
   /// The cycle currently being trained, creating one if the regime has never
   /// been started or the previous cycle just closed.
-  Future<Cycle> ensureOpenCycle(String regimeId) async {
+  ///
+  /// Find-and-create in one transaction, because this is a *write* reached from
+  /// several watched reads at once — `todayProvider` and `cycleStatusProvider`
+  /// both land here, and on a regime with no cycle yet each of them found
+  /// nothing and inserted one. Three open cycles for one regime, and every
+  /// count downstream — the deload counter included — reading whichever came
+  /// back first.
+  Future<Cycle> ensureOpenCycle(String regimeId) =>
+      db.transaction(() => _ensureOpenCycle(regimeId));
+
+  Future<Cycle> _ensureOpenCycle(String regimeId) async {
     final open = await (db.select(db.cycles)
           ..where((t) =>
               t.regimeId.equals(regimeId) &
@@ -381,6 +391,65 @@ class TrainingRepository {
           ),
         );
     return (db.select(db.cycles)..where((t) => t.id.equals(id))).getSingle();
+  }
+
+  /// Collapses regimes that already carry more than one open cycle.
+  ///
+  /// [ensureOpenCycle] is a transaction now, so no new pair can be made — but a
+  /// phone that ran an earlier build has the pairs it made then, and nothing
+  /// about them heals on its own: Today reads the newest open cycle, so a
+  /// regime that has never been trained opens on "Cycle 2", the sessions logged
+  /// under one of them do not count towards the other, and the deload lands
+  /// wherever the count happens to fall.
+  ///
+  /// The lowest index wins, because duplicates were minted within milliseconds
+  /// of each other and the first is the one the programme actually meant. Any
+  /// workout pointing at a loser is moved onto the keeper before the loser is
+  /// tombstoned, so nothing logged is orphaned.
+  ///
+  /// Idempotent and one query wide on a database with nothing wrong with it,
+  /// which is what lets it run at every launch.
+  Future<int> healDuplicateOpenCycles() async {
+    final open = await (db.select(db.cycles)
+          ..where((t) => t.completedAt.isNull() & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.cycleIndex)]))
+        .get();
+
+    final byRegime = <String, List<Cycle>>{};
+    for (final cycle in open) {
+      byRegime.putIfAbsent(cycle.regimeId, () => []).add(cycle);
+    }
+
+    var healed = 0;
+    for (final cycles in byRegime.values) {
+      if (cycles.length < 2) continue;
+      final keeper = cycles.first;
+      final losers = cycles.skip(1).toList();
+
+      await db.transaction(() async {
+        for (final loser in losers) {
+          await (db.update(db.workouts)
+                ..where((t) => t.cycleId.equals(loser.id)))
+              .write(
+            WorkoutsCompanion(
+              cycleId: Value(keeper.id),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+          await (db.update(db.cycles)..where((t) => t.id.equals(loser.id)))
+              .write(
+            CyclesCompanion(
+              deletedAt: Value(nowMs()),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+          healed++;
+        }
+      });
+    }
+    return healed;
   }
 
   Future<List<String>> _sessionIds(String regimeId) async {
@@ -690,6 +759,18 @@ class TrainingRepository {
     if (changes.isEmpty) return;
 
     await db.transaction(() async {
+      // One past the highest live position. Counting live rows handed a new
+      // slot a position a surviving one still held, because a removed slot is
+      // tombstoned and nothing renumbers behind it.
+      Future<int> nextOrderIndex() async {
+        final live = await (db.select(db.sessionExercises)
+              ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
+            .get();
+        return live.fold<int>(
+                -1, (m, s) => s.orderIndex > m ? s.orderIndex : m) +
+            1;
+      }
+
       for (final change in changes) {
         switch (change.kind) {
           case SessionChangeKind.added:
@@ -710,22 +791,23 @@ class TrainingRepository {
                     .write(
                   SessionExercisesCompanion(
                     deletedAt: const Value(null),
+                    // Back at the end rather than at the position it held when
+                    // it was removed — that position belongs to whatever moved
+                    // up behind it, and two slots on one index is an order the
+                    // database is free to break either way.
+                    orderIndex: Value(await nextOrderIndex()),
                     updatedAt: Value(nowMs()),
                     dirty: const Value(true),
                   ),
                 );
                 continue;
               }
-              final live = await (db.select(db.sessionExercises)
-                    ..where((t) =>
-                        t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
-                  .get();
               await db.into(db.sessionExercises).insert(
                     SessionExercisesCompanion.insert(
                       id: Value(newId()),
                       sessionId: sessionId,
                       exerciseId: exerciseId,
-                      orderIndex: live.length,
+                      orderIndex: await nextOrderIndex(),
                     ),
                   );
             }
@@ -1332,10 +1414,23 @@ class TrainingRepository {
     );
   }
 
-  Future<void> logBodyweight(DateTime date, double kg) async {
+  /// One row per day, upserted in a transaction.
+  ///
+  /// The look-up and the insert are one act on purpose: a double tap on Save,
+  /// or the same day logged from Settings and the bodyweight screen at once,
+  /// had both callers find no row and both insert one. Two weights for one day
+  /// is not a duplicate you can see — the screen shows whichever the query
+  /// returns first, and every bodyweight-scored lift on that day reads the
+  /// other one half the time.
+  Future<void> logBodyweight(DateTime date, double kg) =>
+      db.transaction(() => _logBodyweight(date, kg));
+
+  Future<void> _logBodyweight(DateTime date, double kg) async {
     final key = dayKeyOf(date);
     final existing = await (db.select(db.bodyweightLogs)
-          ..where((t) => t.dayKey.equals(key) & t.deletedAt.isNull()))
+          ..where((t) => t.dayKey.equals(key) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)])
+          ..limit(1))
         .getSingleOrNull();
 
     if (existing != null) {
@@ -1439,13 +1534,15 @@ class TrainingRepository {
     // open a second parallel log for the same session. Hand back the running
     // one instead; the sets already in it are the ones being asked for.
     final running = await openWorkout();
-    if (at == null) {
-      if (running != null && running.sessionId == sessionId) return running.id;
-    } else if (running != null) {
-      // Only one workout may be open at a time. `openWorkout` returns the
-      // newest by startedAt, so an abandoned backdated log would be hidden by
-      // the next session you start and become unreachable — in progress
-      // forever, listed nowhere.
+    if (running != null) {
+      // The same session again is the double tap: hand back the running log,
+      // because the sets already in it are the ones being asked for.
+      if (at == null && running.sessionId == sessionId) return running.id;
+      // Anything else would be a second workout open at once. `openWorkout`
+      // returns the newest by startedAt, so the older one is hidden behind it
+      // and becomes unreachable — in progress forever, listed nowhere. Today
+      // hides Start behind the resume card, but this is the invariant and it
+      // belongs here rather than in whichever screen remembers to check.
       throw StateError('Finish the session in progress first');
     }
 
@@ -1834,35 +1931,46 @@ class TrainingRepository {
         isDone: isDone,
         restSeconds: restSeconds,
         note: note,
-        completedAt: isDone.present && isDone.value
-            ? Value(nowMs())
-            : const Value.absent(),
+        // Cleared on an untick as deliberately as it is stamped on a tick: a
+        // set that is not done has no moment it was done at, and leaving the
+        // old stamp behind left `restTargetFor` reading a rest off a set that
+        // had been taken back.
+        completedAt: !isDone.present
+            ? const Value.absent()
+            : isDone.value
+                ? Value(nowMs())
+                : const Value(null),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
     );
   }
 
+  /// In a transaction, because the read that picks the index and the insert
+  /// that takes it have to be one act: two taps on `+` inside a frame of each
+  /// other both read the same highest index and both claimed it.
   Future<String> addSet(String workoutExerciseId, {SetType type = SetType.working}) async {
-    final existing = await (db.select(db.setLogs)
-          ..where((t) => t.workoutExerciseId.equals(workoutExerciseId) & t.deletedAt.isNull()))
-        .get();
-    // One past the highest index, not the number of rows. Deletes are
-    // tombstones and nothing renumbers after them, so counting live rows handed
-    // the new set an index another row still held: delete a drop group, press
-    // `+`, and the new set landed in the middle of the table on top of an
-    // existing one, in an order the database could break either way.
-    final next =
-        existing.fold<int>(-1, (m, s) => s.setIndex > m ? s.setIndex : m) + 1;
     final id = newId();
-    await db.into(db.setLogs).insert(
-          SetLogsCompanion.insert(
-            id: Value(id),
-            workoutExerciseId: workoutExerciseId,
-            setIndex: next,
-            setType: Value(type),
-          ),
-        );
+    await db.transaction(() async {
+      final existing = await (db.select(db.setLogs)
+            ..where((t) => t.workoutExerciseId.equals(workoutExerciseId) & t.deletedAt.isNull()))
+          .get();
+      // One past the highest index, not the number of rows. Deletes are
+      // tombstones and nothing renumbers after them, so counting live rows handed
+      // the new set an index another row still held: delete a drop group, press
+      // `+`, and the new set landed in the middle of the table on top of an
+      // existing one, in an order the database could break either way.
+      final next =
+          existing.fold<int>(-1, (m, s) => s.setIndex > m ? s.setIndex : m) + 1;
+      await db.into(db.setLogs).insert(
+            SetLogsCompanion.insert(
+              id: Value(id),
+              workoutExerciseId: workoutExerciseId,
+              setIndex: next,
+              setType: Value(type),
+            ),
+          );
+    });
     return id;
   }
 
@@ -2160,9 +2268,6 @@ class TrainingRepository {
     String exerciseId, {
     int targetSets = 3,
   }) async {
-    final existing = await (db.select(db.workoutExercises)
-          ..where((t) => t.workoutId.equals(workoutId) & t.deletedAt.isNull()))
-        .get();
     final shape = await _shapeFor(
       workoutId: workoutId,
       exerciseId: exerciseId,
@@ -2171,12 +2276,23 @@ class TrainingRepository {
 
     final id = newId();
     await db.transaction(() async {
+      // One past the highest position, not the number of live rows — the same
+      // rule `addSet` follows, and for the same reason. A removed exercise is
+      // tombstoned and nothing renumbers behind it, so counting live rows put
+      // the new movement on a position another one still held, and the log's
+      // page order became whichever way SQLite felt like breaking the tie.
+      final existing = await (db.select(db.workoutExercises)
+            ..where((t) => t.workoutId.equals(workoutId) & t.deletedAt.isNull()))
+          .get();
+      final next =
+          existing.fold<int>(-1, (m, e) => e.orderIndex > m ? e.orderIndex : m) +
+              1;
       await db.into(db.workoutExercises).insert(
             WorkoutExercisesCompanion.insert(
               id: Value(id),
               workoutId: workoutId,
               exerciseId: exerciseId,
-              orderIndex: existing.length,
+              orderIndex: next,
               targetSets: Value(targetSets),
             ),
           );
