@@ -1319,6 +1319,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
   }
 
   Future<void> _finish(WorkoutDetail detail) async {
+    // Whatever was typed in the last 300ms is part of this session. Without
+    // this the debounce could still be in flight when `completeWorkout`
+    // tombstones every unticked row, and the write would land on a set that
+    // had already been thrown away.
+    _flushWrite();
     final done = _doneSets(detail);
     // Work done under an exercise that was skipped afterwards is still work,
     // and it is what discarding would delete.
