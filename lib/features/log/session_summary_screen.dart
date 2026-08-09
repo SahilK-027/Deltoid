@@ -13,6 +13,20 @@ import '../../domain/units.dart';
 import '../history/history_screen.dart' show formatWeight;
 import 'log_providers.dart';
 
+/// Changes ticked in the summary's programme section but not yet written.
+///
+/// The ticks used to live only in [_ChangesSectionState], and only that
+/// section's own button ever wrote them. `Done` — the white button at the
+/// bottom of the screen, and the obvious way off it — popped straight back to
+/// Today and threw the selection away without a word, which is the worst
+/// possible answer: the user has said what the programme should do from now on
+/// and been told nothing about it not happening. Leaving the screen honours the
+/// ticks instead.
+final _pendingChangesProvider =
+    StateProvider<({String sessionId, List<SessionChange> changes})?>(
+  (ref) => null,
+);
+
 /// The last screen of a session: what it came to, and the only place a note can
 /// be written while the session is still in your head.
 ///
@@ -55,7 +69,7 @@ class SessionSummaryScreen extends ConsumerWidget {
       // of a session that is already closed.
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _leave(context);
+        if (!didPop) _leave(context, ref);
       },
       child: Scaffold(
         body: Column(
@@ -76,7 +90,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                           icon: Icons.close_rounded,
                           fill: Colors.transparent,
                           tooltip: 'Done',
-                          onTap: () => _leave(context),
+                          onTap: () => _leave(context, ref),
                         ),
                         Expanded(
                           child: Text(
@@ -198,7 +212,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                 top: false,
                 child: PrimaryButton(
                   label: 'Done',
-                  onPressed: () => _leave(context),
+                  onPressed: () => _leave(context, ref),
                 ),
               ),
             ),
@@ -210,8 +224,22 @@ class SessionSummaryScreen extends ConsumerWidget {
 
   /// Back to Today, however this screen was reached — it replaced the log, so
   /// one pop is the whole way out.
-  static void _leave(BuildContext context) {
-    Navigator.of(context).pop();
+  ///
+  /// Anything ticked and not yet written goes in on the way past. The
+  /// repository and the navigator are both taken before the await, because the
+  /// widget that owns this `ref` is the one being popped.
+  static Future<void> _leave(BuildContext context, WidgetRef ref) async {
+    final navigator = Navigator.of(context);
+    final repo = ref.read(trainingRepositoryProvider);
+    final pending = ref.read(_pendingChangesProvider);
+    if (pending != null && pending.changes.isNotEmpty) {
+      ref.read(_pendingChangesProvider.notifier).state = null;
+      await repo.applySessionChanges(
+        sessionId: pending.sessionId,
+        changes: pending.changes,
+      );
+    }
+    navigator.pop();
   }
 
   static Future<void> _editSessionNote(
@@ -292,6 +320,13 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
   bool _saved = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Nothing is carried in from a previous session's summary.
+    ref.read(_pendingChangesProvider.notifier).state = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.c;
     final changes =
@@ -365,9 +400,12 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
                     color:
                         _picked.contains(i) ? c.textPrimary : c.textTertiary,
                   ),
-                  onTap: () => setState(() {
-                    if (!_picked.remove(i)) _picked.add(i);
-                  }),
+                  onTap: () {
+                    setState(() {
+                      if (!_picked.remove(i)) _picked.add(i);
+                    });
+                    _remember(changes);
+                  },
                 ),
             ],
           ),
@@ -387,13 +425,27 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
     );
   }
 
+  /// Hands the current selection to the screen, so leaving by `Done`, by the ✕
+  /// or by the back gesture writes it rather than dropping it.
+  void _remember(List<SessionChange> changes) {
+    ref.read(_pendingChangesProvider.notifier).state = (
+      sessionId: widget.sessionId,
+      changes: _pickedFrom(changes),
+    );
+  }
+
+  List<SessionChange> _pickedFrom(List<SessionChange> changes) => [
+        for (var i = 0; i < changes.length; i++)
+          if (_picked.contains(i)) changes[i],
+      ];
+
   Future<void> _apply(List<SessionChange> changes) async {
+    // Cleared first: this write is the selection, and leaving afterwards must
+    // not apply the same changes a second time.
+    ref.read(_pendingChangesProvider.notifier).state = null;
     await ref.read(trainingRepositoryProvider).applySessionChanges(
           sessionId: widget.sessionId,
-          changes: [
-            for (var i = 0; i < changes.length; i++)
-              if (_picked.contains(i)) changes[i],
-          ],
+          changes: _pickedFrom(changes),
         );
     if (mounted) setState(() => _saved = true);
   }
