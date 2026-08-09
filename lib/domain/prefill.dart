@@ -9,6 +9,7 @@ class PastSet {
     required this.type,
     this.weight,
     this.reps,
+    this.partialReps,
     this.addedWeight,
     this.isLeg = false,
   });
@@ -16,6 +17,16 @@ class PastSet {
   final SetType type;
   final double? weight;
   final int? reps;
+
+  /// Partials from that set, carried so the ghost can show them.
+  ///
+  /// **Shown, never adopted.** Everything else in a `PastSet` is a plan for
+  /// today — the same weight, one more rep — and partials are not: they are
+  /// what went wrong, or what was squeezed out at the end. Filling them in
+  /// ahead of the set would log halves nobody did. `_adoptGhost` deliberately
+  /// leaves this alone.
+  final int? partialReps;
+
   final double? addedWeight;
 
   /// Whether this set was a leg of the drop group above it rather than the head
@@ -28,6 +39,7 @@ class PastSet {
         type: type,
         weight: weight ?? this.weight,
         reps: reps ?? this.reps,
+        partialReps: partialReps,
         addedWeight: addedWeight ?? this.addedWeight,
         isLeg: isLeg,
       );
@@ -216,6 +228,9 @@ List<PastSet> applyDeload(
         type: s.type,
         weight: scale(s.weight),
         reps: s.reps,
+        // Carried, not scaled: there is no such thing as 70% of a partial rep,
+        // and the ghost's job is to say what happened last time.
+        partialReps: s.partialReps,
         addedWeight: scale(s.addedWeight),
       ),
   ];

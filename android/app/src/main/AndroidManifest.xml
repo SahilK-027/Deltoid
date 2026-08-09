@@ -7,6 +7,16 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- The rest alert is an alarm handed to the OS, not a timer inside the
+         app: a Dart timer is frozen the moment Android suspends the process,
+         so the tone only played when the phone was picked back up. USE_EXACT_ALARM
+         rather than SCHEDULE_EXACT_ALARM — this is an alarm-clock use, and the
+         other one makes the user grant a permission through a settings screen
+         before a rest can ever ring on time. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- So a rest scheduled before a reboot is put back afterwards. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:label="Deltoid"
         android:name="${applicationName}"
@@ -33,6 +43,21 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- The plugin's own receivers. Without these a scheduled rest alert
+             is accepted and then never shown. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

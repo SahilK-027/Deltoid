@@ -415,6 +415,20 @@ nothing. Never for an error, never dismissible — a notice states a rule that i
 currently true. **The copy states the rule, not its cause**; an implementation
 detail in a warning reads as an excuse.
 
+### Toast
+
+The one transient message. `surfaceHighest` fill, `border` hairline, `Radii.md`,
+floating with a `Space.md` margin, and body text at the size the screen around
+it reads at — the same object every card and sheet is, not Material's slab in
+its own type scale.
+
+**Short.** Long enough to read six words, not long enough to still be covering
+the log when you look back at it: ~1.8s, or ~3.2s when it carries an action,
+because an action needs time to be aimed at. Anything needing longer is not a
+toast, it is a sheet. **One at a time** — the queue is cleared on every one, as
+a second message means the first is in its way. A failure says so in `negative`
+text; nothing else uses colour here.
+
 ### Empty states
 
 An outlined box: 1px `border`, radius 16, padding 20, muted glyph left, `body`
@@ -494,6 +508,7 @@ one field twice the other for no reason a reader can see.
 | **Value field** | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: **transparent fill plus a 2px `accent` outline** — focus is an outline on nothing, because a fill *and* a border is two signals for one state. |
 | **Ghost value** | A suggestion sits **inside** the field as `textTertiary` text — no dot, no italic — because you compare against it at the moment you are deciding, and a separate column costs the width the value needs. No synthesised italic anywhere: with no italic face bundled, the renderer shears the upright glyphs. |
 | **Completed row** | Values dim to `textSecondary`, fields drop from `surfaceHigh` to `surface`, and the checkbox goes solid. Dull, not black — at `surfaceSunken` a finished row reads as a hole cut in the table. Never struck through or recoloured. |
+| **Split cell** | A value that is really two numbers is **two boxes with one seam** — square on the shared side, rounded away from it, 2px apart — not one box holding an expression. `13+1` asks the eye to do arithmetic at arm's length to find a number that is not even the sum. Split, the halves are **50-50**: both are what the record is made of, and a sliver beside a wide box reads as an afterthought stuck on the end. The second half **only exists once there is something in it**: a number recorded on the row, a number the ghost is carrying from last time, or the pad asking for one. The pad's toggle is a **plain toggle** — `P` opens the half, `F` closes it — and an empty half never outlives the toggle that opened it. It slides out from the right edge over `Motion.fast` rather than snapping, because the first half halves in width when it opens. Empty reads as a dim `–`, never a `0`. **Both halves take focus on their own tap** — a field you can see and cannot type into is a broken field — but **a tap never closes the half**: only the pad's `F` does, or moving to another cell. Tapping the first half to correct it would otherwise take away the box the second number was opened for. The heading names the column once — not the halves, which are not always there. |
 | **Delete** | **Swipe the row left** to uncover a `negative` button, then tap it. The **whole** row travels, and the button is **carried in by the row** — parked one panel past the edge and clipped until the swipe brings it in, never a static panel uncovered underneath. The swipe reveals; it never deletes on release. A tap anywhere else, or a swipe on another row, closes it. |
 
 ### The numeric keypad
@@ -508,6 +523,9 @@ readout** — the field being typed into is outlined in the table above, and the
 digits land in it as they are pressed. A pad that captions itself is a pad
 covering the thing it is captioning.
 
+- **The digits run `1 2 3` on the top row.** Every pad this thumb already uses
+  — the dialler, the passcode, the timer — counts downwards, and a pad that
+  counts upwards is one that has to be looked at.
 - **Step keys move by the unit of the field**, and say so: one plate for a load,
   one rep for a count, half a minute for a time (`+0:30`, never `+30`).
 - **On an empty buffer, a step starts from last time.** "One plate more than
@@ -520,6 +538,18 @@ covering the thing it is captioning.
 - Anything a movement's numbers imply — a plate diagram for a barbell load —
   grows in above the digits and **collapses to nothing** when it does not apply,
   rather than reserving a band that is empty most of the time.
+- **`F` / `P` says whether the set is being given partials**, not which box the
+  digits are in. `P` opens the partial half in the table above and puts the
+  digits there; `F` closes it again, and is the **only** control that does —
+  and because it says the set is all full reps, it **drops whatever partials
+  were recorded on it**, rather than leaving a number behind a shut box.
+  Tapping a box moves the digits into that box and leaves the key alone — the
+  half is still open, so a key that flipped back to `F` would be reporting a
+  mode change nobody made. Both halves stay lit so the state is readable
+  without looking at the table. It appears only where partials exist — a count, never a load and never
+  a hold — and it takes the slot the decimal point sits in on a load. It is for
+  changing your mind mid-entry; the way *in* is tapping the half of the count
+  cell you meant.
 
 ### The stopwatch pad
 

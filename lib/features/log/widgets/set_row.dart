@@ -88,6 +88,10 @@ class SetTableHeader extends StatelessWidget {
           // Load and reps are the same width. Reps had a fixed 68 against an
           // expanding load column, which on a phone made one field twice the
           // other for no reason a reader could see.
+          // One heading, whether or not a row below it has split its count
+          // cell. The split comes and goes per row, and a `Part` column
+          // standing over rows that mostly have no such cell is a heading for
+          // something that is not there.
           Expanded(
             child: Text(
               measure.columnLabel,
@@ -122,12 +126,24 @@ class SetRow extends StatelessWidget {
     required this.editing,
     required this.buffer,
     required this.onEdit,
+    required this.onEditPartial,
     required this.onToggleDone,
+    this.partialShownFor,
+    this.partialClosedFor,
+    this.partialEditing = false,
   });
 
   static const indexColumn = 34.0;
   static const doneColumn = 40.0;
   static const fieldHeight = 42.0;
+
+  /// The sliding partial half, so a test can measure whether it is actually
+  /// on screen — it stays in the tree, clipped to nothing, while it is shut.
+  static const partialHalfKey = ValueKey('set-row-partial-half');
+
+  /// The seam between the two halves of a split count cell. They take half
+  /// the column each; this is the hairline of background between them.
+  static const splitGap = 2.0;
 
   /// A row's full height, fields plus their padding. The index column beside
   /// it is sized to this so a drop group's capsule lines up with its rows
@@ -143,15 +159,59 @@ class SetRow extends StatelessWidget {
   final MeasureMode measure;
 
   final PastSet? ghost;
+
+  /// The set whose count cell is showing its partial half.
+  ///
+  /// Both halves take focus on their own tap — a field you can see and cannot
+  /// type into is a broken field — but a tap never *closes* the half: only the
+  /// pad's `F` does that, or moving to another cell. Tapping the reps to fix
+  /// them would otherwise take away the box the partials were opened for.
+  final String? partialShownFor;
+
+  /// The set whose partials `F` has just dropped.
+  ///
+  /// Beats every reason to show the half. Without it the box would spring
+  /// straight back open — on this set's own number, which the clearing write
+  /// has not yet taken away, or on the ghost's, which nothing can.
+  final String? partialClosedFor;
+
+  /// Which half the digits are going into. Follows the last tap, and the pad's
+  /// `F` / `P`.
+  final bool partialEditing;
+
   final EditTarget? editing;
   final ValueListenable<String> buffer;
   final void Function(SetLog, SetField) onEdit;
+
+  /// Opens the count field with the digits going into the partial half — what
+  /// tapping that half means.
+  final void Function(SetLog) onEditPartial;
+
   final void Function(SetLog, bool) onToggleDone;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final beaten = _beatsGhost();
+
+    // The count column is one cell until there is a second number in it.
+    //
+    // Partials are the exception, not the shape of every set, so the split is
+    // asked for — by `P` on the pad, which closes it again on `F` — or already
+    // earned by a number that is there to be read. Showing it on every row put
+    // an empty box on the table five times an exercise and made the reps
+    // narrower to do it. A hold never splits: there is no half-second.
+    final editingThis = editing?.setId == set.id;
+    final split =
+        !measure.isHold &&
+        partialClosedFor != set.id &&
+        ((editingThis && partialShownFor == set.id) ||
+            (set.partialReps ?? 0) > 0 ||
+            // Last time's partials open it too. A ghost that quietly drops
+            // half of what the set was is a ghost you cannot match: `8` where
+            // the week before read `8+3` says you did the same set, and you
+            // did not.
+            (ghost?.partialReps ?? 0) > 0);
 
     // Swipe-to-delete wraps this from the group above, so the index column
     // travels with the fields. See [SwipeToDelete].
@@ -212,17 +272,79 @@ class SetRow extends StatelessWidget {
             ),
           const SizedBox(width: Space.sm),
           Expanded(
-            child: _ValueCell(
-              unit: unit,
-              field: SetField.reps,
-              isTime: measure.isHold,
-              value: set.reps?.toDouble(),
-              ghost: ghost?.reps?.toDouble(),
-              done: set.isDone,
-              active:
-                  editing?.setId == set.id && editing?.field == SetField.reps,
-              buffer: buffer,
-              onTap: () => onEdit(set, SetField.reps),
+            // Split, the two numbers get **half each**. The partial count is
+            // not a lesser number than the reps once it exists — it is the
+            // other half of what the set was — and a sliver beside a wide box
+            // reads as an afterthought stuck on the end.
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final half =
+                    (constraints.maxWidth - SetRow.splitGap) / 2 +
+                    SetRow.splitGap;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _ValueCell(
+                        unit: unit,
+                        field: SetField.reps,
+                        isTime: measure.isHold,
+                        value: set.reps?.toDouble(),
+                        ghost: ghost?.reps?.toDouble(),
+                        done: set.isDone,
+                        active:
+                            editingThis &&
+                            editing?.field == SetField.reps &&
+                            !partialEditing,
+                        buffer: buffer,
+                        onTap: () => onEdit(set, SetField.reps),
+                        // Squared off against the partial half only while
+                        // there is one to share a seam with. On its own the
+                        // cell is an ordinary field, rounded all round.
+                        radius: split
+                            ? const BorderRadius.horizontal(
+                                left: Radius.circular(Radii.sm),
+                              )
+                            : null,
+                      ),
+                    ),
+                    // The half slides out from the right edge rather than
+                    // appearing: the reps cell halves in width when it opens,
+                    // and a field that jumps a thumb's width mid-set is a
+                    // field you mis-tap. Laid out at its full width behind the
+                    // clip throughout, so the number never reflows while it
+                    // travels.
+                    ClipRect(
+                      child: AnimatedContainer(
+                        key: SetRow.partialHalfKey,
+                        duration: Motion.fast,
+                        curve: Motion.curve,
+                        width: split ? half : 0,
+                        height: SetRow.fieldHeight,
+                        child: OverflowBox(
+                          alignment: Alignment.centerRight,
+                          minWidth: half,
+                          maxWidth: half,
+                          child: Row(
+                            children: [
+                              const SizedBox(width: SetRow.splitGap),
+                              Expanded(
+                                child: _PartialCell(
+                                  value: set.partialReps,
+                                  ghost: ghost?.partialReps,
+                                  done: set.isDone,
+                                  active: editingThis && partialEditing,
+                                  buffer: buffer,
+                                  onTap: () => onEditPartial(set),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(width: Space.sm),
@@ -428,6 +550,7 @@ class _ValueCell extends StatefulWidget {
     required this.buffer,
     required this.onTap,
     this.prefix,
+    this.radius,
   });
 
   final SetField field;
@@ -446,6 +569,10 @@ class _ValueCell extends StatefulWidget {
   final ValueListenable<String> buffer;
   final VoidCallback onTap;
   final String? prefix;
+
+  /// Squared off on the side it shares a seam with, when this cell is one half
+  /// of a split one. Null is the ordinary all-round [Radii.sm].
+  final BorderRadius? radius;
 
   @override
   State<_ValueCell> createState() => _ValueCellState();
@@ -536,7 +663,7 @@ class _ValueCellState extends State<_ValueCell> {
               : (_flash
                     ? c.surfaceHighest
                     : (widget.done ? c.surface : c.surfaceHigh)),
-          borderRadius: BorderRadius.circular(Radii.sm),
+          borderRadius: widget.radius ?? BorderRadius.circular(Radii.sm),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
             width: 2,
@@ -573,6 +700,87 @@ class _ValueCellState extends State<_ValueCell> {
       return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
     }
     return formatInUnit(v, cell.unit);
+  }
+}
+
+/// The other half of the count cell: reps that did not finish the range of
+/// motion.
+///
+/// A cell of its own rather than a suffix on the reps. `13+1` in one box asks
+/// the eye to parse an arithmetic expression to find out how many reps were
+/// done, at arm's length, mid-set — and the answer is not the sum. Two boxes
+/// with one seam say the same thing without being read twice.
+///
+/// Empty is the normal state and it stays quiet: a hairline outline and a dim
+/// dash, not a zero. A zero is a number, and this column mostly has no number
+/// in it.
+class _PartialCell extends StatelessWidget {
+  const _PartialCell({
+    required this.value,
+    required this.ghost,
+    required this.done,
+    required this.active,
+    required this.buffer,
+    required this.onTap,
+  });
+
+  final int? value;
+
+  /// What this set's partials were last time, sitting in the cell the way
+  /// every other ghost on the row does. Shown only — [PastSet.partialReps]
+  /// explains why it is never adopted.
+  final int? ghost;
+
+  final bool done;
+  final bool active;
+  final ValueListenable<String> buffer;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!active) return _build(context, (value ?? 0) == 0 ? '' : '$value');
+    return ValueListenableBuilder<String>(
+      valueListenable: buffer,
+      builder: (context, buffer, _) => _build(context, buffer),
+    );
+  }
+
+  Widget _build(BuildContext context, String display) {
+    final c = context.c;
+    final hasValue = display.isNotEmpty;
+    final ghostText = (ghost ?? 0) == 0 ? '' : '$ghost';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        height: SetRow.fieldHeight,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          // Dimmer than the reps half even when it holds a number: this is a
+          // note on the set, not the result of it.
+          color: active
+              ? Colors.transparent
+              : (done ? c.surface : c.surfaceHigh),
+          borderRadius: const BorderRadius.horizontal(
+            right: Radius.circular(Radii.sm),
+          ),
+          border: Border.all(
+            color: active ? c.accent : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Text(
+          hasValue ? display : (ghostText.isEmpty ? '–' : ghostText),
+          style: context.t.labelLarge?.copyWith(
+            color: hasValue
+                ? (done ? c.textSecondary : c.textPrimary)
+                : c.textTertiary,
+          ),
+          maxLines: 1,
+        ),
+      ),
+    );
   }
 }
 

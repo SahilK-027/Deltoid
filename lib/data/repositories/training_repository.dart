@@ -1012,6 +1012,7 @@ class TrainingRepository {
                     type: s.setType,
                     weight: s.weight,
                     reps: s.reps,
+                    partialReps: s.partialReps,
                     addedWeight: s.addedWeight,
                     isLeg: s.parentSetId != null,
                   ),
@@ -1814,6 +1815,7 @@ class TrainingRepository {
     String setId, {
     Value<double?> weight = const Value.absent(),
     Value<int?> reps = const Value.absent(),
+    Value<int?> partialReps = const Value.absent(),
     Value<double?> addedWeight = const Value.absent(),
     Value<SetType> setType = const Value.absent(),
     Value<bool> isDone = const Value.absent(),
@@ -1825,6 +1827,7 @@ class TrainingRepository {
       SetLogsCompanion(
         weight: weight,
         reps: reps,
+        partialReps: partialReps,
         addedWeight: addedWeight,
         setType: setType,
         parentSetId: parentSetId,

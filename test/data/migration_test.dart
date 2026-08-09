@@ -70,4 +70,22 @@ void main() {
     expect(plank.measureMode, MeasureMode.hold);
     await reopened.close();
   });
+
+  test('v8 adds partial reps to a database that has none', () async {
+    final fresh = AppDatabase(NativeDatabase(file));
+    await ensureStarterCatalog(fresh);
+    await fresh.customStatement('ALTER TABLE set_logs DROP COLUMN partial_reps');
+    await fresh.close();
+    await stampVersion(7);
+
+    final reopened = AppDatabase(NativeDatabase(file));
+    final columns = await reopened
+        .customSelect("SELECT name FROM pragma_table_info('set_logs')")
+        .get();
+    expect(
+      columns.map((r) => r.read<String>('name')),
+      contains('partial_reps'),
+    );
+    await reopened.close();
+  });
 }

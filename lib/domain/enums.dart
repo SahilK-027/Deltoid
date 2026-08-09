@@ -68,9 +68,15 @@ String formatClock(int seconds) {
 }
 
 /// A count in the form its exercise is measured in: `8` reps, `2:25` held.
-String formatCount(int? count, MeasureMode mode) {
+///
+/// Partials ride along as a suffix — `8+3` — and never inside the count. They
+/// are not reps: nothing that adds up (volume, e1RM, beating last time) may
+/// read them, and printing them apart is what keeps that true everywhere the
+/// number is read.
+String formatCount(int? count, MeasureMode mode, {int? partial}) {
   final n = count ?? 0;
-  return mode.isHold ? formatClock(n) : '$n';
+  final base = mode.isHold ? formatClock(n) : '$n';
+  return (partial ?? 0) > 0 && !mode.isHold ? '$base+$partial' : base;
 }
 
 enum Equipment { barbell, dumbbell, machine, cable, bodyweight, band, other }

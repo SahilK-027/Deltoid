@@ -9,6 +9,7 @@ import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'regime_screen.dart';
 import 'regime_setup.dart';
+import '../../core/widgets/toast.dart';
 
 /// The Regimes tab: every programme, and the catalog they are all built from.
 ///
@@ -186,15 +187,11 @@ class RegimesScreen extends ConsumerWidget {
     final id = await createRegimeFlow(context, ref, activate: false);
     if (id == null) return;
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: const Text('Added to the library — still training the old one'),
-        action: SnackBarAction(
-          label: 'Activate',
-          onPressed: () =>
-              ref.read(regimeRepositoryProvider).setActiveRegime(id),
-        ),
-      ),
+    showToastOn(
+      messenger,
+      'Added to the library — still training the old one',
+      actionLabel: 'Activate',
+      onAction: () => ref.read(regimeRepositoryProvider).setActiveRegime(id),
     );
   }
 }
@@ -341,9 +338,7 @@ class _RegimeRow extends ConsumerWidget {
   Future<void> _activate(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     await ref.read(regimeRepositoryProvider).setActiveRegime(summary.regime.id);
-    messenger.showSnackBar(
-      SnackBar(content: Text('Training ${summary.regime.name}')),
-    );
+    showToastOn(messenger, 'Training ${summary.regime.name}');
   }
 
   Future<bool> _delete(BuildContext context, WidgetRef ref) async {

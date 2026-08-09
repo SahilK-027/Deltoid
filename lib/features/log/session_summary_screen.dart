@@ -581,7 +581,7 @@ class _EntryRow extends ConsumerWidget {
         : (a, b) => ((b.weight ?? b.addedWeight) ?? 0)
             .compareTo((a.weight ?? a.addedWeight) ?? 0));
     final set = pool.first;
-    final count = formatCount(set.reps, measure);
+    final count = formatCount(set.reps, measure, partial: set.partialReps);
 
     if (exercise.loadMode == LoadMode.bodyweight) {
       return 'Bodyweight × $count';

@@ -69,6 +69,8 @@ class SetKeypad extends StatelessWidget {
     this.nextLabel = 'Next',
     this.barKg,
     this.isTime = false,
+    this.partial = false,
+    this.onTogglePartial,
   });
 
   final SetField field;
@@ -97,6 +99,12 @@ class SetKeypad extends StatelessWidget {
   /// Empty bar weight, when this movement is loaded on one. Drives the plate
   /// view above the digits; null means no bar and no diagram.
   final double? barKg;
+
+  /// Whether the digits are landing in the set's **partial** count rather than
+  /// its full reps. Null [onTogglePartial] means this field has no partials to
+  /// speak of — a load, or a hold — and the key is not offered at all.
+  final bool partial;
+  final VoidCallback? onTogglePartial;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +196,8 @@ class SetKeypad extends StatelessWidget {
                 onKey: onKey,
                 onNext: onNext,
                 nextLabel: nextLabel,
+                partial: partial,
+                onTogglePartial: onTogglePartial,
               ),
             ],
           ),
@@ -205,6 +215,8 @@ class _KeyGrid extends StatelessWidget {
     required this.onKey,
     required this.onNext,
     required this.nextLabel,
+    required this.partial,
+    required this.onTogglePartial,
   });
 
   final SetField field;
@@ -213,6 +225,8 @@ class _KeyGrid extends StatelessWidget {
   final ValueChanged<String> onKey;
   final VoidCallback onNext;
   final String nextLabel;
+  final bool partial;
+  final VoidCallback? onTogglePartial;
 
   @override
   Widget build(BuildContext context) {
@@ -227,10 +241,14 @@ class _KeyGrid extends StatelessWidget {
 
     return Column(
       children: [
+        // Phone order, not calculator order: `1 2 3` on the top row. Every
+        // other pad this thumb uses — the dialler, the passcode, the timer —
+        // counts downwards, and a pad that counts upwards is one you have to
+        // look at.
         _row([
-          _Key(label: '7', onTap: () => onKey('7')),
-          _Key(label: '8', onTap: () => onKey('8')),
-          _Key(label: '9', onTap: () => onKey('9')),
+          _Key(label: '1', onTap: () => onKey('1')),
+          _Key(label: '2', onTap: () => onKey('2')),
+          _Key(label: '3', onTap: () => onKey('3')),
           _Key(
             icon: Icons.backspace_outlined,
             onTap: () => onKey('⌫'),
@@ -244,14 +262,16 @@ class _KeyGrid extends StatelessWidget {
           _Key(label: '−$stepLabel', onTap: () => onKey('-'), muted: true),
         ]),
         _row([
-          _Key(label: '1', onTap: () => onKey('1')),
-          _Key(label: '2', onTap: () => onKey('2')),
-          _Key(label: '3', onTap: () => onKey('3')),
+          _Key(label: '7', onTap: () => onKey('7')),
+          _Key(label: '8', onTap: () => onKey('8')),
+          _Key(label: '9', onTap: () => onKey('9')),
           _Key(label: '+$stepLabel', onTap: () => onKey('+'), muted: true),
         ]),
         _row([
           if (field.isDecimal)
             _Key(label: '.', onTap: () => onKey('.'))
+          else if (onTogglePartial != null)
+            _PartialKey(partial: partial, onTap: onTogglePartial!)
           else
             const _Key(label: '', onTap: null),
           _Key(label: '0', onTap: () => onKey('0')),
@@ -323,6 +343,69 @@ class _Key extends StatelessWidget {
                       ),
                     ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Switches the digits between a set's full reps and its partials.
+///
+/// One key with both halves showing, rather than a `P` that lights up: which
+/// number you are typing into is the one thing on this pad you cannot work out
+/// from the digits, and a toggle that only shows its own state makes you read
+/// the field to find out where the last three taps went.
+class _PartialKey extends StatelessWidget {
+  const _PartialKey({required this.partial, required this.onTap});
+
+  final bool partial;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Expanded(
+      child: SizedBox(
+        height: 52,
+        child: Material(
+          color: c.surfaceHigh,
+          borderRadius: BorderRadius.circular(Radii.md),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Radii.md),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  _half(context, 'F', selected: !partial),
+                  _half(context, 'P', selected: partial),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _half(BuildContext context, String label, {required bool selected}) {
+    final c = context.c;
+    return Expanded(
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? c.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(Radii.sm),
+        ),
+        child: Text(
+          label,
+          style: context.t.labelLarge?.copyWith(
+            color: selected ? c.onAccent : c.textTertiary,
           ),
         ),
       ),

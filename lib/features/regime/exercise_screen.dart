@@ -12,6 +12,7 @@ import '../../domain/units.dart';
 import '../history/exercise_history_screen.dart';
 import 'regime_screen.dart';
 import 'regime_settings.dart';
+import '../../core/widgets/toast.dart';
 
 /// One catalog row, watched so an edit made here redraws the screen it was
 /// made on.
@@ -686,15 +687,10 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   Future<void> _setArchived(Exercise exercise, bool archived) async {
     await _repo.updateExercise(exercise.id, archived: Value(archived));
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            archived ? '${exercise.name} archived' : '${exercise.name} restored',
-          ),
-        ),
-      );
+    showToast(
+      context,
+      archived ? '${exercise.name} archived' : '${exercise.name} restored',
+    );
   }
 
   /// Removing a slot is one tap, so it gets an undo rather than a dialog — the
@@ -706,14 +702,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     await repo.removeSessionExercise(widget.slotId!);
     navigator.pop();
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('$name removed'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => repo.restoreSessionExercise(widget.slotId!),
-        ),
-      ),
+    showToastOn(
+      messenger,
+      '$name removed',
+      actionLabel: 'Undo',
+      onAction: () => repo.restoreSessionExercise(widget.slotId!),
     );
   }
 }

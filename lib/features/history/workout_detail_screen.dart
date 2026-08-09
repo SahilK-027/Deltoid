@@ -14,6 +14,7 @@ import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'history_screen.dart' show formatWeight;
+import '../../core/widgets/toast.dart';
 
 /// One day, exactly as it was logged.
 ///
@@ -284,7 +285,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     await ref.read(trainingRepositoryProvider).deleteWorkout(detail.workout.id);
     navigator.pop();
-    messenger.showSnackBar(const SnackBar(content: Text('Session deleted')));
+    showToastOn(messenger, 'Session deleted');
   }
 
   static List<String> _facts(WorkoutDetail detail) {
@@ -619,7 +620,7 @@ class _SetLine extends StatelessWidget {
               children: [
                 Text(
                   '${_load(set, exercise, unit)} × '
-                  '${formatCount(set.reps, exercise.measureMode)}',
+                  '${formatCount(set.reps, exercise.measureMode, partial: set.partialReps)}',
                   style: context.t.labelLarge,
                 ),
                 if (set.note != null && set.note!.isNotEmpty)

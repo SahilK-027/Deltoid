@@ -16,6 +16,7 @@ import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
+import '../../core/widgets/toast.dart';
 
 /// When the last automatic export ran. One fires after every finished
 /// session, but Settings never said so, which made the whole mechanism
@@ -186,25 +187,23 @@ class SettingsScreen extends ConsumerWidget {
       if (result == null) return;
       file = result;
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      showToastOn(messenger, 'Export failed: $e', destructive: true);
       return;
     }
 
     if (destination == _ExportTo.downloads) {
       try {
         final location = await saveToDownloads(file);
-        messenger.showSnackBar(SnackBar(content: Text('Saved to $location')));
+        showToastOn(messenger, 'Saved to $location');
       } on BackupSaveException catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+        showToastOn(messenger, e.message, destructive: true);
       }
       return;
     }
 
     // The file is kept whether or not the share sheet is used, so say where
     // it went — a backup you cannot find later is one you have to trust.
-    messenger.showSnackBar(
-      SnackBar(content: Text('Saved to ${file.parent.path}')),
-    );
+showToastOn(messenger, 'Saved to ${file.parent.path}');
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
@@ -226,11 +225,7 @@ class SettingsScreen extends ConsumerWidget {
     // writing into rows that no longer exist.
     final open = await ref.read(trainingRepositoryProvider).openWorkout();
     if (open != null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Finish or delete the session in progress first'),
-        ),
-      );
+      showToastOn(messenger, 'Finish or delete the session in progress first');
       return;
     }
 
@@ -255,7 +250,7 @@ class SettingsScreen extends ConsumerWidget {
       decoded = await service.decode(contents);
       summary = service.summarise(decoded);
     } on FormatException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      showToastOn(messenger, e.message, destructive: true);
       return;
     }
 
@@ -284,11 +279,9 @@ class SettingsScreen extends ConsumerWidget {
             service.restore(contents, onProgress: report, decoded: decoded),
       );
       if (result == null) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('Restored ${result.rowsWritten} rows')),
-      );
+      showToastOn(messenger, 'Restored ${result.rowsWritten} rows');
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+      showToastOn(messenger, 'Restore failed: $e', destructive: true);
     }
   }
 }

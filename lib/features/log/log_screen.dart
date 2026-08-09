@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/providers.dart';
 import '../../core/rest_alert.dart';
+import '../../core/workout_notifications.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/reorder_sheet.dart';
@@ -27,6 +28,7 @@ import 'widgets/exercise_sheets.dart';
 import 'widgets/hold_pad.dart';
 import 'widgets/rest_timer.dart';
 import 'widgets/set_row.dart';
+import '../../core/widgets/toast.dart';
 
 /// Which value the keypad is currently editing.
 class EditTarget {
@@ -52,7 +54,8 @@ class LogScreen extends ConsumerStatefulWidget {
   ConsumerState<LogScreen> createState() => _LogScreenState();
 }
 
-class _LogScreenState extends ConsumerState<LogScreen> {
+class _LogScreenState extends ConsumerState<LogScreen>
+    with WidgetsBindingObserver {
   EditTarget? _editing;
 
   /// Set when the hold pad has been sent away in favour of the digits, for a
@@ -66,6 +69,36 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// convert rather than parse. Set in [_focus] and true for exactly one field
   /// type: the count column of a movement measured in time.
   bool _timeField = false;
+
+  /// The digits are landing in the set's partial count rather than its full
+  /// reps. Follows whichever half of a split count cell was last tapped, and
+  /// the pad's `F` / `P`.
+  bool _partialField = false;
+
+  /// The set whose count cell is showing its partial half.
+  ///
+  /// Deliberately not the same thing as [_partialField], which only says where
+  /// the digits are going. **Only the pad's `F` closes the half**: tapping the
+  /// reps side to fix the reps moves the cursor, and taking the partial box
+  /// away underneath that tap would lose the number it was opened for. Moving
+  /// to another cell entirely closes it too — the row reads this against
+  /// [EditTarget.setId].
+  String? _partialShownFor;
+
+  /// The set whose partials were just cleared by `F`.
+  ///
+  /// `F` means "this set is all full reps", so it erases the count as well as
+  /// closing the box. Both the row's own number and the ghost's would otherwise
+  /// re-open the split — the row's because the clearing write has not come back
+  /// through the stream yet, the ghost's because it never changes — and the
+  /// key would look like it had done nothing.
+  String? _partialClosedFor;
+
+
+  /// What was in the buffer the last time the F/P key was pressed, one for
+  /// each side. Both cleared on every focus change.
+  String? _fullStash;
+  String? _partialStash;
 
   /// The keypad's in-progress text, held in a notifier rather than in state.
   ///
@@ -82,6 +115,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   Timer? _clock;
   DateTime? _restStartedAt;
   int _restTargetSeconds = 120;
+
+  /// The target belonging to the exercise now on screen, held back while a
+  /// rest started under the previous exercise is still running. Turning the
+  /// page mid-rest used to swap the target under the running clock, so a rest
+  /// with forty seconds left jumped back up to two minutes.
+  int? _pendingRestTarget;
 
   /// Set once the current rest has reached zero, so the buzz fires on the
   /// crossing and not on every tick after it. Cleared whenever the rest is
@@ -100,6 +139,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   /// Whether the opening exercise's rest target has been fetched yet.
   bool _restTargetLoaded = false;
+
+  /// What the ongoing notification was last posted with, so a keystroke does
+  /// not re-post a line that has not changed.
+  String? _notifiedSignature;
 
   /// The keystroke waiting to be written, and its debounce.
   ({EditTarget target, String value})? _pending;
@@ -127,6 +170,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   @override
   void initState() {
     super.initState();
+    // The screen going off is what breaks the rest clock — see
+    // [didChangeAppLifecycleState].
+    WidgetsBinding.instance.addObserver(this);
     // The tick no longer rebuilds the screen. It used to call setState on the
     // whole log — PageView included — once a second whether or not anything on
     // it showed a clock; the two widgets that need one now tick themselves.
@@ -145,6 +191,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // A workout you have left holds no row on the lock screen, and no alarm.
+    WorkoutNotifications.instance.clear().ignore();
     _clock?.cancel();
     _restBarHide?.cancel();
     _buffer.dispose();
@@ -155,6 +204,71 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     RestAlert.instance.release().ignore();
     _pages.dispose();
     super.dispose();
+  }
+
+  /// Hands the rest over to the OS when the app stops running, and takes it
+  /// back when it starts again.
+  ///
+  /// Everything on this screen that counts — the bar, the buzz — is driven by
+  /// a Dart `Timer`, and Android freezes those the moment the process is
+  /// suspended. Put the phone face down between sets and the tone did not play
+  /// at the end of the rest; it played when the phone was picked back up,
+  /// which is late enough to be worse than nothing. So on the way out the end
+  /// of the rest is scheduled as a real alarm, and on the way back in that
+  /// alarm is cancelled because the in-app one can do the job again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        final startedAt = _restStartedAt;
+        if (startedAt != null && !_restAlerted) {
+          WorkoutNotifications.instance
+              .scheduleRestDone(
+                startedAt.add(Duration(seconds: _restTargetSeconds)),
+                body: _detail?.session?.name,
+              )
+              .ignore();
+        }
+      case AppLifecycleState.resumed:
+        WorkoutNotifications.instance.cancelRest().ignore();
+        // The clock kept running in the world while it was stopped in here, so
+        // a rest that ended while the phone was away is settled on sight
+        // rather than up to a second later.
+        _checkRestElapsed();
+      case AppLifecycleState.inactive:
+        // A shade pulled halfway down, a call coming in. Nothing has stopped.
+        break;
+    }
+    _postSessionNotification();
+  }
+
+  /// Keeps the ongoing lock-screen line in step with the session.
+  ///
+  /// Posted with the same id every time, so it updates a single row rather
+  /// than stacking one up per set. The rest countdown on it is drawn by the
+  /// system from an end time — this app does not, and cannot, tick it while
+  /// suspended.
+  void _postSessionNotification() {
+    final detail = _detail;
+    if (detail == null) return;
+    final startedAt = _restStartedAt;
+    final resting = startedAt != null && _showRestBar && !_restAlerted;
+    final done = _doneSets(detail);
+    final total = _totalSets(detail);
+    WorkoutNotifications.instance
+        .showSession(
+          title: detail.session?.name ?? 'Workout',
+          body: resting
+              ? 'Resting · $done of $total sets'
+              : '$done of $total sets',
+          restEndsAt: resting
+              ? startedAt.add(Duration(seconds: _restTargetSeconds))
+              : null,
+        )
+        .ignore();
   }
 
   /// Buzzes once when rest reaches zero. Without this the timer only ever
@@ -175,6 +289,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (_restAlerted) return;
     _restAlerted = true;
     RestAlert.instance.fire();
+    // The countdown on the lock screen is over too, and nothing else rebuilds
+    // this screen for another five seconds.
+    _postSessionNotification();
     // Hold the "done" state briefly so picking the phone up right after the
     // buzz still shows what happened, then get out of the way.
     _restBarHide?.cancel();
@@ -211,12 +328,35 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           sessionId: detail.workout.sessionId,
         );
     if (!mounted) return;
-    setState(() => _restTargetSeconds = seconds);
+    // A clock already counting down belongs to the set that started it. The
+    // new exercise's target takes over at the next rest, not in the middle of
+    // this one.
+    if (_restRunning) {
+      _pendingRestTarget = seconds;
+      return;
+    }
+    setState(() {
+      _pendingRestTarget = null;
+      _restTargetSeconds = seconds;
+    });
+  }
+
+  /// Whether rest is still on the clock. Past zero the bar says "Rest done"
+  /// and the number is no longer being counted, so a new target may land.
+  bool get _restRunning {
+    final startedAt = _restStartedAt;
+    if (startedAt == null) return false;
+    return DateTime.now().difference(startedAt).inSeconds < _restTargetSeconds;
   }
 
   void _startRest() {
     _restBarHide?.cancel();
     setState(() {
+      final pending = _pendingRestTarget;
+      if (pending != null) {
+        _restTargetSeconds = pending;
+        _pendingRestTarget = null;
+      }
       _restStartedAt = DateTime.now();
       _restAlerted = false;
       _showRestBar = true;
@@ -227,7 +367,12 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// opens on the number you settled on.
   Future<void> _adjustRest(WorkoutDetail detail, int delta) async {
     final seconds = (_restTargetSeconds + delta).clamp(15, 900).toInt();
-    setState(() => _restTargetSeconds = seconds);
+    // A hand on the ± is the latest word on the target, so a value held back
+    // by a page turn does not get to overwrite it at the next set.
+    setState(() {
+      _restTargetSeconds = seconds;
+      _pendingRestTarget = null;
+    });
 
     if (detail.entries.isEmpty) return;
     final page = _page.clamp(0, detail.entries.length - 1);
@@ -244,14 +389,10 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     // so the write matches nothing. Silently forgetting it is worse than
     // saying so: the timer would simply be back at 120s next week.
     if (saved || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Rest set for today. ${entry.exercise.name} is not in this '
-          'session\'s template, so it will not be remembered.',
-        ),
-        duration: const Duration(seconds: 4),
-      ),
+    showToast(
+      context,
+      'Rest set for today. ${entry.exercise.name} is not in this '
+      'session\'s template, so it will not be remembered.',
     );
   }
 
@@ -298,6 +439,24 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       });
     }
 
+    // The lock-screen line follows this screen's state rather than being
+    // posted from each of the six places that change it. A signature, so a
+    // build caused by a keystroke does not re-post a notification that says
+    // exactly what it said a moment ago.
+    final signature = [
+      detail.session?.name,
+      _doneSets(detail),
+      _totalSets(detail),
+      _showRestBar,
+      _restAlerted,
+      _restStartedAt?.millisecondsSinceEpoch,
+      _restTargetSeconds,
+    ].join('|');
+    if (signature != _notifiedSignature) {
+      _notifiedSignature = signature;
+      _postSessionNotification();
+    }
+
     final cells = _buildCells(detail);
 
     return PopScope(
@@ -313,12 +472,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         // Leaving without finishing is fine — the session keeps running and
         // survives a force-stop — but it has to be said out loud, or the sets
         // logged so far look lost.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Session still running — resume it from Today'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        showToast(context, 'Session still running — resume it from Today');
         Navigator.of(context).pop();
       },
       child: Scaffold(
@@ -385,9 +539,13 @@ class _LogScreenState extends ConsumerState<LogScreen> {
                           prefill: prefill[entry.exercise.id],
                           unit: _unit,
                           editing: _editing,
+                          partialShownFor: _partialShownFor,
+                          partialClosedFor: _partialClosedFor,
+                          partialEditing: _partialField,
                           buffer: _buffer,
                           openSwipe: _openSwipe,
                           onEdit: _focus,
+                          onEditPartial: _focusPartial,
                           rowKeyFor: _rowKey,
                           onToggleDone: _toggleDone,
                           onNextExercise: () => _goToPage(index + 1),
@@ -401,7 +559,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
             // one white button on the screen. Finishing early is still
             // possible from the top bar — it just isn't advertised.
             if (_editing != null ||
-                _totalSets(detail) == 0 ||
+                _allSets(detail) == 0 ||
                 _doneSets(detail) < _totalSets(detail))
               const SizedBox.shrink()
             else
@@ -468,10 +626,28 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     final located = _detail == null ? null : _locate(_detail!, set.id);
     final isTime = field == SetField.reps &&
         (located?.$1.exercise.measureMode.isHold ?? false);
+    // Tapping the reps half of a split cell lands here. The digits follow the
+    // tap — that is what tapping a field means — but the partial box stays
+    // open, because only the pad's `F` closes it.
+    final sameCell = _editing?.setId == set.id && _editing?.field == field;
     setState(() {
+      // Leaving the partial half with keystrokes still settling: what is on
+      // screen is newer than the row, which will not have caught up until the
+      // write comes back through the stream. Coming back to this half has to
+      // read this, not the row, or it reloads the number that was there before
+      // and writes it straight back — which is how a `3` refused to become a
+      // `2`.
+      if (sameCell && _partialField) _partialStash = _buffer.value;
       _editing = EditTarget(set.id, field);
       _typeHold = false;
       _timeField = isTime;
+      _partialField = false;
+      if (!sameCell) {
+        _fullStash = null;
+        _partialStash = null;
+        _partialShownFor = null;
+        _partialClosedFor = null;
+      }
       _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
         SetField.added => _fmtLoadIn(set.addedWeight),
@@ -481,6 +657,76 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       };
     });
     _revealRow(set.id);
+  }
+
+  /// The partial half, by tapping it. Opens the count field with the digits
+  /// going into the partials rather than the reps — the same state the pad's
+  /// `P` puts it in.
+  void _focusPartial(SetLog set) {
+    _focus(set, SetField.reps);
+    setState(() {
+      _partialField = true;
+      _partialShownFor = set.id;
+      _partialClosedFor = null;
+      _fullStash = _buffer.value;
+      // The stash first: it is what was last typed here, and the row is a
+      // build behind whenever a write is still in flight.
+      _buffer.value =
+          _partialStash ??
+          ((set.partialReps ?? 0) == 0 ? '' : '${set.partialReps}');
+    });
+  }
+
+  /// Opens the partial box, or puts it away — the pad's `F` / `P`.
+  ///
+  /// **The only control that closes it.** Tapping a half moves the digits into
+  /// that half and leaves the split standing; this is the one that decides
+  /// whether the set is being given partials at all. Opening lands the digits
+  /// in the new box, which is the only reason to have pressed it.
+  ///
+  /// The pending keystroke is flushed first, because the buffer is about to
+  /// mean a different column: switching with a write in flight would land the
+  /// full reps in the partial count, or the other way about.
+  void _togglePartial(SetLog set) {
+    final wasOpen = _partialShownFor == set.id;
+    // Where the digits were going, which is not the same question as whether
+    // the box was open: the reps half can be the live one with the partial box
+    // sitting open beside it.
+    final wasInPartial = _partialField;
+    final typed = _buffer.value;
+    _flushWrite();
+    setState(() {
+      _partialShownFor = wasOpen ? null : set.id;
+      _partialClosedFor = wasOpen ? set.id : null;
+      _partialField = !wasOpen;
+      // The other side comes back from the stash rather than from the row: the
+      // flush above has only just been *sent*, so the row this build is holding
+      // still has the number that was there before the last few keystrokes.
+      if (wasOpen) {
+        // Going back to full is a statement about the set, not just about the
+        // pad: whatever partials it had are no longer claimed, so the count is
+        // dropped rather than left behind a closed box. Empty rather than
+        // null, so pressing `P` straight afterwards starts from nothing — the
+        // row is still holding the old number until the clearing write below
+        // comes back through the stream.
+        _partialStash = '';
+        // Closing from the reps half changes nothing about what is being
+        // typed — the box going away is the other one.
+        _buffer.value = wasInPartial
+            ? (_fullStash ?? set.reps?.toString() ?? '')
+            : typed;
+      } else {
+        _fullStash = typed;
+        _buffer.value =
+            _partialStash ??
+            ((set.partialReps ?? 0) == 0 ? '' : '${set.partialReps}');
+      }
+    });
+    if (wasOpen) {
+      ref
+          .read(trainingRepositoryProvider)
+          .updateSet(set.id, partialReps: const Value(null));
+    }
   }
 
   /// The keypad is a sibling in the Column, so opening it shrinks the page
@@ -550,11 +796,19 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
     final isLast = cells.isNotEmpty && cells.last == target;
     // The key has to name what it does. On a reps field with nothing typed and
-    // no ghost to borrow from, "Done" completes nothing at all.
+    // no ghost to borrow from, "Done" completes nothing at all. In partial mode
+    // the buffer is not the reps, so the row answers for them.
     final needsReps =
         target.field == SetField.reps &&
-        (int.tryParse(_buffer.value) ?? 0) <= 0 &&
+        (_partialField
+            ? (set.reps ?? 0) <= 0
+            : (int.tryParse(_buffer.value) ?? 0) <= 0) &&
         ghost?.reps == null;
+
+    // Partials belong to reps and to nothing else: a hold has no half-second,
+    // and a load is not counted at all.
+    final canBePartial =
+        target.field == SetField.reps && !entry.exercise.measureMode.isHold;
 
     return SetKeypad(
       field: target.field,
@@ -570,8 +824,19 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       barKg: entry.exercise.loadMode == LoadMode.total
           ? entry.exercise.barKind.kg
           : null,
-      hint: hint.isEmpty ? null : hint,
-      onUseHint: hint.isEmpty ? null : () => _commit(hint, target),
+      // The key says whether the partial box is **open**, not which box the
+      // digits are in. Tapping the reps half to correct them is not leaving
+      // partial entry — the box is still there, waiting — and a key that
+      // flipped back to `F` on that tap was reporting a mode change nobody
+      // asked for.
+      partial: _partialShownFor == target.setId,
+      onTogglePartial: canBePartial ? () => _togglePartial(set) : null,
+      // Last time's number is a full-rep number. Offering it while the digits
+      // are going into the partial count would file it as halves.
+      hint: hint.isEmpty || _partialField ? null : hint,
+      onUseHint: hint.isEmpty || _partialField
+          ? null
+          : () => _commit(hint, target),
       nextLabel: needsReps
           ? (entry.exercise.measureMode.isHold ? 'Time?' : 'Reps?')
           : isLast
@@ -636,9 +901,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
         final count = _timeField
             ? secondsFromDigits(pending.value)
             : typed?.round();
+        final value = Value(count == 0 ? null : count);
         repo.updateSet(
           pending.target.setId,
-          reps: Value(count == 0 ? null : count),
+          reps: _partialField ? const Value.absent() : value,
+          partialReps: _partialField ? value : const Value.absent(),
         );
     }
   }
@@ -651,14 +918,23 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     if (from.field == SetField.reps) {
       // Read the buffer, not the row: the write for this keystroke may still be
       // in flight, and a stale row would silently skip marking the set done.
-      var reps = _timeField
+      //
+      // Except in partial mode, where the buffer holds the partials and the
+      // full reps are whatever was typed before the toggle — already flushed
+      // above, so the row is the honest source for them.
+      var reps = _partialField
+          ? (_locate(detail, from.setId)?.$2.reps ?? 0)
+          : _timeField
           ? secondsFromDigits(_buffer.value)
           : int.tryParse(_buffer.value) ?? 0;
       // A weight with no reps used to do nothing at all while the key said
       // "Done": the keypad simply closed. Fall back to last time's reps, which
       // is what adopting the ghost would have written anyway; with no ghost to
       // fall back on the key says "Reps?" and this never runs.
-      if (reps <= 0) {
+      // Not in partial mode: the buffer there is the partial count, and
+      // committing last time's reps into it would file eight full reps as
+      // eight halves.
+      if (reps <= 0 && !_partialField) {
         final located = _locate(detail, from.setId);
         if (located != null) {
           final ghost = _ghostFor(
@@ -678,7 +954,9 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       }
 
       if (reps > 0) {
-        _adoptGhost(from.setId);
+        // The count is settled — typed, timed, or taken from the ghost a few
+        // lines up and already flushed. Only the load may still be blank.
+        _adoptGhost(from.setId, skipCount: true);
         // Rest was already being measured; it was simply thrown away. Absent
         // rather than null when there is none to record: re-ticking a set an
         // hour later must not erase the rest it was actually given.
@@ -769,6 +1047,52 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     HapticFeedback.mediumImpact();
 
     if (_hasOpenSetsBesides(set.id)) _startRest();
+    _followTick(set.id);
+  }
+
+  /// Sends the thumb to the next set after one is ticked.
+  ///
+  /// Ticking a box used to leave the keypad wherever it was — usually on the
+  /// row you had just finished — so the next set began with a tap to move and a
+  /// tap to open. The next open set is the only thing you can do next, and past
+  /// the last one on a page it is on the page after it.
+  ///
+  /// With nothing open left, the keypad goes away instead: the session is
+  /// finished, and the screen's one remaining action is the button underneath
+  /// it, which cannot be seen with the pad up.
+  void _followTick(String setId) {
+    final detail = _detail;
+    if (detail == null) return;
+
+    final open = _nextOpenSetAfter(detail, setId);
+    if (open == null) {
+      setState(() => _editing = null);
+      return;
+    }
+
+    final page = _pageOf(detail, open.id);
+    if (page >= 0 && page != _page) _goToPage(page);
+    // The field standing between that set and being logged, or its count when
+    // last time's numbers already fill the rest.
+    _focus(open, _firstEmptyField(open.id) ?? SetField.reps);
+  }
+
+  /// The first set after [setId] still waiting to be logged, in the order the
+  /// page turns. Skipped exercises are not in the walk — their sets are never
+  /// going to be ticked, so landing on one is a dead end.
+  SetLog? _nextOpenSetAfter(WorkoutDetail detail, String setId) {
+    final ordered = [
+      for (final entry in detail.entries)
+        if (entry.workoutExercise.skipReason == SkipReason.none) ...entry.sets,
+    ];
+    final at = ordered.indexWhere((s) => s.id == setId);
+    if (at < 0) return null;
+    // Only forwards. A set ticked out of order in the middle of an exercise
+    // should carry on down the table, not send the page back to a row above it.
+    for (final set in ordered.skip(at + 1)) {
+      if (!set.isDone) return set;
+    }
+    return null;
   }
 
   /// Whether any set other than [setId] is still open.
@@ -828,7 +1152,7 @@ class _LogScreenState extends ConsumerState<LogScreen> {
   /// Typing only the reps is the normal case — same weight as last week, one
   /// more rep. Without this the set would be stored as reps against a null
   /// load: invisible to the progress chart, and unable to register as a PR.
-  void _adoptGhost(String setId) {
+  void _adoptGhost(String setId, {bool skipCount = false}) {
     final detail = _detail;
     if (detail == null) return;
     final located = _locate(detail, setId);
@@ -852,7 +1176,13 @@ class _LogScreenState extends ConsumerState<LogScreen> {
       case LoadMode.bodyweight:
         break;
     }
-    if (set.reps == null && ghost.reps != null) {
+    // [skipCount] because `set` here is one build behind: the count was
+    // written a moment ago by the caller and the watched query has not come
+    // back with it yet, so the row still reads null. Without this the ghost is
+    // adopted straight over the number just recorded — which is how a hold
+    // timed on the stopwatch was logged, and then immediately replaced by last
+    // week's time.
+    if (!skipCount && set.reps == null && ghost.reps != null) {
       repo.updateSet(setId, reps: Value(ghost.reps));
     }
   }
@@ -990,10 +1320,13 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   Future<void> _finish(WorkoutDetail detail) async {
     final done = _doneSets(detail);
+    // Work done under an exercise that was skipped afterwards is still work,
+    // and it is what discarding would delete.
+    final logged = _loggedSets(detail);
     final navigator = Navigator.of(context);
     final repo = ref.read(trainingRepositoryProvider);
 
-    if (done == 0) {
+    if (logged == 0) {
       final discard = await confirmAction(
         context,
         title: 'Nothing logged',
@@ -1028,8 +1361,8 @@ class _LogScreenState extends ConsumerState<LogScreen> {
           context,
           title: 'Discard this session?',
           message:
-              '$done logged set${done == 1 ? '' : 's'} '
-              '${done == 1 ? 'is' : 'are'} deleted. This cannot be undone.',
+              '$logged logged set${logged == 1 ? '' : 's'} '
+              '${logged == 1 ? 'is' : 'are'} deleted. This cannot be undone.',
           confirmLabel: 'Discard',
           cancelLabel: 'Keep it',
           destructive: true,
@@ -1062,7 +1395,19 @@ class _LogScreenState extends ConsumerState<LogScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────
 
+  /// Sets that still count towards finishing the session. A skipped exercise
+  /// is out of both counts: its sets are never going to be ticked, and leaving
+  /// them in the denominator kept the Finish button off the screen for good.
+  static Iterable<SetLog> _countedSets(WorkoutDetail d) => d.entries
+      .where((e) => e.workoutExercise.skipReason == SkipReason.none)
+      .expand((e) => e.sets);
+
   static int _doneSets(WorkoutDetail d) =>
+      _countedSets(d).where((s) => s.isDone).length;
+
+  /// Every set ticked today, skipped exercises included — what would actually
+  /// be thrown away by discarding.
+  static int _loggedSets(WorkoutDetail d) =>
       d.entries.expand((e) => e.sets).where((s) => s.isDone).length;
 
   /// Exercises with sets still open, named and counted. Skipped ones are
@@ -1082,7 +1427,11 @@ class _LogScreenState extends ConsumerState<LogScreen> {
     return out;
   }
 
-  static int _totalSets(WorkoutDetail d) =>
+  static int _totalSets(WorkoutDetail d) => _countedSets(d).length;
+
+  /// Sets on the card at all. Distinguishes a workout with nothing in it from
+  /// one whose every exercise has been skipped — the second still finishes.
+  static int _allSets(WorkoutDetail d) =>
       d.entries.expand((e) => e.sets).length;
 
   /// A stored kg value as the number this phone types in.
@@ -1267,9 +1616,13 @@ class _ExercisePage extends ConsumerWidget {
     required this.prefill,
     required this.unit,
     required this.editing,
+    required this.partialShownFor,
+    required this.partialClosedFor,
+    required this.partialEditing,
     required this.buffer,
     required this.openSwipe,
     required this.onEdit,
+    required this.onEditPartial,
     required this.rowKeyFor,
     required this.onToggleDone,
     required this.onNextExercise,
@@ -1286,11 +1639,19 @@ class _ExercisePage extends ConsumerWidget {
   final WeightUnit unit;
 
   final EditTarget? editing;
+
+  /// The set showing its partial half, and whether the digits are going into
+  /// that half rather than the reps.
+  final String? partialShownFor;
+  final String? partialClosedFor;
+  final bool partialEditing;
+
   final ValueListenable<String> buffer;
 
   /// The one row swiped open across the whole screen.
   final ValueNotifier<String?> openSwipe;
   final void Function(SetLog, SetField) onEdit;
+  final void Function(SetLog) onEditPartial;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
   final VoidCallback onNextExercise;
@@ -1408,9 +1769,13 @@ class _ExercisePage extends ConsumerWidget {
                   entry: entry,
                   unit: unit,
                   editing: editing,
+                  partialShownFor: partialShownFor,
+                  partialClosedFor: partialClosedFor,
+                  partialEditing: partialEditing,
                   buffer: buffer,
                   openSwipe: openSwipe,
                   onEdit: onEdit,
+                  onEditPartial: onEditPartial,
                   rowKeyFor: rowKeyFor,
                   onToggleDone: onToggleDone,
                 ),
@@ -1637,9 +2002,13 @@ class _SetGroup extends ConsumerWidget {
     required this.entry,
     required this.unit,
     required this.editing,
+    required this.partialShownFor,
+    required this.partialClosedFor,
+    required this.partialEditing,
     required this.buffer,
     required this.openSwipe,
     required this.onEdit,
+    required this.onEditPartial,
     required this.rowKeyFor,
     required this.onToggleDone,
   });
@@ -1648,11 +2017,19 @@ class _SetGroup extends ConsumerWidget {
   final ExerciseEntry entry;
   final WeightUnit unit;
   final EditTarget? editing;
+
+  /// The set showing its partial half, and whether the digits are going into
+  /// that half rather than the reps.
+  final String? partialShownFor;
+  final String? partialClosedFor;
+  final bool partialEditing;
+
   final ValueListenable<String> buffer;
 
   /// The one row swiped open across the whole screen.
   final ValueNotifier<String?> openSwipe;
   final void Function(SetLog, SetField) onEdit;
+  final void Function(SetLog) onEditPartial;
   final GlobalKey Function(String setId) rowKeyFor;
   final void Function(SetLog, bool) onToggleDone;
 
@@ -1732,8 +2109,12 @@ class _SetGroup extends ConsumerWidget {
                       unit: unit,
                       ghost: _ghostFor(prefill, entry.sets, group.positions[k]),
                       editing: editing,
+                      partialShownFor: partialShownFor,
+                      partialClosedFor: partialClosedFor,
+                      partialEditing: partialEditing,
                       buffer: buffer,
                       onEdit: onEdit,
+                      onEditPartial: onEditPartial,
                       onToggleDone: onToggleDone,
                     ),
                   ),

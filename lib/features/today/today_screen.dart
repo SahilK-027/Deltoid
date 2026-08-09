@@ -23,6 +23,7 @@ import 'history_heatmap_screen.dart';
 import 'today_providers.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/volume_bars.dart';
+import '../../core/widgets/toast.dart';
 
 /// True between tapping Start and the log screen appearing.
 ///
@@ -58,9 +59,7 @@ Future<void> _startSession(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
   } catch (e) {
-    messenger.showSnackBar(
-      SnackBar(content: Text('Could not start the session: $e')),
-    );
+    showToastOn(messenger, 'Could not start the session: $e', destructive: true);
   } finally {
     container.read(_startingProvider.notifier).state = false;
   }
@@ -199,9 +198,7 @@ Future<void> _logPastSession(
   required bool hasOpenWorkout,
 }) async {
   if (hasOpenWorkout) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Finish the session you are in first')),
-    );
+    showToast(context, 'Finish the session you are in first');
     return;
   }
 
@@ -239,25 +236,19 @@ Future<void> _logPastSession(
       sessionId: picked.sessionId!,
       at: date,
     );
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          cycle == null
-              ? 'Older than this regime — counts towards no cycle'
-              : 'Counts towards cycle ${cycle.cycleIndex}',
-        ),
-        duration: const Duration(seconds: 3),
-      ),
+    showToastOn(
+      messenger,
+      cycle == null
+          ? 'Older than this regime — counts towards no cycle'
+          : 'Counts towards cycle ${cycle.cycleIndex}',
     );
     await navigator.push(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
   } on StateError catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    showToastOn(messenger, e.message, destructive: true);
   } catch (e) {
-    messenger.showSnackBar(
-      SnackBar(content: Text('Could not open that session: $e')),
-    );
+    showToastOn(messenger, 'Could not open that session: $e', destructive: true);
   }
 }
 
@@ -1046,9 +1037,7 @@ class _ResumeHero extends ConsumerWidget {
     try {
       await repo.completeWorkout(workout.id);
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not finish it: $e')),
-      );
+      showToastOn(messenger, 'Could not finish it: $e', destructive: true);
     }
   }
 
@@ -1072,9 +1061,7 @@ class _ResumeHero extends ConsumerWidget {
     try {
       await repo.abandonWorkout(workout.id);
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not discard it: $e')),
-      );
+      showToastOn(messenger, 'Could not discard it: $e', destructive: true);
     }
   }
 

@@ -185,7 +185,10 @@ class BackupService {
       dump: () async =>
           (await db.select(db.setLogs).get()).map((e) => e.toJson()).toList(),
       table: db.setLogs,
-      parse: SetLog.fromJson,
+      // Partials arrived at v8. Nullable, so a file written before it simply
+      // has no key here and every restored set reads as all-full — which is
+      // what those sets meant when they were logged.
+      parse: (row) => SetLog.fromJson({'partialReps': null, ...row}),
       clear: () => db.delete(db.setLogs).go(),
     ),
     _TableCodec(

@@ -32,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -122,6 +122,12 @@ class AppDatabase extends _$AppDatabase {
             // Except the one row this app seeded and already knows the answer
             // for — the Plank has never been a count of reps.
             await backfillSeededMeasureModes(this);
+          }
+          // v8: reps that did not finish the range of motion, counted apart.
+          // Nullable and read as "none", so every set already logged keeps
+          // meaning exactly what it meant — there is nothing to backfill.
+          if (from < 8) {
+            await addColumnIfMissing(setLogs, setLogs.partialReps);
           }
         },
         beforeOpen: (details) async {

@@ -49,6 +49,7 @@ Never "simplify" this to a plain most-recent lookup.
 | `WorkoutExercise` / `SetLog` are **snapshots**, not pointers  | Reordering or swapping mid-workout must never rewrite what you did in March. Same reason switching regimes creates a new `Regime` rather than editing sessions in place.                                                                                                                                                                                                            |
 | `LoadMode` decides what the **weight** means                  | `22.5` on a dumbbell is 45kg of load; `73` on a pec deck is 73kg. Without it every comparison downstream is garbage.                                                                                                                                                                                                                                                                |
 | `MeasureMode` decides what the **count** means                | `set_logs.reps` holds reps _or_ seconds, read through the exercise's mode exactly as `weight` is read through `LoadMode`. Comparisons carry over unchanged; arithmetic that assumes reps does not — a hold has **no e1RM** and adds **nothing to session volume**, because kg × seconds is a different unit. It sits on the exercise, not the set: a plank is never sometimes reps. |
+| `set_logs.partialReps` is **recorded, never arithmetic**       | A partial is a fact about how the set went, not a rep. Nothing that adds up may read it — it is out of session volume, out of `estimated1RM` and out of `beatsPrevious` — or a set of grinding halves reads as a personal record. It is shown from the ghost but **never adopted from it** — `_adoptGhost` fills blanks with a plan for today, and partials are a note on what happened, so prefilling them would log halves nobody did. In the log it is the second half of a split count cell, and everywhere else it prints as a suffix (`8+3`) — never inside the count, which is what keeps the two numbers from ever being summed by accident. Meaningless on a hold: there is no half-second. |
 | Warm-ups, drops and rest-pause are **excluded from progress** | `scorePerformance` counts `working` and `amrap` only. Including the rest is how naive logs claim progress that isn't there.                                                                                                                                                                                                                                                         |
 | A **backoff set is volume**, though it is not progress        | `countsForProgress` protects a comparison; `countsAsVolume` counts work done. Two questions, two answers.                                                                                                                                                                                                                                                                           |
 | `estimated1RM` caps reps at 12                                | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison is `beatsPrevious`, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win.                                                                                                          |
@@ -215,6 +216,20 @@ behaviour rather than looks:
 - **Never invent a component in a feature folder.** If a card, row, button or
   sheet is not already in the design system, it gets added there first.
   Anything else drifts within a week and leaves two answers to one question.
+- **The screen is ahead of the row it is drawing.** Writes are debounced and
+  come back through a watched query, so for a few frames after a keystroke the
+  `SetLog` in `build` still holds the old number. Anything that re-reads a
+  value it has just written — refocusing a field, adopting a ghost, reopening
+  the half of a split cell — has to read what the screen last had, not the row,
+  or it writes the stale value straight back over the new one. `_adoptGhost`'s
+  `skipCount`, the keypad's stashes and `_partialClosedFor` all exist for this.
+- **A rest that has to ring on time is an OS alarm, not a `Timer`.** Android
+  freezes Dart timers the moment the process is suspended, so a phone put down
+  between sets buzzed when it was picked back up rather than when the rest was
+  up. The log screen schedules the end of the rest with
+  `WorkoutNotifications.scheduleRestDone` as it goes to the background and
+  cancels it on resume, so exactly one alert fires either way. The same rule
+  covers anything else that must happen at a wall-clock moment.
 - **Loading and empty are different states.** A screen with more than one query
   either tells them apart or is rebuilt around a single query. Collapsing them
   renders "nothing here" at data that is merely late.

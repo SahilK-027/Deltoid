@@ -168,6 +168,20 @@ void main() {
       expect(out.last.weight, 80);
     });
 
+    test('carries partials through unscaled', () {
+      final out = applyDeload(
+        [const PastSet(type: SetType.working, weight: 100, reps: 6, partialReps: 3)],
+        setDelta: 0,
+        weightPct: 80,
+      );
+
+      // There is no such thing as 70% of a partial rep. The load is a plan for
+      // today; the partials are a note on what happened, and the ghost's job
+      // is to say it accurately.
+      expect(out.single.weight, 80);
+      expect(out.single.partialReps, 3);
+    });
+
     test('drops rest-pause and drop-set extensions entirely', () {
       final out = applyDeload(
         [

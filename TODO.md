@@ -43,7 +43,21 @@ The app currently has **342 tests** and is analyzer clean.
 - [x] The plate view sits inside the keypad and shows what to load on the bar,
       for a movement that knows which bar it uses.
 - [x] The rest timer starts itself when a set is ticked, plays its tone on the
-      alarm stream, and holds a wakelock while a session is open.
+      alarm stream, and holds a wakelock while a session is open. A rest still
+      running when the app goes to the background is handed to the OS as an
+      exact alarm, so it rings on time with the screen off, and an ongoing
+      silent notification carries the session, its set count and a system-drawn
+      countdown.
+- [x] Ticking a set moves the keypad to the next open set — turning the page
+      when that set is on the next exercise — and closes it on the last one, so
+      the finish button is the only thing left on screen.
+- [x] Partial reps are logged apart from full ones. The count cell splits in
+      equal halves only once there is a second number in it — `P` on the pad
+      asks for it and `F` closes it again, a number on the row or in the ghost
+      keeps it. Either box takes focus on its own tap; only the pad's `F`
+      closes the half. Last time's partials show as a ghost and are never
+      adopted. History reads them as `8+3`. They are recorded only: out of volume,
+      out of e1RM and out of `beatsPrevious`.
 - [x] Isometric holds are measured in time through `MeasureMode` on the
       exercise. A stopwatch replaces the keypad for them, so starting and
       stopping the clock writes the hold, ticks the set and starts rest, and a
@@ -109,7 +123,10 @@ is used and by what shared pieces it forced into existence.
 Four things are built, analyzer clean and tested, but have not yet been used in
 a gym: the weekly volume bars, the muscle chips, isometric holds and the hold
 pad. Five more have never been verified on real hardware at all: the rest tone,
-the haptics, the wakelock, audio ducking and the share sheet.
+the haptics, the wakelock, audio ducking and the share sheet. Newest and least
+driven: the ongoing session notification and the scheduled rest alarm — the
+notification permission prompt, the countdown on the lock screen and the alarm
+firing with the screen off have only been built, not felt.
 
 ---
 

@@ -253,6 +253,15 @@ void main() {
       expect(formatCount(8, MeasureMode.reps), '8');
       expect(formatCount(null, MeasureMode.hold), '0:00');
     });
+
+    test('partials ride alongside the count and never inside it', () {
+      expect(formatCount(8, MeasureMode.reps, partial: 3), '8+3');
+      // None to speak of reads exactly as it did before partials existed.
+      expect(formatCount(8, MeasureMode.reps, partial: 0), '8');
+      expect(formatCount(8, MeasureMode.reps, partial: null), '8');
+      // A hold has no half-second, so a stray value cannot reach the clock.
+      expect(formatCount(145, MeasureMode.hold, partial: 3), '2:25');
+    });
   });
 
   group('humanizeEnum', () {

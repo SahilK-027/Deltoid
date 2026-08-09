@@ -174,6 +174,17 @@ class SetLogs extends Table with SyncColumns {
   RealColumn get weight => real().nullable()();
   IntColumn get reps => integer().nullable()();
 
+  /// Reps that did not finish the range of motion, counted apart from [reps].
+  ///
+  /// Recorded, never arithmetic: partials are out of volume, out of e1RM and
+  /// out of `beatsPrevious` on purpose. Eight full reps and three halves is a
+  /// fact about how the set went, not eleven reps — folding them together
+  /// would let a set of grinding halves read as a personal record.
+  ///
+  /// Null and 0 both mean "none". Only meaningful on a set counted in reps: a
+  /// hold has no such thing as half a second.
+  IntColumn get partialReps => integer().nullable()();
+
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
   RealColumn get addedWeight => real().nullable()();
 
