@@ -32,6 +32,23 @@ class RegimeSlotsFullException implements Exception {
       'RegimeSlotsFullException: all $identitySlots identity slots are taken';
 }
 
+/// Thrown when a name is nothing but whitespace.
+///
+/// A regime and an exercise are both identified on screen by their name and
+/// nothing else, so an empty one is a row you cannot point at: History shows a
+/// blank, the picker shows a blank, and the only way to tell two of them apart
+/// is the order they happen to be in. The UI asks for a name; this is the rule
+/// underneath, so a name can never be lost by a path that forgot to check.
+class BlankNameException implements Exception {
+  const BlankNameException(this.what);
+
+  /// What was being named — `regime`, `session`, `exercise`.
+  final String what;
+
+  @override
+  String toString() => 'BlankNameException: a $what needs a name';
+}
+
 /// Thrown when a name is already on a live regime.
 ///
 /// A regime is identified on screen by its name and its colour, and nothing
@@ -63,6 +80,7 @@ class RegimeRepository {
   /// exactly as it was recorded, still attached to the programme it was run
   /// under, and can be charted alongside whatever comes next.
   Future<String> createRegime(String name, {bool activate = true}) async {
+    if (name.trim().isEmpty) throw const BlankNameException('regime');
     final id = newId();
     await db.transaction(() async {
       if (await isNameTaken(name)) throw RegimeNameTakenException(name);
@@ -281,6 +299,9 @@ class RegimeRepository {
   }) async {
     // A rename is the other way two regimes end up with one name, and it is
     // the easier one to reach: the create flow at least asks for a new name.
+    if (name.present && name.value.trim().isEmpty) {
+      throw const BlankNameException('regime');
+    }
     if (name.present && await isNameTaken(name.value, exceptId: regimeId)) {
       throw RegimeNameTakenException(name.value);
     }
@@ -306,6 +327,7 @@ class RegimeRepository {
   /// one still held — and two rows on one `orderIndex` leave the programme's
   /// order to whichever way SQLite breaks the tie.
   Future<String> addSession(String regimeId, String name) async {
+    if (name.trim().isEmpty) throw const BlankNameException('session');
     final id = newId();
     await db.transaction(() async {
       final existing = await (db.select(db.sessions)
@@ -327,6 +349,7 @@ class RegimeRepository {
       taken.fold<int>(-1, (m, i) => i > m ? i : m) + 1;
 
   Future<void> renameSession(String sessionId, String name) async {
+    if (name.trim().isEmpty) throw const BlankNameException('session');
     await (db.update(db.sessions)..where((t) => t.id.equals(sessionId))).write(
       SessionsCompanion(
         name: Value(name),
@@ -462,6 +485,7 @@ class RegimeRepository {
     List<String> videos = const [],
     String? notes,
   }) async {
+    if (name.trim().isEmpty) throw const BlankNameException('exercise');
     final id = newId();
     await db.into(db.exercises).insert(
           ExercisesCompanion.insert(
@@ -491,6 +515,9 @@ class RegimeRepository {
     Value<String?> notes = const Value.absent(),
     Value<bool> archived = const Value.absent(),
   }) async {
+    if (name.present && name.value.trim().isEmpty) {
+      throw const BlankNameException('exercise');
+    }
     await (db.update(db.exercises)..where((t) => t.id.equals(id))).write(
       ExercisesCompanion(
         name: name,

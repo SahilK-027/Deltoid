@@ -443,4 +443,60 @@ void main() {
       expect(mine.measureMode, MeasureMode.reps);
     });
   });
+
+  group('a name is not optional', () {
+    test('a regime cannot be created or renamed to whitespace', () async {
+      expect(() => repo.createRegime('   '),
+          throwsA(isA<BlankNameException>()));
+
+      final id = await repo.createRegime('PPL');
+      expect(
+        () => repo.updateRegime(id, name: const Value(' ')),
+        throwsA(isA<BlankNameException>()),
+      );
+      final live = await (db.select(db.regimes)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(live.map((r) => r.name), ['PPL']);
+    });
+
+    test('a session cannot be added or renamed to whitespace', () async {
+      final regimeId = await repo.createRegime('PPL');
+      expect(() => repo.addSession(regimeId, ' '),
+          throwsA(isA<BlankNameException>()));
+
+      final sessionId = await repo.addSession(regimeId, 'Push 1');
+      expect(() => repo.renameSession(sessionId, '\n'),
+          throwsA(isA<BlankNameException>()));
+      expect(
+        (await (db.select(db.sessions)..where((t) => t.id.equals(sessionId)))
+                .getSingle())
+            .name,
+        'Push 1',
+      );
+    });
+
+    test('an exercise cannot be created or renamed to whitespace', () async {
+      expect(
+        () => repo.createExercise(
+          name: '  ',
+          muscle: MuscleGroup.chest,
+          equipment: Equipment.barbell,
+          loadMode: LoadMode.total,
+        ),
+        throwsA(isA<BlankNameException>()),
+      );
+
+      final id = await repo.createExercise(
+        name: 'Larsen press',
+        muscle: MuscleGroup.chest,
+        equipment: Equipment.barbell,
+        loadMode: LoadMode.total,
+      );
+      expect(
+        () => repo.updateExercise(id, name: const Value('')),
+        throwsA(isA<BlankNameException>()),
+      );
+    });
+  });
 }
