@@ -79,6 +79,34 @@ final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
   });
 });
 
+/// Ticked and total sets in the open workout, kept in step with the log.
+///
+/// Its own query rather than a field read off [todayProvider], for the same
+/// reason [weeklyVolumeProvider] is one: `todaySnapshot` does not watch
+/// `set_logs`, and must not, or every keystroke in a live session would re-run
+/// the whole screen's read. But the resume card counts sets and the stale
+/// session's prompts promise how many would be lost, and all three were reading
+/// a number frozen at the moment Start was tapped — "0 of 18 sets" over two
+/// that were logged, and "nothing was logged in it, so nothing is lost" over
+/// work that discarding does delete.
+///
+/// Two counts and no join to anything else, so it is cheap enough to re-run on
+/// a set being ticked. The snapshot's figures stand in until it lands, so the
+/// card never shows a blank where a number belongs.
+final openWorkoutSetsProvider =
+    StreamProvider.family<({int done, int total}), String>((ref, workoutId) {
+  final db = ref.watch(databaseProvider);
+  final repo = ref.watch(trainingRepositoryProvider);
+
+  return db.watchQuery(
+    [db.setLogs, db.workoutExercises],
+    () async => (
+      done: await repo.doneSetCount(workoutId),
+      total: await repo.setCount(workoutId),
+    ),
+  );
+});
+
 final todayProvider = StreamProvider<TodayData>((ref) {
   // Gated on the seeder rather than racing it: this watches `exercises` for
   // renames, and a first launch would otherwise load an empty catalog and then

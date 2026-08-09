@@ -853,6 +853,11 @@ class _ResumeHero extends ConsumerWidget {
     final foreignRegime = owner != null && owner.regimeId != activeRegimeId
         ? owner.regimeName
         : null;
+    // The snapshot's counts are frozen at Start — see [openWorkoutSetsProvider].
+    // They stand in only until the live query lands.
+    final live = ref.watch(openWorkoutSetsProvider(workout.id)).valueOrNull;
+    final done = live?.done ?? doneSets;
+    final total = live?.total ?? totalSets;
     final started = DateTime.fromMillisecondsSinceEpoch(
       workout.startedAt,
       isUtc: true,
@@ -921,9 +926,9 @@ class _ResumeHero extends ConsumerWidget {
                 style: context.t.labelSmall?.copyWith(color: mark),
               ),
             ),
-            if (totalSets > 0)
+            if (total > 0)
               Text(
-                '$doneSets of $totalSets sets',
+                '$done of $total sets',
                 style: context.t.labelSmall,
               ),
           ],
@@ -997,9 +1002,12 @@ class _ResumeHero extends ConsumerWidget {
             children: [
               LinkAction(
                 'Finish it',
-                onTap: () => _finishStale(context, name, started),
+                onTap: () => _finishStale(context, name, started, done),
               ),
-              LinkAction('Discard', onTap: () => _discardStale(context, name)),
+              LinkAction(
+                'Discard',
+                onTap: () => _discardStale(context, name, done),
+              ),
             ],
           ),
         ],
@@ -1014,6 +1022,7 @@ class _ResumeHero extends ConsumerWidget {
     BuildContext context,
     String name,
     DateTime started,
+    int doneSets,
   ) async {
     final stamp = DateFormat('EEE d MMM').format(started);
     final ok = await confirmAction(
@@ -1041,7 +1050,11 @@ class _ResumeHero extends ConsumerWidget {
     }
   }
 
-  Future<void> _discardStale(BuildContext context, String name) async {
+  Future<void> _discardStale(
+    BuildContext context,
+    String name,
+    int doneSets,
+  ) async {
     final ok = await confirmAction(
       context,
       title: 'Discard $name?',
