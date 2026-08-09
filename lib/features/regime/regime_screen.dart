@@ -338,7 +338,14 @@ class _DayBody extends ConsumerWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: Space.huge),
+      // The app draws edge to edge and this screen has no nav bar of its own
+      // to hold the bottom, so the gesture bar sat over the last row — which
+      // on this page is `Delete <session>`, the one row worth being able to
+      // see before it is tapped. `Space.huge` alone is not the inset; the
+      // inset is whatever the system is using plus that.
+      padding: EdgeInsets.only(
+        bottom: Space.huge + MediaQuery.viewPaddingOf(context).bottom,
+      ),
       children: [
         // Two chips, not three. `Delete day` was the loudest thing on a page
         // about what you train, and it sits at the foot now with the other
