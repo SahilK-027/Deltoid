@@ -2127,11 +2127,14 @@ class TrainingRepository {
 
   Future<void> deleteSet(String setId) => deleteSets([setId]);
 
-  /// Deletes several sets as one act.
+  /// Tombstones several sets as one act.
   ///
-  /// Deleting the head of a drop group takes its legs with it: the legs are
-  /// continuations of that set and mean nothing without it, and leaving them
-  /// behind orphaned a `D` run with no set to have dropped from.
+  /// Takes the whole group when the group is what was deleted — but it does
+  /// not work that out for itself. The legs of a drop set are continuations of
+  /// their head and mean nothing without it, so the row that owns the gesture
+  /// hands over every id in the group when the head is the one swiped, and
+  /// only its own when a leg is. This method writes down what it is given;
+  /// see `_deleteIds` in the log screen for the rule.
   Future<void> deleteSets(List<String> setIds) async {
     if (setIds.isEmpty) return;
     await (db.update(db.setLogs)..where((t) => t.id.isIn(setIds))).write(
