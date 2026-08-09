@@ -56,24 +56,46 @@ class _Boot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The status and navigation bars draw over the app, so their *icons* have
+    // to be told which way round the app is.
+    //
+    // This was set on `appBarTheme.systemOverlayStyle`, which only applies
+    // where there is an `AppBar` — and there is not one anywhere in this app,
+    // because every screen wears a `HeaderBand` of its own. So the icons kept
+    // whatever the launch window left behind, which is white: correct on dark
+    // and invisible on light, where the whole bottom strip read as a black
+    // band under a white screen.
+    final overlay = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: _iconsFor(context),
+      statusBarBrightness: Theme.of(context).brightness,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: _iconsFor(context),
+      systemNavigationBarDividerColor: Colors.transparent,
+    );
+
     final init = ref.watch(appInitProvider);
     // Waiting on Today here rather than inside the shell keeps the tab bar from
     // sliding in over an empty page. It is one local query behind the seeder,
     // so this costs a frame or two, not a visible wait.
     final today = ref.watch(todayProvider);
 
-    return init.when(
-      data: (_) => today.hasValue ? const _Ready(child: AppShell()) : const _Holding(),
-      loading: () => const _Holding(),
-      error: (e, st) => _Ready(
-        child: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(Space.xxxl),
-              child: Text(
-                'Could not open the database.\n\n$e',
-                textAlign: TextAlign.center,
-                style: context.t.bodyMedium,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlay,
+      child: init.when(
+        data: (_) =>
+            today.hasValue ? const _Ready(child: AppShell()) : const _Holding(),
+        loading: () => const _Holding(),
+        error: (e, st) => _Ready(
+          child: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(Space.xxxl),
+                child: Text(
+                  'Could not open the database.\n\n$e',
+                  textAlign: TextAlign.center,
+                  style: context.t.bodyMedium,
+                ),
               ),
             ),
           ),
@@ -81,6 +103,12 @@ class _Boot extends ConsumerWidget {
       ),
     );
   }
+
+  /// Bar icons are the opposite of what they sit on.
+  static Brightness _iconsFor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark;
 }
 
 /// What Flutter paints while the system splash is still up: nothing but the
