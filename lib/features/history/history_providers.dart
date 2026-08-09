@@ -125,12 +125,20 @@ class WorkoutFeedNotifier extends AsyncNotifier<PagedHistory<WorkoutSummary>> {
     _filter = filter;
     _reloadOnHistoryWrites(ref, repo);
 
-    final items = await repo.workoutFeed(
-      limit: _loaded,
+    // One past the window, and the extra row is dropped. `length >= limit` is
+    // not "there is more" — it is also exactly what the last page of history
+    // looks like, so the feed offered a `load more` that fetched nothing and
+    // then removed itself. Asking for one row it does not intend to show is
+    // the difference between guessing and knowing.
+    final page = await repo.workoutFeed(
+      limit: _loaded + 1,
       sessionId: filter.sessionId,
       deloadOnly: filter.deloadOnly,
     );
-    return PagedHistory(items: items, hasMore: items.length >= _loaded);
+    return PagedHistory(
+      items: page.take(_loaded).toList(),
+      hasMore: page.length > _loaded,
+    );
   }
 
   Future<void> loadMore() async {
@@ -144,17 +152,18 @@ class WorkoutFeedNotifier extends AsyncNotifier<PagedHistory<WorkoutSummary>> {
 
     final filter = ref.read(historyFilterProvider);
     state = AsyncData(current.copyWith(loadingMore: true));
-    final next = await ref.read(trainingRepositoryProvider).workoutFeed(
-          limit: historyPageSize,
+    final fetched = await ref.read(trainingRepositoryProvider).workoutFeed(
+          limit: historyPageSize + 1,
           olderThan: current.items.last.cursor,
           sessionId: filter.sessionId,
           deloadOnly: filter.deloadOnly,
         );
+    final next = fetched.take(historyPageSize).toList();
 
     _loaded = current.items.length + next.length;
     state = AsyncData(PagedHistory(
       items: [...current.items, ...next],
-      hasMore: next.length >= historyPageSize,
+      hasMore: fetched.length > historyPageSize,
     ));
   }
 }
@@ -174,8 +183,12 @@ class ExerciseHistoryNotifier extends AutoDisposeFamilyAsyncNotifier<
     final repo = ref.watch(trainingRepositoryProvider);
     _reloadOnHistoryWrites(ref, repo);
 
-    final items = await repo.exerciseHistoryPage(exerciseId, limit: _loaded);
-    return PagedHistory(items: items, hasMore: items.length >= _loaded);
+    // The probe row, as in [WorkoutFeedNotifier.build].
+    final page = await repo.exerciseHistoryPage(exerciseId, limit: _loaded + 1);
+    return PagedHistory(
+      items: page.take(_loaded).toList(),
+      hasMore: page.length > _loaded,
+    );
   }
 
   Future<void> loadMore() async {
@@ -188,17 +201,18 @@ class ExerciseHistoryNotifier extends AutoDisposeFamilyAsyncNotifier<
     }
 
     state = AsyncData(current.copyWith(loadingMore: true));
-    final next =
+    final fetched =
         await ref.read(trainingRepositoryProvider).exerciseHistoryPage(
               arg,
-              limit: historyPageSize,
+              limit: historyPageSize + 1,
               olderThan: current.items.last.cursor,
             );
+    final next = fetched.take(historyPageSize).toList();
 
     _loaded = current.items.length + next.length;
     state = AsyncData(PagedHistory(
       items: [...current.items, ...next],
-      hasMore: next.length >= historyPageSize,
+      hasMore: fetched.length > historyPageSize,
     ));
   }
 }
