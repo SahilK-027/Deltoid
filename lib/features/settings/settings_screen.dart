@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show utf8;
 import 'dart:io' show File;
 
 import 'package:file_selector/file_selector.dart';
@@ -246,11 +247,33 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
     final Map<String, dynamic> decoded;
     final String contents;
     try {
-      contents = await file.readAsString();
+      // **Bytes, decoded as UTF-8 here** — not `file.readAsString()`.
+      //
+      // The plugin's string read came back Latin-1 on Android, so every
+      // non-ASCII character in a backup was restored double-encoded: the `·` in
+      // this app's own template names came back as `Â·`, and so would every
+      // accent in a note or an exercise the user had renamed. The exported file
+      // was correct the whole time — the corruption was on the way back in, and
+      // restore replaces the database, so it overwrote the good copy with the
+      // mangled one. The round-trip tests never saw it because they hand the
+      // service a Dart string and never touch a file.
+      contents = utf8.decode(await file.readAsBytes());
       decoded = await service.decode(contents);
       summary = service.summarise(decoded);
     } on FormatException catch (e) {
       showToastOn(messenger, e.message, destructive: true);
+      return;
+    } catch (e) {
+      // A photo picked by mistake never gets as far as a `FormatException`:
+      // reading it as UTF-8 throws first, and the only handler here was for
+      // JSON that parsed but was not a backup. So the screen returned in
+      // silence — indistinguishable from a restore that ran and did nothing,
+      // on the one screen in the app where "did that work?" matters most.
+      showToastOn(
+        messenger,
+        'That file could not be read. Pick a Deltoid backup (.json).',
+        destructive: true,
+      );
       return;
     }
 
