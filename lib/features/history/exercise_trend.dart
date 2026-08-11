@@ -72,8 +72,16 @@ final chartRangeProvider =
           ChartRange.year,
         ));
 
-final exerciseProgressProvider =
-    StreamProvider.family<List<ProgressPoint>, String>((ref, exerciseId) {
+/// **`autoDispose`, and that is the point.** Scoring a chart walks four hundred
+/// performances and every set in them — 150ms or more on a long history — and
+/// this watches `set_logs`, the hot table during a session. Kept alive, one
+/// visit to one exercise's chart meant that whole computation re-ran on every
+/// set ticked for the rest of the app's life, for a screen nobody was looking
+/// at, once per exercise ever opened. The exercise beside it
+/// (`exerciseByIdProvider`) and the page under it were already `autoDispose`;
+/// this one was the odd one out.
+final exerciseProgressProvider = StreamProvider.autoDispose
+    .family<List<ProgressPoint>, String>((ref, exerciseId) {
   return ref.watch(trainingRepositoryProvider).watchExerciseProgress(exerciseId);
 });
 

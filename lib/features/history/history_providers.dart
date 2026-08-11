@@ -40,13 +40,25 @@ class PagedHistory<T> {
   }
 }
 
-/// Reloads the loaded window shortly after any write to logged history.
+/// Reloads the loaded window shortly after history changes *shape*.
 ///
-/// Debounced because a live logging session writes on every tap, and each write
-/// would otherwise re-query every page the user has scrolled through.
+/// Debounced because a write comes in bursts, and each one would otherwise
+/// re-query every page the user has scrolled through — `limit: _loaded + 1`, so
+/// the cost grows with how far down they are.
+///
+/// Deliberately [TrainingRepository.historyShapeChanges] rather than
+/// [TrainingRepository.historyChanges]: `set_logs` is the hot table during a
+/// session — one write per keystroke — and **not one of those writes can change
+/// this list.** These views show completed workouts only, the log screen is the
+/// only place a set is ever written, and the two moments a finished day's sets
+/// do change (`completeWorkout` tombstoning the untouched rows, `deleteWorkout`
+/// taking the tree) both write `workouts` in the same transaction. So the
+/// narrow stream sees every change that matters and none of the ones that
+/// don't. Watching `set_logs` meant every pause in logging re-read the whole
+/// scrolled window to rebuild a list the session is not even in yet.
 void _reloadOnHistoryWrites(Ref ref, TrainingRepository repo) {
   Timer? debounce;
-  final sub = repo.historyChanges().listen((_) {
+  final sub = repo.historyShapeChanges().listen((_) {
     debounce?.cancel();
     debounce = Timer(const Duration(milliseconds: 400), ref.invalidateSelf);
   });

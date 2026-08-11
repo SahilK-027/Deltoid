@@ -364,6 +364,37 @@ void main() {
       ];
       expect(bodyweightOn(20260101, unsorted), 70);
     });
+
+    test('lands on an entry rather than interpolating past it', () {
+      final three = [
+        (dayKey: 20260101, weightKg: 70.0),
+        (dayKey: 20260201, weightKg: 72.0),
+        (dayKey: 20260301, weightKg: 80.0),
+      ];
+      expect(bodyweightOn(20260201, three), 72);
+    });
+
+    test('two entries on one day take the later reading', () {
+      final sameDay = [
+        (dayKey: 20260101, weightKg: 70.0),
+        (dayKey: 20260201, weightKg: 72.0),
+        (dayKey: 20260201, weightKg: 73.0),
+        (dayKey: 20260301, weightKg: 80.0),
+      ];
+      expect(bodyweightOn(20260201, sameDay), 73);
+    });
+
+    test('interpolates the same whatever order the entries arrive in', () {
+      final ordered = [
+        (dayKey: 20260101, weightKg: 70.0),
+        (dayKey: 20260201, weightKg: 72.0),
+        (dayKey: 20260301, weightKg: 80.0),
+      ];
+      final shuffled = [ordered[2], ordered[0], ordered[1]];
+      for (final day in [20260115, 20260220, 20260301, 20251101]) {
+        expect(bodyweightOn(day, shuffled), bodyweightOn(day, ordered));
+      }
+    });
   });
 
   group('stalledSessions', () {

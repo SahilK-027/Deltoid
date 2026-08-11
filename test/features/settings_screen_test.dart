@@ -205,9 +205,16 @@ void main() {
       tester,
     ) async {
       final repo = TrainingRepository(db);
+      // Chosen so the month's own figure is one no entry row can produce:
+      // July averages 75, August averages 78, and the change between the two
+      // averages (+3) is neither of August's entry-to-entry steps (+2 and +1).
+      // With numbers that collide, this passed on the entry row alone and
+      // proved nothing about the month.
+      await repo.logBodyweight(DateTime(2026, 7, 14), 74.0);
       await repo.logBodyweight(DateTime(2026, 7, 20), 75.0);
-      await repo.logBodyweight(DateTime(2026, 7, 28), 75.0);
-      await repo.logBodyweight(DateTime(2026, 8, 1), 76.0);
+      await repo.logBodyweight(DateTime(2026, 7, 28), 76.0);
+      await repo.logBodyweight(DateTime(2026, 8, 1), 77.0);
+      await repo.logBodyweight(DateTime(2026, 8, 3), 79.0);
       await pump(tester, const BodyweightScreen());
 
       // `.builder`: a month below the fold is not built until it is scrolled
@@ -215,10 +222,33 @@ void main() {
       await tester.scrollUntilVisible(find.text('July 2026'), 120,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
+      expect(find.text('3 weigh-ins'), findsOneWidget);
       expect(find.text('2 weigh-ins'), findsOneWidget);
+      // August averaged 78 against July's 75 — the month row's own figure.
+      expect(find.text('+3'), findsOneWidget);
+    });
+
+    testWidgets('a month of one weigh-in claims no trend of its own', (
+      tester,
+    ) async {
+      final repo = TrainingRepository(db);
+      // July averages 76.0 while *ending* at 77.0, so the two comparisons
+      // available here point opposite ways: August's single weigh-in is 0.5
+      // above July's average and 0.5 below the weigh-in before it.
+      await repo.logBodyweight(DateTime(2026, 7, 20), 75.0);
+      await repo.logBodyweight(DateTime(2026, 7, 28), 77.0);
+      await repo.logBodyweight(DateTime(2026, 8, 1), 76.5);
+      await pump(tester, const BodyweightScreen());
+      await tester.pumpAndSettle();
+
+      // The month row printed `+0.5` directly above its only entry printing
+      // `−0.5`, against the identical weight. Both were arithmetically right
+      // and the pair was unreadable, so the summary of a month that has no
+      // shape yet says nothing at all.
       expect(find.text('1 weigh-in'), findsOneWidget);
-      // August averaged 76 against July's 75.
-      expect(find.text('+1'), findsWidgets);
+      expect(find.text('+0.5'), findsNothing);
+      // The entry keeps the comparison it can make honestly.
+      expect(find.text('−0.5'), findsOneWidget);
     });
 
     testWidgets('a row opens the sheet that corrects and deletes it', (

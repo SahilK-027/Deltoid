@@ -1474,38 +1474,50 @@ class AppSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SheetHeader(title: title, subtitle: subtitle),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: contentPadding ??
-                  const EdgeInsets.fromLTRB(
-                    Space.gutter,
-                    Space.lg,
-                    Space.gutter,
-                    Space.lg,
-                  ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: children,
+    // The sheet rides above the keyboard, and it is this component's job rather
+    // than each caller's.
+    //
+    // Four sheets did it themselves and every other one did not, so anything
+    // with a field in it that was not on that list — a set note, a rep target,
+    // a session name typed from the wrong screen — opened the keyboard straight
+    // over its own Save button. Reserving the inset here also shortens the
+    // scroll area rather than pushing it off the bottom, so a long sheet with
+    // the keyboard up scrolls instead of overflowing.
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SheetHeader(title: title, subtitle: subtitle),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: contentPadding ??
+                    const EdgeInsets.fromLTRB(
+                      Space.gutter,
+                      Space.lg,
+                      Space.gutter,
+                      Space.lg,
+                    ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                ),
               ),
             ),
-          ),
-          if (footer != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.gutter,
-                0,
-                Space.gutter,
-                Space.lg,
+            if (footer != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  0,
+                  Space.gutter,
+                  Space.lg,
+                ),
+                child: footer!,
               ),
-              child: footer!,
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1532,16 +1544,13 @@ Future<String?> promptForNote(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    // The sheet rides above the keyboard rather than behind it.
-    builder: (sheet) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
-      child: _NoteSheet(
-        title: title,
-        subtitle: subtitle,
-        initial: initial,
-        hint: hint,
-        maxLength: maxLength,
-      ),
+    // The keyboard is `AppSheet`'s business — see the inset it reserves.
+    builder: (sheet) => _NoteSheet(
+      title: title,
+      subtitle: subtitle,
+      initial: initial,
+      hint: hint,
+      maxLength: maxLength,
     ),
   );
 }

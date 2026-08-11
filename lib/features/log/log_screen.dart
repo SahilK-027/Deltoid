@@ -409,10 +409,15 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // Everything below reads the order the finger asked for, not the one the
     // database has got round to.
     final detail = loaded == null ? null : _withPendingOrder(loaded);
+    // Null while it is still resolving, which is **not** the same as a workout
+    // with no history behind it. Defaulting to an empty map made this screen
+    // paint its rows with no ghosts in them and then fill them in a frame or
+    // two later — last week's numbers appearing under a finger already on its
+    // way to the keypad. There are two queries here, so the screen has to tell
+    // loading from empty (RULES § Interface) and it waits for both below.
     final prefill =
-        ref.watch(workoutPrefillProvider(widget.workoutId)).valueOrNull ??
-        const {};
-    _prefill = prefill;
+        ref.watch(workoutPrefillProvider(widget.workoutId)).valueOrNull;
+    _prefill = prefill ?? const {};
     _detail = detail;
     // Everything below the database speaks the display unit; everything at or
     // below the repository speaks kilograms.
@@ -424,7 +429,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
       _loadRestTarget(detail, _page);
     }
 
-    if (detail == null) {
+    // Both, or neither. A set row without its ghost is a row that has to be
+    // redrawn the moment the ghost lands, and the tap that opens this screen
+    // has already resolved the prefill it needs — `startWorkout` hands it
+    // forward — so on the path that matters this costs nothing.
+    if (detail == null || prefill == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -1308,7 +1317,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
   }
 
   Future<void> _addExercise(WorkoutDetail detail) async {
-    final exercise = await pickExercise(context, ref);
+    final exercise = await pickExercise(
+      context,
+      ref,
+      alreadyIn: {for (final e in detail.entries) e.exercise.id},
+    );
     if (exercise == null) return;
     await ref
         .read(trainingRepositoryProvider)
@@ -1329,6 +1342,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // and it is what discarding would delete.
     final logged = _loggedSets(detail);
     final navigator = Navigator.of(context);
+    // Captured before the first await, and used after it: this screen is
+    // replaced by the summary at the end, and a `ref` read from a callback that
+    // outlives it throws (RULES § Code).
+    final container = ProviderScope.containerOf(context, listen: false);
     final repo = ref.read(trainingRepositoryProvider);
 
     if (logged == 0) {
@@ -1385,7 +1402,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // reliably has new data and idle time, so it is where the safety net gets
     // refreshed — failures here must never block leaving the screen.
     unawaited(
-      BackupService(ref.read(databaseProvider)).autoExport().catchError((_) {}),
+      BackupService(ref.read(databaseProvider))
+          .autoExport()
+          // Settings reads the newest file once, at launch, because every tab
+          // is built then — so a backup written after that was invisible until
+          // the app was restarted.
+          .then((_) => container.invalidate(lastBackupProvider))
+          .catchError((_) {}),
     );
 
     // Replaces the log rather than sitting on top of it: the session is closed,
@@ -1900,8 +1923,12 @@ Future<_FinishChoice?> _confirmEarlyFinish(
           ),
           const SizedBox(height: Space.lg),
           Text(
-            'The empty sets are discarded — the session is saved with exactly '
-            'what you did.',
+            // "Empty" was the wrong word and it cost a set: a row with a weight
+            // typed into it but never ticked is thrown away too, and the sheet
+            // promised it wasn't. Unticked is the rule everywhere else —
+            // `completeWorkout` tombstones on `isDone`, not on blankness.
+            'Any set you did not tick is discarded — the session is saved with '
+            'exactly what you did.',
             style: sheet.t.bodyMedium?.copyWith(color: c.textSecondary),
           ),
           const SizedBox(height: Space.lg),

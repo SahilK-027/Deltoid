@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/backup/backup_service.dart';
 import '../data/db/database.dart';
 import '../data/repositories/training_repository.dart';
 import '../data/seed/seeder.dart';
@@ -29,6 +30,11 @@ final appInitProvider = FutureProvider<void>((ref) async {
   // be carrying two or three open cycles for one regime — see
   // [TrainingRepository.healDuplicateOpenCycles]. Nothing else notices.
   await ref.watch(trainingRepositoryProvider).healDuplicateOpenCycles();
+  // Discarding a session used to tombstone only the workout row, leaving its
+  // snapshots and sets alive underneath it — see
+  // [TrainingRepository.healOrphanedSnapshots]. Invisible on screen, and
+  // precisely what a first sync push would send.
+  await ref.watch(trainingRepositoryProvider).healOrphanedSnapshots();
 });
 
 /// The regime being trained. Exactly one row is active at a time, but the query
@@ -84,6 +90,18 @@ final activeSessionsProvider = StreamProvider<List<Session>>((ref) {
 final trainingRepositoryProvider = Provider<TrainingRepository>(
   (ref) => TrainingRepository(ref.watch(databaseProvider)),
 );
+
+/// When the last automatic export ran, or null if none has.
+///
+/// Here rather than on the Settings screen because the screen is not what
+/// changes it. The four tabs live in one `IndexedStack` and are all built at
+/// launch, so a provider read only on first build is read *once, before any
+/// session has been finished* — Settings then said "no automatic backup yet"
+/// over a file that had been written an hour earlier, and went on saying it
+/// until the app was restarted. Whoever writes a backup invalidates this.
+final lastBackupProvider = FutureProvider<DateTime?>((ref) {
+  return BackupService(ref.watch(databaseProvider)).lastAutoExportAt();
+});
 
 const themeModeKey = 'theme_mode';
 

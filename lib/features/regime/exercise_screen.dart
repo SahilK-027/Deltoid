@@ -919,10 +919,7 @@ Future<void> showTargetEditor(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    builder: (sheet) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
-      child: _TargetSheet(slot: slot, exercise: exercise),
-    ),
+    builder: (sheet) => _TargetSheet(slot: slot, exercise: exercise),
   );
 }
 

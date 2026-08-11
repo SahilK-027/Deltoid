@@ -55,11 +55,23 @@ class PastPerformance {
     required this.dayKey,
     required this.isDeload,
     required this.sets,
+    this.slotId = '',
     this.startedAt = 0,
     this.skipReason = SkipReason.none,
   });
 
   final String workoutId;
+
+  /// The `workout_exercises` row this performance is of — the slot, not the
+  /// day.
+  ///
+  /// It is the identity two queries' results are merged on, and it has to be
+  /// the slot: the same movement can legitimately be run twice in one session,
+  /// and a merge keyed on the workout collapsed the pair into one. The dropped
+  /// half then never reached prefill, so a second pass of a lift quietly did
+  /// not count as last time. Empty on a performance built without one — the
+  /// merge falls back to the workout, which is what it always did.
+  final String slotId;
   final String? sessionId;
   final String sessionName;
   final int dayKey;

@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'dart:convert' show utf8;
-import 'dart:io' show File;
+import 'dart:io' show Directory, File;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -19,12 +18,9 @@ import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
 
-/// When the last automatic export ran. One fires after every finished
-/// session, but Settings never said so, which made the whole mechanism
-/// invisible and therefore untrusted.
-final lastBackupProvider = FutureProvider<DateTime?>((ref) {
-  return BackupService(ref.watch(databaseProvider)).lastAutoExportAt();
-});
+// `lastBackupProvider` lives in `core/providers.dart`: one fires after every
+// finished session, and the screen that reports it is not the screen that
+// writes it.
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -104,11 +100,20 @@ class SettingsScreen extends ConsumerWidget {
               ),
               AppRow(
                 icon: Icons.schedule,
+                // "Last backup" over a date that only ever moves for the
+                // automatic file, while a manual export you made a minute ago
+                // is nowhere on the screen, reads as a backup that did not
+                // happen. Only the automatic copy is the app's to speak for:
+                // Save to Downloads and Share hand the file to the system, and
+                // where it goes afterwards is not something this row can know.
                 title: lastBackup == null
                     ? 'No automatic backup yet'
-                    : 'Last backup '
+                    : 'Last auto backup '
                         '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
-                subtitle: 'Written automatically after each finished session.',
+                // The distinction is carried by "automatic" in the title.
+                // Spelling it out again down here ran the row past the two
+                // lines it draws and cut the sentence in half.
+                subtitle: 'Written after each finished session.',
               ),
             ],
           ),
@@ -230,13 +235,38 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
       return;
     }
 
-    // No type filter. Android resolves `extensions: ['json']` to a MIME type,
-    // and a .json file arriving from Downloads, a share sheet or a cloud
-    // provider is as often `application/octet-stream` or `text/plain` — so the
-    // filter greys out the very file the user came to pick, with no way to say
-    // why. Anything that is not a backup is caught by `inspect` below and
-    // named as such.
-    final file = await openFile();
+    // The platform picker, which copies the document into the cache and returns
+    // a path — never the contents. `file_selector` sends the bytes through the
+    // channel, and its codec built the whole file in one array on the main
+    // thread: a long history died of `OutOfMemoryError` in the picker's reply,
+    // before any of this ran. `file_selector` stays as the fallback for a build
+    // without the host code, where small files still work.
+    //
+    // No type filter either way. Android resolves `extensions: ['json']` to a
+    // MIME type, and a .json file arriving from Downloads, a share sheet or a
+    // cloud provider is as often `application/octet-stream` or `text/plain` —
+    // so the filter greys out the very file the user came to pick, with no way
+    // to say why. Anything that is not a backup is named as such below.
+    final File? file;
+    try {
+      file = await pickBackupFile(
+        fallback: () async {
+          final picked = await openFile();
+          if (picked == null) return null;
+          // The fallback's `XFile` has no file behind it, so its bytes are
+          // written out once and read back the same way as the real path.
+          final scratch = File(
+            '${Directory.systemTemp.path}/deltoid-restore-'
+            '${DateTime.now().millisecondsSinceEpoch}.json',
+          );
+          await scratch.writeAsBytes(await picked.readAsBytes());
+          return scratch;
+        },
+      );
+    } on BackupSaveException catch (e) {
+      showToastOn(messenger, e.message, destructive: true);
+      return;
+    }
     if (file == null) return;
 
     // Parsed once, off the UI isolate, and the parsed map is what the restore
@@ -245,9 +275,9 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
     // drawing the dialog, which is most of why a long history froze here.
     final BackupSummary summary;
     final Map<String, dynamic> decoded;
-    final String contents;
     try {
-      // **Bytes, decoded as UTF-8 here** — not `file.readAsString()`.
+      // **Decoded as UTF-8 off the byte stream** — not `file.readAsString()`,
+      // and not `utf8.decode(await file.readAsBytes())` either.
       //
       // The plugin's string read came back Latin-1 on Android, so every
       // non-ASCII character in a backup was restored double-encoded: the `·` in
@@ -255,10 +285,14 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
       // accent in a note or an exercise the user had renamed. The exported file
       // was correct the whole time — the corruption was on the way back in, and
       // restore replaces the database, so it overwrote the good copy with the
-      // mangled one. The round-trip tests never saw it because they hand the
-      // service a Dart string and never touch a file.
-      contents = utf8.decode(await file.readAsBytes());
-      decoded = await service.decode(contents);
+      // mangled one.
+      //
+      // Decoding the bytes by hand fixed the encoding and kept the cost: the
+      // whole file as a UTF-16 string is twice its size in one allocation, and
+      // a long history threw `OutOfMemoryError` on that line — the app died
+      // with the user's only copy in the file picker. [decodeStream] walks the
+      // file off disk in chunks instead, so neither copy is ever made.
+      decoded = await service.decodeStream(file.openRead());
       summary = service.summarise(decoded);
     } on FormatException catch (e) {
       showToastOn(messenger, e.message, destructive: true);
@@ -299,7 +333,7 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
         context,
         title: 'Restoring',
         task: (report) =>
-            service.restore(contents, onProgress: report, decoded: decoded),
+            service.restore(null, onProgress: report, decoded: decoded),
       );
       if (result == null) return;
       showToastOn(messenger, 'Restored ${result.rowsWritten} rows');

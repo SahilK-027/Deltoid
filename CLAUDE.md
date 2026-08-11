@@ -55,7 +55,7 @@ flutter analyze && flutter test
 ```
 
 The device belongs to the user. They drive the app on real hardware themselves,
-so never launch an emulator on their behalf.
+so never launch an emulator on their behalf unless they explicitly permit you to do so.
 
 Check [RULES.md § Scope](RULES.md#6-scope) before adding a feature, because the
 answer is usually no.

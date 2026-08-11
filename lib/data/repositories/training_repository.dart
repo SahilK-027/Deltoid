@@ -298,6 +298,28 @@ class TrainingRepository {
 
   final AppDatabase db;
 
+  /// What [startWorkout] already worked out, waiting for the log screen to ask
+  /// for it — keyed `workoutId:exerciseId`.
+  ///
+  /// Starting a session resolves prefill for every slot, because the set rows
+  /// have to mirror last time's *shape*. The log screen then resolves prefill
+  /// for the same exercises all over again, because it needs last time's
+  /// *numbers* for the ghosts — the same walk through history, twice, on the
+  /// one tap in the app you are standing at a bar waiting for. On fifty years
+  /// that is 96ms of work followed by another 121ms of the same work.
+  ///
+  /// **Read once, then dropped.** The entry is only ever handed to the first
+  /// caller and every later resolution goes to the database, so the widest this
+  /// can be out of date is the few milliseconds between writing the workout and
+  /// the screen for it building — a window in which nothing can have changed
+  /// the history it was resolved from. It is an accelerator on a cold path, not
+  /// a cache with a lifetime to reason about, and the truth is always one query
+  /// away underneath it.
+  final _prefillOnOpen = <String, PrefillResult>{};
+
+  static String _prefillKey(String workoutId, String exerciseId) =>
+      '$workoutId:$exerciseId';
+
   // ── Cycles ────────────────────────────────────────────────────────────
 
   /// Completed non-deload cycles before [beforeIndex], counting from the last
@@ -450,6 +472,38 @@ class TrainingRepository {
       });
     }
     return healed;
+  }
+
+  /// Tombstones exercise snapshots and sets left alive under a deleted workout.
+  ///
+  /// The pairs [abandonWorkout] used to leave behind, on a phone that ran the
+  /// build before it took the tree with it. Nothing about them heals on its own
+  /// and nothing on screen shows them, because every read joins the workout —
+  /// but they are live rows carrying `dirty`, so they are exactly what a first
+  /// sync push would send.
+  ///
+  /// Idempotent, and one query wide on a database with nothing wrong with it,
+  /// which is what lets it run at every launch.
+  Future<int> healOrphanedSnapshots() async {
+    final orphaned = await (db.select(db.workoutExercises).join([
+      innerJoin(
+          db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
+    ])
+          ..where(db.workoutExercises.deletedAt.isNull() &
+              db.workouts.deletedAt.isNotNull()))
+        .get();
+    if (orphaned.isEmpty) return 0;
+
+    final stamp = nowMs();
+    final workoutIds = {
+      for (final row in orphaned) row.readTable(db.workouts).id,
+    };
+    await db.transaction(() async {
+      for (final id in workoutIds) {
+        await _tombstoneChildren(id, stamp);
+      }
+    });
+    return orphaned.length;
   }
 
   Future<List<String>> _sessionIds(String regimeId) async {
@@ -996,9 +1050,11 @@ class TrainingRepository {
   /// session — labelled honestly, but not the number you wanted. The
   /// same-session lookup should have no horizon; the cross-session fallback
   /// still does.
+  /// A null [limit] takes the whole history — for the chart, which is the one
+  /// caller that has to see all of it.
   Future<List<PastPerformance>> pastPerformances(
     String exerciseId, {
-    int limit = 60,
+    int? limit = 60,
     String? excludeWorkoutId,
     String? sessionId,
   }) async {
@@ -1016,21 +1072,36 @@ class TrainingRepository {
       sessionId: sessionId,
     );
 
-    final byWorkout = {for (final p in recent) p.workoutId: p};
+    // Keyed on the slot rather than the workout. The same movement can be run
+    // twice in one session — a second pass, a different implement — and keying
+    // this on the workout threw one of the two away before prefill ever saw it.
+    String keyOf(PastPerformance p) =>
+        p.slotId.isEmpty ? p.workoutId : p.slotId;
+
+    final bySlot = {for (final p in recent) keyOf(p): p};
     for (final p in sameSession) {
-      byWorkout.putIfAbsent(p.workoutId, () => p);
+      bySlot.putIfAbsent(keyOf(p), () => p);
     }
     // Sort on the same key both queries ordered by. Sorting the merged list on
     // dayKey alone put two performances from one day in map insertion order,
     // so prefill could pick the earlier and call it last time.
-    final merged = byWorkout.values.toList()
-      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    //
+    // Two slots of one workout tie on `startedAt`, so the slot id breaks it —
+    // ids are UUID v7, so the lower one is the slot that was created first,
+    // which is the one the session template opened with. Last time's numbers
+    // come from the programmed slot rather than from whatever was improvised
+    // after it.
+    final merged = bySlot.values.toList()
+      ..sort((a, b) {
+        final byStart = b.startedAt.compareTo(a.startedAt);
+        return byStart != 0 ? byStart : a.slotId.compareTo(b.slotId);
+      });
     return merged;
   }
 
   Future<List<PastPerformance>> _performances(
     String exerciseId, {
-    required int limit,
+    required int? limit,
     String? excludeWorkoutId,
     String? sessionId,
   }) async {
@@ -1042,8 +1113,8 @@ class TrainingRepository {
           db.workoutExercises.deletedAt.isNull() &
           db.workouts.deletedAt.isNull() &
           db.workouts.status.equalsValue(WorkoutStatus.completed))
-      ..orderBy([OrderingTerm(expression: db.workouts.startedAt, mode: OrderingMode.desc)])
-      ..limit(limit);
+      ..orderBy([OrderingTerm(expression: db.workouts.startedAt, mode: OrderingMode.desc)]);
+    if (limit != null) q.limit(limit);
 
     if (excludeWorkoutId != null) {
       q.where(db.workouts.id.equals(excludeWorkoutId).not());
@@ -1075,6 +1146,7 @@ class TrainingRepository {
           final sets = setsByWe[we.id] ?? const <SetLog>[];
           return PastPerformance(
             workoutId: w.id,
+            slotId: we.id,
             sessionId: w.sessionId,
             sessionName: session?.name ?? 'Ad-hoc',
             dayKey: w.dayKey,
@@ -1314,10 +1386,34 @@ class TrainingRepository {
     int limit = 20,
     HistoryCursor? olderThan,
   }) async {
+    // A slot with nothing ticked in it and no reason given is not a
+    // performance: it is a row that was on the screen. Left in, it drew a card
+    // reading "Nothing logged" with a dash where the weight goes — most easily
+    // reached by running one movement twice in a day and only working the
+    // second of them. A skipped slot stays, sets or not: the reason is the
+    // story, and `pastPerformances` still carries the whole lot for prefill.
+    //
+    // Filtered in the query rather than over the loaded page, because this list
+    // pages by keyset (RULES § Data) — dropping rows afterwards returns a short
+    // page, which the feed reads as the end of history.
+    final logged = existsQuery(
+      db.selectOnly(db.setLogs)
+        ..addColumns([db.setLogs.id])
+        ..where(
+          db.setLogs.workoutExerciseId.equalsExp(db.workoutExercises.id) &
+              db.setLogs.isDone.equals(true) &
+              db.setLogs.deletedAt.isNull(),
+        ),
+    );
+
     var predicate = db.workoutExercises.exerciseId.equals(exerciseId) &
         db.workoutExercises.deletedAt.isNull() &
         db.workouts.deletedAt.isNull() &
-        db.workouts.status.equalsValue(WorkoutStatus.completed);
+        db.workouts.status.equalsValue(WorkoutStatus.completed) &
+        (logged |
+            db.workoutExercises.skipReason
+                .equalsValue(SkipReason.none)
+                .not());
     if (olderThan != null) predicate = predicate & _olderThan(olderThan);
 
     final rows = await (db.select(db.workoutExercises).join([
@@ -1460,7 +1556,14 @@ class TrainingRepository {
   /// separate lines — averaging them would hide the very progression the
   /// per-session split exists to protect.
   Future<List<ProgressPoint>> exerciseProgress(String exerciseId) async {
-    final performances = await pastPerformances(exerciseId, limit: 400);
+    // Unbounded on purpose. This used to ask for the most recent 400
+    // performances, which silently cut the chart off: the year picker is built
+    // from the points that came back, so a movement trained more than 400 times
+    // lost its early years from the axis *and* from the list of years you are
+    // allowed to ask for, with nothing on screen to say a horizon existed. Fifty
+    // years of one movement is under two thousand rows and costs about the same
+    // as four hundred did, because the price is the set rows underneath them.
+    final performances = await pastPerformances(exerciseId, limit: null);
     if (performances.isEmpty) return const [];
 
     final exercise =
@@ -1570,24 +1673,40 @@ class TrainingRepository {
             DateTime.now().minute);
 
     // Prefill is resolved before the transaction so the write stays short.
-    final plans = <({SessionExercise slot, PrefillResult prefill})>[];
-    for (final slot in slots) {
-      final past = await pastPerformances(
-        slot.exerciseId,
-        limit: 30,
-        sessionId: sessionId,
-      );
-      plans.add((
-        slot: slot,
-        prefill: resolvePrefill(
-          candidates: past,
-          sessionId: sessionId,
-          targetIsDeload: cycle?.isDeload ?? false,
-          deloadSetDelta: slot.deloadSetDelta ?? regime.deloadSetDelta,
-          deloadWeightPct: slot.deloadWeightPct ?? regime.deloadWeightPct,
-          unit: unit,
-        ),
-      ));
+    //
+    // Resolved **together**, not one after another: each slot is its own chain
+    // of queries across the database isolate's port, and awaiting them in
+    // series made the tap cost the sum of six round trips instead of the
+    // longest one. The same reasoning `workoutPrefillProvider` already applies
+    // on the other side of the navigation.
+    final plans = await Future.wait([
+      for (final slot in slots)
+        () async {
+          final past = await pastPerformances(
+            slot.exerciseId,
+            limit: 30,
+            sessionId: sessionId,
+          );
+          return (
+            slot: slot,
+            prefill: resolvePrefill(
+              candidates: past,
+              sessionId: sessionId,
+              targetIsDeload: cycle?.isDeload ?? false,
+              deloadSetDelta: slot.deloadSetDelta ?? regime.deloadSetDelta,
+              deloadWeightPct: slot.deloadWeightPct ?? regime.deloadWeightPct,
+              unit: unit,
+            ),
+          );
+        }(),
+    ]);
+
+    // Handed forward to the screen this tap is about to open, which needs the
+    // same answer for its ghosts — see [_prefillOnOpen].
+    _prefillOnOpen.clear();
+    for (final plan in plans) {
+      _prefillOnOpen[_prefillKey(workoutId, plan.slot.exerciseId)] =
+          plan.prefill;
     }
 
     await db.transaction(() async {
@@ -2000,12 +2119,22 @@ class TrainingRepository {
       final at = sets.indexWhere((s) => s.id == afterSetId);
       if (at < 0) return;
 
+      // Every number here is a `setIndex`, never a position in [sets]. The two
+      // are only the same while the exercise has never had a set deleted:
+      // deletes are tombstones and nothing renumbers after them, so the live
+      // rows of an exercise you have deleted the first set of are 1, 2, 3 held
+      // at positions 0, 1, 2. Numbering from the position gave the new row an
+      // index the row above it already held — two live rows on one index, in an
+      // order the database could break either way, which is the same failure
+      // [addSet] counts past the highest index to avoid.
+      final afterIndex = sets[at].setIndex;
+
       // Renumber from the back so no two rows hold the same index mid-flight.
       for (var i = sets.length - 1; i > at; i--) {
         await (db.update(db.setLogs)..where((t) => t.id.equals(sets[i].id)))
             .write(
               SetLogsCompanion(
-                setIndex: Value(i + 1),
+                setIndex: Value(sets[i].setIndex + 1),
                 updatedAt: Value(nowMs()),
                 dirty: const Value(true),
               ),
@@ -2018,7 +2147,7 @@ class TrainingRepository {
             SetLogsCompanion.insert(
               id: Value(id),
               workoutExerciseId: workoutExerciseId,
-              setIndex: at + 1,
+              setIndex: afterIndex + 1,
               setType: Value(type),
               parentSetId: Value(parentSetId),
             ),
@@ -2036,33 +2165,39 @@ class TrainingRepository {
   Future<String> addDropLeg(
     String workoutExerciseId, {
     required String headSetId,
-  }) async {
-    final sets =
-        await (db.select(db.setLogs)
-              ..where(
-                (t) =>
-                    t.workoutExerciseId.equals(workoutExerciseId) &
-                    t.deletedAt.isNull(),
-              )
-              ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
-            .get();
+  }) {
+    // The read and the insert are one act. Finding the tail outside the
+    // transaction left the same window the caller's stale frame did: two taps
+    // inside a frame of each other both read the group before either had added
+    // to it, and the legs came out in the order they were not added.
+    return db.transaction(() async {
+      final sets =
+          await (db.select(db.setLogs)
+                ..where(
+                  (t) =>
+                      t.workoutExerciseId.equals(workoutExerciseId) &
+                      t.deletedAt.isNull(),
+                )
+                ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+              .get();
 
-    final head = sets.indexWhere((s) => s.id == headSetId);
-    if (head < 0) return '';
+      final head = sets.indexWhere((s) => s.id == headSetId);
+      if (head < 0) return '';
 
-    // The end of this group, by parentage — not "the next row that happens to
-    // be a drop", which belonged to whichever set came before it.
-    var tail = head;
-    while (tail + 1 < sets.length && sets[tail + 1].parentSetId == headSetId) {
-      tail++;
-    }
+      // The end of this group, by parentage — not "the next row that happens to
+      // be a drop", which belonged to whichever set came before it.
+      var tail = head;
+      while (tail + 1 < sets.length && sets[tail + 1].parentSetId == headSetId) {
+        tail++;
+      }
 
-    return addSetAfter(
-      workoutExerciseId,
-      afterSetId: sets[tail].id,
-      type: SetType.drop,
-      parentSetId: headSetId,
-    );
+      return addSetAfter(
+        workoutExerciseId,
+        afterSetId: sets[tail].id,
+        type: SetType.drop,
+        parentSetId: headSetId,
+      );
+    });
   }
 
   /// Changes a set's type, keeping the drop group around it consistent.
@@ -2070,7 +2205,14 @@ class TrainingRepository {
   /// The sheet wrote the type and nothing else, which left two shapes the table
   /// cannot draw: a drop set with no leg to have dropped into, and legs still
   /// nested under a head that is no longer a drop at all.
-  Future<void> setSetType(String setId, SetType type) async {
+  /// One transaction, because a conversion is several writes that only make
+  /// sense together: a head that became a drop but never got its leg, or legs
+  /// left nested under a head that is no longer a drop, are both shapes the
+  /// table cannot draw. Interrupted halfway, it now leaves the set as it was.
+  Future<void> setSetType(String setId, SetType type) =>
+      db.transaction(() => _setSetType(setId, type));
+
+  Future<void> _setSetType(String setId, SetType type) async {
     final set = await (db.select(db.setLogs)
           ..where((t) => t.id.equals(setId)))
         .getSingleOrNull();
@@ -2204,6 +2346,13 @@ class TrainingRepository {
     required String workoutId,
     required String exerciseId,
   }) async {
+    // Already resolved by the tap that opened this workout, if this is the log
+    // screen's first ask. Taken rather than read, so everything after it — an
+    // exercise added at 19:40, a past workout deleted from History mid-session
+    // — resolves against the database as it always did.
+    final ready = _prefillOnOpen.remove(_prefillKey(workoutId, exerciseId));
+    if (ready != null) return ready;
+
     final unit = await weightUnit();
     final workout = await (db.select(db.workouts)
           ..where((t) => t.id.equals(workoutId)))
@@ -2522,12 +2671,58 @@ class TrainingRepository {
     return swept;
   }
 
+  /// Throws a session away — the sweep at launch, and Discard from the log.
+  ///
+  /// The whole tree goes, exactly as [deleteWorkout] takes it. Tombstoning only
+  /// the workout row left its exercise snapshots and set rows alive underneath a
+  /// deleted parent: invisible here, because every read joins the workout and
+  /// filters `deletedAt`, but they are live rows with `dirty` set, so the first
+  /// push would hand another device a set that belongs to a session that does
+  /// not exist. A device that had already pulled the parent would then hold the
+  /// orphan for good, since nothing would ever come along to delete it.
   Future<void> abandonWorkout(String workoutId) async {
-    await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
-      WorkoutsCompanion(
-        status: const Value(WorkoutStatus.abandoned),
-        deletedAt: Value(nowMs()),
-        updatedAt: Value(nowMs()),
+    final stamp = nowMs();
+    await db.transaction(() async {
+      await _tombstoneChildren(workoutId, stamp);
+      await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
+        WorkoutsCompanion(
+          status: const Value(WorkoutStatus.abandoned),
+          deletedAt: Value(stamp),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+    });
+  }
+
+  /// Tombstones a workout's exercise snapshots and every set under them.
+  ///
+  /// Shared by [deleteWorkout] and [abandonWorkout] because "the workout is
+  /// gone" has to mean the same thing however it went.
+  Future<void> _tombstoneChildren(String workoutId, int stamp) async {
+    final weIds = [
+      for (final we in await (db.select(db.workoutExercises)
+            ..where((t) => t.workoutId.equals(workoutId)))
+          .get())
+        we.id,
+    ];
+    if (weIds.isEmpty) return;
+
+    await (db.update(db.setLogs)
+          ..where((t) => t.workoutExerciseId.isIn(weIds)))
+        .write(
+      SetLogsCompanion(
+        deletedAt: Value(stamp),
+        updatedAt: Value(stamp),
+        dirty: const Value(true),
+      ),
+    );
+    await (db.update(db.workoutExercises)
+          ..where((t) => t.workoutId.equals(workoutId)))
+        .write(
+      WorkoutExercisesCompanion(
+        deletedAt: Value(stamp),
+        updatedAt: Value(stamp),
         dirty: const Value(true),
       ),
     );
@@ -2540,6 +2735,15 @@ class TrainingRepository {
   /// the heatmap reads the day key, but history pages on `startedAt`, and a row
   /// that sorts by one date while displaying another is worse than either.
   /// The clock time and the session's duration are preserved.
+  ///
+  /// The cycle moves with the date. [startWorkout] resolves a backdated session
+  /// against [cycleCovering] for a reason — a day belongs to the cycle that was
+  /// open when it happened — and re-dating one afterwards has to answer the
+  /// same question, or dragging a workout three weeks back leaves it counting
+  /// towards a cycle it was not part of and the deload lands early. Both cycles
+  /// are then settled the way every other path settles them: the one it left
+  /// reopens if it is no longer complete, and the one it joined closes if it now
+  /// is.
   Future<void> setWorkoutDate(String workoutId, DateTime date) async {
     final workout =
         await (db.select(db.workouts)..where((t) => t.id.equals(workoutId)))
@@ -2556,6 +2760,8 @@ class TrainingRepository {
       was.second,
     );
     final shift = moved.millisecondsSinceEpoch - workout.startedAt;
+    final covering = await cycleCovering(workout.regimeId, moved);
+    final movedCycle = covering?.id != workout.cycleId;
 
     await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
       WorkoutsCompanion(
@@ -2564,10 +2770,18 @@ class TrainingRepository {
         endedAt: workout.endedAt == null
             ? const Value.absent()
             : Value(workout.endedAt! + shift),
+        cycleId: movedCycle ? Value(covering?.id) : const Value.absent(),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
     );
+
+    if (!movedCycle) return;
+    // In this order, and only after the row above has landed: the cycle it left
+    // is judged on what is still in it, and `workout` still carries the old
+    // cycle id for exactly that lookup.
+    await _reopenCycleIfIncomplete(workout);
+    await closeCycleIfSatisfied(workout.regimeId);
   }
 
   /// The context that explains a bad week when you read it back in six months.
@@ -2595,34 +2809,7 @@ class TrainingRepository {
 
     final stamp = nowMs();
     await db.transaction(() async {
-      final weIds = [
-        for (final we in await (db.select(db.workoutExercises)
-              ..where((t) => t.workoutId.equals(workoutId)))
-            .get())
-          we.id,
-      ];
-
-      if (weIds.isNotEmpty) {
-        await (db.update(db.setLogs)
-              ..where((t) => t.workoutExerciseId.isIn(weIds)))
-            .write(
-          SetLogsCompanion(
-            deletedAt: Value(stamp),
-            updatedAt: Value(stamp),
-            dirty: const Value(true),
-          ),
-        );
-      }
-
-      await (db.update(db.workoutExercises)
-            ..where((t) => t.workoutId.equals(workoutId)))
-          .write(
-        WorkoutExercisesCompanion(
-          deletedAt: Value(stamp),
-          updatedAt: Value(stamp),
-          dirty: const Value(true),
-        ),
-      );
+      await _tombstoneChildren(workoutId, stamp);
 
       await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
           .write(

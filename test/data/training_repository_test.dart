@@ -508,6 +508,181 @@ void main() {
     );
   });
 
+  test('moving a logged day moves it into the cycle that covers the new date',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    // Cycle 1 runs, then closes. Cycle 2 opens behind it.
+    final first =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(first);
+    final cycleOne = (await repo.workoutDetail(first))!.workout.cycleId;
+    await repo.advanceCycle(regime.id);
+
+    final second =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(second);
+    final cycleTwo = (await repo.workoutDetail(second))!.workout.cycleId;
+    expect(cycleTwo, isNot(cycleOne));
+
+    // Both cycles were minted in the same second here, so cycle 1 is given the
+    // window a month of training would have left it: opened five weeks ago,
+    // closed a week later.
+    final now = DateTime.now();
+    final opened = now.subtract(const Duration(days: 35));
+    final closed = now.subtract(const Duration(days: 28));
+    await (db.update(db.cycles)..where((t) => t.id.equals(cycleOne!))).write(
+      CyclesCompanion(
+        startedAt: Value(opened.millisecondsSinceEpoch),
+        completedAt: Value(closed.millisecondsSinceEpoch),
+      ),
+    );
+
+    // Re-dated into that window. `startWorkout` would have filed it under
+    // cycle 1 had it been backfilled; moving it has to agree.
+    await repo.setWorkoutDate(second, now.subtract(const Duration(days: 31)));
+
+    final moved = await repo.workoutDetail(second);
+    expect(moved!.workout.cycleId, cycleOne);
+  });
+
+  test('a day dragged out of a cycle it completed reopens that cycle',
+      () async {
+    final regime = await activeRegime();
+    final sessions = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regime.id))
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    // Every session of the cycle trained, so the cycle closes on the last one.
+    String? last;
+    for (final session in sessions) {
+      last = await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+      await repo.completeWorkout(last);
+    }
+    final closed = (await repo.workoutDetail(last!))!.workout.cycleId;
+    final before =
+        await (db.select(db.cycles)..where((t) => t.id.equals(closed!)))
+            .getSingle();
+    expect(before.completedAt, isNotNull);
+
+    // That day is dragged back to before the cycle began, so the cycle is a
+    // session short again. A cycle counted for work that did not happen in it
+    // lands the deload early.
+    await repo.setWorkoutDate(
+      last,
+      DateTime.fromMillisecondsSinceEpoch(before.startedAt)
+          .subtract(const Duration(days: 30)),
+    );
+
+    final after =
+        await (db.select(db.cycles)..where((t) => t.id.equals(closed!)))
+            .getSingle();
+    expect(after.completedAt, isNull);
+  });
+
+  test('one movement run twice in a day keeps both slots as last time',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final opened = (await repo.workoutDetail(id))!;
+    final first = opened.entries.first;
+
+    // The same movement again, later in the day — a second pass, which the
+    // picker marks but does not refuse.
+    final secondSlot =
+        await repo.addExerciseToWorkout(id, first.exercise.id);
+
+    await repo.updateSet(
+      first.sets.first.id,
+      weight: const Value(60),
+      reps: const Value(8),
+      isDone: const Value(true),
+    );
+    final withBoth = (await repo.workoutDetail(id))!;
+    final second = withBoth.entries
+        .firstWhere((e) => e.workoutExercise.id == secondSlot);
+    await repo.updateSet(
+      second.sets.first.id,
+      weight: const Value(40),
+      reps: const Value(15),
+      isDone: const Value(true),
+    );
+    await repo.completeWorkout(id);
+
+    // Both slots survive the merge. Keyed on the workout, one of the two was
+    // dropped before prefill ever saw it.
+    final past = await repo.pastPerformances(
+      first.exercise.id,
+      sessionId: push1.id,
+    );
+    expect(past, hasLength(2));
+    expect(
+      past.map((p) => p.sets.first.weight),
+      containsAll(<double>[60, 40]),
+    );
+
+    // And last time is the slot the session template opened with, not the one
+    // improvised after it.
+    final next = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+      at: DateTime.now().add(const Duration(days: 1)),
+    );
+    final prefill = await repo.prefillForWorkout(
+      workoutId: next,
+      exerciseId: first.exercise.id,
+    );
+    expect(prefill.source, PrefillSource.sameSession);
+    expect(prefill.sets.first.weight, 60);
+  });
+
+  test('the tap hands its prefill to the screen, and only once', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    // A week with real numbers behind it.
+    final logged =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final first = (await repo.workoutDetail(logged))!.entries.first;
+    for (final set in first.sets) {
+      await repo.updateSet(
+        set.id,
+        weight: const Value(60),
+        reps: const Value(8),
+        isDone: const Value(true),
+      );
+    }
+    await repo.completeWorkout(logged);
+
+    // Starting the next one resolves prefill to shape the rows, and hands that
+    // answer to the log screen rather than making it walk history again.
+    final next = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+      at: DateTime.now().add(const Duration(days: 1)),
+    );
+    final handed = await repo.prefillForWorkout(
+      workoutId: next,
+      exerciseId: first.exercise.id,
+    );
+    expect(handed.source, PrefillSource.sameSession);
+    expect(handed.sets.first.weight, 60);
+
+    // Taken, not kept: the day the numbers came from is deleted, and the very
+    // next ask has to notice. An accelerator that outlived its tap would go on
+    // showing ghosts from a workout that no longer exists.
+    await repo.deleteWorkout(logged);
+    final after = await repo.prefillForWorkout(
+      workoutId: next,
+      exerciseId: first.exercise.id,
+    );
+    expect(after.hasSuggestion, isFalse);
+  });
+
   test('a session can be logged for a past date', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
@@ -1438,6 +1613,30 @@ void main() {
     expect(open, hasLength(1));
   });
 
+  test('the progress chart is given every performance, not a recent window',
+      () async {
+    final push1 = await sessionNamed('Push 1');
+    for (var i = 0; i < 12; i++) {
+      await logSession(push1, weight: 20 + i.toDouble());
+    }
+
+    final entry = (await repo.workoutDetail(await logSession(push1)))!
+        .entries
+        .first;
+    final exerciseId = entry.exercise.id;
+
+    // A window is a window whatever its size: what matters is that the chart
+    // does not get one. Asking for five proves the horizon is real; asking for
+    // none has to come back with the lot, or the early years of a long history
+    // are missing from the axis and from the year picker built off it.
+    expect(await repo.pastPerformances(exerciseId, limit: 5), hasLength(5));
+    expect(
+      await repo.pastPerformances(exerciseId, limit: null),
+      hasLength(13),
+    );
+    expect(await repo.exerciseProgress(exerciseId), hasLength(13));
+  });
+
   test('deleting a workout removes it from every history view', () async {
     final push1 = await sessionNamed('Push 1');
     final id = await logSession(push1);
@@ -1459,6 +1658,63 @@ void main() {
     if (incline != null) {
       expect(await repo.pastPerformances(incline.id), isEmpty);
     }
+  });
+
+  /// Live snapshot rows sitting under a workout that has been tombstoned.
+  ///
+  /// Invisible on every screen, because each read joins the workout and filters
+  /// `deletedAt` — and precisely what a first sync push would hand another
+  /// device.
+  Future<int> orphanedSnapshots() async {
+    final rows = await (db.select(db.workoutExercises).join([
+      innerJoin(
+          db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
+    ])
+          ..where(db.workoutExercises.deletedAt.isNull() &
+              db.workouts.deletedAt.isNotNull()))
+        .get();
+    return rows.length;
+  }
+
+  test('discarding a session takes its sets and snapshots with it', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final detail = await repo.workoutDetail(id);
+    await repo.updateSet(detail!.entries.first.sets.first.id,
+        weight: const Value(40), reps: const Value(8), isDone: const Value(true));
+
+    await repo.abandonWorkout(id);
+
+    expect(await orphanedSnapshots(), 0);
+    final live = await (db.select(db.setLogs)
+          ..where((t) => t.deletedAt.isNull()))
+        .get();
+    expect(live, isEmpty, reason: 'no set outlives the session it was in');
+  });
+
+  test('the heal at launch clears snapshots an older build left behind',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    // Exactly what the previous `abandonWorkout` wrote: the workout row only.
+    await (db.update(db.workouts)..where((t) => t.id.equals(id))).write(
+      WorkoutsCompanion(
+        status: const Value(WorkoutStatus.abandoned),
+        deletedAt: Value(nowMs()),
+      ),
+    );
+    expect(await orphanedSnapshots(), greaterThan(0));
+
+    expect(await repo.healOrphanedSnapshots(), greaterThan(0));
+    expect(await orphanedSnapshots(), 0);
+
+    // Runs at every launch, so it has to be free on a database with nothing
+    // wrong with it.
+    expect(await repo.healOrphanedSnapshots(), 0);
   });
 
   test('deleting the workout that closed a cycle reopens it', () async {
@@ -1698,6 +1954,31 @@ void main() {
         List.generate(after.length, (i) => i),
       );
       expect(after[2].id, sets[1].id);
+    });
+
+    test('an insert after a deleted set still lands on a free index', () async {
+      final (:weId, :sets) = await firstExercise();
+
+      // Deletes are tombstones and nothing renumbers behind them, so the live
+      // rows are now 1, 2 held at positions 0, 1. Numbering the insert from the
+      // position handed the new row index 1 — the one its own head already
+      // held, two live rows on one index. Reachable from the log screen in two
+      // taps: swipe the first set away, then turn the next one into a drop.
+      await repo.deleteSet(sets.first.id);
+      await repo.setSetType(sets[1].id, SetType.drop);
+
+      final after = await setsOf(weId);
+      final live = after.where((s) => s.deletedAt == null).toList();
+      expect(
+        live.map((s) => s.setIndex).toSet().length,
+        live.length,
+        reason: 'no two live sets may hold the same index',
+      );
+      // The leg still sits directly under the head it continues.
+      final head = live.firstWhere((s) => s.id == sets[1].id);
+      final leg = live.firstWhere((s) => s.parentSetId == sets[1].id);
+      expect(leg.setIndex, head.setIndex + 1);
+      expect(live.indexOf(leg), live.indexOf(head) + 1);
     });
 
     test('the + on a group adds a leg to that group, not a new drop set',

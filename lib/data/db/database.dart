@@ -133,6 +133,24 @@ class AppDatabase extends _$AppDatabase {
         beforeOpen: (details) async {
           // Tombstones and cascades depend on referential integrity being real.
           await customStatement('PRAGMA foreign_keys = ON');
+
+          // Give the query planner statistics to plan with.
+          //
+          // Without them SQLite guesses how selective each table is, and on
+          // this schema it guessed wrong in the one place it hurts most: the
+          // weekly volume query — which re-runs *every time a set is ticked* —
+          // was planned as `SCAN workout_exercises` over every snapshot row
+          // ever written, to answer a question about the last seven days. Fifty
+          // years of training made that 143ms of work per tick. With statistics
+          // the planner starts from `idx_workouts_day` instead and the same
+          // query is under a millisecond.
+          //
+          // `optimize` rather than `ANALYZE`: it only re-analyses tables whose
+          // shape has actually moved, so it costs nothing on the launches where
+          // nothing has changed and about 30ms on the one after a decade lands.
+          // Every index it needed already existed — all that was missing was
+          // the evidence to use them.
+          await customStatement('PRAGMA optimize');
         },
       );
 

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -452,17 +454,30 @@ Future<SkipReason?> _pickSkipReason(BuildContext context) {
 /// the same question in both — which of my movements is this. It keeps its own
 /// header rather than using `AppSheet`, since the list under the chips has to
 /// scroll inside a bounded height while the search and the chips stay put.
-Future<Exercise?> pickExercise(BuildContext context, WidgetRef ref) {
+/// [alreadyIn] marks the movements the caller is already carrying — the
+/// exercises in the running workout, or the slots in the session being edited.
+///
+/// Marked rather than removed or refused. Running the same movement twice in a
+/// day is a real thing to do, and the picker cannot tell a second pass from a
+/// mis-tap — but it can stop the mis-tap being invisible, which is what it was:
+/// the rail grew a second identical tab and nothing said why.
+Future<Exercise?> pickExercise(
+  BuildContext context,
+  WidgetRef ref, {
+  Set<String> alreadyIn = const {},
+}) {
   return showModalBottomSheet<Exercise>(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    builder: (_) => const _ExercisePicker(),
+    builder: (_) => _ExercisePicker(alreadyIn: alreadyIn),
   );
 }
 
 class _ExercisePicker extends ConsumerStatefulWidget {
-  const _ExercisePicker();
+  const _ExercisePicker({this.alreadyIn = const {}});
+
+  final Set<String> alreadyIn;
 
   @override
   ConsumerState<_ExercisePicker> createState() => _ExercisePickerState();
@@ -492,89 +507,107 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
         if (all.any((e) => e.muscle == m)) m,
     ];
 
+    // Eight tenths of the screen, or whatever is left above the keyboard —
+    // whichever is less. The two were added together before: the sheet reserved
+    // the keyboard *and* then asked for 80% of the whole phone, so with the pad
+    // up it wanted 115% of the screen. This is the one sheet that opens with a
+    // field focused, so it was the one where that always happened.
+    //
+    // The `SafeArea` is here because this sheet builds its own column instead
+    // of using `AppSheet`, and so never inherited one: with the keyboard down,
+    // the last exercise in the list sat under the system navigation bar.
+    final media = MediaQuery.of(context);
+    final available =
+        media.size.height - media.viewInsets.bottom - media.padding.top;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            const SheetHeader(title: 'Exercises'),
-            Padding(
-              padding: searchFieldPadding,
-              child: SearchField(
-                hint: 'Search exercises',
-                autofocus: true,
-                onChanged: (v) => setState(() => _query = v),
-              ),
-            ),
-            if (present.length > 1)
-              SizedBox(
-                height: 52,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(
-                      Space.gutter, 0, Space.gutter, Space.md),
-                  children: [
-                    AppChip(
-                      label: 'All',
-                      selected: _muscle == null,
-                      onTap: () => setState(() => _muscle = null),
-                    ),
-                    for (final m in present) ...[
-                      const SizedBox(width: Space.sm),
-                      AppChip(
-                        label: m.label,
-                        hue: context.c.forMuscle(m),
-                        selected: _muscle == m,
-                        onTap: () =>
-                            setState(() => _muscle = _muscle == m ? null : m),
-                      ),
-                    ],
-                  ],
+        height: math.min(media.size.height * 0.8, available),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SheetHeader(title: 'Exercises'),
+              Padding(
+                padding: searchFieldPadding,
+                child: SearchField(
+                  hint: 'Search exercises',
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _query = v),
                 ),
               ),
-            Expanded(
-              child: filtered.isEmpty && q.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.search_off,
-                      title: 'No exercises yet',
-                      message: 'Search for a name to create your first one.',
-                    )
-                  : ListView.builder(
-                      // A trailing "create" row whenever there is a search
-                      // term: hitting a gym with a machine the app has never
-                      // heard of should not be a dead end mid-session.
-                      itemCount: filtered.length + (q.isEmpty ? 0 : 1),
-                      itemBuilder: (context, i) {
-                        if (i == filtered.length) {
+              if (present.length > 1)
+                SizedBox(
+                  height: 52,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(
+                        Space.gutter, 0, Space.gutter, Space.md),
+                    children: [
+                      AppChip(
+                        label: 'All',
+                        selected: _muscle == null,
+                        onTap: () => setState(() => _muscle = null),
+                      ),
+                      for (final m in present) ...[
+                        const SizedBox(width: Space.sm),
+                        AppChip(
+                          label: m.label,
+                          hue: context.c.forMuscle(m),
+                          selected: _muscle == m,
+                          onTap: () =>
+                              setState(() => _muscle = _muscle == m ? null : m),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: filtered.isEmpty && q.isEmpty
+                    ? const EmptyState(
+                        icon: Icons.search_off,
+                        title: 'No exercises yet',
+                        message: 'Search for a name to create your first one.',
+                      )
+                    : ListView.builder(
+                        // A trailing "create" row whenever there is a search
+                        // term: hitting a gym with a machine the app has never
+                        // heard of should not be a dead end mid-session.
+                        itemCount: filtered.length + (q.isEmpty ? 0 : 1),
+                        itemBuilder: (context, i) {
+                          if (i == filtered.length) {
+                            return AppRow(
+                              icon: Icons.add_rounded,
+                              title: 'Create "${_query.trim()}"',
+                              onTap: () => _create(context, ref, _query.trim()),
+                            );
+                          }
+                          final e = filtered[i];
                           return AppRow(
-                            icon: Icons.add_rounded,
-                            title: 'Create "${_query.trim()}"',
-                            onTap: () => _create(context, ref, _query.trim()),
-                          );
-                        }
-                        final e = filtered[i];
-                        return AppRow(
-                          title: e.name,
-                          // Tappable here for the same reason as in the catalog
-                          // (THEME → Components): the muscle you can see is the filter.
-                          subtitleLeading: AppChip(
-                            label: e.muscle.label,
-                            dense: true,
-                            hue: context.c.forMuscle(e.muscle),
-                            selected: _muscle == e.muscle,
-                            onTap: () => setState(
-                              () => _muscle =
-                                  _muscle == e.muscle ? null : e.muscle,
+                            title: e.name,
+                            // Tappable here for the same reason as in the catalog
+                            // (THEME → Components): the muscle you can see is the filter.
+                            subtitleLeading: AppChip(
+                              label: e.muscle.label,
+                              dense: true,
+                              hue: context.c.forMuscle(e.muscle),
+                              selected: _muscle == e.muscle,
+                              onTap: () => setState(
+                                () => _muscle =
+                                    _muscle == e.muscle ? null : e.muscle,
+                              ),
                             ),
-                          ),
-                          subtitle: e.equipment.label,
-                          onTap: () => Navigator.of(context).pop(e),
-                        );
-                      },
-                    ),
-            ),
-          ],
+                            subtitle: e.equipment.label,
+                            trailing: widget.alreadyIn.contains(e.id)
+                                ? const Pill('Already in')
+                                : null,
+                            onTap: () => Navigator.of(context).pop(e),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

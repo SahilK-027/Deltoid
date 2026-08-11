@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
@@ -194,6 +195,108 @@ void main() {
     await expectLater(backup.restore('{"hello":"world"}'), throwsFormatException);
 
     expect((await db.select(db.workouts).get()).length, before);
+  });
+
+  test('the streamed file is exactly the payload, and restores', () async {
+    await logASession();
+
+    final file = File(
+      '${Directory.systemTemp.createTempSync('deltoid').path}/backup.json',
+    );
+    addTearDown(() => file.parent.deleteSync(recursive: true));
+
+    var lastFraction = 0.0;
+    var lastRows = 0;
+    await backup.writeBackup(file, onProgress: (step) {
+      lastRows = step.rows;
+      lastFraction = step.fraction ?? lastFraction;
+    });
+
+    // Written a page at a time, so the shape has to be assembled by hand — and
+    // the thing that keeps that honest is that it must equal what `jsonEncode`
+    // of the whole payload would have produced.
+    final streamed = jsonDecode(file.readAsStringSync());
+    final built = jsonDecode(jsonEncode(await backup.buildPayload()));
+    // `exportedAt` is stamped as each is made, so it is the one key that may
+    // differ.
+    (streamed as Map).remove('exportedAt');
+    (built as Map).remove('exportedAt');
+    expect(streamed, built);
+
+    expect(lastRows, greaterThan(0));
+    expect(lastFraction, closeTo(1.0, 0.001));
+
+    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(fresh.close);
+    final service = BackupService(fresh);
+    await service.restore(
+      null,
+      decoded: await service.decodeStream(file.openRead()),
+    );
+    expect((await fresh.select(fresh.workouts).get()).length, 1);
+  });
+
+  test('an empty database still writes a file that restores', () async {
+    final empty = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(empty.close);
+    final service = BackupService(empty);
+
+    final file = File(
+      '${Directory.systemTemp.createTempSync('deltoid').path}/empty.json',
+    );
+    addTearDown(() => file.parent.deleteSync(recursive: true));
+    await service.writeBackup(file);
+
+    // The separators are written by hand, so the degenerate cases — no rows at
+    // all, and a table between two others that is empty — are where a stray
+    // comma would land.
+    final decoded = await service.decodeStream(file.openRead());
+    expect(service.summarise(decoded).totalRows, 0);
+    await service.restore(null, decoded: decoded);
+  });
+
+  test('a file restores from its bytes without ever being one string',
+      () async {
+    await logASession();
+    final bytes = utf8.encode(jsonEncode(await backup.buildPayload()));
+
+    // In chunks, as a file arrives off disk — and split mid-character, because
+    // a naive chunked decode cuts the app's own `·` in half and throws.
+    Stream<List<int>> inChunks() async* {
+      const size = 64;
+      for (var i = 0; i < bytes.length; i += size) {
+        yield bytes.sublist(i, (i + size).clamp(0, bytes.length));
+      }
+    }
+
+    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(fresh.close);
+    final service = BackupService(fresh);
+
+    final decoded = await service.decodeStream(inChunks());
+    final result = await service.restore(null, decoded: decoded);
+
+    expect(result.rowsWritten, greaterThan(0));
+    expect((await fresh.select(fresh.workouts).get()).length, 1);
+    // The `·` in the template's own name is the character that caught the
+    // Latin-1 read; it has to survive this path too.
+    final regime = await (fresh.select(fresh.regimes)
+          ..where((t) => t.isActive.equals(true)))
+        .getSingle();
+    expect(regime.name, contains('·'));
+  });
+
+  test('a stream that is not a backup is refused', () async {
+    Stream<List<int>> streamOf(String s) => Stream.value(utf8.encode(s));
+
+    await expectLater(
+      backup.decodeStream(streamOf('not json at all')),
+      throwsFormatException,
+    );
+    await expectLater(
+      backup.decodeStream(streamOf('[1,2,3]')),
+      throwsFormatException,
+    );
   });
 
   test('a backup from a newer app version is refused', () {

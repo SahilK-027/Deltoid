@@ -38,13 +38,15 @@ String _label(String table) => table.replaceAll('_', ' ');
 
 /// JSON in another isolate.
 ///
-/// Top-level, and deliberately not methods: a closure written inside
+/// Top-level, and deliberately not a method: a closure written inside
 /// [BackupService] captures the whole enclosing context, `this` included, and
 /// `this` holds an `AppDatabase` wrapping an FFI handle that cannot cross an
 /// isolate boundary — `Isolate.run` fails at the send, not at the JSON.
-Future<String> _encodeOffIsolate(Map<String, dynamic> payload) =>
-    Isolate.run(() => jsonEncode(payload));
-
+///
+/// Only the *read* side needs this now. Encoding used to come through here too,
+/// which meant the entire history crossed the port twice — out as rows and back
+/// as a 70 MB string — to save a freeze that [BackupService.writeBackup] avoids
+/// by never building either one.
 Future<Map<String, dynamic>> _decodeOffIsolate(String json) =>
     Isolate.run(() => jsonDecode(json) as Map<String, dynamic>);
 
@@ -73,14 +75,26 @@ class ImportResult {
 class _TableCodec<T extends Insertable<dynamic>> {
   const _TableCodec({
     required this.name,
-    required this.dump,
+    required this.page,
+    required this.count,
     required this.table,
     required this.parse,
     required this.clear,
   });
 
   final String name;
-  final Future<List<Map<String, dynamic>>> Function() dump;
+
+  /// One window of rows, oldest id first.
+  ///
+  /// A page rather than the whole table, because the export writes as it reads:
+  /// `set_logs` alone is 168k rows at fifty years, and turning all of them into
+  /// maps before a byte reaches the disk is most of what an export used to cost.
+  /// Ordered by id so the windows tile exactly — ids are UUID v7, so this is
+  /// also creation order.
+  final Future<List<Map<String, dynamic>>> Function(int limit, int offset) page;
+
+  /// How many rows there are, for the header the file carries and for progress.
+  final Future<int> Function() count;
 
   /// The table itself, so a restore can insert a whole file in batches rather
   /// than a row at a time. 120k round trips through the platform channel took
@@ -110,9 +124,13 @@ class BackupService {
   late final List<_TableCodec> _codecs = [
     _TableCodec(
       name: 'exercises',
-      dump: () async => (await db.select(db.exercises).get())
+      page: (limit, offset) async => (await (db.select(db.exercises)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
           .map((e) => e.toJson())
           .toList(),
+      count: () => _countOf(db.exercises),
       // `fromJson` is generated against *today's* columns and reads every one
       // of them unconditionally, so a file written before a column existed
       // dies on a null cast — with the user's only copy of their history in
@@ -128,8 +146,13 @@ class BackupService {
     ),
     _TableCodec(
       name: 'regimes',
-      dump: () async =>
-          (await db.select(db.regimes).get()).map((e) => e.toJson()).toList(),
+      page: (limit, offset) async => (await (db.select(db.regimes)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
+          .map((e) => e.toJson())
+          .toList(),
+      count: () => _countOf(db.regimes),
       table: db.regimes,
       // A file written before v5 has no identity slot in it, and
       // `Regime.fromJson` casts the missing key straight to int. Everything
@@ -140,50 +163,78 @@ class BackupService {
     ),
     _TableCodec(
       name: 'sessions',
-      dump: () async =>
-          (await db.select(db.sessions).get()).map((e) => e.toJson()).toList(),
+      page: (limit, offset) async => (await (db.select(db.sessions)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
+          .map((e) => e.toJson())
+          .toList(),
+      count: () => _countOf(db.sessions),
       table: db.sessions,
       parse: Session.fromJson,
       clear: () => db.delete(db.sessions).go(),
     ),
     _TableCodec(
       name: 'session_exercises',
-      dump: () async => (await db.select(db.sessionExercises).get())
+      page: (limit, offset) async => (await (db.select(db.sessionExercises)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
           .map((e) => e.toJson())
           .toList(),
+      count: () => _countOf(db.sessionExercises),
       table: db.sessionExercises,
       parse: SessionExercise.fromJson,
       clear: () => db.delete(db.sessionExercises).go(),
     ),
     _TableCodec(
       name: 'cycles',
-      dump: () async =>
-          (await db.select(db.cycles).get()).map((e) => e.toJson()).toList(),
+      page: (limit, offset) async => (await (db.select(db.cycles)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
+          .map((e) => e.toJson())
+          .toList(),
+      count: () => _countOf(db.cycles),
       table: db.cycles,
       parse: Cycle.fromJson,
       clear: () => db.delete(db.cycles).go(),
     ),
     _TableCodec(
       name: 'workouts',
-      dump: () async =>
-          (await db.select(db.workouts).get()).map((e) => e.toJson()).toList(),
+      page: (limit, offset) async => (await (db.select(db.workouts)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
+          .map((e) => e.toJson())
+          .toList(),
+      count: () => _countOf(db.workouts),
       table: db.workouts,
       parse: Workout.fromJson,
       clear: () => db.delete(db.workouts).go(),
     ),
     _TableCodec(
       name: 'workout_exercises',
-      dump: () async => (await db.select(db.workoutExercises).get())
+      page: (limit, offset) async => (await (db.select(db.workoutExercises)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
           .map((e) => e.toJson())
           .toList(),
+      count: () => _countOf(db.workoutExercises),
       table: db.workoutExercises,
       parse: WorkoutExercise.fromJson,
       clear: () => db.delete(db.workoutExercises).go(),
     ),
     _TableCodec(
       name: 'set_logs',
-      dump: () async =>
-          (await db.select(db.setLogs).get()).map((e) => e.toJson()).toList(),
+      page: (limit, offset) async => (await (db.select(db.setLogs)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
+          .map((e) => e.toJson())
+          .toList(),
+      count: () => _countOf(db.setLogs),
       table: db.setLogs,
       // Partials arrived at v8. Nullable, so a file written before it simply
       // has no key here and every restored set reads as all-full — which is
@@ -193,15 +244,35 @@ class BackupService {
     ),
     _TableCodec(
       name: 'bodyweight_logs',
-      dump: () async => (await db.select(db.bodyweightLogs).get())
+      page: (limit, offset) async => (await (db.select(db.bodyweightLogs)
+                ..orderBy([(t) => OrderingTerm(expression: t.id)])
+                ..limit(limit, offset: offset))
+              .get())
           .map((e) => e.toJson())
           .toList(),
+      count: () => _countOf(db.bodyweightLogs),
       table: db.bodyweightLogs,
       parse: BodyweightLog.fromJson,
       clear: () => db.delete(db.bodyweightLogs).go(),
     ),
   ];
 
+  /// How many rows a table holds, asked of SQLite rather than of Dart.
+  Future<int> _countOf(TableInfo<Table, dynamic> table) async {
+    final row = await db.customSelect(
+      'SELECT COUNT(*) AS c FROM ${table.actualTableName}',
+      readsFrom: {table},
+    ).getSingle();
+    return row.read<int>('c');
+  }
+
+  /// Rows read per pass. Big enough that the query overhead disappears, small
+  /// enough that a chunk of encoded JSON is a megabyte rather than a hundred.
+  static const _pageSize = 2000;
+
+  /// The whole database as one map. Kept for the tests and the seed tool, which
+  /// want a payload in hand; **the app writes files with [writeBackup]**, which
+  /// never holds one.
   Future<Map<String, dynamic>> buildPayload({BackupProgress? onProgress}) async {
     final data = <String, dynamic>{};
     final counts = <String, int>{};
@@ -209,7 +280,12 @@ class BackupService {
     var read = 0;
     for (var i = 0; i < _codecs.length; i++) {
       final codec = _codecs[i];
-      final rows = await codec.dump();
+      final rows = <Map<String, dynamic>>[];
+      for (var offset = 0;; offset += _pageSize) {
+        final page = await codec.page(_pageSize, offset);
+        rows.addAll(page);
+        if (page.length < _pageSize) break;
+      }
       data[codec.name] = rows;
       counts[codec.name] = rows.length;
       read += rows.length;
@@ -233,6 +309,79 @@ class BackupService {
     };
   }
 
+  /// Writes the whole database to [file] as JSON, a page of rows at a time.
+  ///
+  /// **Nothing here ever holds the backup.** The export used to build every row
+  /// of every table as a map, send that structure across an isolate port to be
+  /// encoded, take a 70 MB string back across the port, and hand it to
+  /// `writeAsString`, which encoded it to UTF-8 a third time — several hundred
+  /// megabytes of peak heap to produce a file the disk was going to receive in
+  /// 64 kB pieces anyway. It ran unasked after every session, which made it the
+  /// most expensive thing the app did and the one nobody had asked for.
+  ///
+  /// So the structure is written by hand and only the *rows* go through
+  /// `jsonEncode`. Awaiting the sink between pages hands the frame back, so a
+  /// long export is slow rather than frozen — and peak memory is one page.
+  ///
+  /// The shape is byte-identical to what [buildPayload] produces, which is what
+  /// the round-trip tests hold it to.
+  Future<File> writeBackup(File file, {BackupProgress? onProgress}) async {
+    final counts = <String, int>{};
+    for (final codec in _codecs) {
+      counts[codec.name] = await codec.count();
+    }
+    final total = counts.values.fold(0, (a, b) => a + b);
+
+    final sink = file.openWrite();
+    var written = 0;
+    try {
+      sink
+        ..write('{"format":$backupFormatVersion')
+        ..write(',"schemaVersion":${db.schemaVersion}')
+        ..write(',"exportedAt":'
+            '${jsonEncode(DateTime.now().toUtc().toIso8601String())}')
+        ..write(',"counts":${jsonEncode(counts)}')
+        ..write(',"data":{');
+
+      for (var i = 0; i < _codecs.length; i++) {
+        final codec = _codecs[i];
+        if (i > 0) sink.write(',');
+        sink.write('${jsonEncode(codec.name)}:[');
+
+        var first = true;
+        for (var offset = 0;; offset += _pageSize) {
+          final page = await codec.page(_pageSize, offset);
+          if (page.isNotEmpty) {
+            final buffer = StringBuffer();
+            for (final row in page) {
+              if (!first) buffer.write(',');
+              first = false;
+              buffer.write(jsonEncode(row));
+            }
+            sink.write(buffer.toString());
+            // Back-pressure, and the only reason this does not freeze the UI:
+            // the sink is drained before the next page is read.
+            await sink.flush();
+
+            written += page.length;
+            onProgress?.call((
+              phase: BackupPhase.writing,
+              detail: _label(codec.name),
+              rows: written,
+              fraction: total == 0 ? null : (written / total).clamp(0.0, 1.0),
+            ));
+          }
+          if (page.length < _pageSize) break;
+        }
+        sink.write(']');
+      }
+      sink.write('}}');
+    } finally {
+      await sink.close();
+    }
+    return file;
+  }
+
   /// Where backups live: a `Deltoid` folder the user can actually open.
   ///
   /// Temp storage was fine for handing a file to the share sheet and useless
@@ -251,42 +400,14 @@ class BackupService {
   /// Writes a timestamped JSON file into [backupDirectory], ready for the share
   /// sheet — and still there afterwards, whether it was shared or not.
   ///
-  /// The encode runs in another isolate. It is one synchronous call over the
-  /// whole history, and on the UI isolate it froze the app for as long as it
-  /// took — no frames, no progress, no way to tell a slow export from a hung
-  /// one. The indent went with it: nothing reads this by eye, and pretty
+  /// Streamed row by row through [writeBackup]: the file is never a string, and
+  /// the indent is gone with it — nothing reads this by eye, and pretty
   /// printing a decade of sets doubled both the time and the file.
   Future<File> exportToFile({BackupProgress? onProgress}) async {
-    final payload = await buildPayload(onProgress: onProgress);
-    final rows = _totalOf(payload);
-
-    onProgress?.call((
-      phase: BackupPhase.encoding,
-      detail: '$rows rows',
-      rows: rows,
-      fraction: null,
-    ));
-    final contents = await _encodeOffIsolate(payload);
-
     final dir = await backupDirectory();
     final name =
         'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
-    final file = File('${dir.path}/$name');
-
-    onProgress?.call((
-      phase: BackupPhase.writing,
-      detail: name,
-      rows: rows,
-      fraction: 0.95,
-    ));
-    await file.writeAsString(contents);
-    return file;
-  }
-
-  static int _totalOf(Map<String, dynamic> payload) {
-    final counts = payload['counts'];
-    if (counts is! Map) return 0;
-    return counts.values.fold(0, (a, b) => a + (b as num).toInt());
+    return writeBackup(File('${dir.path}/$name'), onProgress: onProgress);
   }
 
   /// Keeps the last [keep] automatic exports in app storage, so a phone that
@@ -295,13 +416,12 @@ class BackupService {
     final dir = Directory('${(await backupDirectory()).path}/auto');
     if (!dir.existsSync()) dir.createSync(recursive: true);
 
-    final payload = await buildPayload();
     final name =
         'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
-    // Also off-isolate: this one runs unasked, on the summary screen, right
-    // after a session is saved — the last place a two-second freeze belongs.
-    final contents = await _encodeOffIsolate(payload);
-    await File('${dir.path}/$name').writeAsString(contents);
+    // Streamed, and that matters most here: this one runs unasked, on the
+    // summary screen, right after a session is saved — the last place to build
+    // the whole history in memory.
+    await writeBackup(File('${dir.path}/$name'));
 
     final files = dir
         .listSync()
@@ -348,6 +468,29 @@ class BackupService {
   /// Parses a backup off the UI isolate. The result feeds both [summarise] and
   /// [restore], so the file is read exactly once.
   Future<Map<String, dynamic>> decode(String json) => _decodeOffIsolate(json);
+
+  /// Parses a backup straight off a byte stream, never holding the file as one
+  /// string.
+  ///
+  /// Reading a backup with `utf8.decode(await file.readAsBytes())` costs the
+  /// file twice over and the second copy is the expensive one: Dart strings are
+  /// UTF-16, so a 67 MB export asks Android for a single 134 MB allocation on
+  /// top of the bytes it was decoded from. It threw `OutOfMemoryError` and took
+  /// the process down before the restore had written a row — on the one screen
+  /// that exists to get a history back. The chunked decoders below walk the
+  /// file instead, so the peak is the parsed rows and nothing else.
+  Future<Map<String, dynamic>> decodeStream(Stream<List<int>> bytes) async {
+    final Object? decoded;
+    try {
+      decoded = await bytes.transform(utf8.decoder).transform(json.decoder).first;
+    } on FormatException {
+      throw const FormatException('That file is not valid JSON.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('That file is not a Deltoid backup.');
+    }
+    return decoded;
+  }
 
   static Map<String, dynamic> _decode(String json) {
     final Object? decoded;
@@ -424,13 +567,15 @@ class BackupService {
   /// hang, and the natural response to a hung restore is to kill the app
   /// halfway through it.
   Future<ImportResult> restore(
-    String json, {
+    String? json, {
     BackupProgress? onProgress,
-    /// An already-parsed file, from [decode]. Passing it is the difference
-    /// between reading a fifty-year backup once and reading it twice.
+    /// An already-parsed file, from [decode] or [decodeStream]. Passing it is
+    /// the difference between reading a fifty-year backup once and reading it
+    /// twice — and it is the only form that never needs the file as a string,
+    /// so [json] may be null when it is given.
     Map<String, dynamic>? decoded,
   }) async {
-    final payload = decoded ?? await _decodeOffIsolate(json);
+    final payload = decoded ?? await _decodeOffIsolate(json!);
     final summary = summarise(payload);
 
     onProgress?.call((
@@ -490,6 +635,13 @@ class BackupService {
         regimeRows.any((row) =>
             row is Map && !row.containsKey('identityIndex'));
     if (needsSlots) await backfillIdentityIndexes(db);
+
+    // A restore is the one moment the database goes from empty to a decade in
+    // a single act, so the planner statistics gathered at open describe a
+    // database that no longer exists — and the screens the user looks at next
+    // are planned against them. `beforeOpen` would fix it on the following
+    // launch; this fixes it now.
+    await db.customStatement('ANALYZE');
 
     return ImportResult(summary: summary, rowsWritten: written);
   }

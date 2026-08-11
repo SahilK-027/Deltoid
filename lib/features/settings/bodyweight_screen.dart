@@ -412,7 +412,16 @@ class _MonthRow extends StatelessWidget {
     final c = context.c;
     // Both averages came out of `AVG(weight_kg)`; nothing here reads a row.
     final average = month.averageKg;
-    final delta = previous == null
+    // A month holding one weigh-in has no trend of its own, and its "average"
+    // is that single measurement. Printing a month-on-month change beside it
+    // put two answers to one question two lines apart: the month read
+    // `+0.2 · 168.7` over its only entry reading `−0.2 · 168.7`. Both were
+    // right — the month compared averages, the entry compared itself to the
+    // weigh-in before it — and a reader has no way to know that, so the app
+    // simply looked as though it could not add up. Where there is no month
+    // shaped change to report, the row says nothing and the entry underneath
+    // carries the one comparison that is local and unambiguous.
+    final delta = previous == null || month.count == 1
         ? null
         : formatBodyweightDelta(average, previous!.averageKg, unit);
 
@@ -634,13 +643,10 @@ Future<void> logBodyweightPrompt(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    builder: (sheet) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
-      child: _BodyweightSheet(
-        unit: unit,
-        date: date,
-        initial: initial,
-      ),
+    builder: (sheet) => _BodyweightSheet(
+      unit: unit,
+      date: date,
+      initial: initial,
     ),
   );
   if (result == null) return;

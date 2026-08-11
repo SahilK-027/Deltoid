@@ -43,6 +43,32 @@ Future<String> saveToDownloads(File file) async {
   }
 }
 
+/// Asks the system picker for a backup and returns a **file on disk**, or null
+/// if the picker was dismissed.
+///
+/// The platform copies the chosen document into the app's cache and hands back
+/// a path. `file_selector` hands back the contents instead, and a long history
+/// killed the process on the way through the codec — a 67 MB file is a 134 MB
+/// array on the main thread, thrown before the restore had written a row. The
+/// export side has always avoided that (see [saveToDownloads]); this is the
+/// same rule inbound, and it means the file can then be read a chunk at a time.
+///
+/// Falls back to [fallback] where the channel is not implemented, so a build
+/// without the host code still restores small files rather than nothing.
+Future<File?> pickBackupFile({
+  Future<File?> Function()? fallback,
+}) async {
+  if (!canSaveToDownloads) return fallback?.call();
+  try {
+    final path = await _channel.invokeMethod<String>('pickBackup');
+    return path == null ? null : File(path);
+  } on PlatformException catch (e) {
+    throw BackupSaveException(e.message ?? 'That file could not be opened.');
+  } on MissingPluginException {
+    return fallback?.call();
+  }
+}
+
 class BackupSaveException implements Exception {
   const BackupSaveException(this.message);
 

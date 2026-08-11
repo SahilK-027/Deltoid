@@ -385,7 +385,7 @@ class _DayBody extends ConsumerWidget {
                 ? 'No exercises'
                 : '${slots.length} exercise${slots.length == 1 ? '' : 's'}',
             actionLabel: 'Add',
-            onAction: () => _add(context, ref),
+            onAction: () => _add(context, ref, slots),
           ),
         ),
         if (slots.isEmpty)
@@ -439,8 +439,19 @@ class _DayBody extends ConsumerWidget {
     await ref.read(regimeRepositoryProvider).renameSession(session.id, name);
   }
 
-  Future<void> _add(BuildContext context, WidgetRef ref) async {
-    final exercise = await pickExercise(context, ref);
+  Future<void> _add(
+    BuildContext context,
+    WidgetRef ref,
+    List<({SessionExercise slot, Exercise exercise})> slots,
+  ) async {
+    // The slots already in this day are marked in the picker rather than
+    // hidden: a session may legitimately run one movement twice, and the
+    // second slot should be a decision instead of a surprise.
+    final exercise = await pickExercise(
+      context,
+      ref,
+      alreadyIn: {for (final s in slots) s.exercise.id},
+    );
     if (exercise == null) return;
     await ref
         .read(regimeRepositoryProvider)
@@ -619,14 +630,11 @@ Future<String?> promptForText(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    builder: (sheet) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(sheet).viewInsets.bottom),
-      child: _NamePromptSheet(
-        title: title,
-        hint: hint,
-        initial: initial,
-        validate: validate,
-      ),
+    builder: (sheet) => _NamePromptSheet(
+      title: title,
+      hint: hint,
+      initial: initial,
+      validate: validate,
     ),
   );
 }

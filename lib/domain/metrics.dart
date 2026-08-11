@@ -220,23 +220,45 @@ double sessionVolume({
 /// Bodyweight on a given day, linearly interpolated between the surrounding
 /// entries. Without this, weighing yourself twice a month would leave most
 /// pull-up sets unscoreable.
+/// Called once per performance, so it copies and sorts nothing it does not
+/// have to. `bodyweightSeries` already comes back ordered by day, which is
+/// every caller in the app; an unsorted list is still accepted and sorted, but
+/// it is the exception rather than the price of every call. Thirty years of one
+/// movement is a thousand-odd calls over a thousand-odd entries, and doing the
+/// copy, the sort and a linear scan on each of them cost most of a second
+/// before the chart could be drawn.
 double? bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) {
   if (log.isEmpty) return null;
-  final sorted = [...log]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
 
-  if (dayKey <= sorted.first.dayKey) return sorted.first.weightKg;
-  if (dayKey >= sorted.last.dayKey) return sorted.last.weightKg;
-
-  for (var i = 0; i < sorted.length - 1; i++) {
-    final a = sorted[i];
-    final b = sorted[i + 1];
-    if (dayKey >= a.dayKey && dayKey <= b.dayKey) {
-      if (b.dayKey == a.dayKey) return b.weightKg;
-      final t = (dayKey - a.dayKey) / (b.dayKey - a.dayKey);
-      return a.weightKg + (b.weightKg - a.weightKg) * t;
+  var ordered = log;
+  for (var i = 1; i < log.length; i++) {
+    if (log[i - 1].dayKey > log[i].dayKey) {
+      ordered = [...log]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
+      break;
     }
   }
-  return sorted.last.weightKg;
+
+  if (dayKey <= ordered.first.dayKey) return ordered.first.weightKg;
+  if (dayKey >= ordered.last.dayKey) return ordered.last.weightKg;
+
+  // The last entry on or before [dayKey]. The bounds above mean it is never
+  // the final element, so `lo + 1` is always a real entry to interpolate to.
+  var lo = 0;
+  var hi = ordered.length - 1;
+  while (lo < hi) {
+    final mid = (lo + hi + 1) ~/ 2;
+    if (ordered[mid].dayKey <= dayKey) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  final a = ordered[lo];
+  final b = ordered[lo + 1];
+  if (b.dayKey == a.dayKey) return b.weightKg;
+  final t = (dayKey - a.dayKey) / (b.dayKey - a.dayKey);
+  return a.weightKg + (b.weightKg - a.weightKg) * t;
 }
 
 /// How many consecutive recent performances failed to beat the best e1RM that

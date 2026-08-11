@@ -1,8 +1,11 @@
 package com.deltoid.deltoid
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import java.io.File
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -93,14 +96,82 @@ class MainActivity : FlutterActivity() {
                             }
                         }.start()
                     }
+                    "pickBackup" -> {
+                        if (pendingPick != null) {
+                            result.error("busy", "A file is already being picked.", null)
+                        } else {
+                            pendingPick = result
+                            startActivityForResult(
+                                Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                    // Not `application/json`: a .json arriving from
+                                    // Downloads, a share sheet or a cloud provider is
+                                    // as often octet-stream or text/plain, and the
+                                    // filter greys out the very file the user came
+                                    // for. What it is gets decided by reading it.
+                                    type = "*/*"
+                                },
+                                PICK_BACKUP,
+                            )
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
     }
 
+    /**
+     * Copies the picked document into the cache and hands Dart the path.
+     *
+     * The path, never the bytes. `file_selector` returns a picked file's
+     * *contents* through the platform channel, and the codec builds the whole
+     * thing in one `ByteArrayOutputStream` on the main thread: a 67 MB backup
+     * asked for a 134 MB array and threw `OutOfMemoryError` before a single row
+     * had been restored — with the user's only copy of their training in the
+     * picker. Export already knew better (see `DownloadsWriter`); this is the
+     * same rule on the way back in.
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != PICK_BACKUP) {
+            super.onActivityResult(requestCode, resultCode, data)
+            return
+        }
+
+        val result = pendingPick
+        pendingPick = null
+        if (result == null) return
+
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            result.success(null)
+            return
+        }
+
+        // On a worker: this is a copy of a file that can be tens of megabytes,
+        // and it is started from a screen that has to keep drawing.
+        Thread {
+            try {
+                val target = File(cacheDir, "restore-${System.currentTimeMillis()}.json")
+                contentResolver.openInputStream(uri).use { input ->
+                    if (input == null) throw IllegalStateException("The file could not be opened.")
+                    target.outputStream().use { output -> input.copyTo(output, COPY_BUFFER) }
+                }
+                runOnUiThread { result.success(target.absolutePath) }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    result.error("pick_failed", e.message ?: e.toString(), null)
+                }
+            }
+        }.start()
+    }
+
+    private var pendingPick: MethodChannel.Result? = null
+
     companion object {
         private const val CHANNEL = "com.deltoid.deltoid/boot"
         private const val FILES_CHANNEL = "com.deltoid.deltoid/files"
         private const val BOOT_TIMEOUT_MS = 5_000L
+        private const val PICK_BACKUP = 0x0DEC
+        private const val COPY_BUFFER = 64 * 1024
     }
 }
