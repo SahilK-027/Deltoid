@@ -135,7 +135,18 @@ void main() {
     expect(pullup.formVideoUrls, isNotEmpty);
     expect(pullup.formVideoUrls.first, startsWith('https://'));
 
-    final sets = await db.select(db.setLogs).get();
+    // Ordered, and only the rows that were actually logged. `logASession`
+    // fills the first exercise and leaves the rest blank, and finishing
+    // tombstones those blanks rather than deleting them — so an unordered
+    // `.first` was a coin toss between a set with 22.5 in it and one of the
+    // fifteen tombstones with nothing in it, which failed about one run in
+    // five. Restoring re-inserts every row, so physical order is not stable
+    // across the round trip this test exists to check.
+    final sets = await (db.select(db.setLogs)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+        .get();
+    expect(sets, isNotEmpty);
     expect(sets.first.setType, SetType.working);
     expect(sets.first.weight, 22.5);
 
@@ -354,15 +365,8 @@ void main() {
     expect((await db.select(db.workouts).get()).length, 1);
   });
 
-  test('a backup from an older schema still restores', () async {
-    await logASession();
-    final payload = await backup.buildPayload();
-    payload['schemaVersion'] = 1;
-
-    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(fresh.close);
-    await BackupService(fresh).restore(jsonEncode(payload));
-
-    expect((await fresh.select(fresh.workouts).get()).length, 1);
-  });
+  // A restore from a *lower* schema stamp used to be tested here. At schema 1
+  // there is no lower number to stamp, and what that test was really reaching
+  // for — a row that arrives without a column this build reads — is covered
+  // properly by 'a file written before a column existed still restores'.
 }

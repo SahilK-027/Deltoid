@@ -6846,6 +6846,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_workouts_cycle',
     'CREATE INDEX idx_workouts_cycle ON workouts (cycle_id)',
   );
+  late final Index idxWorkoutsStarted = Index(
+    'idx_workouts_started',
+    'CREATE INDEX idx_workouts_started ON workouts (started_at, id)',
+  );
   late final Index idxWorkoutExercisesWorkout = Index(
     'idx_workout_exercises_workout',
     'CREATE INDEX idx_workout_exercises_workout ON workout_exercises (workout_id)',
@@ -6883,6 +6887,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxWorkoutsSessionLookup,
     idxWorkoutsDay,
     idxWorkoutsCycle,
+    idxWorkoutsStarted,
     idxWorkoutExercisesWorkout,
     idxWorkoutExercisesExercise,
     idxSetLogsParent,

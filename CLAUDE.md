@@ -36,9 +36,11 @@ explained properly in [RULES.md](RULES.md).
 6. **History paging is keyset, not offset**, and filters belong in the query.
 7. **Pure logic lives in `lib/domain/`** and is tested without a database.
    Extend those tests when behaviour changes.
-8. **A column change is three edits** — `tables.dart`, the migration step, and a
-   default in the backup codec — and every migration step must survive running
-   twice. Regenerate after any schema edit: `dart run build_runner build`.
+8. **There is no migration ladder while the app is unreleased.** `schemaVersion`
+   is 1 and there is no `onUpgrade`: a schema change is `tables.dart`, a
+   regenerate (`dart run build_runner build`), a default in the backup codec,
+   and a reinstall. The ladder starts the day a build reaches someone else's
+   phone — see [RULES.md § 3](RULES.md#3-schema-and-migrations).
 9. **No programme is hardcoded**, and no personal numbers, cues or links go in
    `seed_data.dart`.
 10. **Never copy the project to keep an old version around.** No `old-*/`, no

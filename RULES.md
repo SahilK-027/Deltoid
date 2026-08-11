@@ -87,30 +87,44 @@ Drift code has to be regenerated after any edit to `lib/data/db/tables.dart`:
 dart run build_runner build
 ```
 
-**Adding or changing a column means three edits rather than one:**
+**Nothing is released, so there is no migration ladder.** `schemaVersion` is 1
+and `MigrationStrategy` has an `onCreate` and no `onUpgrade`. Every database
+that exists is one we made and can throw away, so a schema change is:
 
-1. the column in `tables.dart`,
-2. a `from < n` step in `lib/data/db/database.dart`, with `schemaVersion` bumped,
-3. **a default in the backup codec** for that table.
+1. the column or `@TableIndex` in `tables.dart`,
+2. `dart run build_runner build`,
+3. **a default in the backup codec** for that table,
+4. reinstall the app on every device, because there is no upgrade path and
+   the old database will not be migrated onto the new shape.
 
-The third is the easy one to miss and the expensive one to get wrong.
-`Exercise.fromJson` is generated against _today's_ columns and reads every one
-of them unconditionally, so a file exported before the column existed throws a
-null cast on restore — with the only copy of a user's history in the file
-picker. `backup/backup_service.dart` spreads a default map under each restored
-row for exactly this reason, and `test/data/backup_service_test.dart` restores a
-payload with a column stripped out to keep it honest. An **index-only**
-migration is the one case that skips step 3: nothing new is stored, so nothing
-can be missing from an older file.
+This carried a v2..v8 ladder, one step per schema change made during the build,
+each migrating a database shape that only ever existed on a test device. Every
+future change would have had to keep all of them working forever, for installs
+that will never exist. It went, and it starts again — properly, one step per
+released change, with `schemaVersion` climbing from 1 — the day a build reaches
+a phone that is not ours. **Once that happens this section is wrong and has to
+be rewritten before the next schema change**, along with the rules the ladder
+needs: every step idempotent (`addColumnIfMissing`, `CREATE INDEX IF NOT
+EXISTS`, never bare `m.addColumn` / `m.createIndex`, because a device given an
+earlier build comes back with the structure in place and the stamp behind it,
+and the bare form throws on launch before any screen), and a test that runs a
+full upgrade over a database that already has everything.
 
-**Every migration step must survive being right twice.** Use
-`addColumnIfMissing` and `CREATE INDEX IF NOT EXISTS` — never bare
-`m.addColumn` / `m.createIndex`. A phone that has run a later build and is then
-given an earlier one comes back with the structure in place and the version
-stamp behind it, and the bare form throws `duplicate column name` or
-`index … already exists` **on launch, before any screen, with no way back into
-the app**. `test/data/migration_test.dart` runs a full upgrade over a database
-that already has everything.
+Step 3 stays true whether or not a ladder exists, and it is the easy one to
+miss and the expensive one to get wrong. `Exercise.fromJson` is generated
+against _today's_ columns and reads every one of them unconditionally, so a
+file exported before the column existed throws a null cast on restore — with
+the only copy of a user's history in the file picker. `backup/backup_service.dart`
+spreads a default map under each restored row for exactly this reason, and
+`test/data/backup_service_test.dart` restores a payload with a column stripped
+out to keep it honest. An **index-only** change is the one case that skips it:
+nothing new is stored, so nothing can be missing from an older file.
+
+A backup also carries the `schemaVersion` it was written against, and import
+refuses anything **newer** than the running build can read rather than clearing
+the tables and failing halfway. Collapsing the version to 1 therefore made every
+previously exported file unrestorable, which was acceptable exactly once, while
+the only data anywhere was test data.
 
 **Backfill wherever the app already knows the answer.** A new column's default
 is the honest value for a row nobody has been asked about, and the wrong value

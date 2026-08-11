@@ -132,6 +132,13 @@ class Cycles extends Table with SyncColumns {
 @TableIndex(name: 'idx_workouts_session_lookup', columns: {#sessionId, #status})
 @TableIndex(name: 'idx_workouts_day', columns: {#dayKey})
 @TableIndex(name: 'idx_workouts_cycle', columns: {#cycleId})
+/// History pages by keyset on `(startedAt, id)` descending, which without this
+/// was a scan of every workout and a temp B-tree to sort them — once per page,
+/// with the first page the dearest because nothing is filtered out yet. Small
+/// either way at a human number of sessions, and the index is 148 kB against
+/// thirty years, so this buys under two milliseconds. It is here because it
+/// costs nothing to declare while the schema is still free to change.
+@TableIndex(name: 'idx_workouts_started', columns: {#startedAt, #id})
 class Workouts extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   TextColumn get sessionId => text().nullable().references(Sessions, #id)();

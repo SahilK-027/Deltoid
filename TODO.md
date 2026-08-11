@@ -8,7 +8,7 @@ This file carries status and nothing else. Why a feature is shaped the way it is
 belongs in [THEME.md](THEME.md), and the rules it must not break belong in
 [RULES.md](RULES.md).
 
-The app currently has **396 tests** and is analyzer clean.
+The app currently has **392 tests** and is analyzer clean.
 
 ---
 
