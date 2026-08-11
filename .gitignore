@@ -52,3 +52,9 @@ app.*.map.json
 # glob catches the "ephemeral 2" copies file sync leaves behind, which showed
 # up staged once already.
 **/ios/Flutter/ephemeral*/
+
+# Databases pulled off the device for inspection. An audit ran `adb ... cat
+# deltoid.sqlite` into the working tree and the result reached the index.
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
