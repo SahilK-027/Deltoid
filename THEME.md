@@ -127,12 +127,12 @@ is allowed to shout where the six are not.
 
 | Token | Hue | Means |
 | --- | --- | --- |
-| `data` | cyan | Default chart series, sparklines |
+| `seriesPrimary` | cyan | First chart line, sparklines |
 | `positive` | green | Success, completed, beat last time |
 | `deload` | orange | A light week, wherever it appears |
 | `warning` | yellow | A stated limit or consequence |
 | `negative` | red | Destructive fill, delete panel |
-| `info` | blue | Second series, heat ramp, session marks |
+| `seriesSecondary` | blue | Second chart line, heat ramp, session marks |
 | `series[]` | cyan · blue · yellow · green · lavender | Categorical, in order |
 | `identity[]` | the six, in order | One per programme |
 | `heatOn` | blue | A day trained |
@@ -230,8 +230,16 @@ Every string the user reads is a sentence, or a fragment that could start one.
 That last one matters more than it looks: at 12, thirty points of title sit hard
 against the notch and the header band reads as part of the system bar.
 
-**Radius** — cards 20, buttons and fields 14, chips and pills 999, identity
-tiles 30% of tile size, heat cells 4, bar-list bars 2.
+**Radius is named for what wears it, never for a size.** `Radii.card` 20 ·
+`Radii.sheet` 24 · `Radii.control` 14 (buttons and fields) · `Radii.cell` 10
+(table cells, keypad keys, rail tiles) · `Radii.panel` 18 (notice, empty box) ·
+`Radii.mark` 6 (checkbox, done square) · `Radii.pill` 999. Identity tiles take
+30% of tile size, heat cells 4, bar-list bars 2.
+
+The names used to be `xs … xxl`, the same ladder `Space` uses — and not the same
+numbers, since `Space.md` is 12 against a radius of 14. One set of suffixes over
+two scales invites you to pair a padding with a corner because they sound like a
+matched pair, and they never were.
 
 **Elevation — none, ever.** Depth is surface colour. A card is `surface` on
 `bg`; a control on a card is `surfaceHigh`.

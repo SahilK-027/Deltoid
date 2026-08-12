@@ -654,14 +654,14 @@ class _ThemeTile extends StatelessWidget {
             padding: EdgeInsets.all(selected ? 3 : 4),
             decoration: BoxDecoration(
               color: c.surface,
-              borderRadius: BorderRadius.circular(Radii.md + 3),
+              borderRadius: BorderRadius.circular(Radii.control + 3),
               border: Border.all(
                 color: selected ? c.accent : c.border,
                 width: selected ? 2 : 1,
               ),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.md),
+              borderRadius: BorderRadius.circular(Radii.control),
               child: AspectRatio(
                 aspectRatio: 1.1,
                 child: switch (mode) {

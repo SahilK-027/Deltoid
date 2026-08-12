@@ -96,7 +96,7 @@ class _SessionPickRow extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: c.surfaceHigh,
-            borderRadius: BorderRadius.circular(Radii.md),
+            borderRadius: BorderRadius.circular(Radii.control),
             border: isNext ? Border.all(color: c.accent, width: 2) : null,
           ),
           child: Row(
@@ -398,7 +398,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
             ),
             decoration: BoxDecoration(
               color: c.surfaceHigh,
-              borderRadius: BorderRadius.circular(Radii.md),
+              borderRadius: BorderRadius.circular(Radii.control),
             ),
             child: Row(
               children: [

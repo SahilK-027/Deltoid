@@ -97,7 +97,7 @@ ThemeData buildTheme(Brightness brightness) {
     extensions: [c],
     textTheme: text,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: c.info,
+      seedColor: c.seriesSecondary,
       brightness: brightness,
     ).copyWith(
       surface: c.surface,
@@ -105,7 +105,7 @@ ThemeData buildTheme(Brightness brightness) {
       surfaceContainerHighest: c.surfaceHigh,
       primary: c.accent,
       onPrimary: c.onAccent,
-      secondary: c.data,
+      secondary: c.seriesPrimary,
       error: c.negative,
       outline: c.border,
       outlineVariant: c.border,
@@ -146,7 +146,7 @@ ThemeData buildTheme(Brightness brightness) {
       modalBarrierColor: Colors.black.withValues(alpha: isDark ? 0.66 : 0.38),
       elevation: 0,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xxl)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.sheet)),
       ),
       showDragHandle: true,
       dragHandleColor: c.surfaceHighest,
@@ -157,7 +157,7 @@ ThemeData buildTheme(Brightness brightness) {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.xxl),
+        borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       titleTextStyle: text.headlineSmall,
       contentTextStyle: text.bodyLarge?.copyWith(color: c.textSecondary),
@@ -172,7 +172,7 @@ ThemeData buildTheme(Brightness brightness) {
         textStyle: text.titleMedium,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
         ),
       ),
     ),
@@ -181,7 +181,7 @@ ThemeData buildTheme(Brightness brightness) {
         foregroundColor: c.textPrimary,
         textStyle: text.titleMedium,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.sm),
+          borderRadius: BorderRadius.circular(Radii.cell),
         ),
       ),
     ),
@@ -193,7 +193,7 @@ ThemeData buildTheme(Brightness brightness) {
         side: BorderSide.none,
         textStyle: text.titleMedium,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
         ),
       ),
     ),
@@ -209,21 +209,21 @@ ThemeData buildTheme(Brightness brightness) {
       hintStyle: text.bodyLarge?.copyWith(color: c.textTertiary),
       contentPadding: const EdgeInsets.all(Space.lg),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
         borderSide: BorderSide.none,
       ),
       // A focused field loses its fill and gains a white outline — the same
       // move the set-row fields make when the keypad opens.
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
         borderSide: BorderSide(color: c.accent, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
         borderSide: BorderSide(color: c.negative, width: 2),
       ),
     ),
@@ -235,7 +235,7 @@ ThemeData buildTheme(Brightness brightness) {
       elevation: 0,
       insetPadding: const EdgeInsets.all(Space.md),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
       ),
     ),
     listTileTheme: ListTileThemeData(
@@ -243,7 +243,7 @@ ThemeData buildTheme(Brightness brightness) {
       subtitleTextStyle: text.bodyMedium,
       iconColor: c.textPrimary,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
       ),
     ),
     switchTheme: SwitchThemeData(
@@ -262,7 +262,7 @@ ThemeData buildTheme(Brightness brightness) {
       checkColor: WidgetStatePropertyAll(c.onAccent),
       side: BorderSide(color: c.textSecondary, width: 2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.xs),
+        borderRadius: BorderRadius.circular(Radii.mark),
       ),
     ),
     radioTheme: RadioThemeData(
@@ -295,7 +295,7 @@ ThemeData buildTheme(Brightness brightness) {
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
         color: c.surfaceHighest,
-        borderRadius: BorderRadius.circular(Radii.sm),
+        borderRadius: BorderRadius.circular(Radii.cell),
       ),
       textStyle: text.bodySmall?.copyWith(color: c.textPrimary),
     ),

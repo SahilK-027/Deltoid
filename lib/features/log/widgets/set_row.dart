@@ -30,7 +30,7 @@ export 'keypad.dart'
 /// set stays grey. Without this the only difference between a warm-up and a
 /// top set was one letter in the same colour as everything around it.
 Color setTypeColour(BuildContext context, SetType type) => switch (type) {
-  SetType.warmup => context.c.data,
+  SetType.warmup => context.c.seriesPrimary,
   SetType.drop || SetType.restPause => context.c.deload,
   _ => context.c.textSecondary,
 };
@@ -302,7 +302,7 @@ class SetRow extends StatelessWidget {
                         // cell is an ordinary field, rounded all round.
                         radius: split
                             ? const BorderRadius.horizontal(
-                                left: Radius.circular(Radii.sm),
+                                left: Radius.circular(Radii.cell),
                               )
                             : null,
                       ),
@@ -521,7 +521,7 @@ class _SwipeToDeleteState extends State<SwipeToDelete> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: c.negative,
-                    borderRadius: BorderRadius.circular(Radii.xs),
+                    borderRadius: BorderRadius.circular(Radii.mark),
                   ),
                   child: const Icon(
                     Icons.delete_outline_rounded,
@@ -571,7 +571,7 @@ class _ValueCell extends StatefulWidget {
   final String? prefix;
 
   /// Squared off on the side it shares a seam with, when this cell is one half
-  /// of a split one. Null is the ordinary all-round [Radii.sm].
+  /// of a split one. Null is the ordinary all-round [Radii.cell].
   final BorderRadius? radius;
 
   @override
@@ -663,7 +663,7 @@ class _ValueCellState extends State<_ValueCell> {
               : (_flash
                     ? c.surfaceHighest
                     : (widget.done ? c.surface : c.surfaceHigh)),
-          borderRadius: widget.radius ?? BorderRadius.circular(Radii.sm),
+          borderRadius: widget.radius ?? BorderRadius.circular(Radii.cell),
           border: Border.all(
             color: widget.active ? c.accent : Colors.transparent,
             width: 2,
@@ -763,7 +763,7 @@ class _PartialCell extends StatelessWidget {
               ? Colors.transparent
               : (done ? c.surface : c.surfaceHigh),
           borderRadius: const BorderRadius.horizontal(
-            right: Radius.circular(Radii.sm),
+            right: Radius.circular(Radii.cell),
           ),
           border: Border.all(
             color: active ? c.accent : Colors.transparent,
@@ -874,7 +874,7 @@ class _DoneBox extends StatelessWidget {
               color: done
                   ? (beaten ? c.positive : c.accent)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(Radii.xs),
+              borderRadius: BorderRadius.circular(Radii.mark),
               border: Border.all(
                 color: done ? Colors.transparent : c.textTertiary,
                 width: 2,

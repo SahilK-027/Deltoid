@@ -173,7 +173,7 @@ class _Parts extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: c.surfaceHigh,
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
       ),
       child: Column(
         children: [

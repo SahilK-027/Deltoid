@@ -239,9 +239,9 @@ class _Primary extends StatelessWidget {
 
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(Radii.md),
+      borderRadius: BorderRadius.circular(Radii.control),
       child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: BorderRadius.circular(Radii.control),
         onTap: onTap,
         child: Center(
           child: Row(

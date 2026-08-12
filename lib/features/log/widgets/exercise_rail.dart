@@ -309,7 +309,7 @@ class _Tab extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: fill,
-                    borderRadius: BorderRadius.circular(Radii.sm),
+                    borderRadius: BorderRadius.circular(Radii.cell),
                   ),
                   child: Text(
                     label,

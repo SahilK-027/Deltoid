@@ -126,7 +126,7 @@ class _TemplateCard extends StatelessWidget {
     final body = enabled ? null : c.textTertiary;
 
     return AppCard(
-      radius: Radii.lg,
+      radius: Radii.panel,
       outline: BorderSide(color: c.border),
       onTap: enabled ? () => Navigator.of(context).pop(t) : null,
       child: Row(

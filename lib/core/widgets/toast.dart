@@ -7,7 +7,7 @@ import '../theme/tokens.dart';
 /// Material's default snack bar is a wide slab with its own type scale and its
 /// own four-second dwell, neither of which is this app's. A toast here is the
 /// same object every card and sheet is: a `surfaceHighest` fill, a hairline
-/// border, `Radii.md`, and body text at the size the rest of the screen reads
+/// border, `Radii.control`, and body text at the size the rest of the screen reads
 /// at. It is also **short** — long enough to read six words, not long enough to
 /// still be covering the log when you go back to it. Anything that needs
 /// longer than that is not a toast, it is a sheet.
@@ -64,7 +64,7 @@ void showToastOn(
           vertical: Space.md,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
           side: BorderSide(color: c.border),
         ),
         action: actionLabel == null || onAction == null

@@ -110,7 +110,7 @@ class _CalendarCardState extends State<_CalendarCard> {
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(Radii.xxl),
+        borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       padding: const EdgeInsets.fromLTRB(
         Space.lg,

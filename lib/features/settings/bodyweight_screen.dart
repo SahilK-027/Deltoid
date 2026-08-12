@@ -298,8 +298,8 @@ class _MonthListState extends State<_MonthList> {
           padding: EdgeInsets.only(bottom: last ? 0 : 1),
           child: ClipRRect(
             borderRadius: BorderRadius.vertical(
-              top: Radius.circular(m == 0 ? Radii.xl : 0),
-              bottom: Radius.circular(last ? Radii.xl : 0),
+              top: Radius.circular(m == 0 ? Radii.card : 0),
+              bottom: Radius.circular(last ? Radii.card : 0),
             ),
             child: ColoredBox(
               color: context.c.surface,
@@ -541,7 +541,7 @@ class _TrendCard extends ConsumerWidget {
               series: [
                 TrendSeries(
                   name: 'Bodyweight',
-                  color: context.c.data,
+                  color: context.c.seriesPrimary,
                   spots: [
                     for (final e in points)
                       FlSpot(trendX(e.dayKey), unit.fromKg(e.weightKg)),

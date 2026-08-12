@@ -32,16 +32,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.textTertiary,
     required this.accent,
     required this.onAccent,
-    required this.accentMuted,
-    required this.accentSurface,
     required this.deload,
     required this.deloadMuted,
     required this.warning,
     required this.warningMuted,
     required this.positive,
     required this.negative,
-    required this.data,
-    required this.info,
+    required this.seriesPrimary,
+    required this.seriesSecondary,
     required this.series,
     required this.identity,
     required this.heatEmpty,
@@ -79,15 +77,6 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   final Color accent;
   final Color onAccent;
 
-  /// A grey fill that reads as "selected" without going all the way to
-  /// [accent] — the track behind a segmented control, a quiet chip.
-  final Color accentMuted;
-
-  /// A whole surface nudged one step towards the foreground. Used for the one
-  /// card a screen is about, in place of the tint a coloured accent used to
-  /// give it.
-  final Color accentSurface;
-
   /// Deload identity. Orange, and the only hue in the cycle model — a light
   /// week has to be legible at a glance on the heatmap and in history.
   ///
@@ -108,11 +97,16 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   final Color positive;
   final Color negative;
 
-  /// Default chart series. Not [accent]: a chart is information, not an action.
-  final Color data;
+  /// The first line on a chart, and the only one when there is just one. Not
+  /// [accent]: a chart is information, not an action.
+  ///
+  /// It was `data`, which named the category rather than the role — every one
+  /// of these is data, so the name distinguished nothing from `info` sitting
+  /// next to it.
+  final Color seriesPrimary;
 
-  /// Second series, heatmap ramp, identity tiles.
-  final Color info;
+  /// The second line, the heatmap ramp and identity tiles.
+  final Color seriesSecondary;
 
   /// Categorical series, in order.
   final List<Color> series;
@@ -201,16 +195,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     textTertiary: Color(0xFF6E6E6E),
     accent: Color(0xFFFFFFFF),
     onAccent: Color(0xFF121212),
-    accentMuted: Color(0xFF2B2B2B),
-    accentSurface: Color(0xFF242424),
     deload: orange,
     deloadMuted: Color(0xFF3A2318),
     warning: yellow,
     warningMuted: Color(0xFF3A3117),
     positive: green,
     negative: red,
-    data: cyan,
-    info: blue,
+    seriesPrimary: cyan,
+    seriesSecondary: blue,
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
@@ -238,16 +230,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     textTertiary: Color(0xFF8C8C8C),
     accent: Color(0xFF111111),
     onAccent: Color(0xFFFFFFFF),
-    accentMuted: Color(0xFFE0E0E0),
-    accentSurface: Color(0xFFF7F7F7),
     deload: orange,
     deloadMuted: Color(0xFFFBE4D6),
     warning: yellow,
     warningMuted: Color(0xFFFBEED2),
     positive: green,
     negative: red,
-    data: cyan,
-    info: blue,
+    seriesPrimary: cyan,
+    seriesSecondary: blue,
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
     heatEmpty: Color(0xFFE0E0E0),
@@ -302,16 +292,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     Color? textTertiary,
     Color? accent,
     Color? onAccent,
-    Color? accentMuted,
-    Color? accentSurface,
     Color? deload,
     Color? deloadMuted,
     Color? warning,
     Color? warningMuted,
     Color? positive,
     Color? negative,
-    Color? data,
-    Color? info,
+    Color? seriesPrimary,
+    Color? seriesSecondary,
     List<Color>? series,
     List<Color>? identity,
     Color? heatEmpty,
@@ -331,16 +319,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       textTertiary: textTertiary ?? this.textTertiary,
       accent: accent ?? this.accent,
       onAccent: onAccent ?? this.onAccent,
-      accentMuted: accentMuted ?? this.accentMuted,
-      accentSurface: accentSurface ?? this.accentSurface,
       deload: deload ?? this.deload,
       deloadMuted: deloadMuted ?? this.deloadMuted,
       warning: warning ?? this.warning,
       warningMuted: warningMuted ?? this.warningMuted,
       positive: positive ?? this.positive,
       negative: negative ?? this.negative,
-      data: data ?? this.data,
-      info: info ?? this.info,
+      seriesPrimary: seriesPrimary ?? this.seriesPrimary,
+      seriesSecondary: seriesSecondary ?? this.seriesSecondary,
       series: series ?? this.series,
       identity: identity ?? this.identity,
       heatEmpty: heatEmpty ?? this.heatEmpty,
@@ -369,16 +355,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       textTertiary: c(textTertiary, other.textTertiary),
       accent: c(accent, other.accent),
       onAccent: c(onAccent, other.onAccent),
-      accentMuted: c(accentMuted, other.accentMuted),
-      accentSurface: c(accentSurface, other.accentSurface),
       deload: c(deload, other.deload),
       deloadMuted: c(deloadMuted, other.deloadMuted),
       warning: c(warning, other.warning),
       warningMuted: c(warningMuted, other.warningMuted),
       positive: c(positive, other.positive),
       negative: c(negative, other.negative),
-      data: c(data, other.data),
-      info: c(info, other.info),
+      seriesPrimary: c(seriesPrimary, other.seriesPrimary),
+      seriesSecondary: c(seriesSecondary, other.seriesSecondary),
       series: l(series, other.series),
       identity: l(identity, other.identity),
       heatEmpty: c(heatEmpty, other.heatEmpty),
@@ -409,13 +393,33 @@ abstract final class Space {
   static const section = 28.0;
 }
 
+/// Corner radii, named by **what wears them** rather than by size.
+///
+/// They used to be `xs … xxl`, the same ladder [Space] uses — and they are not
+/// the same numbers. `Space.md` is 12 and `Radii.md` was 14; `Space.lg` is 16
+/// and `Radii.lg` was 18. Two scales sharing one set of suffixes in one file is
+/// a trap: it invites you to pair `Space.md` padding with `Radii.md` corners on
+/// the assumption they were drawn together, and they never were.
 abstract final class Radii {
-  static const xs = 6.0;
-  static const sm = 10.0;
-  static const md = 14.0;
-  static const lg = 18.0;
-  static const xl = 20.0;
-  static const xxl = 24.0;
+  /// Small marks: a checkbox, a done square, the delete chip on a set row.
+  static const mark = 6.0;
+
+  /// Table cells, keypad keys, rail tiles — a control inside a control.
+  static const cell = 10.0;
+
+  /// Buttons and input fields (THEME → Space, radius).
+  static const control = 14.0;
+
+  /// A panel that holds a message: the notice, the empty box, illustrations.
+  static const panel = 18.0;
+
+  /// Cards.
+  static const card = 20.0;
+
+  /// Sheets, dialogs and the day picker — anything that arrives over the page.
+  static const sheet = 24.0;
+
+  /// Chips and pills. Large enough that the height decides the shape.
   static const pill = 999.0;
 }
 
@@ -431,7 +435,11 @@ abstract final class Motion {
   static const emphasized = Curves.easeOutQuint;
 
   /// Presses and toggles, where a hint of overshoot reads as responsive.
-  static const spring = Curves.easeOutBack;
+  ///
+  /// Named for what it does, not for a spring: nothing here is physical, and a
+  /// name promising simulated motion is one someone reaches for expecting mass
+  /// and damping to come with it.
+  static const overshoot = Curves.easeOutBack;
 }
 
 /// Tabular figures everywhere a number can change — weights, reps, dates,

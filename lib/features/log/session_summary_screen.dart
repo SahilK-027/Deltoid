@@ -512,7 +512,7 @@ class _NoteBox extends StatelessWidget {
         padding: const EdgeInsets.all(Space.lg),
         decoration: BoxDecoration(
           color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Text(
           text ?? 'Slept badly, everything felt heavy, the rack was busy…',

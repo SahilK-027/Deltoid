@@ -124,9 +124,9 @@ class _StepButton extends StatelessWidget {
     final c = context.c;
     return Material(
       color: c.surfaceHigh,
-      borderRadius: BorderRadius.circular(Radii.sm),
+      borderRadius: BorderRadius.circular(Radii.cell),
       child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.sm),
+        borderRadius: BorderRadius.circular(Radii.cell),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(

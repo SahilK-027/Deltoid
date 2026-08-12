@@ -386,7 +386,7 @@ class AppCard extends StatelessWidget {
     this.onLongPress,
     this.fill,
     this.outline,
-    this.radius = Radii.xl,
+    this.radius = Radii.card,
   });
 
   final Widget child;
@@ -698,7 +698,7 @@ class PrimaryButton extends StatelessWidget {
         height: 54,
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -748,7 +748,7 @@ class SecondaryButton extends StatelessWidget {
         height: 54,
         decoration: BoxDecoration(
           color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1160,7 +1160,7 @@ class IconTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final tint = color ?? c.info;
+    final tint = color ?? c.seriesSecondary;
     return Container(
       width: size,
       height: size,
@@ -1799,7 +1799,7 @@ class NoticeBox extends StatelessWidget {
       padding: const EdgeInsets.all(Space.lg),
       decoration: BoxDecoration(
         color: c.warningMuted,
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: BorderRadius.circular(Radii.panel),
         border: Border.all(color: c.warning.withValues(alpha: 0.45)),
       ),
       child: Row(
@@ -1856,7 +1856,7 @@ class EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(Space.xl),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: BorderRadius.circular(Radii.panel),
         border: Border.all(color: c.border),
       ),
       child: Row(
@@ -1916,7 +1916,7 @@ class EmptyState extends StatelessWidget {
                 height: 68,
                 decoration: BoxDecoration(
                   color: c.surfaceHigh,
-                  borderRadius: BorderRadius.circular(Radii.xxl),
+                  borderRadius: BorderRadius.circular(Radii.sheet),
                 ),
                 child: Icon(icon, color: c.textPrimary, size: 28),
               ),

@@ -323,9 +323,9 @@ class _Key extends StatelessWidget {
         height: 52,
         child: Material(
           color: onTap == null ? Colors.transparent : bg,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
           child: InkWell(
-            borderRadius: BorderRadius.circular(Radii.md),
+            borderRadius: BorderRadius.circular(Radii.control),
             onTap: onTap == null
                 ? null
                 : () {
@@ -370,9 +370,9 @@ class _PartialKey extends StatelessWidget {
         height: 52,
         child: Material(
           color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.circular(Radii.control),
           child: InkWell(
-            borderRadius: BorderRadius.circular(Radii.md),
+            borderRadius: BorderRadius.circular(Radii.control),
             onTap: () {
               HapticFeedback.selectionClick();
               onTap();
@@ -400,7 +400,7 @@ class _PartialKey extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected ? c.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(Radii.sm),
+          borderRadius: BorderRadius.circular(Radii.cell),
         ),
         child: Text(
           label,

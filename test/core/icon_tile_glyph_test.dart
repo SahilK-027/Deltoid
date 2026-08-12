@@ -45,7 +45,7 @@ void main() {
       for (final fill in [
         palette.deload,
         palette.positive,
-        palette.info,
+        palette.seriesSecondary,
         palette.negative,
       ]) {
         expect(_contrast(IconTile.glyphOn(fill), fill),

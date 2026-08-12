@@ -214,7 +214,7 @@ class _Chart extends ConsumerWidget {
     // One line per session slot is the point, not a detail: 22.5 in Push 1 and
     // 20 in Push 2 are two progressions, and drawing them as one is the mistake
     // this app exists to avoid.
-    final palette = [c.data, c.info, c.deload, c.positive];
+    final palette = [c.seriesPrimary, c.seriesSecondary, c.deload, c.positive];
     final names = bySession.keys.toList();
 
     return TrendChart(

@@ -214,7 +214,7 @@ class _NavItem extends StatelessWidget {
           AnimatedScale(
             scale: selected ? 1.04 : 1,
             duration: Motion.base,
-            curve: Motion.spring,
+            curve: Motion.overshoot,
             child: destination.icon == null
                 ? PlateIcon(size: 27, color: tint, filled: selected)
                 : Icon(
