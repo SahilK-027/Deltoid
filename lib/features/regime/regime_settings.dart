@@ -164,7 +164,7 @@ class _DeloadSheet extends ConsumerWidget {
             label: 'Sets during deload',
             helper: 'Applied to each exercise, never below one set',
             value: regime.deloadSetDelta == 0
-                ? 'unchanged'
+                ? 'Unchanged'
                 : '${regime.deloadSetDelta}',
             onDecrement: regime.deloadSetDelta > -3
                 ? () => repo.updateRegime(regime.id,
@@ -224,6 +224,7 @@ class StepperRow extends StatelessWidget {
           CircleIconButton(
             icon: Icons.remove_rounded,
             size: 36,
+            tooltip: 'Decrease',
             tint: onDecrement == null ? c.textTertiary : null,
             onTap: onDecrement,
           ),
@@ -238,6 +239,7 @@ class StepperRow extends StatelessWidget {
           CircleIconButton(
             icon: Icons.add_rounded,
             size: 36,
+            tooltip: 'Increase',
             tint: onIncrement == null ? c.textTertiary : null,
             onTap: onIncrement,
           ),

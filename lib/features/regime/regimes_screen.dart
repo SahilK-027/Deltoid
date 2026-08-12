@@ -263,6 +263,7 @@ class _RegimeRow extends ConsumerWidget {
       trailing: CircleIconButton(
         icon: Icons.more_horiz_rounded,
         fill: Colors.transparent,
+        tooltip: 'Regime actions',
         onTap: () => _showActions(context, ref),
       ),
     );

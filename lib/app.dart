@@ -45,6 +45,25 @@ class DeltoidApp extends ConsumerWidget {
         duration: Motion.fast,
         curve: Motion.curve,
       ),
+      builder: (context, child) {
+        // **The one place text scale is decided.** The type scale runs 11 to
+        // 30sp and half this app is a table: the log's set rows, the keypad's
+        // keys and every button are fixed heights with text inside them, so at
+        // the top of Android's font slider the keypad overflows and the log
+        // stops being readable at exactly the moment it is being used.
+        //
+        // Clamped rather than ignored. Refusing to scale at all is the other
+        // way to break this, and the 30% that fits is worth having — it is the
+        // difference between a `micro` label at 11 and one at 14.
+        final scaler = MediaQuery.textScalerOf(context).clamp(
+          minScaleFactor: 1.0,
+          maxScaleFactor: 1.3,
+        );
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: scaler),
+          child: child!,
+        );
+      },
       home: const _FailureToasts(child: _Boot()),
     );
   }

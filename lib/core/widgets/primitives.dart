@@ -774,12 +774,19 @@ class SecondaryButton extends StatelessWidget {
 
 /// A circular icon control. A bare `IconButton` floating on charcoal has no
 /// edges and reads as decoration.
+///
+/// [tooltip] is **required**, and it is the control's name rather than a hint:
+/// a glyph on its own is the one kind of control that cannot say what it does.
+/// It was optional, and six of the thirteen call sites left it off — the ✕ on
+/// three different sheets among them — so the label is now the thing that has
+/// to be written for the code to compile, the same argument `formatWeight`
+/// makes for its unit.
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     super.key,
     required this.icon,
     required this.onTap,
-    this.tooltip,
+    required this.tooltip,
     this.tint,
     this.fill,
     this.size = 40,
@@ -787,7 +794,9 @@ class CircleIconButton extends StatelessWidget {
 
   final IconData icon;
   final VoidCallback? onTap;
-  final String? tooltip;
+
+  /// What this button does, in one or two words.
+  final String tooltip;
   final Color? tint;
   final Color? fill;
   final double size;
@@ -809,7 +818,14 @@ class CircleIconButton extends StatelessWidget {
         child: Icon(icon, size: size * 0.45, color: tint ?? c.textPrimary),
       ),
     );
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+    // Named as well as tipped: a tooltip needs a long press to appear, which is
+    // not a gesture anyone makes mid-set, and a screen reader reads neither the
+    // circle nor the glyph inside it.
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(message: tooltip, child: button),
+    );
   }
 }
 
@@ -1438,6 +1454,7 @@ class SheetHeader extends StatelessWidget {
                   icon: Icons.close_rounded,
                   fill: Colors.transparent,
                   size: 48,
+                  tooltip: 'Close',
                   onTap: () => Navigator.of(context).maybePop(),
                 ),
               ),
@@ -1690,6 +1707,7 @@ Future<bool> confirmAction(
                   CircleIconButton(
                     icon: Icons.close_rounded,
                     fill: Colors.transparent,
+                    tooltip: 'Close',
                     onTap: () => Navigator.of(ctx).pop(false),
                   ),
                 ],

@@ -205,6 +205,7 @@ class _CardHeader extends StatelessWidget {
         CircleIconButton(
           icon: Icons.close_rounded,
           fill: Colors.transparent,
+          tooltip: 'Close',
           onTap: () => Navigator.of(context).maybePop(),
         ),
       ],
@@ -234,7 +235,11 @@ class _MonthBar extends StatelessWidget {
     final c = context.c;
     return Row(
       children: [
-        _Arrow(icon: Icons.chevron_left_rounded, onTap: onBack),
+        _Arrow(
+          icon: Icons.chevron_left_rounded,
+          onTap: onBack,
+          tooltip: 'Previous month',
+        ),
         Expanded(
           child: Pressable(
             onTap: onTapLabel,
@@ -265,7 +270,11 @@ class _MonthBar extends StatelessWidget {
             ),
           ),
         ),
-        _Arrow(icon: Icons.chevron_right_rounded, onTap: onForward),
+        _Arrow(
+          icon: Icons.chevron_right_rounded,
+          onTap: onForward,
+          tooltip: 'Next month',
+        ),
       ],
     );
   }
@@ -274,10 +283,15 @@ class _MonthBar extends StatelessWidget {
 /// A month step. Disabled at the ends of the range rather than hidden: a
 /// control that disappears makes the row re-centre as you page through it.
 class _Arrow extends StatelessWidget {
-  const _Arrow({required this.icon, required this.onTap});
+  const _Arrow({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
 
   final IconData icon;
   final VoidCallback? onTap;
+  final String tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -285,6 +299,7 @@ class _Arrow extends StatelessWidget {
     return CircleIconButton(
       icon: icon,
       onTap: onTap,
+      tooltip: tooltip,
       fill: onTap == null ? Colors.transparent : c.surfaceHigh,
       tint: onTap == null ? c.textTertiary : c.textPrimary,
     );

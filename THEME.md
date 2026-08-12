@@ -171,6 +171,13 @@ what frees the fills to be light enough to serve both themes.
 One family, nine roles. **Minimum 11sp, maximum 30sp.** Nothing is larger than a
 page title or smaller than a nav label.
 
+**One exception, and it is a clock.** The hold pad's timer runs at 44sp, because
+it is the only number in the app read from the floor with your chin on your
+hands. The cap exists so that no *heading* competes with a page title; a running
+clock is not a heading, and shrinking it to 30 would obey the rule at the cost
+of the one moment the screen exists for. Nothing else takes this exception —
+if a second thing ever needs it, the role belongs in the table above.
+
 | Role | Size / line | Weight | Case | Colour | Used for |
 | --- | --- | --- | --- | --- | --- |
 | `pageTitle` | 30 / 36 | 800 | Sentence, tracking −0.5 | primary | The one title in a destination's header band |

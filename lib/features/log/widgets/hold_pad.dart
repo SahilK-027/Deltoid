@@ -177,6 +177,9 @@ class _HoldPadState extends State<HoldPad> {
       children: [
         Text(
           _format(shown),
+          // 44, over the 30sp cap, and the one place in the app that goes over
+          // it — see THEME → Type. Read from the floor mid-plank, not a
+          // heading competing with a page title.
           style: context.t.displayMedium?.copyWith(
             fontSize: 44,
             height: 1.1,
