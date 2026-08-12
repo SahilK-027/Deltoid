@@ -223,7 +223,10 @@ class BackupService {
           .toList(),
       count: () => _countOf(db.workoutExercises),
       table: db.workoutExercises,
-      parse: WorkoutExercise.fromJson,
+      // A file written before the muscle snapshot existed has no key for it,
+      // and null is the honest value: the row predates the column, so readers
+      // fall back to the catalog rather than being told it was `other`.
+      parse: (row) => WorkoutExercise.fromJson({'muscle': null, ...row}),
       clear: () => db.delete(db.workoutExercises).go(),
     ),
     _TableCodec(

@@ -774,7 +774,57 @@ class TrainingRepository {
   ///   programme rather than you.
   Future<Map<MuscleGroup, int>> setsByMuscleSince(int fromDayKey) async {
     final counted = db.setLogs.id.count();
-    final rows = await (db.selectOnly(db.setLogs).join([
+    final muscle = _loggedMuscle;
+    final rows = await (_volumeQuery()
+          ..addColumns(<Expression<Object>>[muscle, counted])
+          ..where(db.workouts.dayKey.isBiggerOrEqualValue(fromDayKey))
+          ..groupBy([muscle]))
+        .get();
+
+    return {
+      for (final r in rows)
+        MuscleGroup.values.byName(r.read(muscle)!): r.read(counted) ?? 0,
+    };
+  }
+
+  /// The catalog's muscle for each of [exerciseIds], for snapshotting onto the
+  /// rows a workout is built from.
+  ///
+  /// One query for a whole session rather than one per slot: this is on the
+  /// path of the tap that opens the log.
+  Future<Map<String, MuscleGroup>> _musclesOf(
+    Iterable<String> exerciseIds,
+  ) async {
+    final ids = exerciseIds.toSet().toList();
+    if (ids.isEmpty) return const {};
+    final rows = await (db.selectOnly(db.exercises)
+          ..addColumns([db.exercises.id, db.exercises.muscle])
+          ..where(db.exercises.id.isIn(ids)))
+        .get();
+    return {
+      for (final r in rows)
+        r.read(db.exercises.id)!:
+            r.readWithConverter(db.exercises.muscle)!,
+    };
+  }
+
+  /// The muscle a logged set counts toward: the snapshot on the row, falling
+  /// back to the catalog for rows written before that column existed.
+  ///
+  /// The fallback is the whole reason the column is nullable — see
+  /// `WorkoutExercises.muscle`. Every row this app writes from now on carries
+  /// its own answer, so the join below is only load-bearing for history logged
+  /// before the snapshot, and for rows restored from an older backup.
+  Expression<String> get _loggedMuscle =>
+      coalesce([db.workoutExercises.muscle, db.exercises.muscle]);
+
+  /// The joins and filters every volume count shares.
+  ///
+  /// Factored so the rolling window and the weekly history cannot drift apart:
+  /// two copies of these predicates is two definitions of "a hard set", and the
+  /// screens that showed different numbers for the same week would be right to.
+  JoinedSelectStatement<HasResultSet, dynamic> _volumeQuery() {
+    return db.selectOnly(db.setLogs).join([
       innerJoin(
         db.workoutExercises,
         db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId),
@@ -788,33 +838,115 @@ class TrainingRepository {
         db.exercises.id.equalsExp(db.workoutExercises.exerciseId),
       ),
     ])
-          ..addColumns(<Expression<Object>>[db.exercises.muscle, counted])
-          ..where(
-            db.workouts.dayKey.isBiggerOrEqualValue(fromDayKey) &
-                // Sets logged in the session you are standing in count the
-                // moment they are ticked: the bar list is read mid-workout, and
-                // a set you have done is a set you have done whether or not you
-                // have pressed Finish yet.
-                db.workouts.status
-                    .equalsValue(WorkoutStatus.abandoned)
-                    .not() &
-                db.workouts.deletedAt.isNull() &
-                db.workoutExercises.deletedAt.isNull() &
-                db.workoutExercises.skipReason.equalsValue(SkipReason.none) &
-                db.setLogs.isDone.equals(true) &
-                db.setLogs.deletedAt.isNull() &
-                db.setLogs.setType.isIn([
-                  for (final t in SetType.values)
-                    if (countsAsVolume(t)) t.name,
-                ]),
-          )
-          ..groupBy([db.exercises.muscle]))
+      ..where(
+        // Sets logged in the session you are standing in count the moment they
+        // are ticked: the bar list is read mid-workout, and a set you have done
+        // is a set you have done whether or not you have pressed Finish yet.
+        db.workouts.status.equalsValue(WorkoutStatus.abandoned).not() &
+            db.workouts.deletedAt.isNull() &
+            db.workoutExercises.deletedAt.isNull() &
+            db.workoutExercises.skipReason.equalsValue(SkipReason.none) &
+            db.setLogs.isDone.equals(true) &
+            db.setLogs.deletedAt.isNull() &
+            db.setLogs.setType.isIn([
+              for (final t in SetType.values)
+                if (countsAsVolume(t)) t.name,
+            ]),
+      );
+  }
+
+  /// Hard sets per muscle **per day**, between two day keys inclusive.
+  ///
+  /// Counted by day rather than by week on purpose. `day_key` is a `yyyyMMdd`
+  /// integer, not a date, so bucketing into weeks in SQL would mean unpacking
+  /// it into a real date on every row and doing calendar arithmetic there;
+  /// `domain/volume_history.dart` does that once in Dart, where the week rule
+  /// is testable without a database.
+  ///
+  /// The volume rules are [setsByMuscleSince]'s, exactly — same joins, same
+  /// filters, same definition of a hard set.
+  ///
+  /// Bounded, never open-ended: a year of training is a few hundred rows here,
+  /// and the range control means nothing ever asks for more than a year at
+  /// once. That bound is why this is a day-level query and not a paging one.
+  Future<List<({int dayKey, MuscleGroup muscle, int sets})>> setsByMuscleDaily({
+    required int fromDayKey,
+    required int toDayKey,
+  }) async {
+    final counted = db.setLogs.id.count();
+    final muscle = _loggedMuscle;
+    final rows = await (_volumeQuery()
+          ..addColumns(<Expression<Object>>[
+            db.workouts.dayKey,
+            muscle,
+            counted,
+          ])
+          ..where(db.workouts.dayKey.isBetweenValues(fromDayKey, toDayKey))
+          ..groupBy([db.workouts.dayKey, muscle]))
         .get();
 
-    return {
+    return [
       for (final r in rows)
-        r.readWithConverter(db.exercises.muscle)!: r.read(counted) ?? 0,
-    };
+        (
+          dayKey: r.read(db.workouts.dayKey)!,
+          muscle: MuscleGroup.values.byName(r.read(muscle)!),
+          sets: r.read(counted) ?? 0,
+        ),
+    ];
+  }
+
+  /// Which movements produced a region's sets, most first.
+  ///
+  /// The question a regional total cannot answer: `Back 17.8 per week` is a
+  /// number you can read and not act on, and "eleven of those were lat
+  /// pulldowns and none were rows" is the same training telling you what to
+  /// change. Counted over the same span and through the same filters as
+  /// [setsByMuscleDaily], so the parts add up to the whole.
+  ///
+  /// The **name** is read live rather than snapshotted, unlike the muscle:
+  /// renaming "Dips" to "Weighted dips" is the same movement under a corrected
+  /// label, and a list showing both would be the rename failing rather than
+  /// history being preserved. What a movement *trained* is a fact about the
+  /// session; what it is *called* is a fact about now.
+  Future<List<({String exerciseId, String name, int sets})>> setsByExercise({
+    required int fromDayKey,
+    required int toDayKey,
+    required List<MuscleGroup> muscles,
+  }) async {
+    if (muscles.isEmpty) return const [];
+    final counted = db.setLogs.id.count();
+    final rows = await (_volumeQuery()
+          ..addColumns(<Expression<Object>>[
+            db.workoutExercises.exerciseId,
+            db.exercises.name,
+            counted,
+          ])
+          ..where(
+            db.workouts.dayKey.isBetweenValues(fromDayKey, toDayKey) &
+                _loggedMuscle.isIn([for (final m in muscles) m.name]),
+          )
+          ..groupBy([db.workoutExercises.exerciseId, db.exercises.name])
+          ..orderBy([OrderingTerm.desc(counted)]))
+        .get();
+
+    return [
+      for (final r in rows)
+        (
+          exerciseId: r.read(db.workoutExercises.exerciseId)!,
+          name: r.read(db.exercises.name)!,
+          sets: r.read(counted) ?? 0,
+        ),
+    ];
+  }
+
+  /// The oldest day anything countable was logged on, or null on a fresh app.
+  ///
+  /// What the year picker offers is built from this: a year with nothing in it
+  /// is a year the picker has no business listing.
+  Future<int?> firstLoggedDayKey() async {
+    final oldest = db.workouts.dayKey.min();
+    final row = await (_volumeQuery()..addColumns([oldest])).getSingleOrNull();
+    return row?.read(oldest);
   }
 
   /// Every completed workout, oldest first.
@@ -1782,6 +1914,11 @@ class TrainingRepository {
         .get();
 
     final unit = await weightUnit();
+    // Snapshotted onto every row this writes — see `WorkoutExercises.muscle`.
+    // One query for the whole session rather than one per slot: this runs on
+    // the tap that opens the log, where six round trips to the database isolate
+    // are six frames.
+    final muscles = await _musclesOf([for (final s in slots) s.exerciseId]);
     final workoutId = newId();
     // A backdated session keeps the current clock time: the date is what was
     // forgotten, the hour is unknowable and unimportant.
@@ -1861,6 +1998,7 @@ class TrainingRepository {
                 exerciseId: slot.exerciseId,
                 orderIndex: i,
                 targetSets: Value(targetSets),
+                muscle: Value(muscles[slot.exerciseId]),
               ),
             );
 
@@ -2570,6 +2708,7 @@ class TrainingRepository {
       exerciseId: exerciseId,
       targetSets: targetSets,
     );
+    final muscle = (await _musclesOf([exerciseId]))[exerciseId];
 
     final id = newId();
     await db.transaction(() async {
@@ -2589,6 +2728,7 @@ class TrainingRepository {
               exerciseId: exerciseId,
               orderIndex: next,
               targetSets: Value(targetSets),
+              muscle: Value(muscle),
             ),
           );
       for (var k = 0; k < shape.length; k++) {
@@ -2628,6 +2768,10 @@ class TrainingRepository {
       exerciseId: newExerciseId,
       targetSets: old.targetSets,
     );
+    // The replacement's muscle, not the row it displaces: a swap from a press
+    // to a row is a different muscle trained, and the slot it inherits is a
+    // position rather than a category.
+    final muscle = (await _musclesOf([newExerciseId]))[newExerciseId];
 
     final id = newId();
     await db.transaction(() async {
@@ -2649,6 +2793,7 @@ class TrainingRepository {
               exerciseId: newExerciseId,
               orderIndex: old.orderIndex,
               targetSets: Value(old.targetSets),
+              muscle: Value(muscle),
             ),
           );
 

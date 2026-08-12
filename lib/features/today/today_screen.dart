@@ -21,6 +21,7 @@ import '../regime/regime_setup.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'today_providers.dart';
+import 'volume_history_screen.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
@@ -1535,12 +1536,27 @@ class _VolumeCard extends ConsumerWidget {
     // rest of this screen exists to avoid.
     if (volume == null) return const SizedBox.shrink();
 
+    void openHistory() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const VolumeHistoryScreen()),
+        );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('This week'),
+        // `Weekly volume`, not `This week`: the window is a rolling seven days
+        // ([volumeWindowDays]), and the heading sat directly under a
+        // Consistency section whose `this week` is calendar-bound — two
+        // different weeks on one screen, both called this one.
+        SectionHeader(
+          'Weekly volume',
+          // Nothing to open on a fresh install, and a link to an empty screen
+          // is a control that does nothing.
+          actionLabel: volume.isEmpty ? null : 'All time',
+          onAction: openHistory,
+        ),
         AppCard(
           padding: const EdgeInsets.all(Space.md),
+          onTap: volume.isEmpty ? null : openHistory,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

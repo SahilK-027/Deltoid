@@ -402,6 +402,11 @@ class _Generator {
         'exerciseId': _idsByKey[slot.exerciseKey],
         'orderIndex': i,
         'targetSets': slot.sets,
+        // Snapshotted exactly as `startWorkout` does it. Leaving it null would
+        // still restore — readers fall back to the catalog — but then years of
+        // generated history would exercise the fallback rather than the path
+        // the app actually writes, which is the one the volume screens read.
+        'muscle': exercise.muscle.name,
         'notes': random.nextInt(30) == 0 ? _exerciseNote() : null,
         'skipReason': skipped
             ? SkipReason.values[1 + random.nextInt(SkipReason.values.length - 1)]

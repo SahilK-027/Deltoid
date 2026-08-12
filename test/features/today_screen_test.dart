@@ -227,7 +227,7 @@ void main() {
       // that six empty tracks is a chart of nothing. What that cost was the
       // section appearing from nowhere on the day of the first workout, which
       // moved everything under it. The page keeps its shape instead.
-      expect(find.text('This week'), findsOneWidget);
+      expect(find.text('Weekly volume'), findsOneWidget);
       expect(find.byType(VolumeBars), findsOneWidget);
     });
 
@@ -243,7 +243,7 @@ void main() {
       await pumpToday(tester);
       await frames(tester);
 
-      expect(find.text('This week'), findsOneWidget);
+      expect(find.text('Weekly volume'), findsOneWidget);
       for (final region in MuscleRegion.values) {
         expect(
           find.text(region.label),

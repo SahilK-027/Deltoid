@@ -1485,9 +1485,25 @@ class AppSheet extends StatelessWidget {
     // over its own Save button. Reserving the inset here also shortens the
     // scroll area rather than pushing it off the bottom, so a long sheet with
     // the keyboard up scrolls instead of overflowing.
+    // And it clears the gesture bar under it, in the same reservation.
+    //
+    // `viewInsets.bottom + padding.bottom`, and the sum is right because the
+    // two never overlap: `padding` is what the system chrome covers that the
+    // keyboard does not, so with the keyboard up the gesture bar is already
+    // excluded from it and the sum is just the keyboard. Taking the larger of
+    // the two instead — which this briefly did — reserves nothing at all on a
+    // phone whose `viewPadding` is reported as zero, and the last row of the
+    // sheet lands behind the navigation bar.
+    final media = MediaQuery.of(context);
+
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.only(
+        bottom: media.viewInsets.bottom + media.padding.bottom,
+      ),
       child: SafeArea(
+        // Sides only — the bottom is reserved above, and letting `SafeArea` add
+        // it again is how a sheet ends up double-padded.
+        bottom: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

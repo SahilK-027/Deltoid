@@ -179,6 +179,30 @@ void main() {
     );
   });
 
+  test('a logged row without a muscle snapshot restores, and stays honest',
+      () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+
+    final data = payload['data']! as Map<String, dynamic>;
+    data['workout_exercises'] = (data['workout_exercises']! as List)
+        .cast<Map<String, dynamic>>()
+        .map((row) => {...row}..remove('muscle'))
+        .toList();
+
+    await backup.restore(jsonEncode(payload));
+
+    final restored = await db.select(db.workoutExercises).get();
+    expect(restored, isNotEmpty);
+    expect(
+      restored.every((e) => e.muscle == null),
+      isTrue,
+      reason: 'null means "logged before the column existed, ask the catalog" '
+          '— defaulting to `other` would file the sets under no region and '
+          'drop them from every chart',
+    );
+  });
+
   test('the bar a movement is loaded on survives the round trip', () async {
     await logASession();
     final bench = await (db.select(db.exercises)

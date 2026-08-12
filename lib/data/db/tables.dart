@@ -374,6 +374,23 @@ class WorkoutExercises extends Table with SyncColumns {
   TextColumn get skipReason =>
       textEnum<SkipReason>().withDefault(const Constant('none'))();
 
+  /// The muscle this movement trained, copied at the moment it was logged.
+  ///
+  /// The snapshot rule applied to a column that used to be read live. Weekly
+  /// volume counted sets through a join onto `exercises.muscle`, which is fine
+  /// over seven days and dishonest over years: recategorising one movement in
+  /// the catalog silently rewrote every week it ever appeared in, and a chart
+  /// of "sets per muscle since 2026" would redraw itself because you fixed a
+  /// label today. What you trained in March is a fact about March.
+  ///
+  /// **Nullable, and null is not [MuscleGroup.other].** Null means the row was
+  /// logged before this column existed and the catalog is the best answer we
+  /// have; readers fall back to `exercises.muscle` for exactly those rows
+  /// (`_muscleOfLog` in `training_repository.dart`). Defaulting to `other`
+  /// instead would have been a value the app invented, and `other` belongs to
+  /// no region — every pre-existing set would have quietly left the chart.
+  TextColumn get muscle => textEnum<MuscleGroup>().nullable()();
+
   @override
   List<String> get customConstraints => [
         _liveOrTombstoned,
@@ -382,6 +399,13 @@ class WorkoutExercises extends Table with SyncColumns {
         'CHECK (notes IS NULL OR length(notes) <= 4000)',
         "CHECK (skip_reason IN ('none', 'failed', 'equipmentBusy', "
             "'shortOnTime', 'injury', 'other'))",
+        // Same reasoning as `Exercises.muscle`: `textEnum` throws on a value it
+        // does not know, and it throws for the whole result set rather than the
+        // one row — so an unparseable string here takes down the log, history
+        // and every volume chart at once.
+        "CHECK (muscle IS NULL OR muscle IN ('chest', 'back', 'shoulders', "
+            "'biceps', 'triceps', 'forearms', 'quads', 'hamstrings', 'glutes', "
+            "'calves', 'core', 'other'))",
       ];
 }
 

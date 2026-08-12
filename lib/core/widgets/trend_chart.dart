@@ -74,9 +74,19 @@ class TrendRangeBar extends StatelessWidget {
     required this.window,
     required this.years,
     required this.onChanged,
+    this.ranges = ChartRange.values,
   });
 
   final TrendWindow window;
+
+  /// The rolling windows offered, shortest first. All of them unless a screen
+  /// has one it cannot honestly draw — weekly volume bars over `1W` is a chart
+  /// of one bar, so that screen passes the three that are charts.
+  ///
+  /// A subset rather than a per-screen control: the chips, the year picker and
+  /// the sheet stay one component, so a screen cannot quietly grow a second
+  /// range control with different spacing (THEME → Charts).
+  final List<ChartRange> ranges;
 
   /// Years there is something to look at, newest first. A picker offering 2019
   /// to a log that starts in 2024 is a list of empty charts.
@@ -90,7 +100,7 @@ class TrendRangeBar extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final r in ChartRange.values) ...[
+          for (final r in ranges) ...[
             AppChip(
               label: r.label,
               selected: window.range == r,
@@ -115,9 +125,30 @@ class TrendRangeBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: false,
+      // The sheet keeps itself inside the system's insets rather than relying
+      // on the one inside it: `isScrollControlled` lets a long list grow to the
+      // full height of the *window*, which on an edge-to-edge Android is taller
+      // than the screen you can see.
+      useSafeArea: true,
+      // And it never takes the whole of it. Twenty years of training is a list
+      // longer than a phone, and a sheet that fills the screen is a screen
+      // wearing a sheet's clothes — the barrier above it is what says this is a
+      // question you can dismiss.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+      ),
       builder: (sheet) => AppSheet(
         title: 'Which year?',
-        contentPadding: const EdgeInsets.only(bottom: Space.md),
+        // The default padding, minus the top the header already provides. It
+        // used to pass `only(bottom:)`, which drops the sheet's side gutter as
+        // well — the rows then ran edge to edge while every other sheet's did
+        // not.
+        contentPadding: const EdgeInsets.fromLTRB(
+          Space.gutter,
+          0,
+          Space.gutter,
+          Space.lg,
+        ),
         children: [
           for (final year in years)
             AppRow(

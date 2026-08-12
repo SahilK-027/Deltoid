@@ -357,6 +357,16 @@ heading itself goes in the trailing slot, on the title's line.
 
 ### Sheets — the default for any choice
 
+**A sheet reserves the gesture bar itself, and `SafeArea` is not how.** A modal
+bottom sheet's route consumes the bottom padding before its builder runs, so a
+`SafeArea` inside sees zero and adds nothing — every sheet in the app had its
+last row under the system navigation bar, and only the one call site passing
+`useSafeArea: true` escaped it. `AppSheet` reserves `viewPadding.bottom`
+instead, and takes **the larger** of that and `viewInsets.bottom` rather than
+the sum: with the keyboard up the gesture bar is behind it, and adding both
+lifts the sheet off the keyboard by the height of a bar nobody can see.
+
+
 `surface`, top radius 24, our own drag handle 36×4 eight points from the top.
 Header row: **bold `title` centred, ✕ on the right** in a 48 tap target, with a
 full-width hairline under it. Then rows.
@@ -471,6 +481,21 @@ Dashes are for a card that has a reason to exist and one missing figure.
 sparkline → hairline → `value` + unit + chevron. The zero state keeps the whole
 layout and prints `——` where the value goes, so a grid stays a grid.
 
+**The number outranks the name**, and it is the tile's whole premise: `title` is
+16 and `value` is 22, so the name reads as the label of a figure rather than the
+heading of a card. A screen where the name should lead is a screen of rows, not
+of tiles.
+
+**Two to a row, and they match without being measured.** Every tile is the same
+shape — one line of title, one of caption, a fixed chart, one figure — so a row
+is `CrossAxisAlignment.start` and nothing else. `stretch` inside a scrolling
+list asks for an infinite height and throws; `IntrinsicHeight` works and lays
+the whole subtree out a second time to discover what the tiles already agree on.
+
+**The caption is the tile's readout.** It names the span at rest — what the
+chart is scaled against and how many periods it covers — and names the period
+under your finger while the chart is being scrubbed.
+
 ### Charts
 
 **There is one chart and one range control**, and both are shared. A plot
@@ -492,6 +517,63 @@ widget you write per screen.
   series colour. Sparklines drop the axes entirely.
 - **Markers only while they mark something.** Past roughly 40 points the circles
   touch and the line is lost inside them; drop them and offer zoom instead.
+- **A bucket is a bar, not a point on a line.** A line between two weeks claims
+  the value between them means something, and weekly set counts have no between
+  — you did eleven that week and nine the next. Bars carry a *count over a
+  period*; the line carries a measurement taken at a moment.
+- **A bar's gap is a share of its slot, never a constant.** At thirteen bars a
+  fixed 2pt gap is a quarter of each column and reads as separation; at
+  fifty-two it is three quarters of it, and the chart becomes a grey band with
+  hairlines drawn on it. Below roughly four points of slot the bars simply
+  meet, and the corner radius goes with the gap — a 2pt radius on a 2pt bar is
+  a lozenge.
+- **A week that was trained never draws as a week that was not.** A bar rounded
+  from a real count to zero pixels is the chart contradicting the data; clamp it
+  to a point of ink.
+- **Changing a chart's range zooms it; it does not cut to the new one.** Every
+  range ends today, so the motion is anchored on the **right edge**: widening
+  from three months to a year is stepping back from the same wall — the weeks
+  you were looking at stay put and more arrive on the left. Scaling about the
+  centre slides this week sideways, and this week is the bar the eye is holding.
+  Both the bar pitch and the value scale interpolate; weeks that were off-screen
+  fade in rather than arriving fully drawn.
+- **Only a change of range animates.** New data in the same range moves a bar
+  and nothing else — animating a zoom when a set is ticked makes logging a set
+  look like navigating somewhere.
+- **Axis furniture cross-fades, it does not travel.** Gridlines and month labels
+  belong to a scale that was replaced, not moved: `Jul` cannot slide to where
+  `Jan` is, and a gridline that snaps under moving bars reads as a glitch. Swap
+  them under the motion at the same duration.
+- **Many bars are one painter, not many boxes.** Fifty-two weeks across six
+  tiles is three hundred render objects laid out and composited to draw what is
+  a single path.
+- **A bar chart's empty bar keeps its slot**, drawn as the full-height
+  `heatEmpty` track. It is the same absence a rest day is on the heatmap, and a
+  skipped week that closes up is a skipped week you cannot see.
+- **A gridline is `border` on `surface` only.** Over a lighter fill —
+  `heatEmpty`, `surfaceHighest` — `border` is *darker* than what it crosses and
+  reads as a scratch rather than a rule. Use `textTertiary` there, or drop the
+  line: a figure printed under the chart usually says it better.
+- **A chart read by touch names the value in its caption, not in a tooltip.** On
+  a card half a phone wide, a tooltip covers the chart it is describing. The
+  caption is already the line saying what the chart is of, so it is the line
+  that says which week you are on.
+- **A sparkline may omit its scale; a chart you navigated to may not.** The
+  small version is read as a shape among siblings, so it carries no axis and no
+  figure beyond the one under it. The full-size one is the answer to "how much",
+  and it states a y axis in the unit counted and calendar labels under the
+  baseline. Printing `peak 21` beside a sparkline instead is a fact about the
+  drawing rather than about the training, and reads as neither.
+- **A bar chart's y axis is anchored at zero and snapped to a round step** — 2s,
+  5s, 10s — with the maximum at or above the peak so the tallest bar sits under
+  the top gridline rather than over it. This is the opposite of the trend
+  chart's rule, and for the opposite reason: there, zero is not in the data and
+  anchoring flattens a year of bodyweight; here, a week you skipped *is* zero
+  and has to sit on the baseline.
+- **Scrub, don't tap, once the bars are thin.** A year is 52 bars across a
+  phone; nothing that narrow is a target. One horizontal drag over the plot
+  moves the readout, and it stays out of the list's way because a drag has to
+  clear `kTouchSlop` to claim the gesture.
 - **Zoom is horizontal only.** Time is the axis with too much in it; scaling the
   value axis makes the same progress look like whatever you last pinched.
 - **A point the metric cannot score is not a zero** — it is left out.

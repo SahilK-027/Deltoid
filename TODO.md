@@ -8,7 +8,7 @@ This file carries status and nothing else. Why a feature is shaped the way it is
 belongs in [THEME.md](THEME.md), and the rules it must not break belong in
 [RULES.md](RULES.md).
 
-The app currently has **448 tests** and is analyzer clean.
+The app currently has **485 tests** and is analyzer clean.
 
 ---
 
@@ -77,6 +77,24 @@ The app currently has **448 tests** and is analyzer clean.
       view behind it, drawing a year per `CustomPaint`.
 - [x] Weekly muscle volume shows six region rows under the heatmap, counted in
       SQL, with arms and legs folding open onto their own muscles.
+- [x] Volume history answers the question the rolling week cannot: a screen of
+      six stat tiles, one bar per week, opened from that card exactly as the
+      all-time heatmap opens from the one above it. Averages divide by every
+      week in the span including the empty ones, each tile scales to its own
+      peak, and scrubbing the bars names the week in the caption. A region opens
+      onto its own muscles, so a year of neglected hamstrings is visible rather
+      than buried in a leg total. `1M / 3M / 1Y` plus the year picker — never
+      "all time", which is a decade squashed into a phone's width.
+- [x] A region opens onto a full-size chart with a y axis and months under the
+      baseline, three figures the average cannot state on its own (total, best
+      week, weeks trained of weeks in the span), and **which movements produced
+      the sets**, with each one's share. That last section is what a region with
+      one muscle has instead of a split: Back cannot ask quads-versus-hamstrings
+      but it can ask why eleven of its sets were pulldowns.
+- [x] `workout_exercises.muscle` snapshots what a movement trained at the moment
+      it was logged, so refiling an exercise in the catalog no longer rewrites
+      every week it ever appeared in. Nullable, and null means "logged before
+      the column existed, ask the catalog" — not `other`.
 - [x] The bodyweight log is one tap from Settings, groups by month with deltas,
       has its own trend, and is interpolated into every bodyweight lift's score.
 
@@ -120,9 +138,9 @@ is used and by what shared pieces it forced into existence.
 
 ### Not yet driven on the device
 
-Four things are built, analyzer clean and tested, but have not yet been used in
-a gym: the weekly volume bars, the muscle chips, isometric holds and the hold
-pad. Five more have never been verified on real hardware at all: the rest tone,
+Five things are built, analyzer clean and tested, but have not yet been used in
+a gym: the weekly volume bars, the volume history screens, the muscle chips,
+isometric holds and the hold pad. Five more have never been verified on real hardware at all: the rest tone,
 the haptics, the wakelock, audio ducking and the share sheet. Newest and least
 driven: the ongoing session notification and the scheduled rest alarm — the
 notification permission prompt, the countdown on the lock screen and the alarm

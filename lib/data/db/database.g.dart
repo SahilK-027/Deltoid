@@ -4622,6 +4622,15 @@ class $WorkoutExercisesTable extends WorkoutExercises
         defaultValue: const Constant('none'),
       ).withConverter<SkipReason>($WorkoutExercisesTable.$converterskipReason);
   @override
+  late final GeneratedColumnWithTypeConverter<MuscleGroup?, String> muscle =
+      GeneratedColumn<String>(
+        'muscle',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<MuscleGroup?>($WorkoutExercisesTable.$convertermusclen);
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     updatedAt,
@@ -4634,6 +4643,7 @@ class $WorkoutExercisesTable extends WorkoutExercises
     targetSets,
     notes,
     skipReason,
+    muscle,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4765,6 +4775,12 @@ class $WorkoutExercisesTable extends WorkoutExercises
           data['${effectivePrefix}skip_reason'],
         )!,
       ),
+      muscle: $WorkoutExercisesTable.$convertermusclen.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}muscle'],
+        ),
+      ),
     );
   }
 
@@ -4775,6 +4791,10 @@ class $WorkoutExercisesTable extends WorkoutExercises
 
   static JsonTypeConverter2<SkipReason, String, String> $converterskipReason =
       const EnumNameConverter<SkipReason>(SkipReason.values);
+  static JsonTypeConverter2<MuscleGroup, String, String> $convertermuscle =
+      const EnumNameConverter<MuscleGroup>(MuscleGroup.values);
+  static JsonTypeConverter2<MuscleGroup?, String?, String?> $convertermusclen =
+      JsonTypeConverter2.asNullable($convertermuscle);
 }
 
 class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
@@ -4789,6 +4809,23 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
   final int targetSets;
   final String? notes;
   final SkipReason skipReason;
+
+  /// The muscle this movement trained, copied at the moment it was logged.
+  ///
+  /// The snapshot rule applied to a column that used to be read live. Weekly
+  /// volume counted sets through a join onto `exercises.muscle`, which is fine
+  /// over seven days and dishonest over years: recategorising one movement in
+  /// the catalog silently rewrote every week it ever appeared in, and a chart
+  /// of "sets per muscle since 2026" would redraw itself because you fixed a
+  /// label today. What you trained in March is a fact about March.
+  ///
+  /// **Nullable, and null is not [MuscleGroup.other].** Null means the row was
+  /// logged before this column existed and the catalog is the best answer we
+  /// have; readers fall back to `exercises.muscle` for exactly those rows
+  /// (`_muscleOfLog` in `training_repository.dart`). Defaulting to `other`
+  /// instead would have been a value the app invented, and `other` belongs to
+  /// no region — every pre-existing set would have quietly left the chart.
+  final MuscleGroup? muscle;
   const WorkoutExercise({
     required this.id,
     required this.updatedAt,
@@ -4801,6 +4838,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     required this.targetSets,
     this.notes,
     required this.skipReason,
+    this.muscle,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4824,6 +4862,11 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
         $WorkoutExercisesTable.$converterskipReason.toSql(skipReason),
       );
     }
+    if (!nullToAbsent || muscle != null) {
+      map['muscle'] = Variable<String>(
+        $WorkoutExercisesTable.$convertermusclen.toSql(muscle),
+      );
+    }
     return map;
   }
 
@@ -4844,6 +4887,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           ? const Value.absent()
           : Value(notes),
       skipReason: Value(skipReason),
+      muscle: muscle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(muscle),
     );
   }
 
@@ -4866,6 +4912,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       skipReason: $WorkoutExercisesTable.$converterskipReason.fromJson(
         serializer.fromJson<String>(json['skipReason']),
       ),
+      muscle: $WorkoutExercisesTable.$convertermusclen.fromJson(
+        serializer.fromJson<String?>(json['muscle']),
+      ),
     );
   }
   @override
@@ -4885,6 +4934,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       'skipReason': serializer.toJson<String>(
         $WorkoutExercisesTable.$converterskipReason.toJson(skipReason),
       ),
+      'muscle': serializer.toJson<String?>(
+        $WorkoutExercisesTable.$convertermusclen.toJson(muscle),
+      ),
     };
   }
 
@@ -4900,6 +4952,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     int? targetSets,
     Value<String?> notes = const Value.absent(),
     SkipReason? skipReason,
+    Value<MuscleGroup?> muscle = const Value.absent(),
   }) => WorkoutExercise(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -4912,6 +4965,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     targetSets: targetSets ?? this.targetSets,
     notes: notes.present ? notes.value : this.notes,
     skipReason: skipReason ?? this.skipReason,
+    muscle: muscle.present ? muscle.value : this.muscle,
   );
   WorkoutExercise copyWithCompanion(WorkoutExercisesCompanion data) {
     return WorkoutExercise(
@@ -4934,6 +4988,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       skipReason: data.skipReason.present
           ? data.skipReason.value
           : this.skipReason,
+      muscle: data.muscle.present ? data.muscle.value : this.muscle,
     );
   }
 
@@ -4950,7 +5005,8 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           ..write('orderIndex: $orderIndex, ')
           ..write('targetSets: $targetSets, ')
           ..write('notes: $notes, ')
-          ..write('skipReason: $skipReason')
+          ..write('skipReason: $skipReason, ')
+          ..write('muscle: $muscle')
           ..write(')'))
         .toString();
   }
@@ -4968,6 +5024,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     targetSets,
     notes,
     skipReason,
+    muscle,
   );
   @override
   bool operator ==(Object other) =>
@@ -4983,7 +5040,8 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           other.orderIndex == this.orderIndex &&
           other.targetSets == this.targetSets &&
           other.notes == this.notes &&
-          other.skipReason == this.skipReason);
+          other.skipReason == this.skipReason &&
+          other.muscle == this.muscle);
 }
 
 class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
@@ -4998,6 +5056,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
   final Value<int> targetSets;
   final Value<String?> notes;
   final Value<SkipReason> skipReason;
+  final Value<MuscleGroup?> muscle;
   final Value<int> rowid;
   const WorkoutExercisesCompanion({
     this.id = const Value.absent(),
@@ -5011,6 +5070,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     this.targetSets = const Value.absent(),
     this.notes = const Value.absent(),
     this.skipReason = const Value.absent(),
+    this.muscle = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WorkoutExercisesCompanion.insert({
@@ -5025,6 +5085,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     this.targetSets = const Value.absent(),
     this.notes = const Value.absent(),
     this.skipReason = const Value.absent(),
+    this.muscle = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : workoutId = Value(workoutId),
        exerciseId = Value(exerciseId),
@@ -5041,6 +5102,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     Expression<int>? targetSets,
     Expression<String>? notes,
     Expression<String>? skipReason,
+    Expression<String>? muscle,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5055,6 +5117,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
       if (targetSets != null) 'target_sets': targetSets,
       if (notes != null) 'notes': notes,
       if (skipReason != null) 'skip_reason': skipReason,
+      if (muscle != null) 'muscle': muscle,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5071,6 +5134,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     Value<int>? targetSets,
     Value<String?>? notes,
     Value<SkipReason>? skipReason,
+    Value<MuscleGroup?>? muscle,
     Value<int>? rowid,
   }) {
     return WorkoutExercisesCompanion(
@@ -5085,6 +5149,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
       targetSets: targetSets ?? this.targetSets,
       notes: notes ?? this.notes,
       skipReason: skipReason ?? this.skipReason,
+      muscle: muscle ?? this.muscle,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5127,6 +5192,11 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
         $WorkoutExercisesTable.$converterskipReason.toSql(skipReason.value),
       );
     }
+    if (muscle.present) {
+      map['muscle'] = Variable<String>(
+        $WorkoutExercisesTable.$convertermusclen.toSql(muscle.value),
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5147,6 +5217,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
           ..write('targetSets: $targetSets, ')
           ..write('notes: $notes, ')
           ..write('skipReason: $skipReason, ')
+          ..write('muscle: $muscle, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10701,6 +10772,7 @@ typedef $$WorkoutExercisesTableCreateCompanionBuilder =
       Value<int> targetSets,
       Value<String?> notes,
       Value<SkipReason> skipReason,
+      Value<MuscleGroup?> muscle,
       Value<int> rowid,
     });
 typedef $$WorkoutExercisesTableUpdateCompanionBuilder =
@@ -10716,6 +10788,7 @@ typedef $$WorkoutExercisesTableUpdateCompanionBuilder =
       Value<int> targetSets,
       Value<String?> notes,
       Value<SkipReason> skipReason,
+      Value<MuscleGroup?> muscle,
       Value<int> rowid,
     });
 
@@ -10833,6 +10906,12 @@ class $$WorkoutExercisesTableFilterComposer
   ColumnWithTypeConverterFilters<SkipReason, SkipReason, String>
   get skipReason => $composableBuilder(
     column: $table.skipReason,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<MuscleGroup?, MuscleGroup, String>
+  get muscle => $composableBuilder(
+    column: $table.muscle,
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
@@ -10962,6 +11041,11 @@ class $$WorkoutExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get muscle => $composableBuilder(
+    column: $table.muscle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$WorkoutsTableOrderingComposer get workoutId {
     final $$WorkoutsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -11051,6 +11135,9 @@ class $$WorkoutExercisesTableAnnotationComposer
         column: $table.skipReason,
         builder: (column) => column,
       );
+
+  GeneratedColumnWithTypeConverter<MuscleGroup?, String> get muscle =>
+      $composableBuilder(column: $table.muscle, builder: (column) => column);
 
   $$WorkoutsTableAnnotationComposer get workoutId {
     final $$WorkoutsTableAnnotationComposer composer = $composerBuilder(
@@ -11169,6 +11256,7 @@ class $$WorkoutExercisesTableTableManager
                 Value<int> targetSets = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<SkipReason> skipReason = const Value.absent(),
+                Value<MuscleGroup?> muscle = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutExercisesCompanion(
                 id: id,
@@ -11182,6 +11270,7 @@ class $$WorkoutExercisesTableTableManager
                 targetSets: targetSets,
                 notes: notes,
                 skipReason: skipReason,
+                muscle: muscle,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11197,6 +11286,7 @@ class $$WorkoutExercisesTableTableManager
                 Value<int> targetSets = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<SkipReason> skipReason = const Value.absent(),
+                Value<MuscleGroup?> muscle = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutExercisesCompanion.insert(
                 id: id,
@@ -11210,6 +11300,7 @@ class $$WorkoutExercisesTableTableManager
                 targetSets: targetSets,
                 notes: notes,
                 skipReason: skipReason,
+                muscle: muscle,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

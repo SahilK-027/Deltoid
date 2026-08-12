@@ -2290,5 +2290,183 @@ void main() {
       final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
       expect(counts[logged.muscle] ?? 0, 0);
     });
+
+    test('the muscle is snapshotted onto the logged row', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final detail = await repo.workoutDetail(id);
+      final entry = detail!.entries.first;
+
+      expect(
+        entry.workoutExercise.muscle,
+        entry.exercise.muscle,
+        reason: 'the row carries its own answer, not a pointer to the catalog',
+      );
+    });
+
+    test('refiling an exercise does not rewrite what it trained in March',
+        () async {
+      // The reason the snapshot exists. Weekly volume used to count through a
+      // join onto `exercises.muscle`, so correcting a movement's category today
+      // silently redrew every week it had ever appeared in.
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      final detail = await repo.workoutDetail(id);
+      final exerciseId = detail!.entries.first.exercise.id;
+      // Anything the movement is definitely not.
+      final refiled = logged.muscle == MuscleGroup.calves
+          ? MuscleGroup.core
+          : MuscleGroup.calves;
+      await (db.update(db.exercises)..where((t) => t.id.equals(exerciseId)))
+          .write(ExercisesCompanion(muscle: Value(refiled)));
+
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[logged.muscle], logged.sets);
+      expect(counts[refiled] ?? 0, 0);
+    });
+
+    test('a row logged before the column falls back to the catalog', () async {
+      // What a restore from an older backup lands: no snapshot on the row, and
+      // the catalog is the best answer there is. Null must not read as `other`,
+      // which belongs to no region and would drop the sets from every chart.
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      await db.customStatement(
+        'UPDATE workout_exercises SET muscle = NULL',
+      );
+
+      final counts = await repo.setsByMuscleSince(dayKeyOf(DateTime.now()));
+      expect(counts[logged.muscle], logged.sets);
+    });
+
+    test('daily counts carry the day, and agree with the rolling window',
+        () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      final today = dayKeyOf(DateTime.now());
+      final daily = await repo.setsByMuscleDaily(
+        fromDayKey: today,
+        toDayKey: today,
+      );
+      final row = daily.firstWhere((r) => r.muscle == logged.muscle);
+
+      expect(row.dayKey, today);
+      expect(row.sets, logged.sets);
+      // Same filters, same definition of a hard set — the two screens cannot
+      // disagree about the same week.
+      final rolling = await repo.setsByMuscleSince(today);
+      expect(row.sets, rolling[logged.muscle]);
+    });
+
+    test('the daily range is a bound, not a suggestion', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+        at: DateTime.now().subtract(const Duration(days: 40)),
+      );
+      await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      final today = dayKeyOf(DateTime.now());
+      expect(
+        await repo.setsByMuscleDaily(fromDayKey: today, toDayKey: today),
+        isEmpty,
+      );
+      expect(
+        await repo.setsByMuscleDaily(
+          fromDayKey: dayKeyOf(
+            DateTime.now().subtract(const Duration(days: 90)),
+          ),
+          toDayKey: today,
+        ),
+        isNotEmpty,
+      );
+    });
+
+    test('the movements behind a region add up to it', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+      );
+      final logged = await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      final today = dayKeyOf(DateTime.now());
+      final byExercise = await repo.setsByExercise(
+        fromDayKey: today,
+        toDayKey: today,
+        muscles: [logged.muscle],
+      );
+
+      expect(byExercise, hasLength(1));
+      expect(byExercise.single.sets, logged.sets);
+      expect(byExercise.single.name, isNotEmpty);
+
+      // The parts are the whole: a breakdown that does not sum to the total
+      // above it is two different counts on one screen.
+      final rolling = await repo.setsByMuscleSince(today);
+      expect(
+        byExercise.fold(0, (s, r) => s + r.sets),
+        rolling[logged.muscle],
+      );
+    });
+
+    test('a region nobody trained has no movements behind it', () async {
+      final today = dayKeyOf(DateTime.now());
+      expect(
+        await repo.setsByExercise(
+          fromDayKey: today,
+          toDayKey: today,
+          muscles: const [],
+        ),
+        isEmpty,
+      );
+    });
+
+    test('the first logged day is where the year picker starts', () async {
+      expect(await repo.firstLoggedDayKey(), isNull);
+
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final old = DateTime.now().subtract(const Duration(days: 400));
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: push1.id,
+        at: old,
+      );
+      await tickFirstExercise(id);
+      await repo.completeWorkout(id);
+
+      expect(await repo.firstLoggedDayKey(), dayKeyOf(old));
+    });
   });
 }
