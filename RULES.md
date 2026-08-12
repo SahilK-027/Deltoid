@@ -181,7 +181,17 @@ version 5 added `regimes.identity_index`, version 6 indexed
 
 **Pure logic lives in `lib/domain/`** and is tested without a database. Extend
 those tests whenever behaviour changes, because that is where a rule is actually
-held.
+held. Domain files take **plain values, never a drift row** — that is what keeps
+them testable without a database.
+
+**Anything that turns data into a string is domain, not a screen.** A formatter
+written where it is first needed gets copied to the second screen that needs it,
+and the copies then drift silently: `_load` in workout detail and `_loadLabel`
+in exercise history were byte-identical, while the two functions picking a day's
+top set disagreed about every hold ever logged — one ranked by weight, the other
+by duration, and both carried a comment claiming they matched. `formatWeight`
+had likewise settled in `history_screen.dart`, so six screens imported a screen
+to render a number. `lib/domain/set_format.dart` is where these live.
 
 **Never watch a constant query.** The "invalidate on write" trick —
 `db.customSelect('SELECT 1', readsFrom: {…}).watch()` — emits **once** and then
@@ -297,8 +307,8 @@ The design system is [THEME.md](THEME.md), and it decides everything visual:
 the tokens, the type roles, the component vocabulary, and the six rules that
 settle a close call. Read it before drawing anything.
 
-Three rules belong here rather than there, because breaking them breaks
-behaviour rather than looks:
+These belong here rather than there, because breaking them breaks behaviour
+rather than looks:
 
 - **The log screen owns the horizontal axis.** It is a `PageView` with one
   exercise per page. The set row is the single exception, and only to uncover
