@@ -177,11 +177,11 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// Red has no entry: `negative` is the one signal that must never be mistaken
   /// for information, and it stays out of the palette everything else is drawn
   /// from.
-  static const orange = Color(0xFFFF8B66);
+  static const orange = Color(0xFFFF8660);
   static const blue = Color(0xFF689FFA);
-  static const yellow = Color(0xFFFDD35F);
+  static const yellow = Color(0xFFFFD15E);
   static const green = Color(0xFF5DBA86);
-  static const lavender = Color(0xFFBE8CFF);
+  static const lavender = Color(0xFFB28DF7);
   static const cyan = Color(0xFF77D4E3);
 
   /// The one red, for the one thing red means — and the one place a hue is

@@ -99,8 +99,8 @@ The ramp inverts; it is never tinted. `bg #F4F4F4` · `surface #FFFFFF` ·
 
 ### The hues
 
-**Six, plus one red.** `orange #FF8B66` · `blue #689FFA` · `yellow #FDD35F` ·
-`green #5DBA86` · `lavender #BE8CFF` · `cyan #77D4E3`, and `red #F83446`.
+**Six, plus one red.** `orange #FF8660` · `blue #689FFA` · `yellow #FFD15E` ·
+`green #5DBA86` · `lavender #B28DF7` · `cyan #77D4E3`, and `red #F83446`.
 
 They are named on `DeltoidColors` and referenced by name. **Never write a hex at
 a call site**: a chart series, a regime's mark and the deload orange have to be
@@ -151,7 +151,7 @@ Two rules keep those from colliding:
 
 ### A filled mark's glyph is its own hue, taken down
 
-Not white, not black. `#FF8B66` carries `#9E2600`; `#5DBA86` carries `#275C3E`.
+Not white, not black. `#FF8660` carries `#9E2600`; `#5DBA86` carries `#275C3E`.
 A tile is one colour with a shape cut out of it, and a white or black shape
 makes it two.
 

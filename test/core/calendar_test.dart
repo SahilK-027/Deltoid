@@ -160,7 +160,7 @@ void main() {
                   last: DateTime(2026, 8, 2),
                   marks: {
                     20260801: const Color(0xFF689FFA), // trained
-                    20260802: const Color(0xFFFF8B66), // deload
+                    20260802: const Color(0xFFFF8660), // deload
                   },
                 ),
                 child: const Text('open'),
@@ -186,7 +186,7 @@ void main() {
     expect(ringOn('1')?.top.color, const Color(0xFF689FFA));
     // The 2nd is also the selected day: the ring survives the fill, because
     // the ring is the only thing saying it was a deload.
-    expect(ringOn('2')?.top.color, const Color(0xFFFF8B66));
+    expect(ringOn('2')?.top.color, const Color(0xFFFF8660));
     // A day with nothing logged and no reason to be marked has no ring.
     expect(ringOn('5'), isNull);
   });
