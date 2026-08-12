@@ -69,8 +69,16 @@ is fully usable with the radio off, forever, whether or not anyone signs in.
 pending for an hour and that is the design working. The only thing that makes it
 worth mentioning is how long it has been true.
 
-There is no fourth state for "syncing right now". A spinner on a background job
-nobody is waiting for is a spinner that teaches the user to wait.
+There is no state for "syncing right now". A spinner on a background job nobody
+is waiting for is a spinner that teaches the user to wait.
+
+**One moment needs a message rather than a state: a new phone taken to the gym
+before it has ever had signal.** `Local`, nothing logged, and the history
+sitting on a server this phone cannot reach. Nothing can fix that until there is
+a network — but the app must not look like an install that lost everything. The
+empty state says the history is probably on an account this phone has not signed
+into yet, which is the difference between a user who waits and a user who
+reinstalls in a panic.
 
 ---
 
@@ -90,6 +98,14 @@ existing session works offline indefinitely; only a first launch could ever be
 blocked, and it is not. Declining is a real answer — see
 [THEME.md](THEME.md) for the screen and why the decline has equal standing on
 it.
+
+**No internet at first launch needs no special handling.** Sign-in fails, the
+app is used offline, and connecting later is the same Settings row every
+`Local` install already has. There is deliberately no remembered intent and no
+prompt that comes back when the network does: that is a flag, a listener bound
+to it and a decision about how often to reappear — which is a nag, and this app
+does not nag. The `Local` state is visible in Settings, and someone who wanted a
+backup and could not get one will go and get it.
 
 ### Why the anon key stops being a problem
 
@@ -312,9 +328,20 @@ history split across both. That last part is not cosmetic; it breaks the one
 thing the app exists for, because per-session progression is keyed to an
 exercise id.
 
-Deferring it removes the problem from the common path entirely. Sign in and pull
-and the catalog arrives from the account, already carrying the user's own notes
-and edits. Decline, or find the account empty, and it is seeded then.
+Deferring it removes the problem from the path where sign-in comes *before* use.
+Sign in and pull and the catalog arrives from the account, already carrying the
+user's own notes and edits. Decline, or find the account empty, and it is seeded
+then.
+
+**It does not remove the problem from the other order, which is the more likely
+one.** Installing with no signal, training offline for a month and signing in
+afterwards seeds a catalog locally first, and then meets an account whose
+catalog was seeded on another phone long ago — the same `starterKey`s under
+different ids. So **deduplicating on `starterKey` and repointing references is
+real work, not a rare case**, and it is the same work whether the second history
+arrives by push or by merge. Rows the user created themselves carry no
+`starterKey` and are never deduplicated by name: two exercises genuinely called
+`Cable fly` may be two different movements, and only the user knows.
 
 ### The three shapes
 

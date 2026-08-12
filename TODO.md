@@ -189,6 +189,13 @@ The shape, decided: **correct on any number of devices, live on
       - [ ] Settings: connect, state, last run, and the two sign-out doors.
       - [ ] Scheduling: debounced after writes, on resume, on connectivity, plus
             an idle backstop whose interval wants a real phone to choose it.
+            Needs `connectivity_plus` — the design says "on connectivity
+            regained" in three places and nothing in `pubspec.yaml` can detect
+            it.
+      - [ ] Catalog deduplication on `starterKey`, with references repointed.
+            Needed whenever a phone that has trained offline signs into an
+            account that already has a catalog, which is the ordinary
+            offline-first order — not a rare case.
 
 - [ ] **The migration ladder, as a prerequisite of sync rather than a
       consequence.** `schemaVersion` is 1 with no `onUpgrade`, which holds only
