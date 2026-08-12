@@ -111,14 +111,22 @@ class _TotalStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = overview?.sessions;
+    // An empty log says so in the eyebrow, and a `—— sessions` beside it is the
+    // same fact twice on one screen (rule 6). It also read as a black rule
+    // rather than as a pair of dashes once the light theme was driven: two em
+    // dashes at 22sp bold in `#111111` is a line, not a zero state.
+    //
+    // The dash still stands for a count that has not *arrived* — that one is a
+    // gap the next frame fills, not an absence the header already named.
+    if (overview != null && total == 0) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          // Nothing logged prints a dash, and so does a count that has not
-          // arrived yet — never a 0 that the next frame replaces.
-          total == null || total == 0
+          // A count that has not arrived prints a dash — never a 0 that the
+          // next frame replaces.
+          total == null
               ? '——'
               : NumberFormat.decimalPattern().format(total),
           style: context.t.displaySmall,

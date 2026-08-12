@@ -131,10 +131,20 @@ is used and by what shared pieces it forced into existence.
       no spinner anywhere there is already content on screen. The four things
       that actually cost frames were found by reading the code rather than by
       guessing, and all four are fixed.
-- [ ] **7 · Reconciliation** — the light theme has only been checked at token
-      level and needs driving on every screen, along with the empty states and
-      the motion. THEME.md gets corrected wherever the build taught us something
-      the original audit did not.
+- [ ] **7 · Reconciliation** — the light theme has now been driven on an
+      emulator across Workouts, Regimes, the exercise catalog, History and
+      Settings, all of them **empty**. What that confirmed: the neutral ramp
+      inverts without a tint, the primary action is black, and the six hues
+      appear only as fills — the catalog's muscle chips carry a coloured dot
+      with `textPrimary` text, which is the rule. What it found: History said
+      "nothing logged" twice, once in the eyebrow and once as a `——` that reads
+      as a black rule at 22sp in `#111111`.
+
+      **Still unchecked, and all of it needs a populated log**: chart lines
+      (`seriesPrimary` cyan measures 1.7:1 on a white card — the documented
+      risk, and the one most likely to be wrong), the heatmap ramp, the volume
+      bars, identity marks on a second regime, deload orange, and every screen
+      of the log itself. Motion has not been looked at in either theme.
 
 ### Not yet driven on the device
 
