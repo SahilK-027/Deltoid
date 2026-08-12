@@ -132,56 +132,44 @@ firing with the screen off have only been built, not felt.
 
 ## Left
 
-- [ ] **Supabase sync.** The one feature still outstanding. Scope-approved —
-      see [RULES.md § 6](RULES.md#6-scope) for what that decision does and does
-      not open. Needs the project URL and the anon key before anything can
-      connect, though the whole layer can be built and tested behind a seam
-      without them. Every table already carries the sync columns (`updatedAt`,
-      `deletedAt`, `deviceId` and `dirty`), so the local schema needs no
-      migration for it.
+- [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
+      document to read before writing any of it. Scope-approved and bounded by
+      [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to
+      take, not collaboration and not a feature.
 
-      **Four decisions come before code**, because each one changes the shape of
-      the layer and the last two are expensive to reverse:
+      Three of the four decisions that were open are now closed. **Identity** is
+      Google through Supabase Auth, which is also what makes the anon key
+      harmless — with RLS keyed to `auth.uid()` the key alone grants nothing.
+      **What syncs** is the nine `SyncColumns` tables and never `app_settings`.
+      **Conflict** is row-level last-write-wins on `updatedAt`, tie broken on
+      `deviceId`, both of which the audit made trustworthy. Only **concurrency**
+      is still open: `journal_mode` is `delete`, so a sync reader and a writer
+      serialise completely, and WAL trades a little durability to fix it.
 
-      - **Identity.** Supabase Auth with a real sign-in, or the anon key plus a
-        client-asserted `user_id`. The second has no login screen and no
-        security: the anon key ships inside the APK, so anyone who extracts it
-        can read and write that id's rows. Worth stating out loud before it is
-        chosen by default.
-      - **Merge granularity.** Whole-row last-write-wins is simplest and loses
-        concurrent edits to different fields of one set; column-level is right
-        for `set_logs` and overkill elsewhere.
-      - **What syncs.** The nine tables carrying `SyncColumns`, and never
-        `app_settings` — `device_id` in particular must stay on its device.
-      - **Concurrency.** `journal_mode` is `delete` today, so a sync reader and
-        a writer serialise completely; WAL fixes that and trades a little
-        durability. `busy_timeout` is 5 s, which a long restore exceeds while
-        holding the write lock.
+      **The local schema does not change.** `user_id` is server-side only,
+      attached from the session at push time. Nothing in `tables.dart` moves.
 
-      The data layer has been audited for it and the local half is done: every
-      invariant the repository held in Dart is now held by the database too, a
-      failed write is reported rather than dropped, `deviceId` is stamped on
-      every write rather than only on the insert, and `nowMs` cannot go
-      backwards. What is deliberately **not** built, because none of it means
-      anything until there is a server:
+      In build order, each piece landing on its own:
 
-      - `dirty` is written and never cleared, and nothing reads it. Every row in
-        the database is dirty, seeded catalog rows included, so a first push
-        would send all of it.
-      - `last_pull_at` and `user_id` are named in the `app_settings` doc comment
-        and written by nothing.
-      - There is no merge rule. Whole-row last-write-wins loses concurrent edits
-        to different fields of one set; which tables want column-level merging is
-        a decision to make before any code, not after.
-      - `updatedAt` is this phone's clock. It is monotonic within a run now, but
-        two devices still need a server's timestamp to agree.
-      - No update carries an `updatedAt` precondition, so a pull that lands
-        mid-edit overwrites silently in either direction.
-      - Two devices each seed the starter catalog independently and nothing keys
-        them together, so a first sync would duplicate it. `starterKey` is the
-        natural key and is not unique.
-      - `busy_timeout` is 5 s and a restore holds the write lock for longer than
-        that on a long history, so a second connection would fail against it.
+      - [ ] Migration ladder — the prerequisite below, before any of this ships.
+      - [ ] Supabase project: nine tables, `user_id`, RLS with `using` *and*
+            `with check` on every one. Needs the project URL and anon key.
+      - [ ] A `SyncClient` seam with a fake behind it, so push, pull, conflict
+            and adoption are all testable without a network or a credential.
+      - [ ] Push: drain `dirty`, parents first, idempotent upserts, and clear
+            `dirty` only against an unchanged `updatedAt`.
+      - [ ] Pull: `last_pull_at` cursor, LWW applier through the repositories,
+            tombstones as tombstones, a bad row skipped and named rather than
+            stopping the batch.
+      - [ ] Adoption: the three shapes at sign-in, and the prompt for the third
+            that exports the losing side before it overwrites anything.
+      - [ ] Sign-in on Google, session persisted, seen once.
+      - [ ] The welcome screen — the app's one illustrated page, drawn to
+            [THEME.md § Illustration](THEME.md), monochrome, with declining
+            given equal standing.
+      - [ ] Settings: connect, state, last run, and the two sign-out doors.
+      - [ ] Scheduling: debounced after writes, on resume, on connectivity, plus
+            an idle backstop whose interval wants a real phone to choose it.
 
 - [ ] **The migration ladder, as a prerequisite of sync rather than a
       consequence.** `schemaVersion` is 1 with no `onUpgrade`, which holds only

@@ -17,11 +17,12 @@ code and a stale one about the plan.
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **[RULES.md](RULES.md)**   | **Before changing anything.** Every invariant, the migration protocol, the traps already hit, and what is out of scope                                  |
 | **[THEME.md](THEME.md)**   | Before touching anything visual. The app screen by screen, and the language it is drawn in — don't invent a card, row, button or sheet that isn't in it |
+| **[SYNC.md](SYNC.md)**     | Before touching cloud backup. What syncs, what never does, how a conflict resolves, and the eight things sync may never do                              |
 | **[README.md](README.md)** | Setup, commands, project layout, how the layers fit                                                                                                     |
 | **[TODO.md](TODO.md)**     | What is done and what is left. Status lives there and nowhere else                                                                                      |
 
 This file holds no facts of its own. If anything here contradicts one of those
-four documents, the other document is the correct one.
+five documents, the other document is the correct one.
 
 ## The rules most easily broken
 

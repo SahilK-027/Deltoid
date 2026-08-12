@@ -429,6 +429,32 @@ toast, it is a sheet. **One at a time** — the queue is cleared on every one, a
 a second message means the first is in its way. A failure says so in `negative`
 text; nothing else uses colour here.
 
+### Illustration
+
+**One drawing, one screen, and only where a screen has nothing else to be.**
+Today that is the welcome screen and nowhere else. An illustration inside a
+working screen is decoration, and decoration is what rule 1 spends the whole
+colour system avoiding.
+
+- **A single continuous stroke**, hand-drawn rather than geometric — a barbell,
+  a figure mid-rep, a plate. Weight 2, round caps, round joins. It should look
+  drawn by a person and not by a vector tool.
+- **`textPrimary` on `surface`, and nothing else.** No fill, no second weight,
+  no shadow.
+- **Monochrome, including the accent.** This is the rule most likely to be
+  broken, because the obvious reference for the form — a line drawing with one
+  coloured dot resting on it — puts a hue into chrome. In this app a warm dot is
+  `deload`, an orange one is a light week, and a drawing that borrows either is
+  a drawing that means something it does not mean. If a point of emphasis is
+  wanted it is `accent`, which is white on dark and black on light, and it
+  inverts with the theme like everything else.
+- **It themes by inverting, not by having a light and a dark asset.** One path,
+  one colour token.
+- **Inline vector, not an image asset.** It has to take the theme colour at
+  build time and stay sharp at any size.
+- **Never load-bearing.** Nothing is only said by the drawing. Remove it and the
+  screen still reads.
+
 ### Empty states
 
 An outlined box: 1px `border`, radius 16, padding 20, muted glyph left, `body`
@@ -658,6 +684,32 @@ a menu dropped over the page has no room to say what an option *means*.
 **Creation is a sheet, or one screen. Never a wizard.** No illustrated intro, no
 progress bar, no "we will build you a plan" framing — the user is the planner.
 One question per sheet; if a second is genuinely required it is a second sheet.
+
+**The welcome screen is the one illustrated page, and it is not a wizard.** The
+rule above bans an illustrated intro in front of *creating something* — the
+regime flow, where a drawing would stand between the user and the thing they
+came to build. The welcome screen is a different object: one screen, one
+question, asked once, with the answer that skips it given equal standing on the
+page.
+
+It stays inside the rule as long as all of this is true:
+
+- **One screen, never two.** No carousel, no progress dots, no "next".
+- **One question**, and it is not about training. It is where the history is
+  kept, which is the only thing the app cannot infer.
+- **Declining is a real answer, not a delay.** `Use without an account` is a
+  plain text action directly under the primary — not greyed, not small print,
+  not a corner `Skip`. Choosing it is final and repairable: Settings offers the
+  same connection later, and nothing nags.
+- **Seen once.** Answered either way, it never appears again.
+- **It says what it will do before it asks.** The subtitle names the outcome —
+  a history that survives a lost phone — rather than the mechanism.
+
+The composition, top to bottom: the mark, the illustration, a `display` line, a
+`body` line under it, the primary button, an `OR` rule, the decline action.
+Centred, generous vertical space, everything inside the gutter. It is the only
+screen in the app with a centred `display` line, which is what makes it read as
+a threshold rather than as a page.
 Choice cards handle a genuinely branching decision: `surface` fill, radius 16,
 1px `border`, padding 16, icon left, `title`, one `body` line, radio right, and
 **a selected state that is a 2px border rather than a fill change**, so the card

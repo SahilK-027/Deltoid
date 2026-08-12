@@ -64,6 +64,18 @@ Never "simplify" this to a plain most-recent lookup.
 | **An enum column is checked in the database**                 | `textEnum` throws on a string no member answers to, and the throw takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a `CHECK … IN (…)`, written out by hand, and `schema_constraints_test` walks every member of every enum, so a value added to the enum and not to the column fails a test rather than a screen. |
 | **A number that cannot mean anything is refused at the column** | Deload percentages, rep ranges that run backwards, a `dayKey` of 0, a session that ended before it started, a set that is a leg of itself, a bodyweight of 850. Each was reachable only through a restore or a merged row — exactly the writer that does not pass the repository, and exactly what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke. |
 
+**Cloud backup has its own invariants, and they live in
+[SYNC.md § 13](SYNC.md#13-what-sync-may-never-do).** The four that are really
+about data rather than about protocol are repeated here, because this is the
+list people read:
+
+| Rule | Why |
+| ---- | --- |
+| **No screen waits on the network** | Offline-first is the architecture, not a stage. A read comes from local disk and a write returns when SQLite returns; the cloud is drained behind it. A screen that awaits a radio between a thumb and a set is the one change that cannot be walked back. |
+| **Two histories are never merged silently** | They share no ids, so a merge is not a reconciliation — it is a union claiming you trained twice as often as you did. `backup_service` already refuses this for restore; signing in asks the same question, with counts, and exports the losing side first. |
+| **Deletes stay tombstones** | A hard delete has no `deleted_at` to push and is resurrected by the next pull. Every delete in the app is already a tombstone; sync is the reason it had to be. |
+| **A pulled row is written through the repositories** | Same constraints, same transactions, same stamping as a typed one. A second write path is a second set of bugs, and it is the path with no screen watching it. |
+
 **Three levels of note, and they never leak into each other:**
 
 | Column                    | Scope                         | Written from           |
@@ -252,6 +264,14 @@ with another device is a server's job.
 once, so the column used to name the row's creator for the rest of its life —
 and it exists to break a same-millisecond tie between two devices, which it
 cannot do if both copies carry the same originating id.
+
+**`dirty` is cleared only against an unchanged `updatedAt`, and
+`last_pull_at` advances only after its batch commits.** Both are the same
+mistake in two directions: acknowledging work that has not landed. A row edited
+while its own push was in flight is still owed, and clearing it on the response
+strands that edit on the phone forever — invisibly, because nothing downstream
+ever looks at a row that is not dirty. A cursor advanced before the write loses
+every row in the batch it did not finish. See [SYNC.md](SYNC.md).
 
 **Never copy the project to keep an old version around.** No `old-*/` folders,
 no `*.bak`, no second checkout, no `git worktree` for "reference". Git holds
