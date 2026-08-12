@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 
+import '../../core/failure.dart';
+
 extension WatchTables on GeneratedDatabase {
   /// Re-runs [load] once immediately, then again after every write to [tables].
   ///
@@ -53,7 +55,19 @@ extension WatchTables on GeneratedDatabase {
         // first failure, which left the screen stuck on whatever it had:
         // a screen that can say "that went wrong" can also recover on the
         // next write.
-        if (!cancelled) controller.addError(error, stack);
+        //
+        // Announced as well as forwarded, and that is the half that reaches a
+        // person. The error does go down the stream — but every screen in this
+        // app reads its providers with `valueOrNull`, which maps an error to
+        // `null`, which every screen draws as its *loading* state. So a query
+        // that started failing was indistinguishable from one that was merely
+        // slow, forever, on a screen with nothing on it. Rebuilding fifty read
+        // sites around `AsyncValue.when` would be the thorough fix; saying so
+        // out loud at the one place that knows is the honest one.
+        if (!cancelled) {
+          reportFailure(error, stack, what: 'Some of this could not be loaded.');
+          controller.addError(error, stack);
+        }
       } finally {
         running = false;
       }

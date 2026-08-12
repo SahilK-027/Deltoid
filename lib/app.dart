@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -5,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/failure.dart';
 import 'core/providers.dart';
 import 'core/theme/theme.dart';
 import 'core/theme/tokens.dart';
 import 'core/widgets/scroll.dart';
+import 'core/widgets/toast.dart';
 import 'features/shell/app_shell.dart';
 import 'features/today/today_providers.dart';
 
@@ -42,9 +45,55 @@ class DeltoidApp extends ConsumerWidget {
         duration: Motion.fast,
         curve: Motion.curve,
       ),
-      home: const _Boot(),
+      home: const _FailureToasts(child: _Boot()),
     );
   }
+}
+
+/// Speaks the app's failures out loud.
+///
+/// Under `MaterialApp` rather than inside the shell, for two reasons: it needs
+/// the `ScaffoldMessenger` that `MaterialApp` builds, and the screen a write
+/// fails on is very often the log — which is pushed *over* the shell. A
+/// listener down in a tab would be silent for exactly the screen that writes
+/// most.
+///
+/// A toast rather than a dialog: this reports things that have already happened
+/// and that the user cannot act on from here, and the one rule a transient
+/// message has to obey is not standing in front of the next set (THEME →
+/// Toast).
+class _FailureToasts extends StatefulWidget {
+  const _FailureToasts({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FailureToasts> createState() => _FailureToastsState();
+}
+
+class _FailureToastsState extends State<_FailureToasts> {
+  StreamSubscription<AppFailure>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = failures.listen((failure) {
+      if (!mounted) return;
+      // The messenger, not the context, and read at the moment of the failure:
+      // whatever route is on top is the one that should carry the message.
+      showToastOn(ScaffoldMessenger.of(context), failure.what,
+          destructive: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Blocks first paint until the schema exists, the starting catalog is seeded
