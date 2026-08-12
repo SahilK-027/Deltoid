@@ -44,10 +44,10 @@ class HistoryScreen extends ConsumerWidget {
               // underneath. Stacked flush left it left the right half of the
               // band empty, which is what made it read as unfinished rather
               // than spare.
-              eyebrow: _span(overview),
+              eyebrow: _eyebrow(overview),
               // Without the eyebrow the title is the first line under the
               // status bar, and 12 leaves it sitting on the notch (THEME → Space).
-              topGap: _span(overview) == null ? Space.xxl : Space.md,
+              topGap: _eyebrow(overview) == null ? Space.xxl : Space.md,
               belowGap: Space.lg,
               actions: [_TotalStat(overview: overview)],
               below: SegmentedPill<HistoryView>(
@@ -76,6 +76,19 @@ class HistoryScreen extends ConsumerWidget {
   /// `SINCE MARCH 2024` — but only once there is a span to state. A history one
   /// day old printed "since July 2026", which is the same dishonesty as the
   /// sessions-per-week rate that divided by three weeks that hadn't happened.
+  /// The line above the title.
+  ///
+  /// An empty log says so rather than dropping the line: without it the title
+  /// is the first thing under the status bar, and the one screen state where
+  /// you most need telling what you are looking at was the one state that said
+  /// the least. Null while the count is still in flight — a line that appears
+  /// a frame later is the staged reveal this app avoids.
+  static String? _eyebrow(HistoryOverview? overview) {
+    if (overview == null) return null;
+    if (overview.firstDayKey == null) return 'Nothing logged';
+    return _span(overview);
+  }
+
   static String? _span(HistoryOverview? overview) {
     if (overview == null || !overview.spansMonths) return null;
     final first = dateFromDayKey(overview.firstDayKey!);
