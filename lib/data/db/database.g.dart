@@ -5239,6 +5239,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     'set_index',
     aliasedName,
     false,
+    check: () => ComparableExpr(setIndex).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
@@ -5258,6 +5259,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     'weight',
     aliasedName,
     true,
+    check: () => ComparableExpr(weight).isBiggerOrEqualValue(0),
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
@@ -5267,6 +5269,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     'reps',
     aliasedName,
     true,
+    check: () => ComparableExpr(reps).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -5278,6 +5281,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     'partial_reps',
     aliasedName,
     true,
+    check: () => ComparableExpr(partialReps).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -5289,6 +5293,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     'added_weight',
     aliasedName,
     true,
+    check: () => ComparableExpr(addedWeight).isBiggerOrEqualValue(0),
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
@@ -5599,7 +5604,12 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   final SetType setType;
 
   /// As entered. Interpretation depends on the exercise's [LoadMode].
+  ///
+  /// Never negative. Assisted movements are a [LoadMode], not a minus sign —
+  /// a negative load here would be scored, charted and compared as one.
   final double? weight;
+
+  /// Reps, or seconds when the exercise is measured as a hold.
   final int? reps;
 
   /// Reps that did not finish the range of motion, counted apart from [reps].
@@ -6236,6 +6246,7 @@ class $BodyweightLogsTable extends BodyweightLogs
     'weight_kg',
     aliasedName,
     false,
+    check: () => ComparableExpr(weightKg).isBiggerThanValue(0),
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
@@ -6357,6 +6368,9 @@ class BodyweightLog extends DataClass implements Insertable<BodyweightLog> {
   final String deviceId;
   final bool dirty;
   final int dayKey;
+
+  /// A bodyweight of zero is not a light reading, it is a missing one — and it
+  /// divides into every bodyweight-scored lift on the day it lands.
   final double weightKg;
   const BodyweightLog({
     required this.id,

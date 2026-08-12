@@ -201,4 +201,52 @@ void main() {
         await db.customSelect('PRAGMA busy_timeout').getSingle();
     expect(row.data.values.first, 5000);
   });
+
+  test('a negative load is refused', () async {
+    final we = await aWorkoutExercise(await aRegime());
+    await expectLater(
+      db.into(db.setLogs).insert(SetLogsCompanion.insert(
+            id: Value(newId()),
+            workoutExerciseId: we,
+            setIndex: 0,
+            weight: const Value(-60),
+          )),
+      throwsA(isA<SqliteException>()),
+      reason: 'assistance is a LoadMode, not a minus sign',
+    );
+  });
+
+  test('negative reps are refused', () async {
+    final we = await aWorkoutExercise(await aRegime());
+    await expectLater(
+      db.into(db.setLogs).insert(SetLogsCompanion.insert(
+            id: Value(newId()),
+            workoutExerciseId: we,
+            setIndex: 0,
+            reps: const Value(-1),
+          )),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test('a zero weight is not a bodyweight reading', () async {
+    await expectLater(
+      db.into(db.bodyweightLogs).insert(BodyweightLogsCompanion.insert(
+          id: Value(newId()), dayKey: 20260202, weightKg: 0)),
+      throwsA(isA<SqliteException>()),
+      reason: 'zero divides into every bodyweight-scored lift that day',
+    );
+  });
+
+  test('zero is still a legal load and a legal rep count', () async {
+    final we = await aWorkoutExercise(await aRegime());
+    await db.into(db.setLogs).insert(SetLogsCompanion.insert(
+          id: Value(newId()),
+          workoutExerciseId: we,
+          setIndex: 0,
+          weight: const Value(0),
+          reps: const Value(0),
+        ));
+    expect(await db.setLogs.count().getSingle(), 1);
+  });
 }

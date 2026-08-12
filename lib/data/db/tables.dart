@@ -1,3 +1,9 @@
+// ignore_for_file: recursive_getters
+//
+// `check()` names the column it constrains, which reads as a getter returning
+// itself. It is how drift spells a CHECK constraint — the generator reads the
+// expression at build time and the getter is never actually called.
+
 import 'package:drift/drift.dart';
 
 import '../../core/ids.dart';
@@ -203,13 +209,20 @@ class WorkoutExercises extends Table with SyncColumns {
 )
 class SetLogs extends Table with SyncColumns {
   TextColumn get workoutExerciseId => text().references(WorkoutExercises, #id)();
-  IntColumn get setIndex => integer()();
+  IntColumn get setIndex => integer().check(setIndex.isBiggerOrEqualValue(0))();
   TextColumn get setType =>
       textEnum<SetType>().withDefault(const Constant('working'))();
 
   /// As entered. Interpretation depends on the exercise's [LoadMode].
-  RealColumn get weight => real().nullable()();
-  IntColumn get reps => integer().nullable()();
+  ///
+  /// Never negative. Assisted movements are a [LoadMode], not a minus sign —
+  /// a negative load here would be scored, charted and compared as one.
+  RealColumn get weight =>
+      real().nullable().check(weight.isBiggerOrEqualValue(0))();
+
+  /// Reps, or seconds when the exercise is measured as a hold.
+  IntColumn get reps =>
+      integer().nullable().check(reps.isBiggerOrEqualValue(0))();
 
   /// Reps that did not finish the range of motion, counted apart from [reps].
   ///
@@ -220,10 +233,12 @@ class SetLogs extends Table with SyncColumns {
   ///
   /// Null and 0 both mean "none". Only meaningful on a set counted in reps: a
   /// hold has no such thing as half a second.
-  IntColumn get partialReps => integer().nullable()();
+  IntColumn get partialReps =>
+      integer().nullable().check(partialReps.isBiggerOrEqualValue(0))();
 
   /// Extra load for bodyweight-plus movements (weighted pull-ups, dips).
-  RealColumn get addedWeight => real().nullable()();
+  RealColumn get addedWeight =>
+      real().nullable().check(addedWeight.isBiggerOrEqualValue(0))();
 
   /// The head of the drop group this set is a leg of, or null when the set
   /// stands on its own.
@@ -270,7 +285,10 @@ class SetLogs extends Table with SyncColumns {
 )
 class BodyweightLogs extends Table with SyncColumns {
   IntColumn get dayKey => integer()();
-  RealColumn get weightKg => real()();
+
+  /// A bodyweight of zero is not a light reading, it is a missing one — and it
+  /// divides into every bodyweight-scored lift on the day it lands.
+  RealColumn get weightKg => real().check(weightKg.isBiggerThanValue(0))();
 }
 
 /// Key/value store for local preferences and sync bookkeeping
