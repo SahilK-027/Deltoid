@@ -168,6 +168,25 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     final measure = exercise?.measureMode ?? _measureMode;
     final notes = exercise?.notes ?? _notes;
 
+    // Archive rather than delete: past workouts point at this row, and history
+    // with a hole in it is worse than a catalog with one extra entry. Built
+    // here because it changes place as well as colour — see the foot below.
+    final archiveRow = exercise == null
+        ? null
+        : AppRow(
+            icon: exercise.archived
+                ? Icons.unarchive_outlined
+                : Icons.archive_outlined,
+            title: exercise.archived
+                ? 'Restore to the catalog'
+                : 'Archive this exercise',
+            subtitle: exercise.archived
+                ? 'It appears in the picker again'
+                : 'It leaves the picker; logged sets stay',
+            tint: exercise.archived ? null : c.negative,
+            onTap: () => _setArchived(exercise, !exercise.archived),
+          );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -423,6 +442,10 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               child: ListCard(
                 inset: Space.lg,
                 children: [
+                  // Restoring is not destructive, so it sits above the red row
+                  // rather than under it: red is the foot of a list, and a
+                  // plain row after one reads as an afterthought.
+                  if (exercise.archived) archiveRow!,
                   if (widget.fromDay && entry != null)
                     AppRow(
                       icon: Icons.remove_circle_outline,
@@ -431,22 +454,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       tint: c.negative,
                       onTap: () => _removeFromDay(entry.exercise.name),
                     ),
-                  // Archive rather than delete: past workouts point at this
-                  // row, and history with a hole in it is worse than a catalog
-                  // with one extra entry.
-                  AppRow(
-                    icon: exercise.archived
-                        ? Icons.unarchive_outlined
-                        : Icons.archive_outlined,
-                    title: exercise.archived
-                        ? 'Restore to the catalog'
-                        : 'Archive this exercise',
-                    subtitle: exercise.archived
-                        ? 'It appears in the picker again'
-                        : 'It leaves the picker; logged sets stay',
-                    tint: exercise.archived ? null : c.negative,
-                    onTap: () => _setArchived(exercise, !exercise.archived),
-                  ),
+                  if (!exercise.archived) archiveRow!,
                 ],
               ),
             ),

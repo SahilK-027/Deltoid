@@ -250,6 +250,22 @@ Future<void> showExerciseMenu(
             await repo.setSkipReason(entry.workoutExercise.id, reason);
           },
         ),
+        // One row that opens the whole order, rather than a pair of buttons
+        // that nudge this one exercise a place at a time. Two directions is a
+        // fine control for moving something *once*; it is a bad one for
+        // arranging six movements, which is what you are actually doing when
+        // you open this — and the rail's own long-press drag already exists for
+        // the single nudge.
+        if (total > 1)
+          AppRow(
+            icon: Icons.swap_vert_rounded,
+            title: 'Re-order exercises',
+            subtitle: 'Drag them into the order you are training them',
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              onReorder();
+            },
+          ),
         AppRow(
           icon: Icons.delete_outline_rounded,
           title: 'Remove from this workout',
@@ -280,22 +296,6 @@ Future<void> showExerciseMenu(
             navigator.pop();
           },
         ),
-        // One row that opens the whole order, rather than a pair of buttons
-        // that nudge this one exercise a place at a time. Two directions is a
-        // fine control for moving something *once*; it is a bad one for
-        // arranging six movements, which is what you are actually doing when
-        // you open this — and the rail's own long-press drag already exists for
-        // the single nudge.
-        if (total > 1)
-          AppRow(
-            icon: Icons.swap_vert_rounded,
-            title: 'Re-order exercises',
-            subtitle: 'Drag them into the order you are training them',
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              onReorder();
-            },
-          ),
       ],
     ),
   );
@@ -305,8 +305,8 @@ Future<void> showExerciseMenu(
 /// offered in the set sheet: backoff, rest-pause and AMRAP exist in the data
 /// and arrive from a template, but nothing types them by hand mid-session.
 String _typeBlurb(SetType type) => switch (type) {
-      SetType.warmup => 'Ignored by progression and by last-time',
       SetType.working => 'Counts toward the top set and e1RM',
+      SetType.warmup => 'Ignored by progression and by last-time',
       SetType.drop => 'Continues the set above it, lighter',
       _ => '',
     };
@@ -361,9 +361,11 @@ Future<void> showSetActions(
         // the live one ticked. It was a strip of chips, which made this the
         // only sheet where choosing something meant hitting a pill instead of
         // a row, and the chips carried no room to say what a type does.
+        // Working first, because it is what almost every row already is and
+        // what a mis-typed row is being put back to.
         for (final type in const [
-          SetType.warmup,
           SetType.working,
+          SetType.warmup,
           SetType.drop,
         ]) ...[
           AppRow(

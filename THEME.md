@@ -403,7 +403,12 @@ full-width hairline under it. Then rows.
   inside a panel. **No rules between them**: a sheet is one short list with a
   hairline already under its header, and a line under every row turns five
   choices into five boxes. Row padding is the separation.
-- A picker sheet lists options as `title` + `body` description + trailing radio.
+- A picker sheet lists options as `title` + `body` description + trailing radio,
+  **commonest option first** — the one a mis-tap is being corrected back to.
+- **A red row is the last row.** Anything tinted `negative` sits at the foot of
+  its list or card, and nothing plain follows it: red is where a list ends, and
+  an ordinary row underneath one reads as an afterthought. Where a row's tint
+  depends on state, its *position* moves with the tint.
 - **Cap the height at two thirds of the screen.** A sheet taller than the phone
   has no distance to travel, so its entrance and exit both read as a cut.
 - **Text entry lives in a sheet, not a dialog** — header, one `surfaceSunken`
