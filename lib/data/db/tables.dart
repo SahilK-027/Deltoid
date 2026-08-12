@@ -13,7 +13,7 @@ mixin SyncColumns on Table {
   TextColumn get id => text().clientDefault(newId)();
   IntColumn get updatedAt => integer().clientDefault(nowMs)();
   IntColumn get deletedAt => integer().nullable()();
-  TextColumn get deviceId => text().withDefault(const Constant(''))();
+  TextColumn get deviceId => text().clientDefault(() => currentDeviceId)();
   BoolColumn get dirty => boolean().withDefault(const Constant(true))();
 
   @override

@@ -52,7 +52,7 @@ class $ExercisesTable extends Exercises
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -937,7 +937,7 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -1713,7 +1713,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -2222,7 +2222,7 @@ class $SessionExercisesTable extends SessionExercises
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -3116,7 +3116,7 @@ class $CyclesTable extends Cycles with TableInfo<$CyclesTable, Cycle> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -3727,7 +3727,7 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -4536,7 +4536,7 @@ class $WorkoutExercisesTable extends WorkoutExercises
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -5201,7 +5201,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
@@ -6204,7 +6204,7 @@ class $BodyweightLogsTable extends BodyweightLogs
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
+    clientDefault: () => currentDeviceId,
   );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override

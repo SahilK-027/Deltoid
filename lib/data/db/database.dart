@@ -53,6 +53,18 @@ class AppDatabase extends _$AppDatabase {
           // Tombstones and cascades depend on referential integrity being real.
           await customStatement('PRAGMA foreign_keys = ON');
 
+          // Wait for the lock rather than failing on it.
+          //
+          // Zero — the default — is right for exactly one writer, which is
+          // what a single connection on drift's background isolate gives us
+          // today. A sync opening its own connection makes contention real,
+          // and the failure mode of a zero timeout is an immediate
+          // SQLITE_BUSY thrown at whichever screen happened to be writing.
+          await customStatement('PRAGMA busy_timeout = 5000');
+
+          // Before anything can write a row that carries it.
+          await _ensureDeviceId();
+
           // Give the query planner statistics to plan with.
           //
           // Without them SQLite guesses how selective each table is, and on
@@ -72,6 +84,28 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('PRAGMA optimize');
         },
       );
+
+  /// This install's identity, minted once and kept for the life of the
+  /// database file.
+  ///
+  /// In `app_settings` rather than in a column default, because it has to
+  /// survive a restore: the backup carries the rows a device wrote, and a
+  /// device that changed identity every launch would make `deviceId` describe
+  /// the launch instead of the phone.
+  Future<void> _ensureDeviceId() async {
+    final existing = await (select(appSettings)
+          ..where((t) => t.key.equals(deviceIdKey)))
+        .getSingleOrNull();
+    if (existing != null) {
+      setCurrentDeviceId(existing.value);
+      return;
+    }
+    final minted = newId();
+    await into(appSettings).insert(
+      AppSettingsCompanion.insert(key: deviceIdKey, value: minted),
+    );
+    setCurrentDeviceId(minted);
+  }
 
   static QueryExecutor _open() =>
       driftDatabase(name: 'deltoid', native: const DriftNativeOptions());

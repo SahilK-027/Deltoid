@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
@@ -163,5 +165,40 @@ void main() {
 
     await BackupService(fresh).restore(null, decoded: payload);
     expect(await fresh.setLogs.count().getSingle(), 2);
+  });
+
+  test('every row is stamped with this install\'s device id', () async {
+    final regime = await aRegime();
+    final row = await (db.select(db.regimes)..where((t) => t.id.equals(regime)))
+        .getSingle();
+
+    expect(row.deviceId, isNotEmpty,
+        reason: 'the column existed and nothing ever wrote it');
+    expect(row.deviceId, currentDeviceId);
+  });
+
+  test('the device id survives reopening the same file', () async {
+    final file = File(
+        '${Directory.systemTemp.path}/deltoid_device_${newId()}.sqlite');
+    addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+    final first = AppDatabase.forTesting(NativeDatabase(file));
+    await first.customSelect('SELECT 1').get();
+    final minted = currentDeviceId;
+    await first.close();
+
+    final second = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(second.close);
+    await second.customSelect('SELECT 1').get();
+
+    expect(currentDeviceId, minted,
+        reason: 'a device that re-mints on every launch describes the launch, '
+            'not the phone');
+  });
+
+  test('the lock is waited on rather than failed on', () async {
+    final row =
+        await db.customSelect('PRAGMA busy_timeout').getSingle();
+    expect(row.data.values.first, 5000);
   });
 }
