@@ -65,7 +65,7 @@ Never "simplify" this to a plain most-recent lookup.
 | **A number that cannot mean anything is refused at the column** | Deload percentages, rep ranges that run backwards, a `dayKey` of 0, a session that ended before it started, a set that is a leg of itself, a bodyweight of 850. Each was reachable only through a restore or a merged row — exactly the writer that does not pass the repository, and exactly what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke. |
 
 **Cloud backup has its own invariants, and they live in
-[SYNC.md § 13](SYNC.md#13-what-sync-may-never-do).** The four that are really
+[SYNC.md § 13](SYNC.md#15-what-sync-may-never-do).** The four that are really
 about data rather than about protocol are repeated here, because this is the
 list people read:
 
@@ -75,6 +75,8 @@ list people read:
 | **Two histories are never merged silently** | They share no ids, so a merge is not a reconciliation — it is a union claiming you trained twice as often as you did. `backup_service` already refuses this for restore; signing in asks the same question, with counts, and exports the losing side first. |
 | **Deletes stay tombstones** | A hard delete has no `deleted_at` to push and is resurrected by the next pull. Every delete in the app is already a tombstone; sync is the reason it had to be. |
 | **A pulled row is written through the repositories** | Same constraints, same transactions, same stamping as a typed one. A second write path is a second set of bugs, and it is the path with no screen watching it. |
+| **No merge deletes logged work** | The nine unique indexes are correct for one device and reachable by two doing something ordinary — appending is the commonest action in the app, and two devices appending to one parent both compute `max + 1`. A collision is two *different* rows claiming one slot, which last-write-wins cannot resolve, so the rule is re-slot, re-flag or re-number. Never discard. |
+| **A conflict is decided on the server's clock** | `updatedAt` is a phone's wall clock, and two phones do not agree. The disagreement does not average out: a device running ten minutes fast wins every conflict it is ever in, and the other device's edits vanish silently. `nowMs` being monotonic is the half of this that is local; `server_updated_at` is the other half. |
 
 **Three levels of note, and they never leak into each other:**
 

@@ -137,14 +137,23 @@ firing with the screen off have only been built, not felt.
       [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to
       take, not collaboration and not a feature.
 
-      Three of the four decisions that were open are now closed. **Identity** is
-      Google through Supabase Auth, which is also what makes the anon key
-      harmless — with RLS keyed to `auth.uid()` the key alone grants nothing.
-      **What syncs** is the nine `SyncColumns` tables and never `app_settings`.
-      **Conflict** is row-level last-write-wins on `updatedAt`, tie broken on
-      `deviceId`, both of which the audit made trustworthy. Only **concurrency**
-      is still open: `journal_mode` is `delete`, so a sync reader and a writer
-      serialise completely, and WAL trades a little durability to fix it.
+The shape, decided: **correct on any number of devices, live on
+      none.** Two phones never lose a write, fabricate one, or refuse each
+      other's rows; what they do not do is update each other within seconds. A
+      held socket is what Keep and Notion need for two people in one document,
+      and it would cost a battery budget here to serve a case one person with
+      one phone does not produce — while the correctness it gets confused with
+      is built either way.
+
+      **Identity** is Google through Supabase Auth, which is also what makes the
+      anon key harmless: with RLS keyed to `auth.uid()` the key alone grants
+      nothing. **What syncs** is the nine `SyncColumns` tables and never
+      `app_settings`. **Conflict** is row-level last-write-wins throughout,
+      ordered on a server timestamp rather than a phone's — field-level merge
+      was rejected because a `SetLog` is one physical event, and merging
+      `60 × 8` with `62.5 × 5` field-by-field yields a lift nobody performed.
+      Only **`journal_mode`** is still open: `delete` today, so a sync reader
+      and a writer serialise completely, and WAL trades a little durability.
 
       **The local schema does not change.** `user_id` is server-side only,
       attached from the session at push time. Nothing in `tables.dart` moves.
@@ -158,11 +167,21 @@ firing with the screen off have only been built, not felt.
             and adoption are all testable without a network or a credential.
       - [ ] Push: drain `dirty`, parents first, idempotent upserts, and clear
             `dirty` only against an unchanged `updatedAt`.
-      - [ ] Pull: `last_pull_at` cursor, LWW applier through the repositories,
-            tombstones as tombstones, a bad row skipped and named rather than
-            stopping the batch.
-      - [ ] Adoption: the three shapes at sign-in, and the prompt for the third
-            that exports the losing side before it overwrites anything.
+      - [ ] Pull: `last_pull_at` cursor on `server_updated_at`, LWW applier
+            through the repositories, tombstones as tombstones, a bad row
+            skipped and named rather than stopping the batch.
+      - [ ] Collision resolution for the nine unique indexes — re-slot,
+            re-flag, re-number, never delete. The first four are not edge cases:
+            two devices appending to one parent both compute `max + 1`.
+      - [ ] Defer `ensureStarterCatalog` until the welcome screen is answered,
+            so a fresh phone signing in does not end up with two catalogs and
+            its history split across two ids for one movement.
+      - [ ] A test per row of [SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does),
+            so a later change that breaks one fails a build rather than a
+            history.
+      - [ ] Adoption: the three shapes at sign-in, and for the third a prompt
+            offering keep-account / keep-phone / merge, with counts on both
+            sides and the side not kept exported to a file first.
       - [ ] Sign-in on Google, session persisted, seen once.
       - [ ] The welcome screen — the app's one illustrated page, drawn to
             [THEME.md § Illustration](THEME.md), monochrome, with declining
