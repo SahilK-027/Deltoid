@@ -56,6 +56,17 @@ class Exercises extends Table with SyncColumns {
 ///
 /// Switching regimes creates a new row rather than editing sessions in place,
 /// so past history keeps pointing at the programme it was actually run under.
+/// At most one live regime is active, enforced by the database.
+///
+/// A unique index on a column filtered to a single value is how SQLite says
+/// "one row at most": with `WHERE is_active = 1` only the active rows are
+/// indexed, and they all share the same key. `setActiveRegime` already
+/// deactivates-then-activates in one transaction; this is what holds when the
+/// write does not come through it.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_regimes_single_active '
+  'ON regimes (is_active) WHERE is_active = 1 AND deleted_at IS NULL',
+)
 class Regimes extends Table with SyncColumns {
   TextColumn get name => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(false))();
@@ -120,6 +131,15 @@ class SessionExercises extends Table with SyncColumns {
 /// Not a calendar week. The cycle advances when the work is done, which is the
 /// whole point — life happens and the programme shouldn't care.
 @TableIndex(name: 'idx_cycles_regime', columns: {#regimeId, #cycleIndex})
+/// A regime cannot hold the same cycle number twice.
+///
+/// `_ensureOpenCycle` is a transaction for this reason, and there is repair
+/// code for regimes that already carry more than one open cycle — which is the
+/// evidence that this went wrong once, under a build where it was not.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_cycles_regime_index_live '
+  'ON cycles (regime_id, cycle_index) WHERE deleted_at IS NULL',
+)
 class Cycles extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   IntColumn get cycleIndex => integer()();
@@ -171,6 +191,16 @@ class WorkoutExercises extends Table with SyncColumns {
 }
 
 @TableIndex(name: 'idx_set_logs_parent', columns: {#workoutExerciseId})
+/// No two live sets under one exercise share a position.
+///
+/// Inserting mid-list shifts the rows above it from the top down for exactly
+/// this reason — each one moves into a slot the row above has already left.
+/// Tombstones are excluded, so the gap a deleted set leaves is free to be
+/// filled again.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_set_logs_position_live '
+  'ON set_logs (workout_exercise_id, set_index) WHERE deleted_at IS NULL',
+)
 class SetLogs extends Table with SyncColumns {
   TextColumn get workoutExerciseId => text().references(WorkoutExercises, #id)();
   IntColumn get setIndex => integer()();
@@ -202,7 +232,12 @@ class SetLogs extends Table with SyncColumns {
   /// alone, which cannot tell "one drop set with two legs" from "two separate
   /// drop sets that happen to sit next to each other" — converting two sets in
   /// a row swallowed the second into the first.
-  TextColumn get parentSetId => text().nullable()();
+  ///
+  /// A real reference, like every other relationship here. It was a bare text
+  /// column, so the database would accept a head id that names no set at all —
+  /// the one place the schema took the app's word for it.
+  TextColumn get parentSetId =>
+      text().nullable().references(SetLogs, #id)();
 
   IntColumn get restSeconds => integer().nullable()();
   IntColumn get completedAt => integer().nullable()();
@@ -219,6 +254,20 @@ class SetLogs extends Table with SyncColumns {
 /// three questions — a month's days, a chart window, the newest entry — all of
 /// which were full scans until this existed.
 @TableIndex(name: 'idx_bodyweight_day', columns: {#dayKey})
+/// One live row per day, enforced here rather than only in the upsert.
+///
+/// `logBodyweight` already does the look-up and the write in one transaction,
+/// which is what makes a double tap on Save safe. That defence is Dart, and a
+/// second writer — a restore, or a device merging someone else's rows — never
+/// passes through it. Two weights for one day is the invisible kind of wrong:
+/// the screen shows whichever the query returns first and every
+/// bodyweight-scored lift that day reads the other one half the time.
+///
+/// Partial, so a tombstoned row never blocks re-logging the day it was on.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_bodyweight_day_live '
+  'ON bodyweight_logs (day_key) WHERE deleted_at IS NULL',
+)
 class BodyweightLogs extends Table with SyncColumns {
   IntColumn get dayKey => integer()();
   RealColumn get weightKg => real()();

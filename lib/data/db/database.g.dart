@@ -5302,6 +5302,9 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES set_logs (id)',
+    ),
   );
   static const VerificationMeta _restSecondsMeta = const VerificationMeta(
     'restSeconds',
@@ -5620,6 +5623,10 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   /// alone, which cannot tell "one drop set with two legs" from "two separate
   /// drop sets that happen to sit next to each other" — converting two sets in
   /// a row swallowed the second into the first.
+  ///
+  /// A real reference, like every other relationship here. It was a bare text
+  /// column, so the database would accept a head id that names no set at all —
+  /// the one place the schema took the app's word for it.
   final String? parentSetId;
   final int? restSeconds;
   final int? completedAt;
@@ -6822,6 +6829,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SetLogsTable setLogs = $SetLogsTable(this);
   late final $BodyweightLogsTable bodyweightLogs = $BodyweightLogsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final Index idxRegimesSingleActive = Index(
+    'idx_regimes_single_active',
+    'CREATE UNIQUE INDEX idx_regimes_single_active ON regimes (is_active) WHERE is_active = 1 AND deleted_at IS NULL',
+  );
   late final Index idxSessionsRegime = Index(
     'idx_sessions_regime',
     'CREATE INDEX idx_sessions_regime ON sessions (regime_id)',
@@ -6833,6 +6844,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxCyclesRegime = Index(
     'idx_cycles_regime',
     'CREATE INDEX idx_cycles_regime ON cycles (regime_id, cycle_index)',
+  );
+  late final Index idxCyclesRegimeIndexLive = Index(
+    'idx_cycles_regime_index_live',
+    'CREATE UNIQUE INDEX idx_cycles_regime_index_live ON cycles (regime_id, cycle_index) WHERE deleted_at IS NULL',
   );
   late final Index idxWorkoutsSessionLookup = Index(
     'idx_workouts_session_lookup',
@@ -6862,9 +6877,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_set_logs_parent',
     'CREATE INDEX idx_set_logs_parent ON set_logs (workout_exercise_id)',
   );
+  late final Index idxSetLogsPositionLive = Index(
+    'idx_set_logs_position_live',
+    'CREATE UNIQUE INDEX idx_set_logs_position_live ON set_logs (workout_exercise_id, set_index) WHERE deleted_at IS NULL',
+  );
   late final Index idxBodyweightDay = Index(
     'idx_bodyweight_day',
     'CREATE INDEX idx_bodyweight_day ON bodyweight_logs (day_key)',
+  );
+  late final Index idxBodyweightDayLive = Index(
+    'idx_bodyweight_day_live',
+    'CREATE UNIQUE INDEX idx_bodyweight_day_live ON bodyweight_logs (day_key) WHERE deleted_at IS NULL',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -6881,9 +6904,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     setLogs,
     bodyweightLogs,
     appSettings,
+    idxRegimesSingleActive,
     idxSessionsRegime,
     idxSessionExercisesSession,
     idxCyclesRegime,
+    idxCyclesRegimeIndexLive,
     idxWorkoutsSessionLookup,
     idxWorkoutsDay,
     idxWorkoutsCycle,
@@ -6891,7 +6916,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxWorkoutExercisesWorkout,
     idxWorkoutExercisesExercise,
     idxSetLogsParent,
+    idxSetLogsPositionLive,
     idxBodyweightDay,
+    idxBodyweightDayLive,
   ];
 }
 
@@ -11321,6 +11348,23 @@ final class $$SetLogsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static $SetLogsTable _parentSetIdTable(_$AppDatabase db) =>
+      db.setLogs.createAlias('set_logs__parent_set_id__set_logs__id');
+
+  $$SetLogsTableProcessedTableManager? get parentSetId {
+    final $_column = $_itemColumn<String>('parent_set_id');
+    if ($_column == null) return null;
+    final manager = $$SetLogsTableTableManager(
+      $_db,
+      $_db.setLogs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentSetIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 }
 
 class $$SetLogsTableFilterComposer
@@ -11388,11 +11432,6 @@ class $$SetLogsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => ColumnFilters(column),
@@ -11427,6 +11466,29 @@ class $$SetLogsTableFilterComposer
           }) => $$WorkoutExercisesTableFilterComposer(
             $db: $db,
             $table: $db.workoutExercises,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SetLogsTableFilterComposer get parentSetId {
+    final $$SetLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentSetId,
+      referencedTable: $db.setLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.setLogs,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -11501,11 +11563,6 @@ class $$SetLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => ColumnOrderings(column),
@@ -11540,6 +11597,29 @@ class $$SetLogsTableOrderingComposer
           }) => $$WorkoutExercisesTableOrderingComposer(
             $db: $db,
             $table: $db.workoutExercises,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SetLogsTableOrderingComposer get parentSetId {
+    final $$SetLogsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentSetId,
+      referencedTable: $db.setLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetLogsTableOrderingComposer(
+            $db: $db,
+            $table: $db.setLogs,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -11596,11 +11676,6 @@ class $$SetLogsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get parentSetId => $composableBuilder(
-    column: $table.parentSetId,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<int> get restSeconds => $composableBuilder(
     column: $table.restSeconds,
     builder: (column) => column,
@@ -11639,6 +11714,29 @@ class $$SetLogsTableAnnotationComposer
     );
     return composer;
   }
+
+  $$SetLogsTableAnnotationComposer get parentSetId {
+    final $$SetLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentSetId,
+      referencedTable: $db.setLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SetLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.setLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$SetLogsTableTableManager
@@ -11654,7 +11752,7 @@ class $$SetLogsTableTableManager
           $$SetLogsTableUpdateCompanionBuilder,
           (SetLog, $$SetLogsTableReferences),
           SetLog,
-          PrefetchHooks Function({bool workoutExerciseId})
+          PrefetchHooks Function({bool workoutExerciseId, bool parentSetId})
         > {
   $$SetLogsTableTableManager(_$AppDatabase db, $SetLogsTable table)
     : super(
@@ -11755,47 +11853,61 @@ class $$SetLogsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({workoutExerciseId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (workoutExerciseId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.workoutExerciseId,
-                                referencedTable: $$SetLogsTableReferences
-                                    ._workoutExerciseIdTable(db),
-                                referencedColumn: $$SetLogsTableReferences
-                                    ._workoutExerciseIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({workoutExerciseId = false, parentSetId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (workoutExerciseId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.workoutExerciseId,
+                                    referencedTable: $$SetLogsTableReferences
+                                        ._workoutExerciseIdTable(db),
+                                    referencedColumn: $$SetLogsTableReferences
+                                        ._workoutExerciseIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (parentSetId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.parentSetId,
+                                    referencedTable: $$SetLogsTableReferences
+                                        ._parentSetIdTable(db),
+                                    referencedColumn: $$SetLogsTableReferences
+                                        ._parentSetIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -11812,7 +11924,7 @@ typedef $$SetLogsTableProcessedTableManager =
       $$SetLogsTableUpdateCompanionBuilder,
       (SetLog, $$SetLogsTableReferences),
       SetLog,
-      PrefetchHooks Function({bool workoutExerciseId})
+      PrefetchHooks Function({bool workoutExerciseId, bool parentSetId})
     >;
 typedef $$BodyweightLogsTableCreateCompanionBuilder =
     BodyweightLogsCompanion Function({

@@ -590,6 +590,20 @@ class BackupService {
     var written = 0;
 
     await db.transaction(() async {
+      // Checked at commit rather than at every row, for this transaction only.
+      //
+      // The codecs are ordered so no table arrives before the tables it points
+      // at, but `set_logs.parent_set_id` points *into its own table*: a
+      // drop-set leg sitting ahead of its head in the file fails against an id
+      // that is two rows further down. Deferring moves the question to the
+      // end, where the answer is known. A file that really is inconsistent
+      // still fails, and still takes the whole restore back with it.
+      //
+      // Not covered by drift's own batch deferral — that is a different code
+      // path from the one `db.batch` takes here. `schema_constraints_test`
+      // fails without this line.
+      await db.customStatement('PRAGMA defer_foreign_keys = ON');
+
       onProgress?.call((
         phase: BackupPhase.clearing,
         detail: 'making room',
