@@ -8,6 +8,7 @@ import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
 import 'package:deltoid/features/today/today_screen.dart';
+import 'package:deltoid/features/today/widgets/volume_bars.dart';
 import 'package:deltoid/features/today/widgets/heatmap.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
@@ -170,9 +171,13 @@ void main() {
 
     final seen = await frames(tester);
 
-    expect(seen.last, contains('Nothing set up yet'));
+    expect(seen.last, contains('Create a regime'));
     // And it never claimed a regime existed on the way there.
     expect(seen.where((f) => f.contains('Cycle 1')), isEmpty);
+
+    // The screen keeps its own shape with nothing in it: the record is the
+    // page's second section on a fresh install exactly as it is on a full one.
+    expect(find.byType(ConsistencyHeatmap), findsOneWidget);
 
     // The empty state is still this screen: the masthead survives it. It is the
     // date and the rest gap, not the screen's name — on a fresh install there
@@ -213,14 +218,17 @@ void main() {
       await repo.completeWorkout(id);
     }
 
-    testWidgets('is not on a fresh install', (tester) async {
+    testWidgets('is there on a fresh install, at zero', (tester) async {
       await createRegimeFromTemplate(db, ppl);
       await pumpToday(tester);
       await frames(tester);
 
-      // Six empty tracks before anything has been logged is a chart of
-      // nothing, and it would be the first thing a new install saw.
-      expect(find.text('This week'), findsNothing);
+      // It used to be held back until something was logged, on the grounds
+      // that six empty tracks is a chart of nothing. What that cost was the
+      // section appearing from nowhere on the day of the first workout, which
+      // moved everything under it. The page keeps its shape instead.
+      expect(find.text('This week'), findsOneWidget);
+      expect(find.byType(VolumeBars), findsOneWidget);
     });
 
     testWidgets('draws all six rows once there is history, zeros included', (

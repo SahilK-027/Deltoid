@@ -460,7 +460,11 @@ class TodayScreen extends ConsumerWidget {
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
         (null, _, _) => const SizedBox.shrink(),
-        (_, null, _) => _NoRegimeState(last: today!.lastCompleted),
+        (_, null, _) => _NoRegimeState(
+          last: today!.lastCompleted,
+          heatmap: today.heatmap,
+          hasHistory: today.hasHistory,
+        ),
         (_, final r?, true) => _NoSessionsState(
           regime: r,
           last: today!.lastCompleted,
@@ -554,12 +558,15 @@ class TodayScreen extends ConsumerWidget {
                         // Under the grid, because they answer the same
                         // question one level down: the heatmap says whether you
                         // turned up, this says what you trained when you did.
-                        // Only once there is history — six empty tracks on a
-                        // fresh install is a chart of nothing.
-                        if (today.hasHistory) ...[
-                          const SizedBox(height: Space.section),
-                          const _VolumeCard(),
-                        ],
+                        //
+                        // Not gated on history. It used to appear only once
+                        // something was logged, which made the section arrive
+                        // out of nowhere on the day of the first workout — the
+                        // screen changing shape underneath you at the one
+                        // moment you are reading it. The zero state carries it
+                        // too, so the page is the same page before and after.
+                        const SizedBox(height: Space.section),
+                        const _VolumeCard(),
                         if (today.lastCompleted != null) ...[
                           const SizedBox(height: Space.section),
                           _LastSessionCard(last: today.lastCompleted!),
@@ -732,26 +739,69 @@ class _RestGap extends StatelessWidget {
 /// screen a brand-new install has — it has to offer the way forward, not just
 /// point at another tab.
 class _NoRegimeState extends ConsumerWidget {
-  const _NoRegimeState({required this.last});
+  const _NoRegimeState({
+    required this.last,
+    required this.heatmap,
+    required this.hasHistory,
+  });
 
   final ({Workout workout, String? sessionName})? last;
+  final HeatmapData heatmap;
+  final bool hasHistory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The same shape the populated screen has — masthead, a band carrying the
+    // one action, then the record underneath — rather than a centred card on a
+    // blank page. What the screen is *made of* is visible before there is
+    // anything in it, so the first regime lands in a page you have already
+    // seen rather than replacing one.
     return Column(
       children: [
         _TodayHeader(last: last),
         Expanded(
-          child: EmptyState(
-            icon: Icons.tune_rounded,
-            title: 'Nothing set up yet',
-            message:
-                'Build your training split — any number of sessions, in '
-                'any order. One pass through all of them is a cycle.',
-            action: PrimaryButton(
-              label: 'Create a regime',
-              onPressed: () => createRegimeFlow(context, ref),
-            ),
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: Space.huge),
+            children: [
+              _SurfaceBlock(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader('Your split'),
+                    Text(
+                      'Any number of sessions, in any order. One pass through '
+                      'all of them is a cycle.',
+                      style: context.t.bodyMedium,
+                    ),
+                    const SizedBox(height: Space.lg),
+                    PrimaryButton(
+                      label: 'Create a regime',
+                      onPressed: () => createRegimeFlow(context, ref),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  Space.section,
+                  Space.gutter,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
+                    const SizedBox(height: Space.section),
+                    const _VolumeCard(),
+                    if (last != null) ...[
+                      const SizedBox(height: Space.section),
+                      _LastSessionCard(last: last!),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ],
