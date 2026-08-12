@@ -8,7 +8,7 @@ This file carries status and nothing else. Why a feature is shaped the way it is
 belongs in [THEME.md](THEME.md), and the rules it must not break belong in
 [RULES.md](RULES.md).
 
-The app currently has **392 tests** and is analyzer clean.
+The app currently has **448 tests** and is analyzer clean.
 
 ---
 
@@ -136,3 +136,28 @@ firing with the screen off have only been built, not felt.
       the project URL and the anon key before it can be started. Every table
       already carries the sync columns (`updatedAt`, `deletedAt`, `deviceId` and
       `dirty`), so the work is additive and needs no migration.
+
+      The data layer has been audited for it and the local half is done: every
+      invariant the repository held in Dart is now held by the database too, a
+      failed write is reported rather than dropped, `deviceId` is stamped on
+      every write rather than only on the insert, and `nowMs` cannot go
+      backwards. What is deliberately **not** built, because none of it means
+      anything until there is a server:
+
+      - `dirty` is written and never cleared, and nothing reads it. Every row in
+        the database is dirty, seeded catalog rows included, so a first push
+        would send all of it.
+      - `last_pull_at` and `user_id` are named in the `app_settings` doc comment
+        and written by nothing.
+      - There is no merge rule. Whole-row last-write-wins loses concurrent edits
+        to different fields of one set; which tables want column-level merging is
+        a decision to make before any code, not after.
+      - `updatedAt` is this phone's clock. It is monotonic within a run now, but
+        two devices still need a server's timestamp to agree.
+      - No update carries an `updatedAt` precondition, so a pull that lands
+        mid-edit overwrites silently in either direction.
+      - Two devices each seed the starter catalog independently and nothing keys
+        them together, so a first sync would duplicate it. `starterKey` is the
+        natural key and is not unique.
+      - `busy_timeout` is 5 s and a restore holds the write lock for longer than
+        that on a long history, so a second connection would fail against it.

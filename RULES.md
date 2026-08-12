@@ -58,6 +58,11 @@ Never "simplify" this to a plain most-recent lookup.
 | Today loads through **one** snapshot                          | `todaySnapshot` + `todayProvider`. A per-card provider brings back the staged reveal: watched queries resolving a frame or two apart, and a frame where "no sessions" is indistinguishable from "sessions haven't loaded". Everything is on local disk — the screen should arrive whole.                                                                                            |
 | **No programme is hardcoded**                                 | `seed/` ships an exercise catalog and _optional_ templates. Never seed a regime, and never put personal numbers, cues or video links in `seed_data.dart` — those are the user's, added through the UI.                                                                                                                                                                              |
 | A rate needs the weeks to have happened                       | Sessions-per-week was `sessionsInTheLast29Days / 4`, which told a two-day-old install it trained "0.3 / week". `domain/consistency.dart` divides by the weeks it actually has and prints a plain count below a fortnight of history.                                                                                                                                                |
+| **A position is unique among live rows**                      | `sessions`, `session_exercises`, `workout_exercises` and `set_logs` all carry a partial unique index on their parent plus `orderIndex`. Every append takes one past the highest live position rather than the live count — a tombstone leaves a gap and nothing renumbers behind it — and the index is what holds when the writer is a restore rather than a tap. **A reorder therefore cannot renumber in place**: see `renumber` in [§ 4](#4-code). |
+| **One session is open at a time**                             | A partial unique index on `workouts (status) WHERE status = 'inProgress'`, the same shape as the single-active-regime one. `startWorkout`'s check is a read outside the transaction that writes, so two doors onto it — Start and the backfill sheet — could both find nothing running. The loser is then hidden behind the newer one by `openWorkout`: unreachable, in progress forever, counted by nothing. |
+| **A day answers to one name in its regime**                   | `idx_sessions_name_live`, keyed on `lower(trim(name))`. The prefill disclosure names the day it borrowed from, History filters by it, and the chart labels its lines with it — two live `Push 1`s makes all three ambiguous. Across regimes is fine, which is why `LoggedSession` carries the regime name. |
+| **An enum column is checked in the database**                 | `textEnum` throws on a string no member answers to, and the throw takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a `CHECK … IN (…)`, written out by hand, and `schema_constraints_test` walks every member of every enum, so a value added to the enum and not to the column fails a test rather than a screen. |
+| **A number that cannot mean anything is refused at the column** | Deload percentages, rep ranges that run backwards, a `dayKey` of 0, a session that ended before it started, a set that is a leg of itself, a bodyweight of 850. Each was reachable only through a restore or a merged row — exactly the writer that does not pass the repository, and exactly what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke. |
 
 **Three levels of note, and they never leak into each other:**
 
@@ -118,7 +123,11 @@ the only copy of a user's history in the file picker. `backup/backup_service.dar
 spreads a default map under each restored row for exactly this reason, and
 `test/data/backup_service_test.dart` restores a payload with a column stripped
 out to keep it honest. An **index-only** change is the one case that skips it:
-nothing new is stored, so nothing can be missing from an older file.
+nothing new is stored, so nothing can be missing from an older file. A
+**constraint-only** change skips it for the same reason — but a constraint
+cannot be altered in place: SQLite has no `ALTER … DROP CHECK`, so loosening or
+tightening one is a table rebuild, and a step that re-maps a retired value has
+to run *before* the rebuild that narrows the column, never after it.
 
 A backup also carries the `schemaVersion` it was written against, and import
 refuses anything **newer** than the running build can read rather than clearing
@@ -199,6 +208,37 @@ arbitrary double; `55.733333333333334 kg` shipped to a screen once.
 case — same weight as last week, one more rep. Without `_adoptGhost` the set
 stores reps against a null weight: invisible to the chart, useless as next
 week's prefill.
+
+**A write that is not awaited still has to report.** The log screen cannot
+await its writes — `_flushWrite` runs from a `Timer` and from `dispose`, neither
+of which can wait on a disk — so a throw used to land on the floor. The tick
+stayed on screen because the tick came from the local buffer, the summary
+counted the set, and the number was not in the database; you found out weeks
+later looking at a hole in a chart. `core/failure.dart` is the channel:
+`reportOnError` on anything deliberately not awaited, `reportFailure` from
+anywhere else, and `main` installs `FlutterError.onError` and
+`PlatformDispatcher.onError` so an uncaught error in a gesture handler — whose
+only symptom is a button that does nothing — reaches the same place. A toast
+under `MaterialApp` says it, which is above the log rather than inside a tab.
+
+**A reorder is two passes, not one.** A position is unique among live rows
+(§ 2) and SQLite checks that on every statement, so writing `i` to the row that
+should end up at `i` collides with whoever is still standing there and rolls the
+whole reorder back — for a permutation that is perfectly legal once it has
+finished. `renumber` in `data/db/renumber.dart` moves everything to a free range
+first, computed inside the same transaction as one past the highest live
+position, then brings it down to `0..n-1`.
+
+**`nowMs` never goes backwards.** It is what last-write-wins compares, and a
+clock moved back — a network correction after a flat battery, a manual change —
+made a row lose to the version it was written to replace. Clamped to the last
+stamp issued, which is the half of the problem that is local; agreeing on time
+with another device is a server's job.
+
+**Every update stamps `deviceId`, not just the insert.** `clientDefault` fires
+once, so the column used to name the row's creator for the rest of its life —
+and it exists to break a same-millisecond tie between two devices, which it
+cannot do if both copies carry the same originating id.
 
 **Never copy the project to keep an old version around.** No `old-*/` folders,
 no `*.bak`, no second checkout, no `git worktree` for "reference". Git holds
