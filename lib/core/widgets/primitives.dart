@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -1873,35 +1875,53 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return Center(
-      child: SingleChildScrollView(
+    // The scroll view is the outer widget and the centring happens inside it,
+    // against a minimum height rather than a `Center`.
+    //
+    // The other way round — `Center(child: SingleChildScrollView(...))` — the
+    // scroll view shrink-wraps its content and is then centred, so the
+    // viewport is both shorter than the page and no taller than what it holds.
+    // Content is clipped against its top *and* bottom edges, mid-screen, with
+    // blank page either side, and scrolling uncovers nothing in either
+    // direction because there is no free extent to scroll through.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
         padding: const EdgeInsets.all(Space.xxxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: c.surfaceHigh,
-                borderRadius: BorderRadius.circular(Radii.xxl),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: math.max(0, constraints.maxHeight - Space.xxxl * 2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: c.surfaceHigh,
+                  borderRadius: BorderRadius.circular(Radii.xxl),
+                ),
+                child: Icon(icon, color: c.textPrimary, size: 28),
               ),
-              child: Icon(icon, color: c.textPrimary, size: 28),
-            ),
-            const SizedBox(height: Space.xl),
-            Text(
-              title,
-              style: context.t.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: Space.sm),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: context.t.bodyMedium,
-            ),
-            if (action != null) ...[const SizedBox(height: Space.xxl), action!],
-          ],
+              const SizedBox(height: Space.xl),
+              Text(
+                title,
+                style: context.t.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Space.sm),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: context.t.bodyMedium,
+              ),
+              if (action != null) ...[
+                const SizedBox(height: Space.xxl),
+                action!,
+              ],
+            ],
+          ),
         ),
       ),
     );
