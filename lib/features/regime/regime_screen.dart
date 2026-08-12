@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
@@ -430,13 +431,24 @@ class _DayBody extends ConsumerWidget {
   }
 
   Future<void> _rename(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(regimeRepositoryProvider);
+    final taken = await repo.liveSessionNames(
+      session.regimeId,
+      exceptId: session.id,
+    );
+    if (!context.mounted) return;
+
     final name = await promptForText(
       context,
       title: 'Rename day',
       initial: session.name,
+      // Keeping its own name is a no-op, not a collision — `exceptId` above.
+      validate: (value) => taken.contains(value.trim().toLowerCase())
+          ? 'This regime already has a day called ${value.trim()}'
+          : null,
     );
     if (name == null || name.isEmpty) return;
-    await ref.read(regimeRepositoryProvider).renameSession(session.id, name);
+    await repo.renameSession(session.id, name);
   }
 
   Future<void> _add(
@@ -597,13 +609,26 @@ Future<void> addSessionPrompt(
   WidgetRef ref,
   String regimeId,
 ) async {
+  // The names already in this regime, read once for the field's validator —
+  // the same shape the regime prompt uses. A day is identified on screen by its
+  // name alone: the prefill disclosure says which day it borrowed from, and
+  // History filters by it. Two called `Push 1` makes both ambiguous, so the
+  // field says so while it is being typed rather than the save failing after
+  // the sheet has closed.
+  final repo = ref.read(regimeRepositoryProvider);
+  final taken = await repo.liveSessionNames(regimeId);
+  if (!context.mounted) return;
+
   final name = await promptForText(
     context,
     title: 'New day',
     hint: 'Push 1, Upper A, Legs …',
+    validate: (value) => taken.contains(value.trim().toLowerCase())
+        ? 'This regime already has a day called ${value.trim()}'
+        : null,
   );
   if (name == null || name.isEmpty) return;
-  await ref.read(regimeRepositoryProvider).addSession(regimeId, name);
+  await repo.addSession(regimeId, name);
 }
 
 /// Small single-field prompt used for names throughout the regime editor.
@@ -619,12 +644,20 @@ Future<void> addSessionPrompt(
 /// it can. Shown under the field and the confirm stays off — a name that is
 /// already taken is said while you are still typing it, not after the sheet
 /// closes and a snackbar tells you the work was thrown away.
+///
+/// [maxLength] stops the typing rather than counting it. A name is one line on
+/// a row and the row ellipsizes, so the honest ceiling is "what fits", and the
+/// tables refuse anything past it outright — a limit reached silently at the
+/// keyboard beats a save that fails after the sheet has closed. No counter:
+/// `12 / 60` under a field nobody was going to fill is noise, which is not the
+/// case for a note, where the limit is the point.
 Future<String?> promptForText(
   BuildContext context, {
   required String title,
   String? hint,
   String initial = '',
   String? Function(String value)? validate,
+  int maxLength = 60,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -635,6 +668,7 @@ Future<String?> promptForText(
       hint: hint,
       initial: initial,
       validate: validate,
+      maxLength: maxLength,
     ),
   );
 }
@@ -644,12 +678,14 @@ class _NamePromptSheet extends StatefulWidget {
     required this.title,
     required this.hint,
     required this.initial,
+    required this.maxLength,
     this.validate,
   });
 
   final String title;
   final String? hint;
   final String initial;
+  final int maxLength;
   final String? Function(String value)? validate;
 
   @override
@@ -694,6 +730,7 @@ class _NamePromptSheetState extends State<_NamePromptSheet> {
           autofocus: true,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.done,
+          inputFormatters: [LengthLimitingTextInputFormatter(widget.maxLength)],
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _submit(),
           style: context.t.bodyLarge?.copyWith(color: c.textPrimary),

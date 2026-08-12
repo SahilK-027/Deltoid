@@ -6851,9 +6851,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_sessions_regime',
     'CREATE INDEX idx_sessions_regime ON sessions (regime_id)',
   );
+  late final Index idxSessionsPositionLive = Index(
+    'idx_sessions_position_live',
+    'CREATE UNIQUE INDEX idx_sessions_position_live ON sessions (regime_id, order_index) WHERE deleted_at IS NULL',
+  );
+  late final Index idxSessionsNameLive = Index(
+    'idx_sessions_name_live',
+    'CREATE UNIQUE INDEX idx_sessions_name_live ON sessions (regime_id, lower(trim(name))) WHERE deleted_at IS NULL',
+  );
   late final Index idxSessionExercisesSession = Index(
     'idx_session_exercises_session',
     'CREATE INDEX idx_session_exercises_session ON session_exercises (session_id)',
+  );
+  late final Index idxSessionExercisesPositionLive = Index(
+    'idx_session_exercises_position_live',
+    'CREATE UNIQUE INDEX idx_session_exercises_position_live ON session_exercises (session_id, order_index) WHERE deleted_at IS NULL',
   );
   late final Index idxCyclesRegime = Index(
     'idx_cycles_regime',
@@ -6879,6 +6891,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_workouts_started',
     'CREATE INDEX idx_workouts_started ON workouts (started_at, id)',
   );
+  late final Index idxWorkoutsSingleOpen = Index(
+    'idx_workouts_single_open',
+    'CREATE UNIQUE INDEX idx_workouts_single_open ON workouts (status) WHERE status = \'inProgress\' AND deleted_at IS NULL',
+  );
   late final Index idxWorkoutExercisesWorkout = Index(
     'idx_workout_exercises_workout',
     'CREATE INDEX idx_workout_exercises_workout ON workout_exercises (workout_id)',
@@ -6886,6 +6902,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxWorkoutExercisesExercise = Index(
     'idx_workout_exercises_exercise',
     'CREATE INDEX idx_workout_exercises_exercise ON workout_exercises (exercise_id)',
+  );
+  late final Index idxWorkoutExercisesPositionLive = Index(
+    'idx_workout_exercises_position_live',
+    'CREATE UNIQUE INDEX idx_workout_exercises_position_live ON workout_exercises (workout_id, order_index) WHERE deleted_at IS NULL',
   );
   late final Index idxSetLogsParent = Index(
     'idx_set_logs_parent',
@@ -6920,15 +6940,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appSettings,
     idxRegimesSingleActive,
     idxSessionsRegime,
+    idxSessionsPositionLive,
+    idxSessionsNameLive,
     idxSessionExercisesSession,
+    idxSessionExercisesPositionLive,
     idxCyclesRegime,
     idxCyclesRegimeIndexLive,
     idxWorkoutsSessionLookup,
     idxWorkoutsDay,
     idxWorkoutsCycle,
     idxWorkoutsStarted,
+    idxWorkoutsSingleOpen,
     idxWorkoutExercisesWorkout,
     idxWorkoutExercisesExercise,
+    idxWorkoutExercisesPositionLive,
     idxSetLogsParent,
     idxSetLogsPositionLive,
     idxBodyweightDay,

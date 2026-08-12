@@ -1094,7 +1094,11 @@ class _ResumeHero extends ConsumerWidget {
       listen: false,
     ).read(trainingRepositoryProvider);
     try {
-      await repo.completeWorkout(workout.id);
+      // False when it is already gone — finished or discarded from the log
+      // itself while this card was still on screen.
+      if (!await repo.completeWorkout(workout.id)) {
+        showToastOn(messenger, 'That session is no longer there');
+      }
     } catch (e) {
       showToastOn(messenger, 'Could not finish it: $e', destructive: true);
     }

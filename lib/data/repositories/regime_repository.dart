@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../db/renumber.dart';
 import '../db/watch.dart';
 
 /// One regime plus the two numbers that describe it in a list: how many
@@ -61,6 +62,27 @@ class RegimeNameTakenException implements Exception {
 
   @override
   String toString() => 'RegimeNameTakenException: $name is already in use';
+}
+
+/// Thrown when a name is already on a live session of the same regime.
+///
+/// The same argument as [RegimeNameTakenException], one level down, and it
+/// matters more here: the whole app turns on *which session* a number came
+/// from. The prefill disclosure says "borrowed from Push 1 on 3 March", History
+/// filters by the day's name, and the progress chart draws one line per session
+/// with the name as its only label. Two live `Push 1`s in one regime makes every
+/// one of those sentences ambiguous, and nothing else on screen tells them
+/// apart.
+///
+/// Across regimes is fine and common — two programmes may each have a `Push 1`,
+/// which is why `LoggedSession` carries the regime name beside it.
+class SessionNameTakenException implements Exception {
+  const SessionNameTakenException(this.name);
+
+  final String name;
+
+  @override
+  String toString() => 'SessionNameTakenException: $name is already in use';
 }
 
 /// Edits to the programme itself: regimes, their sessions, and the exercise
@@ -168,6 +190,7 @@ class RegimeRepository {
       await (db.update(db.regimes)..where((t) => t.id.equals(regimeId))).write(
         RegimesCompanion(
           isActive: const Value(true),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -186,6 +209,7 @@ class RegimeRepository {
         RegimesCompanion(
           isActive: const Value(false),
           deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(stamp),
           dirty: const Value(true),
         ),
@@ -214,6 +238,7 @@ class RegimeRepository {
           .write(
         RegimesCompanion(
           isActive: const Value(true),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -283,6 +308,7 @@ class RegimeRepository {
     await (db.update(db.regimes)..where((t) => t.isActive.equals(true))).write(
       RegimesCompanion(
         isActive: const Value(false),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -312,6 +338,7 @@ class RegimeRepository {
         deloadAfterCycles: deloadAfterCycles,
         deloadSetDelta: deloadSetDelta,
         deloadWeightPct: deloadWeightPct,
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -330,6 +357,9 @@ class RegimeRepository {
     if (name.trim().isEmpty) throw const BlankNameException('session');
     final id = newId();
     await db.transaction(() async {
+      if (await isSessionNameTaken(regimeId, name)) {
+        throw SessionNameTakenException(name);
+      }
       final existing = await (db.select(db.sessions)
             ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
           .get();
@@ -338,25 +368,73 @@ class RegimeRepository {
               id: Value(id),
               regimeId: regimeId,
               name: name,
-              orderIndex: _nextIndex([for (final s in existing) s.orderIndex]),
+              orderIndex: nextPosition([for (final s in existing) s.orderIndex]),
             ),
           );
     });
     return id;
   }
 
-  static int _nextIndex(List<int> taken) =>
-      taken.fold<int>(-1, (m, i) => i > m ? i : m) + 1;
+  /// Whether a live session of [regimeId] already answers to this name.
+  ///
+  /// Trimmed and case-insensitive, matching [isNameTaken] and matching the
+  /// index that backs it — `idx_sessions_name_live` keys on
+  /// `lower(trim(name))`, so the two cannot disagree about what a duplicate is.
+  Future<bool> isSessionNameTaken(
+    String regimeId,
+    String name, {
+    String? exceptId,
+  }) async {
+    final wanted = name.trim().toLowerCase();
+    if (wanted.isEmpty) return false;
+
+    final live = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
+        .get();
+    return live.any(
+      (s) => s.id != exceptId && s.name.trim().toLowerCase() == wanted,
+    );
+  }
+
+  /// Every live session name in a regime, trimmed and lowercased — what a
+  /// prompt checks its field against while it is being typed.
+  Future<Set<String>> liveSessionNames(
+    String regimeId, {
+    String? exceptId,
+  }) async {
+    final live = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
+        .get();
+    return {
+      for (final s in live)
+        if (s.id != exceptId) s.name.trim().toLowerCase(),
+    };
+  }
 
   Future<void> renameSession(String sessionId, String name) async {
     if (name.trim().isEmpty) throw const BlankNameException('session');
-    await (db.update(db.sessions)..where((t) => t.id.equals(sessionId))).write(
-      SessionsCompanion(
-        name: Value(name),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
+    await db.transaction(() async {
+      final session = await (db.select(db.sessions)
+            ..where((t) => t.id.equals(sessionId)))
+          .getSingleOrNull();
+      if (session == null) return;
+      if (await isSessionNameTaken(
+        session.regimeId,
+        name,
+        exceptId: sessionId,
+      )) {
+        throw SessionNameTakenException(name);
+      }
+      await (db.update(db.sessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        SessionsCompanion(
+          name: Value(name),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
   }
 
   /// Soft delete — past workouts keep pointing at the session, so history
@@ -365,24 +443,42 @@ class RegimeRepository {
     await (db.update(db.sessions)..where((t) => t.id.equals(sessionId))).write(
       SessionsCompanion(
         deletedAt: Value(nowMs()),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
     );
   }
 
+  /// Two passes through free ground — see [renumber]. A single pass writes a
+  /// position a surviving row still holds, and `idx_sessions_position_live`
+  /// refuses it mid-transaction.
   Future<void> reorderSessions(List<String> orderedIds) async {
+    if (orderedIds.isEmpty) return;
     await db.transaction(() async {
-      for (var i = 0; i < orderedIds.length; i++) {
-        await (db.update(db.sessions)..where((t) => t.id.equals(orderedIds[i])))
-            .write(
-          SessionsCompanion(
-            orderIndex: Value(i),
-            updatedAt: Value(nowMs()),
-            dirty: const Value(true),
-          ),
-        );
-      }
+      final live = await (db.select(db.sessions)
+            ..where((t) => t.id.isIn(orderedIds) & t.deletedAt.isNull()))
+          .get();
+      if (live.isEmpty) return;
+      final scope = await (db.select(db.sessions)
+            ..where((t) =>
+                t.regimeId.equals(live.first.regimeId) & t.deletedAt.isNull()))
+          .get();
+
+      await renumber(
+        orderedIds,
+        from: nextPosition(scope.map((s) => s.orderIndex)),
+        write: (id, orderIndex) async {
+          await (db.update(db.sessions)..where((t) => t.id.equals(id))).write(
+            SessionsCompanion(
+              orderIndex: Value(orderIndex),
+              deviceId: Value(currentDeviceId),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+        },
+      );
     });
   }
 
@@ -401,7 +497,7 @@ class RegimeRepository {
               id: Value(id),
               sessionId: sessionId,
               exerciseId: exerciseId,
-              orderIndex: _nextIndex([for (final s in existing) s.orderIndex]),
+              orderIndex: nextPosition([for (final s in existing) s.orderIndex]),
             ),
           );
     });
@@ -412,6 +508,7 @@ class RegimeRepository {
     await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
       SessionExercisesCompanion(
         deletedAt: Value(nowMs()),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -425,6 +522,7 @@ class RegimeRepository {
     await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
       SessionExercisesCompanion(
         deletedAt: const Value(null),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -451,25 +549,42 @@ class RegimeRepository {
         notes: notes,
         deloadSetDelta: deloadSetDelta,
         deloadWeightPct: deloadWeightPct,
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
     );
   }
 
+  /// Two passes through free ground, for the reason [reorderSessions] gives.
   Future<void> reorderSessionExercises(List<String> orderedIds) async {
+    if (orderedIds.isEmpty) return;
     await db.transaction(() async {
-      for (var i = 0; i < orderedIds.length; i++) {
-        await (db.update(db.sessionExercises)
-              ..where((t) => t.id.equals(orderedIds[i])))
-            .write(
-          SessionExercisesCompanion(
-            orderIndex: Value(i),
-            updatedAt: Value(nowMs()),
-            dirty: const Value(true),
-          ),
-        );
-      }
+      final live = await (db.select(db.sessionExercises)
+            ..where((t) => t.id.isIn(orderedIds) & t.deletedAt.isNull()))
+          .get();
+      if (live.isEmpty) return;
+      final scope = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(live.first.sessionId) &
+                t.deletedAt.isNull()))
+          .get();
+
+      await renumber(
+        orderedIds,
+        from: nextPosition(scope.map((s) => s.orderIndex)),
+        write: (id, orderIndex) async {
+          await (db.update(db.sessionExercises)..where((t) => t.id.equals(id)))
+              .write(
+            SessionExercisesCompanion(
+              orderIndex: Value(orderIndex),
+              deviceId: Value(currentDeviceId),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+        },
+      );
     });
   }
 
@@ -529,6 +644,7 @@ class RegimeRepository {
         formVideoUrls: videos,
         notes: notes,
         archived: archived,
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),

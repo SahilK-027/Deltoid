@@ -540,10 +540,17 @@ class BackupService {
 
     final counts = decoded['counts'];
     return BackupSummary(
+      // The counts are a header, not the data — they say what the restore is
+      // about to write so the prompt can quote a number. A cast straight to
+      // `num` threw a raw `TypeError` on a file whose counts were anything
+      // else, which is not the `FormatException` this method's callers handle
+      // by name. A count that cannot be read is a count this file does not
+      // have; the rows themselves are still checked properly on the way in.
       counts: {
         if (counts is Map)
           for (final entry in counts.entries)
-            entry.key.toString(): (entry.value as num).toInt(),
+            if (entry.value is num)
+              entry.key.toString(): (entry.value as num).toInt(),
       },
       exportedAt: DateTime.tryParse(decoded['exportedAt']?.toString() ?? '')
               ?.toLocal() ??
@@ -637,18 +644,26 @@ class BackupService {
           ));
         }
       }
-    });
 
-    // A pre-v5 file carries no identity slots, so every regime came in on 0 —
-    // one colour for the whole shelf, and the uniqueness the mark depends on
-    // gone. Deal them out, exactly as the schema migration does. A file that
-    // does carry slots is left alone: they are the colours the user has been
-    // looking at.
-    final regimeRows = data['regimes'];
-    final needsSlots = regimeRows is List &&
-        regimeRows.any((row) =>
-            row is Map && !row.containsKey('identityIndex'));
-    if (needsSlots) await backfillIdentityIndexes(db);
+      // A pre-v5 file carries no identity slots, so every regime came in on 0 —
+      // one colour for the whole shelf, and the uniqueness the mark depends on
+      // gone. Deal them out, exactly as the schema migration does. A file that
+      // does carry slots is left alone: they are the colours the user has been
+      // looking at.
+      //
+      // **Inside the transaction**, because it is part of restoring rather than
+      // a tidy-up after it. It ran after the commit, which left a window — a
+      // crash, a kill, a battery — where the restore had landed and every
+      // regime in it was wearing the same hue, with `nextIdentitySlot` then
+      // handing slot 1 to the next new regime while five sat on 0. That is the
+      // exact collision the column was added to prevent, reached through the
+      // one screen that exists to put a history back.
+      final regimeRows = data['regimes'];
+      final needsSlots = regimeRows is List &&
+          regimeRows.any((row) =>
+              row is Map && !row.containsKey('identityIndex'));
+      if (needsSlots) await backfillIdentityIndexes(db);
+    });
 
     // A restore is the one moment the database goes from empty to a decade in
     // a single act, so the planner statistics gathered at open describe a

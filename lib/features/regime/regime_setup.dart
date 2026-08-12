@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../core/widgets/toast.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../data/seed/seed_data.dart';
 import '../../data/seed/seeder.dart';
@@ -64,23 +65,47 @@ Future<String?> createRegimeFlow(
         ? 'A regime called ${value.trim()} already exists'
         : null,
   );
-  if (name == null) return null;
+  if (name == null || !context.mounted) return null;
 
   final db = ref.read(databaseProvider);
+  // Held rather than reached for after the write: this flow is called from a
+  // row that the new regime's own arrival can take off the screen (RULES § 4).
+  final messenger = ScaffoldMessenger.of(context);
   final trimmed = name.trim();
 
-  if (template.isBlank) {
-    return repo.createRegime(
-      trimmed.isEmpty ? 'My regime' : trimmed,
+  // Both paths below throw by design — a name already taken, the last identity
+  // slot gone — and both were called bare. The checks above make that unlikely
+  // rather than impossible: `full` and the name validator are read *before the
+  // sheet opens*, so the throw is the fallback for exactly the window they
+  // cannot cover. Uncaught it takes the whole flow down from inside a gesture
+  // handler, which shows as a Create button that does nothing at all.
+  try {
+    if (template.isBlank) {
+      return await repo.createRegime(
+        trimmed.isEmpty ? 'My regime' : trimmed,
+        activate: activate,
+      );
+    }
+    return await createRegimeFromTemplate(
+      db,
+      template,
+      name: trimmed,
       activate: activate,
     );
+  } on RegimeNameTakenException catch (e) {
+    showToastOn(messenger, '${e.name} is already taken', destructive: true);
+    return null;
+  } on RegimeSlotsFullException {
+    showToastOn(
+      messenger,
+      'Delete a regime before creating another',
+      destructive: true,
+    );
+    return null;
+  } on BlankNameException {
+    showToastOn(messenger, 'A regime needs a name', destructive: true);
+    return null;
   }
-  return createRegimeFromTemplate(
-    db,
-    template,
-    name: trimmed,
-    activate: activate,
-  );
 }
 
 /// One offer: blank, or one of the two templates.

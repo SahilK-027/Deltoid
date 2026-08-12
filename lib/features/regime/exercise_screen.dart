@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/failure.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
@@ -490,20 +492,28 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       });
       return;
     }
-    _repo.updateExercise(
-      exercise.id,
-      name: name == null ? const Value.absent() : Value(name),
-      muscle: muscle == null ? const Value.absent() : Value(muscle),
-      equipment:
-          equipment == null ? const Value.absent() : Value(equipment),
-      loadMode: loadMode == null ? const Value.absent() : Value(loadMode),
-      barKind: barKind == null ? const Value.absent() : Value(barKind),
-      measureMode:
-          measureMode == null ? const Value.absent() : Value(measureMode),
-      notes: notes == _unset
-          ? const Value.absent()
-          : Value(notes as String?),
-    );
+    // Not awaited — this is a row tap on a save-as-you-go screen, and every
+    // caller is a `void` handler. So it says out loud that it is not being
+    // watched, and reports anyway: load mode in particular re-reads every set
+    // ever logged against this movement, and a failure that only reverted the
+    // row on the next rebuild would look like the tap missed.
+    _repo
+        .updateExercise(
+          exercise.id,
+          name: name == null ? const Value.absent() : Value(name),
+          muscle: muscle == null ? const Value.absent() : Value(muscle),
+          equipment:
+              equipment == null ? const Value.absent() : Value(equipment),
+          loadMode:
+              loadMode == null ? const Value.absent() : Value(loadMode),
+          barKind: barKind == null ? const Value.absent() : Value(barKind),
+          measureMode:
+              measureMode == null ? const Value.absent() : Value(measureMode),
+          notes: notes == _unset
+              ? const Value.absent()
+              : Value(notes as String?),
+        )
+        .reportOnError('That change could not be saved.');
   }
 
   /// Asks before changing a saved exercise, and never while creating one.
@@ -575,6 +585,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       validate: (value) => taken.contains(value.trim().toLowerCase())
           ? 'There is already an exercise called ${value.trim()}'
           : null,
+      // A movement's name carries more than a programme's does — "Incline
+      // dumbbell press (neutral grip)" is one thing people write — so the
+      // catalog allows more room than a regime or a day, and this is the field
+      // that gets it.
+      maxLength: 80,
     );
     if (name == null || name.isEmpty) return;
     _apply(exercise, name: name);
@@ -947,10 +962,23 @@ class _TargetSheetState extends ConsumerState<_TargetSheet> {
     super.dispose();
   }
 
+  /// A rep bound as the slot can hold it, or null for "no target".
+  ///
+  /// The field is a number pad, which is not the same as a number: it will
+  /// accept `0`, and it will accept as many digits as you keep pressing.
+  /// Neither is a rep range — a target of zero reps is the absence of a target,
+  /// and the slot refuses both outright, so a value that got this far unbounded
+  /// would come back as a failed write rather than as a saved target.
+  static int? _bound(String text) {
+    final parsed = int.tryParse(text.trim());
+    if (parsed == null || parsed <= 0) return null;
+    return parsed > 999 ? 999 : parsed;
+  }
+
   Future<void> _save() async {
     final navigator = Navigator.of(context);
-    final low = int.tryParse(_low.text.trim());
-    var high = int.tryParse(_high.text.trim());
+    final low = _bound(_low.text);
+    var high = _bound(_high.text);
     // A range that runs backwards is a typo, not an instruction. One number is
     // a legitimate answer — `5 × 5` — and reads as a range of one.
     if (low != null && high != null && high < low) high = low;
@@ -1012,6 +1040,15 @@ class _RepField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
+          // Three digits and nothing but digits. `TextInputType.number` is a
+          // request for a keyboard, not a constraint on what arrives — a
+          // hardware keyboard, a paste or a suggestion strip all bypass it.
+          // Formatters rather than `maxLength`, which would hang a character
+          // counter under a field two characters wide.
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(3),
+          ],
           textAlign: TextAlign.center,
           style: context.t.labelLarge,
           cursorColor: c.textPrimary,

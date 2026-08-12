@@ -249,4 +249,385 @@ void main() {
         ));
     expect(await db.setLogs.count().getSingle(), 1);
   });
+
+  // ── What a row is allowed to say ────────────────────────────────────────
+  //
+  // Every check below was reachable through a restore or a merged row and
+  // through nothing else — which is exactly the writer that does not pass the
+  // repository, and exactly the writer a server becomes.
+
+  group('an enum column holds an enum value', () {
+    test('a set type nobody has heard of is refused', () async {
+      final we = await aWorkoutExercise(await aRegime());
+      await aSet(we, 0);
+      await expectLater(
+        db.customStatement("UPDATE set_logs SET set_type = 'myo'"),
+        throwsA(isA<SqliteException>()),
+        reason: 'textEnum throws on read, and takes the whole result set with '
+            'it — one bad row blanks the log, history and the chart at once',
+      );
+    });
+
+    test('a workout status nobody has heard of is refused', () async {
+      final regime = await aRegime();
+      await db.into(db.workouts).insert(WorkoutsCompanion.insert(
+          id: Value(newId()), regimeId: regime, dayKey: 20260101));
+      await expectLater(
+        db.customStatement("UPDATE workouts SET status = 'paused'"),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('every member of every enum is accepted', () async {
+      // The checks are written out by hand, so this is what catches a member
+      // added to the enum and not to the column.
+      // One exercise, one set each: `aWorkoutExercise` opens a workout, and
+      // only one may be open at a time now.
+      final we = await aWorkoutExercise(await aRegime());
+      for (var i = 0; i < SetType.values.length; i++) {
+        await db.into(db.setLogs).insert(SetLogsCompanion.insert(
+              id: Value(newId()),
+              workoutExerciseId: we,
+              setIndex: i,
+              setType: Value(SetType.values[i]),
+            ));
+      }
+      // The exercise above opened a workout to hang itself off. Only one may be
+      // open at a time, so it steps aside before the statuses are walked.
+      await db.update(db.workouts).write(
+            WorkoutsCompanion(deletedAt: Value(nowMs())),
+          );
+
+      for (final status in WorkoutStatus.values) {
+        // Only one may be `inProgress` at a time, so each is tombstoned behind
+        // the next.
+        final id = newId();
+        await db.into(db.workouts).insert(WorkoutsCompanion.insert(
+              id: Value(id),
+              regimeId: await aRegime(),
+              dayKey: 20260101,
+              status: Value(status),
+            ));
+        await (db.update(db.workouts)..where((t) => t.id.equals(id)))
+            .write(WorkoutsCompanion(deletedAt: Value(nowMs())));
+      }
+      for (final muscle in MuscleGroup.values) {
+        for (final equipment in Equipment.values) {
+          await db.into(db.exercises).insert(ExercisesCompanion.insert(
+                id: Value(newId()),
+                name: 'x',
+                muscle: muscle,
+                equipment: equipment,
+                loadMode: LoadMode.total,
+              ));
+        }
+      }
+      for (final mode in LoadMode.values) {
+        for (final bar in BarKind.values) {
+          for (final measure in MeasureMode.values) {
+            await db.into(db.exercises).insert(ExercisesCompanion.insert(
+                  id: Value(newId()),
+                  name: 'x',
+                  muscle: MuscleGroup.chest,
+                  equipment: Equipment.barbell,
+                  loadMode: mode,
+                  barKind: Value(bar),
+                  measureMode: Value(measure),
+                ));
+          }
+        }
+      }
+      for (final reason in SkipReason.values) {
+        final regime = await aRegime();
+        final workout = newId();
+        await db.into(db.workouts).insert(WorkoutsCompanion.insert(
+              id: Value(workout),
+              regimeId: regime,
+              dayKey: 20260101,
+              // Finished, because only one session may be open at a time.
+              status: const Value(WorkoutStatus.completed),
+            ));
+        final exercise = newId();
+        await db.into(db.exercises).insert(ExercisesCompanion.insert(
+              id: Value(exercise),
+              name: 'Bench',
+              muscle: MuscleGroup.chest,
+              equipment: Equipment.barbell,
+              loadMode: LoadMode.total,
+            ));
+        await db.into(db.workoutExercises).insert(
+            WorkoutExercisesCompanion.insert(
+                id: Value(newId()),
+                workoutId: workout,
+                exerciseId: exercise,
+                orderIndex: 0,
+                skipReason: Value(reason)));
+      }
+    });
+  });
+
+  group('one session is open at a time', () {
+    Future<String> aWorkout(String regime, {required WorkoutStatus status}) async {
+      final id = newId();
+      await db.into(db.workouts).insert(WorkoutsCompanion.insert(
+            id: Value(id),
+            regimeId: regime,
+            dayKey: 20260101,
+            status: Value(status),
+          ));
+      return id;
+    }
+
+    test('a second open workout is refused', () async {
+      final regime = await aRegime();
+      await aWorkout(regime, status: WorkoutStatus.inProgress);
+      await expectLater(
+        aWorkout(regime, status: WorkoutStatus.inProgress),
+        throwsA(isA<SqliteException>()),
+        reason: 'the older one would be hidden behind the newer for good — '
+            'unreachable, in progress forever, and counted by nothing',
+      );
+    });
+
+    test('a second open workout under another regime is refused too', () async {
+      await aWorkout(await aRegime(), status: WorkoutStatus.inProgress);
+      await expectLater(
+        aWorkout(await aRegime(), status: WorkoutStatus.inProgress),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('any number of finished workouts is fine', () async {
+      final regime = await aRegime();
+      await aWorkout(regime, status: WorkoutStatus.completed);
+      await aWorkout(regime, status: WorkoutStatus.completed);
+      await aWorkout(regime, status: WorkoutStatus.inProgress);
+      expect(await db.workouts.count().getSingle(), 3);
+    });
+
+    test('a discarded session frees the slot', () async {
+      final regime = await aRegime();
+      final open = await aWorkout(regime, status: WorkoutStatus.inProgress);
+      await (db.update(db.workouts)..where((t) => t.id.equals(open))).write(
+        WorkoutsCompanion(
+          status: const Value(WorkoutStatus.abandoned),
+          deletedAt: Value(nowMs()),
+        ),
+      );
+      await aWorkout(regime, status: WorkoutStatus.inProgress);
+      expect(await db.workouts.count().getSingle(), 2);
+    });
+  });
+
+  group('a position is unique among live rows', () {
+    Future<String> aSession(String regime, int order, {String name = 'Push'}) async {
+      final id = newId();
+      await db.into(db.sessions).insert(SessionsCompanion.insert(
+          id: Value(id), regimeId: regime, name: name, orderIndex: order));
+      return id;
+    }
+
+    test('two live sessions cannot share a position', () async {
+      final regime = await aRegime();
+      await aSession(regime, 0, name: 'Push');
+      await expectLater(
+        aSession(regime, 0, name: 'Pull'),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('the same position under another regime is fine', () async {
+      await aSession(await aRegime(), 0);
+      await aSession(await aRegime(), 0);
+      expect(await db.sessions.count().getSingle(), 2);
+    });
+
+    test('a deleted session frees its position', () async {
+      final regime = await aRegime();
+      final first = await aSession(regime, 0, name: 'Push');
+      await (db.update(db.sessions)..where((t) => t.id.equals(first)))
+          .write(SessionsCompanion(deletedAt: Value(nowMs())));
+      await aSession(regime, 0, name: 'Pull');
+      expect(await db.sessions.count().getSingle(), 2);
+    });
+
+    test('two live slots cannot share a position in a workout', () async {
+      final regime = await aRegime();
+      final workout = newId();
+      await db.into(db.workouts).insert(WorkoutsCompanion.insert(
+          id: Value(workout), regimeId: regime, dayKey: 20260101));
+      final exercise = newId();
+      await db.into(db.exercises).insert(ExercisesCompanion.insert(
+            id: Value(exercise),
+            name: 'Bench',
+            muscle: MuscleGroup.chest,
+            equipment: Equipment.barbell,
+            loadMode: LoadMode.total,
+          ));
+      Future<void> slot(int order) =>
+          db.into(db.workoutExercises).insert(WorkoutExercisesCompanion.insert(
+              id: Value(newId()),
+              workoutId: workout,
+              exerciseId: exercise,
+              orderIndex: order));
+
+      await slot(0);
+      await expectLater(slot(0), throwsA(isA<SqliteException>()));
+    });
+  });
+
+  group('a day answers to one name in its regime', () {
+    Future<String> named(String regime, String name) async {
+      final id = newId();
+      await db.into(db.sessions).insert(SessionsCompanion.insert(
+          id: Value(id),
+          regimeId: regime,
+          name: name,
+          orderIndex: await db.sessions.count().getSingle()));
+      return id;
+    }
+
+    test('the same name twice in one regime is refused', () async {
+      final regime = await aRegime();
+      await named(regime, 'Push 1');
+      await expectLater(
+        named(regime, 'Push 1'),
+        throwsA(isA<SqliteException>()),
+        reason: 'the prefill disclosure names the day it borrowed from, and '
+            'two of them makes that sentence ambiguous',
+      );
+    });
+
+    test('case and surrounding space are not a difference', () async {
+      final regime = await aRegime();
+      await named(regime, 'Push 1');
+      await expectLater(
+        named(regime, '  push 1 '),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('two regimes may each have a Push 1', () async {
+      await named(await aRegime(), 'Push 1');
+      await named(await aRegime(), 'Push 1');
+      expect(await db.sessions.count().getSingle(), 2);
+    });
+  });
+
+  group('a number that cannot mean anything', () {
+    test('a deload at 0% of last week is refused', () async {
+      await expectLater(
+        db.into(db.regimes).insert(RegimesCompanion.insert(
+            id: Value(newId()),
+            name: 'R',
+            deloadWeightPct: const Value(0))),
+        throwsA(isA<SqliteException>()),
+        reason: 'a light week prefilled at nothing at all',
+      );
+    });
+
+    test('a deload that adds sets is refused', () async {
+      await expectLater(
+        db.into(db.regimes).insert(RegimesCompanion.insert(
+            id: Value(newId()), name: 'R', deloadSetDelta: const Value(2))),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('a deload every zero cycles is refused', () async {
+      await expectLater(
+        db.into(db.regimes).insert(RegimesCompanion.insert(
+            id: Value(newId()),
+            name: 'R',
+            deloadAfterCycles: const Value(0))),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('a rep range that runs backwards is refused', () async {
+      final regime = await aRegime();
+      final session = newId();
+      await db.into(db.sessions).insert(SessionsCompanion.insert(
+          id: Value(session), regimeId: regime, name: 'Push', orderIndex: 0));
+      final exercise = newId();
+      await db.into(db.exercises).insert(ExercisesCompanion.insert(
+            id: Value(exercise),
+            name: 'Bench',
+            muscle: MuscleGroup.chest,
+            equipment: Equipment.barbell,
+            loadMode: LoadMode.total,
+          ));
+      await expectLater(
+        db.into(db.sessionExercises).insert(SessionExercisesCompanion.insert(
+              id: Value(session),
+              sessionId: session,
+              exerciseId: exercise,
+              orderIndex: 0,
+              targetRepLow: const Value(8),
+              targetRepHigh: const Value(5),
+            )),
+        throwsA(isA<SqliteException>()),
+        reason: '8-5 reads as a range, sorts as a range and prints as one',
+      );
+    });
+
+    test('a day that is not a day is refused', () async {
+      await expectLater(
+        db.into(db.workouts).insert(WorkoutsCompanion.insert(
+            id: Value(newId()), regimeId: await aRegime(), dayKey: 0)),
+        throwsA(isA<SqliteException>()),
+        reason: 'dateFromDayKey does arithmetic on this — 0 is year zero, and '
+            'the calendar scrolls silently to it',
+      );
+    });
+
+    test('a session that ended before it started is refused', () async {
+      await expectLater(
+        db.into(db.workouts).insert(WorkoutsCompanion.insert(
+              id: Value(newId()),
+              regimeId: await aRegime(),
+              dayKey: 20260101,
+              startedAt: const Value(2000),
+              endedAt: const Value(1000),
+            )),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('a set cannot be a leg of itself', () async {
+      final we = await aWorkoutExercise(await aRegime());
+      final id = newId();
+      await db.into(db.setLogs).insert(SetLogsCompanion.insert(
+          id: Value(id), workoutExerciseId: we, setIndex: 0));
+      await expectLater(
+        (db.update(db.setLogs)..where((t) => t.id.equals(id)))
+            .write(SetLogsCompanion(parentSetId: Value(id))),
+        throwsA(isA<SqliteException>()),
+        reason: 'a drop group with no head to draw and no end to walk to',
+      );
+    });
+
+    test('a bodyweight nobody has is refused', () async {
+      await expectLater(
+        db.into(db.bodyweightLogs).insert(BodyweightLogsCompanion.insert(
+            id: Value(newId()), dayKey: 20260101, weightKg: 850)),
+        throwsA(isA<SqliteException>()),
+        reason: 'it is interpolated into every pull-up either side of it',
+      );
+    });
+
+    test('a name that is nothing but space is refused by the column too',
+        () async {
+      await expectLater(
+        db.into(db.sessions).insert(SessionsCompanion.insert(
+            id: Value(newId()),
+            regimeId: await aRegime(),
+            name: '   ',
+            orderIndex: 0)),
+        throwsA(isA<SqliteException>()),
+        reason: 'BlankNameException guards the repository; this guards the '
+            'writer that does not go through it',
+      );
+    });
+  });
 }

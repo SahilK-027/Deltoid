@@ -15,6 +15,14 @@ import 'converters.dart';
 /// [updatedAt] drives last-write-wins merging, [deletedAt] is a tombstone so a
 /// delete on one device propagates instead of being resurrected by the other,
 /// and [dirty] marks rows the local device still owes the server.
+///
+/// [deviceId] is **the device that wrote the version in front of you**, not the
+/// one that created the row. `clientDefault` only fires on an insert, so this
+/// used to name the creator for the rest of the row's life — and last-write-wins
+/// breaks a same-millisecond tie on it, which meant both devices compared the
+/// same originating id, found it equal, and each kept its own copy. Every write
+/// stamps it now; see `stampedNow` in `lib/core/ids.dart` for the trio that
+/// travels together.
 mixin SyncColumns on Table {
   TextColumn get id => text().clientDefault(newId)();
   IntColumn get updatedAt => integer().clientDefault(nowMs)();
@@ -25,6 +33,13 @@ mixin SyncColumns on Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// A tombstone is set once and never moved backwards past the row's own birth.
+///
+/// Table-level rather than per-column because it is the one rule every syncable
+/// table shares, and a restore or a merge is exactly the writer that can put a
+/// delete before the insert it deletes.
+const _liveOrTombstoned = 'CHECK (deleted_at IS NULL OR deleted_at > 0)';
 
 /// The exercise catalog. Shared across every regime — swapping PPL for
 /// upper/lower reuses these rows, which is what keeps history comparable.
@@ -56,6 +71,32 @@ class Exercises extends Table with SyncColumns {
       text().map(const StringListConverter()).withDefault(const Constant('[]'))();
   TextColumn get notes => text().nullable()();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
+
+  /// An enum column is read back through `textEnum`, which **throws on a value
+  /// it does not know** — and not for the one row, but for every read of the
+  /// table, because a single bad string fails the whole result set. So an
+  /// unparseable movement would take the catalog, the log and history down
+  /// together. The app can only ever write a name from the enum; a restore or a
+  /// merged row is the writer this refuses.
+  ///
+  /// The lengths are here for the same reason the checks are: nothing in the UI
+  /// can type a 10 MB name, and a row that arrives with one breaks every screen
+  /// that draws it and every backup that carries it.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (length(name) BETWEEN 1 AND 80)',
+        'CHECK (notes IS NULL OR length(notes) <= 4000)',
+        "CHECK (muscle IN ('chest', 'back', 'shoulders', 'biceps', 'triceps', "
+            "'forearms', 'quads', 'hamstrings', 'glutes', 'calves', 'core', "
+            "'other'))",
+        "CHECK (equipment IN ('barbell', 'dumbbell', 'machine', 'cable', "
+            "'bodyweight', 'band', 'other'))",
+        "CHECK (load_mode IN ('total', 'perSide', 'bodyweight', "
+            "'bodyweightPlus'))",
+        "CHECK (measure_mode IN ('reps', 'hold'))",
+        "CHECK (bar_kind IN ('none', 'olympic', 'womens', 'ez', 'trap'))",
+      ];
 }
 
 /// A training programme: an ordered set of sessions plus its deload policy.
@@ -99,18 +140,79 @@ class Regimes extends Table with SyncColumns {
   IntColumn get identityIndex => integer().withDefault(const Constant(0))();
 
   IntColumn get createdAt => integer().clientDefault(nowMs)();
+
+  /// The deload figures are the ones worth constraining hardest, because they
+  /// are read straight into a suggestion and a wrong one is plausible rather
+  /// than obviously broken: a `deload_weight_pct` of 0 prefills a light week at
+  /// nothing at all, and `deload_after_cycles` of 0 asks `planNextCycle` when
+  /// to deload against a period of zero cycles. Both are unreachable through
+  /// the settings screen and both are one bad row away from a restore.
+  ///
+  /// `deload_set_delta` is documented as negative and was enforced nowhere; a
+  /// positive one adds sets to a light week.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (length(name) BETWEEN 1 AND 60)',
+        'CHECK (deload_after_cycles BETWEEN 1 AND 52)',
+        'CHECK (deload_weight_pct BETWEEN 1 AND 100)',
+        'CHECK (deload_set_delta BETWEEN -20 AND 0)',
+        'CHECK (identity_index BETWEEN 0 AND ${identitySlots - 1})',
+        'CHECK (created_at > 0)',
+      ];
 }
 
 /// One training day template within a regime: "Push 1", "Pull 2", "Lower A".
 @TableIndex(name: 'idx_sessions_regime', columns: {#regimeId})
+/// No two live sessions in a regime share a position.
+///
+/// `set_logs` has carried this rule since a `+` inside a deleted drop group put
+/// two sets on one index; it is the same rule and the same failure, and the
+/// programme's running order is what breaks instead of the set table. Every
+/// append here already takes one past the highest live position rather than the
+/// live count — this is what holds when the write is a restore or a merge
+/// rather than a tap.
+///
+/// A reorder therefore cannot renumber in place: writing position 0 onto the
+/// row currently at 1 collides with the row still sitting at 0. See
+/// `renumber` in `regime_repository.dart` for the two-pass that avoids it.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_sessions_position_live '
+  'ON sessions (regime_id, order_index) WHERE deleted_at IS NULL',
+)
+/// One name per regime, compared the way a person compares them.
+///
+/// The whole app turns on which *session* a number came from — the prefill
+/// disclosure says "borrowed from Push 1 on 3 March" and History filters by the
+/// day's name. Two live sessions called `Push 1` in one regime makes every one
+/// of those sentences ambiguous, and there is nothing else on screen to tell
+/// them apart. `regimes` has answered to this rule since the same shelf of
+/// identical names got built there; sessions were left open.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_sessions_name_live '
+  'ON sessions (regime_id, lower(trim(name))) WHERE deleted_at IS NULL',
+)
 class Sessions extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   TextColumn get name => text()();
   IntColumn get orderIndex => integer()();
+
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (length(trim(name)) BETWEEN 1 AND 60)',
+        'CHECK (order_index >= 0)',
+      ];
 }
 
 /// An exercise slot inside a session template.
 @TableIndex(name: 'idx_session_exercises_session', columns: {#sessionId})
+/// No two live slots in a session share a position — see [Sessions] for the
+/// rule and for what it costs a reorder.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_session_exercises_position_live '
+  'ON session_exercises (session_id, order_index) WHERE deleted_at IS NULL',
+)
 class SessionExercises extends Table with SyncColumns {
   TextColumn get sessionId => text().references(Sessions, #id)();
   TextColumn get exerciseId => text().references(Exercises, #id)();
@@ -130,6 +232,27 @@ class SessionExercises extends Table with SyncColumns {
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   IntColumn get deloadSetDelta => integer().nullable()();
   IntColumn get deloadWeightPct => integer().nullable()();
+
+  /// A rep range that runs backwards is the one shape here that no single
+  /// column can refuse: `8–5` reads as a range, sorts as a range, and prints on
+  /// the slot as one. Both fields are optional and either may stand alone, so
+  /// the rule only bites when both are present.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (order_index >= 0)',
+        'CHECK (target_sets BETWEEN 1 AND 99)',
+        'CHECK (target_rep_low IS NULL OR target_rep_low BETWEEN 1 AND 999)',
+        'CHECK (target_rep_high IS NULL OR target_rep_high BETWEEN 1 AND 999)',
+        'CHECK (target_rep_low IS NULL OR target_rep_high IS NULL '
+            'OR target_rep_low <= target_rep_high)',
+        'CHECK (rest_seconds IS NULL OR rest_seconds BETWEEN 1 AND 3600)',
+        'CHECK (deload_set_delta IS NULL '
+            'OR deload_set_delta BETWEEN -20 AND 0)',
+        'CHECK (deload_weight_pct IS NULL '
+            'OR deload_weight_pct BETWEEN 1 AND 100)',
+        'CHECK (notes IS NULL OR length(notes) <= 4000)',
+      ];
 }
 
 /// One full pass through every session in a regime.
@@ -152,6 +275,18 @@ class Cycles extends Table with SyncColumns {
   IntColumn get startedAt => integer().clientDefault(nowMs)();
   IntColumn get completedAt => integer().nullable()();
   BoolColumn get isDeload => boolean().withDefault(const Constant(false))();
+
+  /// Cycles number from 1 — `planNextCycle` counts up from the last one, and a
+  /// zeroth cycle would make "Cycle 0" a thing Today can say. A cycle that
+  /// finished before it started is the same class of nonsense one table down;
+  /// see [Workouts].
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (cycle_index >= 1)',
+        'CHECK (started_at > 0)',
+        'CHECK (completed_at IS NULL OR completed_at >= started_at)',
+      ];
 }
 
 /// One instance of training — a session actually performed on a day.
@@ -165,6 +300,23 @@ class Cycles extends Table with SyncColumns {
 /// thirty years, so this buys under two milliseconds. It is here because it
 /// costs nothing to declare while the schema is still free to change.
 @TableIndex(name: 'idx_workouts_started', columns: {#startedAt, #id})
+/// One session is open at a time, enforced here rather than only in the check
+/// `startWorkout` makes.
+///
+/// That check is a read, and it happens before the transaction that writes the
+/// rows — so two taps inside the write window both found nothing running and
+/// both opened a log. `openWorkout` returns the newest by `startedAt`, so the
+/// older one is then hidden behind it: unreachable from any screen, `inProgress`
+/// for good, and counted by nothing. Today's Start button guards against the
+/// double tap; the backfill sheet is a second door onto the same write, and a
+/// sync pull is a third.
+///
+/// The same shape as `idx_regimes_single_active`: with the index filtered to
+/// one value, every row in it collides.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_workouts_single_open '
+  "ON workouts (status) WHERE status = 'inProgress' AND deleted_at IS NULL",
+)
 class Workouts extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   TextColumn get sessionId => text().nullable().references(Sessions, #id)();
@@ -178,6 +330,26 @@ class Workouts extends Table with SyncColumns {
   TextColumn get status =>
       textEnum<WorkoutStatus>().withDefault(const Constant('inProgress'))();
   TextColumn get notes => text().nullable()();
+
+  /// `day_key` is what the heatmap and the calendar group on; `started_at` is
+  /// what History pages by. Every write in the app sets the two from one
+  /// `DateTime` — `setWorkoutDate` moves them together for exactly this reason —
+  /// but nothing made them agree, so a restored or merged row could put one
+  /// session on two different days at once: ringed on Tuesday in the grid, filed
+  /// under Monday in the feed, and reachable from neither reliably.
+  ///
+  /// The range is a real one rather than a sanity bound. `dateFromDayKey` does
+  /// arithmetic on this, so `0` is a `DateTime` in year zero and the calendar
+  /// silently scrolls to it.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (day_key BETWEEN 19000101 AND 21001231)',
+        'CHECK (started_at > 0)',
+        'CHECK (ended_at IS NULL OR ended_at >= started_at)',
+        'CHECK (notes IS NULL OR length(notes) <= 4000)',
+        "CHECK (status IN ('planned', 'inProgress', 'completed', 'abandoned'))",
+      ];
 }
 
 /// An exercise as performed in a specific workout.
@@ -186,6 +358,13 @@ class Workouts extends Table with SyncColumns {
 /// reordering or swapping mid-workout must never rewrite what you did in March.
 @TableIndex(name: 'idx_workout_exercises_workout', columns: {#workoutId})
 @TableIndex(name: 'idx_workout_exercises_exercise', columns: {#exerciseId})
+/// No two live slots in a workout share a position — see [Sessions] for the
+/// rule. The log screen is a `PageView` keyed on this order, so two rows on one
+/// index means the page you swipe to is whichever way SQLite broke the tie.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_workout_exercises_position_live '
+  'ON workout_exercises (workout_id, order_index) WHERE deleted_at IS NULL',
+)
 class WorkoutExercises extends Table with SyncColumns {
   TextColumn get workoutId => text().references(Workouts, #id)();
   TextColumn get exerciseId => text().references(Exercises, #id)();
@@ -194,6 +373,16 @@ class WorkoutExercises extends Table with SyncColumns {
   TextColumn get notes => text().nullable()();
   TextColumn get skipReason =>
       textEnum<SkipReason>().withDefault(const Constant('none'))();
+
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (order_index >= 0)',
+        'CHECK (target_sets BETWEEN 1 AND 99)',
+        'CHECK (notes IS NULL OR length(notes) <= 4000)',
+        "CHECK (skip_reason IN ('none', 'failed', 'equipmentBusy', "
+            "'shortOnTime', 'injury', 'other'))",
+      ];
 }
 
 @TableIndex(name: 'idx_set_logs_parent', columns: {#workoutExerciseId})
@@ -258,6 +447,32 @@ class SetLogs extends Table with SyncColumns {
   IntColumn get completedAt => integer().nullable()();
   TextColumn get note => text().nullable()();
   BoolColumn get isDone => boolean().withDefault(const Constant(false))();
+
+  /// A set cannot be a leg of itself. The column is a real reference now, so
+  /// the database already refuses a head that names no set — but it will happily
+  /// accept a row pointing at its own id, and the drop group that describes has
+  /// no head to draw and no end to walk to.
+  ///
+  /// The upper bounds are the other half of the checks above. `weight >= 0`
+  /// refuses the assisted-lift minus sign that made a negative load scoreable;
+  /// these refuse the misplaced decimal on the other side, where a set of
+  /// 1 000 000 kg becomes the top set of the chart forever and rescales every
+  /// axis it appears on. `reps` carries seconds on a hold, so its ceiling is
+  /// generous enough for a very long plank and still short of a stuck timer.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (parent_set_id IS NULL OR parent_set_id <> id)',
+        'CHECK (weight IS NULL OR weight <= 2000)',
+        'CHECK (added_weight IS NULL OR added_weight <= 2000)',
+        'CHECK (reps IS NULL OR reps <= 86400)',
+        'CHECK (partial_reps IS NULL OR partial_reps <= 999)',
+        'CHECK (rest_seconds IS NULL OR rest_seconds BETWEEN 0 AND 86400)',
+        'CHECK (completed_at IS NULL OR completed_at > 0)',
+        'CHECK (note IS NULL OR length(note) <= 4000)',
+        "CHECK (set_type IN ('warmup', 'working', 'backoff', 'drop', "
+            "'restPause', 'amrap'))",
+      ];
 }
 
 /// Needed to make bodyweight lifts comparable over time: 7 pull-ups at 70kg
@@ -289,6 +504,18 @@ class BodyweightLogs extends Table with SyncColumns {
   /// A bodyweight of zero is not a light reading, it is a missing one — and it
   /// divides into every bodyweight-scored lift on the day it lands.
   RealColumn get weightKg => real().check(weightKg.isBiggerThanValue(0))();
+
+  /// The ceiling matters as much as the floor, and for the same reason: this
+  /// number is not read on its own, it is interpolated between neighbours and
+  /// multiplied into every pull-up and dip around it. A fat-fingered `850`
+  /// rescales weeks of history either side of the day it lands on, and the
+  /// screen it lands on shows one number that looks merely wrong.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (day_key BETWEEN 19000101 AND 21001231)',
+        'CHECK (weight_kg < 500)',
+      ];
 }
 
 /// Key/value store for local preferences and sync bookkeeping
@@ -299,4 +526,10 @@ class AppSettings extends Table {
 
   @override
   Set<Column> get primaryKey => {key};
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (length(key) BETWEEN 1 AND 100)',
+        'CHECK (length(value) <= 4000)',
+      ];
 }

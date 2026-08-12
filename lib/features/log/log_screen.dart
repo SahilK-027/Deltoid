@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../core/failure.dart';
 import '../../core/providers.dart';
 import '../../core/rest_alert.dart';
 import '../../core/workout_notifications.dart';
@@ -223,6 +224,14 @@ class _LogScreenState extends ConsumerState<LogScreen>
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
+        // Whatever was typed in the last 300ms goes in before the process can
+        // be taken away. `dispose` flushes for every ordinary way of leaving
+        // this screen, and Android's way of ending an app is not one of them:
+        // backgrounded, the process is killed without ever unwinding the tree,
+        // so the pending keystroke went with it. One digit, one set — the same
+        // number the debounce exists to avoid writing eight times, lost for the
+        // one reason it must not be.
+        _flushWrite();
         final startedAt = _restStartedAt;
         if (startedAt != null && !_restAlerted) {
           WorkoutNotifications.instance
@@ -901,9 +910,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
     switch (pending.target.field) {
       case SetField.weight:
-        repo.updateSet(pending.target.setId, weight: Value(parsed));
+        repo
+            .updateSet(pending.target.setId, weight: Value(parsed))
+            .reportOnError('That weight could not be saved.');
       case SetField.added:
-        repo.updateSet(pending.target.setId, addedWeight: Value(parsed));
+        repo
+            .updateSet(pending.target.setId, addedWeight: Value(parsed))
+            .reportOnError('That weight could not be saved.');
       case SetField.reps:
         // A clock buffer is digits, not a number: `225` is 145 seconds, and
         // `int.parse` would store it as two hundred and twenty-five.
@@ -911,11 +924,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
             ? secondsFromDigits(pending.value)
             : typed?.round();
         final value = Value(count == 0 ? null : count);
-        repo.updateSet(
-          pending.target.setId,
-          reps: _partialField ? const Value.absent() : value,
-          partialReps: _partialField ? value : const Value.absent(),
-        );
+        repo
+            .updateSet(
+              pending.target.setId,
+              reps: _partialField ? const Value.absent() : value,
+              partialReps: _partialField ? value : const Value.absent(),
+            )
+            .reportOnError('That count could not be saved.');
     }
   }
 
@@ -976,7 +991,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
               from.setId,
               isDone: const Value(true),
               restSeconds: rest == null ? const Value.absent() : Value(rest),
-            );
+            )
+            .reportOnError('That set could not be saved.');
         HapticFeedback.mediumImpact();
         // Not after the last one. The rest bar has nothing to count towards
         // with the work over, and it sits directly under the button asking you
@@ -1051,7 +1067,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
           set.id,
           isDone: Value(done),
           restSeconds: rest == null ? const Value.absent() : Value(rest),
-        );
+        )
+        .reportOnError('That set could not be saved.');
     if (!done) return;
     HapticFeedback.mediumImpact();
 
@@ -1175,12 +1192,16 @@ class _LogScreenState extends ConsumerState<LogScreen>
     switch (entry.exercise.loadMode) {
       case LoadMode.bodyweightPlus:
         if (set.addedWeight == null && ghost.addedWeight != null) {
-          repo.updateSet(setId, addedWeight: Value(ghost.addedWeight));
+          repo
+              .updateSet(setId, addedWeight: Value(ghost.addedWeight))
+              .reportOnError('Last time\'s weight could not be filled in.');
         }
       case LoadMode.total:
       case LoadMode.perSide:
         if (set.weight == null && ghost.weight != null) {
-          repo.updateSet(setId, weight: Value(ghost.weight));
+          repo
+              .updateSet(setId, weight: Value(ghost.weight))
+              .reportOnError('Last time\'s weight could not be filled in.');
         }
       case LoadMode.bodyweight:
         break;
@@ -1192,7 +1213,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // timed on the stopwatch was logged, and then immediately replaced by last
     // week's time.
     if (!skipCount && set.reps == null && ghost.reps != null) {
-      repo.updateSet(setId, reps: Value(ghost.reps));
+      repo
+          .updateSet(setId, reps: Value(ghost.reps))
+          .reportOnError('Last time\'s count could not be filled in.');
     }
   }
 
@@ -1396,20 +1419,30 @@ class _LogScreenState extends ConsumerState<LogScreen>
       }
     }
 
-    await repo.completeWorkout(detail.workout.id);
+    // False when the workout is no longer there — deleted from History while
+    // this log was open. Opening a summary of it would show a spinner over a
+    // session that does not exist, so this leaves the way it came instead.
+    if (!await repo.completeWorkout(detail.workout.id)) {
+      navigator.pop();
+      return;
+    }
 
     // Silent rolling snapshot. Finishing a session is the only moment the app
     // reliably has new data and idle time, so it is where the safety net gets
     // refreshed — failures here must never block leaving the screen.
-    unawaited(
-      BackupService(ref.read(databaseProvider))
-          .autoExport()
-          // Settings reads the newest file once, at launch, because every tab
-          // is built then — so a backup written after that was invisible until
-          // the app was restarted.
-          .then((_) => container.invalidate(lastBackupProvider))
-          .catchError((_) {}),
-    );
+    // `reportOnError` does the not-awaiting, and says why it is allowed to:
+    // this must never block leaving the screen, and it must never disappear
+    // either. The rolling snapshot is the safety net, and a net that has
+    // quietly stopped being woven is worse than no net — Settings shows the
+    // newest file's date, which simply stops advancing, with nothing anywhere
+    // to say why.
+    BackupService(ref.read(databaseProvider))
+        .autoExport()
+        // Settings reads the newest file once, at launch, because every tab
+        // is built then — so a backup written after that was invisible until
+        // the app was restarted.
+        .then((_) => container.invalidate(lastBackupProvider))
+        .reportOnError('The automatic backup did not run.');
 
     // Replaces the log rather than sitting on top of it: the session is closed,
     // and back from the summary belongs to Today, not to a set table that can

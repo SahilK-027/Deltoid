@@ -9,6 +9,7 @@ import '../../domain/prefill.dart';
 import '../../domain/session_diff.dart';
 import '../../domain/units.dart';
 import '../db/database.dart';
+import '../db/renumber.dart';
 import '../db/watch.dart';
 
 /// A workout exercise joined with its catalog row — what every log and history
@@ -355,10 +356,19 @@ class TrainingRepository {
   /// nothing and inserted one. Three open cycles for one regime, and every
   /// count downstream — the deload counter included — reading whichever came
   /// back first.
-  Future<Cycle> ensureOpenCycle(String regimeId) =>
+  /// Null when the regime is gone — deleted from the Regimes screen while
+  /// Today, the log or a chart was still watching it.
+  ///
+  /// This used to read the regime with `getSingle`, which throws on no rows. It
+  /// is reached from watched queries, so the throw landed in a stream, and every
+  /// screen reads those with `valueOrNull` — so the visible symptom of deleting
+  /// a regime under an open screen was that screen returning to its loading
+  /// state and staying there. "There is no cycle" is an answer the callers
+  /// already know how to render; an exception is not.
+  Future<Cycle?> ensureOpenCycle(String regimeId) =>
       db.transaction(() => _ensureOpenCycle(regimeId));
 
-  Future<Cycle> _ensureOpenCycle(String regimeId) async {
+  Future<Cycle?> _ensureOpenCycle(String regimeId) async {
     final open = await (db.select(db.cycles)
           ..where((t) =>
               t.regimeId.equals(regimeId) &
@@ -372,8 +382,10 @@ class TrainingRepository {
         .getSingleOrNull();
     if (open != null) return open;
 
-    final regime = await (db.select(db.regimes)..where((t) => t.id.equals(regimeId)))
-        .getSingle();
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(regimeId)))
+        .getSingleOrNull();
+    if (regime == null) return null;
     final last = await (db.select(db.cycles)
           ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull())
           ..orderBy([
@@ -432,6 +444,36 @@ class TrainingRepository {
   /// Idempotent and one query wide on a database with nothing wrong with it,
   /// which is what lets it run at every launch.
   Future<int> healDuplicateOpenCycles() async {
+    // Two steps on purpose, and the order matters for what this costs.
+    //
+    // This runs at every launch, before first paint, and on a database with
+    // nothing wrong with it the answer is "no duplicates" — so the healthy path
+    // has to stay a single read. Opening a transaction to find that out takes
+    // the write lock on the boot path of every launch for the rest of the app's
+    // life, to do nothing.
+    //
+    // So the cheap scan runs first and outside, and only a database that
+    // actually has a pair pays for the transaction — which then re-reads inside
+    // it, because the scan that decided to heal is not the one the merge is
+    // allowed to act on.
+    if (!await _hasDuplicateOpenCycles()) return 0;
+    return db.transaction(_healDuplicateOpenCycles);
+  }
+
+  Future<bool> _hasDuplicateOpenCycles() async {
+    final counted = db.cycles.id.count();
+    final rows = await (db.selectOnly(db.cycles)
+          ..addColumns([db.cycles.regimeId, counted])
+          ..where(db.cycles.completedAt.isNull() & db.cycles.deletedAt.isNull())
+          ..groupBy(
+            [db.cycles.regimeId],
+            having: counted.isBiggerThanValue(1),
+          ))
+        .get();
+    return rows.isNotEmpty;
+  }
+
+  Future<int> _healDuplicateOpenCycles() async {
     final open = await (db.select(db.cycles)
           ..where((t) => t.completedAt.isNull() & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.cycleIndex)]))
@@ -448,13 +490,14 @@ class TrainingRepository {
       final keeper = cycles.first;
       final losers = cycles.skip(1).toList();
 
-      await db.transaction(() async {
+      {
         for (final loser in losers) {
           await (db.update(db.workouts)
                 ..where((t) => t.cycleId.equals(loser.id)))
               .write(
             WorkoutsCompanion(
               cycleId: Value(keeper.id),
+              deviceId: Value(currentDeviceId),
               updatedAt: Value(nowMs()),
               dirty: const Value(true),
             ),
@@ -463,13 +506,14 @@ class TrainingRepository {
               .write(
             CyclesCompanion(
               deletedAt: Value(nowMs()),
+              deviceId: Value(currentDeviceId),
               updatedAt: Value(nowMs()),
               dirty: const Value(true),
             ),
           );
           healed++;
         }
-      });
+      }
     }
     return healed;
   }
@@ -524,10 +568,14 @@ class TrainingRepository {
     return rows.map((e) => e.sessionId).whereType<String>().toSet();
   }
 
-  Future<CycleStatus> cycleStatus(String regimeId) async {
-    final regime =
-        await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
+  /// Null when the regime is gone — see [ensureOpenCycle].
+  Future<CycleStatus?> cycleStatus(String regimeId) async {
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(regimeId)))
+        .getSingleOrNull();
+    if (regime == null) return null;
     final cycle = await ensureOpenCycle(regimeId);
+    if (cycle == null) return null;
     return CycleStatus(
       cycleId: cycle.id,
       cycleIndex: cycle.cycleIndex,
@@ -691,12 +739,19 @@ class TrainingRepository {
 
     return [
       for (final r in rows)
-        LoggedDay(
-          dayKey: r.read(db.workouts.dayKey)!,
-          workouts: r.read(counted) ?? 0,
-          isDeload: (r.read(deload) ?? 0) != 0,
-          anyWorkoutId: r.read(anyId) ?? '',
-        ),
+        // A day with no id behind it is not a day that can be opened, and it
+        // used to be handed over as one: the empty string went to the calendar
+        // as a workout to push, `workoutDetail` found nothing, and the tap
+        // landed on a screen saying the session was gone. `max(id)` over a
+        // group that produced a row cannot actually be null — the guard is for
+        // the shape of the answer, not for a case anyone has seen.
+        if (r.read(anyId) != null)
+          LoggedDay(
+            dayKey: r.read(db.workouts.dayKey)!,
+            workouts: r.read(counted) ?? 0,
+            isDeload: (r.read(deload) ?? 0) != 0,
+            anyWorkoutId: r.read(anyId)!,
+          ),
     ];
   }
 
@@ -820,9 +875,7 @@ class TrainingRepository {
         final live = await (db.select(db.sessionExercises)
               ..where((t) => t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
             .get();
-        return live.fold<int>(
-                -1, (m, s) => s.orderIndex > m ? s.orderIndex : m) +
-            1;
+        return nextPosition(live.map((s) => s.orderIndex));
       }
 
       for (final change in changes) {
@@ -850,6 +903,7 @@ class TrainingRepository {
                     // up behind it, and two slots on one index is an order the
                     // database is free to break either way.
                     orderIndex: Value(await nextOrderIndex()),
+                    deviceId: Value(currentDeviceId),
                     updatedAt: Value(nowMs()),
                     dirty: const Value(true),
                   ),
@@ -876,6 +930,7 @@ class TrainingRepository {
                   .write(
                 SessionExercisesCompanion(
                   deletedAt: Value(nowMs()),
+                  deviceId: Value(currentDeviceId),
                   updatedAt: Value(nowMs()),
                   dirty: const Value(true),
                 ),
@@ -916,17 +971,25 @@ class TrainingRepository {
           if (!wanted.contains(slot)) wanted.add(slot);
         }
 
-        for (var i = 0; i < wanted.length; i++) {
-          await (db.update(db.sessionExercises)
-                ..where((t) => t.id.equals(wanted[i].id)))
-              .write(
-            SessionExercisesCompanion(
-              orderIndex: Value(i),
-              updatedAt: Value(nowMs()),
-              dirty: const Value(true),
-            ),
-          );
-        }
+        // Two passes through free ground — see [renumber]. Applying a
+        // permutation one row at a time puts the first row it moves onto a
+        // position a surviving row still holds, and
+        // `idx_session_exercises_position_live` refuses it mid-transaction.
+        await renumber(
+          [for (final slot in wanted) slot.id],
+          from: nextPosition(live.map((s) => s.orderIndex)),
+          write: (id, orderIndex) async {
+            await (db.update(db.sessionExercises)..where((t) => t.id.equals(id)))
+                .write(
+              SessionExercisesCompanion(
+                orderIndex: Value(orderIndex),
+                deviceId: Value(currentDeviceId),
+                updatedAt: Value(nowMs()),
+                dirty: const Value(true),
+              ),
+            );
+          },
+        );
       }
     });
   }
@@ -959,17 +1022,24 @@ class TrainingRepository {
   /// Closes the current cycle early. The escape hatch for "I'm skipping leg 2
   /// this round" — without it a single missed session would stall the
   /// programme forever.
-  Future<void> advanceCycle(String regimeId) async {
-    final cycle = await ensureOpenCycle(regimeId);
-    await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
-      CyclesCompanion(
-        completedAt: Value(nowMs()),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
-    await ensureOpenCycle(regimeId);
-  }
+  /// One transaction, because the three steps only make sense together: between
+  /// closing this cycle and opening the next, the regime has no open cycle at
+  /// all, and every read of `cycleStatus` that lands there mints one of its own.
+  /// `ensureOpenCycle` is a transaction for exactly that reason; leaving the
+  /// gap open between two of them gave the race back.
+  Future<void> advanceCycle(String regimeId) => db.transaction(() async {
+        final cycle = await _ensureOpenCycle(regimeId);
+        if (cycle == null) return;
+        await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
+          CyclesCompanion(
+            completedAt: Value(nowMs()),
+            deviceId: Value(currentDeviceId),
+            updatedAt: Value(nowMs()),
+            dirty: const Value(true),
+          ),
+        );
+        await _ensureOpenCycle(regimeId);
+      });
 
   /// The cycle that was open on [at], or null when the date predates every
   /// cycle this regime has had.
@@ -1005,24 +1075,34 @@ class TrainingRepository {
   /// "UP NEXT: Push 1" over a full row of filled dots until the next workout
   /// happened to heal it. A cycle should close the moment it is satisfied,
   /// whatever satisfied it.
-  Future<bool> closeCycleIfSatisfied(String regimeId) async {
-    final sessionIds = await _sessionIds(regimeId);
-    if (sessionIds.isEmpty) return false;
+  /// One transaction, for the reason [advanceCycle] gives: the close and the
+  /// open that follows it are a single act, and the moment between them is a
+  /// regime with no open cycle.
+  ///
+  /// Safe to call from inside another transaction — drift nests this as a
+  /// savepoint — which is what lets [setWorkoutDate] settle both cycles inside
+  /// the write that moved the workout.
+  Future<bool> closeCycleIfSatisfied(String regimeId) =>
+      db.transaction(() async {
+        final sessionIds = await _sessionIds(regimeId);
+        if (sessionIds.isEmpty) return false;
 
-    final cycle = await ensureOpenCycle(regimeId);
-    final done = await _completedSessionIds(cycle.id);
-    if (!sessionIds.every(done.contains)) return false;
+        final cycle = await _ensureOpenCycle(regimeId);
+        if (cycle == null) return false;
+        final done = await _completedSessionIds(cycle.id);
+        if (!sessionIds.every(done.contains)) return false;
 
-    await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
-      CyclesCompanion(
-        completedAt: Value(nowMs()),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
-    await ensureOpenCycle(regimeId);
-    return true;
-  }
+        await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
+          CyclesCompanion(
+            completedAt: Value(nowMs()),
+            deviceId: Value(currentDeviceId),
+            updatedAt: Value(nowMs()),
+            dirty: const Value(true),
+          ),
+        );
+        await _ensureOpenCycle(regimeId);
+        return true;
+      });
 
   /// Overrides whether the open cycle is a deload. The suggestion is never
   /// binding.
@@ -1030,6 +1110,7 @@ class TrainingRepository {
     await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
       CyclesCompanion(
         isDeload: Value(isDeload),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -1444,9 +1525,16 @@ class TrainingRepository {
       setsByWe.putIfAbsent(s.workoutExerciseId, () => []).add(s);
     }
 
-    final exercise =
-        await (db.select(db.exercises)..where((t) => t.id.equals(exerciseId)))
-            .getSingle();
+    // The catalog row behind these performances. `getSingle` threw here when it
+    // was missing, which is unreachable through the app — a movement is
+    // archived, never deleted — and entirely reachable through a restore whose
+    // exercise rows were pruned, or a delete arriving from another device. The
+    // throw landed inside a paged read, so the whole history screen for that
+    // movement went blank rather than the one row that had lost its name.
+    final exercise = await (db.select(db.exercises)
+          ..where((t) => t.id.equals(exerciseId)))
+        .getSingleOrNull();
+    if (exercise == null) return const [];
     final bodyweight = await bodyweightSeries();
 
     return [
@@ -1498,12 +1586,15 @@ class TrainingRepository {
 
   /// A bodyweight entry is an input to every bodyweight and BW+ score, not a
   /// diary line, so a typo has to be removable rather than permanent.
-  Future<void> deleteBodyweight(int dayKey) async {
+  Future<void> deleteBodyweight(int dayKey) => _deleteBodyweight(dayKey);
+
+  Future<void> _deleteBodyweight(int dayKey) async {
     await (db.update(db.bodyweightLogs)
           ..where((t) => t.dayKey.equals(dayKey) & t.deletedAt.isNull()))
         .write(
       BodyweightLogsCompanion(
         deletedAt: Value(nowMs()),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -1518,11 +1609,26 @@ class TrainingRepository {
   /// is not a duplicate you can see — the screen shows whichever the query
   /// returns first, and every bodyweight-scored lift on that day reads the
   /// other one half the time.
-  Future<void> logBodyweight(DateTime date, double kg) =>
-      db.transaction(() => _logBodyweight(date, kg));
+  /// [replacing] moves an entry to another day, which is a delete plus a re-log
+  /// because the day is this table's key — and therefore has to be **one act**.
+  /// Run as two calls it was two transactions with a gap between them, and a
+  /// crash or a kill in that gap left the weight gone from the day it was on and
+  /// never written to the day it was moved to. That loss is silent twice over:
+  /// nothing on the bodyweight screen says a day is missing, and the reading
+  /// either side is simply interpolated across the hole, quietly rescoring every
+  /// pull-up and dip in between.
+  Future<void> logBodyweight(DateTime date, double kg, {DateTime? replacing}) =>
+      db.transaction(() => _logBodyweight(date, kg, replacing: replacing));
 
-  Future<void> _logBodyweight(DateTime date, double kg) async {
+  Future<void> _logBodyweight(
+    DateTime date,
+    double kg, {
+    DateTime? replacing,
+  }) async {
     final key = dayKeyOf(date);
+    if (replacing != null && dayKeyOf(replacing) != key) {
+      await _deleteBodyweight(dayKeyOf(replacing));
+    }
     final existing = await (db.select(db.bodyweightLogs)
           ..where((t) => t.dayKey.equals(key) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)])
@@ -1534,6 +1640,7 @@ class TrainingRepository {
           .write(
         BodyweightLogsCompanion(
           weightKg: Value(kg),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -1566,9 +1673,13 @@ class TrainingRepository {
     final performances = await pastPerformances(exerciseId, limit: null);
     if (performances.isEmpty) return const [];
 
-    final exercise =
-        await (db.select(db.exercises)..where((t) => t.id.equals(exerciseId)))
-            .getSingle();
+    // Missing for the reasons [exerciseHistoryPage] gives. A chart with no
+    // catalog row behind it has no load mode to read its numbers through, so
+    // there is nothing honest to plot.
+    final exercise = await (db.select(db.exercises)
+          ..where((t) => t.id.equals(exerciseId)))
+        .getSingleOrNull();
+    if (exercise == null) return const [];
     final bodyweight = await bodyweightSeries();
 
     final points = <ProgressPoint>[];
@@ -1649,8 +1760,15 @@ class TrainingRepository {
       throw StateError('Finish the session in progress first');
     }
 
-    final regime =
-        await (db.select(db.regimes)..where((t) => t.id.equals(regimeId))).getSingle();
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(regimeId)))
+        .getSingleOrNull();
+    // Deleted between the tap and the write. A `StateError` here rather than the
+    // bare one `getSingle` throws, because Today already catches this type by
+    // name and puts its message on a toast.
+    if (regime == null) {
+      throw StateError('That programme has been deleted');
+    }
     // A backdated session belongs to the cycle that was open on its date, not
     // to the one open now. When the date predates every cycle — backfilling
     // from before this regime existed — it belongs to no cycle at all rather
@@ -1864,6 +1982,7 @@ class TrainingRepository {
         .write(
       SessionExercisesCompanion(
         restSeconds: Value(seconds),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2018,7 +2137,7 @@ class TrainingRepository {
     );
   }
 
-  Stream<CycleStatus> watchCycleStatus(String regimeId) {
+  Stream<CycleStatus?> watchCycleStatus(String regimeId) {
     return db.watchQuery(
       [db.workouts, db.cycles, db.sessions, db.regimes],
       () => cycleStatus(regimeId),
@@ -2059,6 +2178,7 @@ class TrainingRepository {
             : isDone.value
                 ? Value(nowMs())
                 : const Value(null),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2079,8 +2199,7 @@ class TrainingRepository {
       // the new set an index another row still held: delete a drop group, press
       // `+`, and the new set landed in the middle of the table on top of an
       // existing one, in an order the database could break either way.
-      final next =
-          existing.fold<int>(-1, (m, s) => s.setIndex > m ? s.setIndex : m) + 1;
+      final next = nextPosition(existing.map((s) => s.setIndex));
       await db.into(db.setLogs).insert(
             SetLogsCompanion.insert(
               id: Value(id),
@@ -2135,6 +2254,7 @@ class TrainingRepository {
             .write(
               SetLogsCompanion(
                 setIndex: Value(sets[i].setIndex + 1),
+                deviceId: Value(currentDeviceId),
                 updatedAt: Value(nowMs()),
                 dirty: const Value(true),
               ),
@@ -2282,6 +2402,7 @@ class TrainingRepository {
     await (db.update(db.setLogs)..where((t) => t.id.isIn(setIds))).write(
       SetLogsCompanion(
         deletedAt: Value(nowMs()),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2290,18 +2411,40 @@ class TrainingRepository {
 
   /// Reorders exercises within a workout only — the session template is
   /// untouched, so rearranging today never rewrites what you did in March.
+  ///
+  /// Two passes through free ground — see [renumber]. The log screen is a
+  /// `PageView` keyed on this order, so a duplicate position is the page you
+  /// swipe to being whichever way SQLite broke the tie;
+  /// `idx_workout_exercises_position_live` refuses it, and a one-pass renumber
+  /// walks straight into that refusal.
   Future<void> reorderWorkoutExercises(List<String> orderedIds) async {
+    if (orderedIds.isEmpty) return;
     await db.transaction(() async {
-      for (var i = 0; i < orderedIds.length; i++) {
-        await (db.update(db.workoutExercises)..where((t) => t.id.equals(orderedIds[i])))
-            .write(
-          WorkoutExercisesCompanion(
-            orderIndex: Value(i),
-            updatedAt: Value(nowMs()),
-            dirty: const Value(true),
-          ),
-        );
-      }
+      final live = await (db.select(db.workoutExercises)
+            ..where((t) => t.id.isIn(orderedIds) & t.deletedAt.isNull()))
+          .get();
+      if (live.isEmpty) return;
+      final scope = await (db.select(db.workoutExercises)
+            ..where((t) =>
+                t.workoutId.equals(live.first.workoutId) &
+                t.deletedAt.isNull()))
+          .get();
+
+      await renumber(
+        orderedIds,
+        from: nextPosition(scope.map((e) => e.orderIndex)),
+        write: (id, orderIndex) async {
+          await (db.update(db.workoutExercises)..where((t) => t.id.equals(id)))
+              .write(
+            WorkoutExercisesCompanion(
+              orderIndex: Value(orderIndex),
+              deviceId: Value(currentDeviceId),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+        },
+      );
     });
   }
 
@@ -2310,6 +2453,7 @@ class TrainingRepository {
         .write(
       WorkoutExercisesCompanion(
         skipReason: Value(reason),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2332,6 +2476,7 @@ class TrainingRepository {
         .write(
       WorkoutExercisesCompanion(
         notes: Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2436,9 +2581,7 @@ class TrainingRepository {
       final existing = await (db.select(db.workoutExercises)
             ..where((t) => t.workoutId.equals(workoutId) & t.deletedAt.isNull()))
           .get();
-      final next =
-          existing.fold<int>(-1, (m, e) => e.orderIndex > m ? e.orderIndex : m) +
-              1;
+      final next = nextPosition(existing.map((e) => e.orderIndex));
       await db.into(db.workoutExercises).insert(
             WorkoutExercisesCompanion.insert(
               id: Value(id),
@@ -2474,7 +2617,11 @@ class TrainingRepository {
   ) async {
     final old = await (db.select(db.workoutExercises)
           ..where((t) => t.id.equals(workoutExerciseId)))
-        .getSingle();
+        .getSingleOrNull();
+    // Removed from the workout while its own swap sheet was open. Nothing to
+    // substitute for, and the empty id says so rather than throwing at a
+    // gesture handler — where the visible symptom is a button that does nothing.
+    if (old == null) return '';
 
     final shape = await _shapeFor(
       workoutId: old.workoutId,
@@ -2489,6 +2636,7 @@ class TrainingRepository {
           .write(
         WorkoutExercisesCompanion(
           deletedAt: Value(nowMs()),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -2523,6 +2671,7 @@ class TrainingRepository {
         .write(
       WorkoutExercisesCompanion(
         deletedAt: Value(nowMs()),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2530,11 +2679,36 @@ class TrainingRepository {
   }
 
   /// Finishes a workout and closes its cycle if that was the last session owed.
-  Future<void> completeWorkout(String workoutId) async {
-    final workout =
-        await (db.select(db.workouts)..where((t) => t.id.equals(workoutId))).getSingle();
+  ///
+  /// **All of it in one transaction.** The cycle close used to run after the
+  /// commit, which left a window — a crash, a kill, a battery — where the
+  /// session was finished and the cycle it satisfied was still open. Today then
+  /// showed "UP NEXT" over a full row of filled dots, and the deload counted a
+  /// cycle that had already been trained. `deleteWorkout` pulled its own cycle
+  /// repair inside its transaction for the mirror-image reason; this is the
+  /// same fix on the way in.
+  /// False when there was no workout to finish — deleted from History while its
+  /// own log was open, or discarded from a second door onto the same session.
+  ///
+  /// Answered rather than thrown, and answered rather than swallowed. `getSingle`
+  /// used to throw here, which died in the gesture handler and left the log
+  /// screen sitting there; returning nothing at all would be worse, because the
+  /// caller would go on to open a summary of a workout that no longer exists.
+  Future<bool> completeWorkout(String workoutId) =>
+      db.transaction(() => _completeWorkout(workoutId));
 
-    await db.transaction(() async {
+  Future<bool> _completeWorkout(String workoutId) async {
+    // **Live rows only.** A delete here is a tombstone, so a workout removed
+    // from History is still a row — and this look-up did not filter it, so
+    // finishing one stamped `completed` onto a session that had been deleted,
+    // and re-marked it dirty for a sync to push. Nothing on screen showed it,
+    // because every read path filters `deletedAt` and this write did not.
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId) & t.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (workout == null) return false;
+
+    {
       // Empty sets would otherwise look like real history full of nulls.
       //
       // Tombstoned rather than deleted, like every other delete in the app: a
@@ -2553,6 +2727,7 @@ class TrainingRepository {
           .write(
         SetLogsCompanion(
           deletedAt: Value(nowMs()),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -2562,31 +2737,35 @@ class TrainingRepository {
         WorkoutsCompanion(
           status: const Value(WorkoutStatus.completed),
           endedAt: Value(nowMs()),
-          updatedAt: Value(nowMs()),
-          dirty: const Value(true),
-        ),
-      );
-    });
-
-    final cycleId = workout.cycleId;
-    if (cycleId == null) return;
-
-    final status = await cycleStatus(workout.regimeId);
-    // `cycleStatus` describes the cycle open *now*. A backdated session can
-    // belong to an older, already-closed one — finishing it must not stamp a
-    // fresh completion onto a cycle that closed weeks ago, and must not close
-    // the current cycle on the strength of a workout that isn't in it.
-    if (status.cycleId != cycleId) return;
-
-    if (status.isComplete) {
-      await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
-        CyclesCompanion(
-          completedAt: Value(nowMs()),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
       );
     }
+
+    final cycleId = workout.cycleId;
+    if (cycleId == null) return true;
+
+    final status = await cycleStatus(workout.regimeId);
+    if (status == null) return true;
+    // `cycleStatus` describes the cycle open *now*. A backdated session can
+    // belong to an older, already-closed one — finishing it must not stamp a
+    // fresh completion onto a cycle that closed weeks ago, and must not close
+    // the current cycle on the strength of a workout that isn't in it.
+    if (status.cycleId != cycleId) return true;
+
+    if (status.isComplete) {
+      await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
+        CyclesCompanion(
+          completedAt: Value(nowMs()),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    }
+    return true;
   }
 
   /// Sets ticked off in a workout, ignoring the empty rows [startWorkout]
@@ -2688,6 +2867,7 @@ class TrainingRepository {
         WorkoutsCompanion(
           status: const Value(WorkoutStatus.abandoned),
           deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(stamp),
           dirty: const Value(true),
         ),
@@ -2713,6 +2893,7 @@ class TrainingRepository {
         .write(
       SetLogsCompanion(
         deletedAt: Value(stamp),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(stamp),
         dirty: const Value(true),
       ),
@@ -2722,6 +2903,7 @@ class TrainingRepository {
         .write(
       WorkoutExercisesCompanion(
         deletedAt: Value(stamp),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(stamp),
         dirty: const Value(true),
       ),
@@ -2777,6 +2959,7 @@ class TrainingRepository {
               ? const Value.absent()
               : Value(workout.endedAt! + shift),
           cycleId: movedCycle ? Value(covering?.id) : const Value.absent(),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),
@@ -2798,6 +2981,7 @@ class TrainingRepository {
     await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
       WorkoutsCompanion(
         notes: Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
+        deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),
       ),
@@ -2829,6 +3013,7 @@ class TrainingRepository {
           .write(
         WorkoutsCompanion(
           deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(stamp),
           dirty: const Value(true),
         ),
@@ -2874,6 +3059,7 @@ class TrainingRepository {
         await (db.update(db.cycles)..where((t) => t.id.equals(c.id))).write(
           CyclesCompanion(
             deletedAt: Value(nowMs()),
+            deviceId: Value(currentDeviceId),
             updatedAt: Value(nowMs()),
             dirty: const Value(true),
           ),
@@ -2882,6 +3068,7 @@ class TrainingRepository {
       await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
         CyclesCompanion(
           completedAt: const Value(null),
+          deviceId: Value(currentDeviceId),
           updatedAt: Value(nowMs()),
           dirty: const Value(true),
         ),

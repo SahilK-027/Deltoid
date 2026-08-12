@@ -260,7 +260,7 @@ void main() {
         .get();
 
     for (var i = 0; i < sessions.length; i++) {
-      final status = await repo.cycleStatus(regime.id);
+      final status = (await repo.cycleStatus(regime.id))!;
       expect(status.cycleIndex, 1);
       expect(status.done, i);
       expect(status.nextSessionId, sessions[i].id);
@@ -275,7 +275,7 @@ void main() {
     }
 
     // Sixth completion closes cycle 1 and opens cycle 2.
-    final status = await repo.cycleStatus(regime.id);
+    final status = (await repo.cycleStatus(regime.id))!;
     expect(status.cycleIndex, 2);
     expect(status.done, 0);
     expect(status.nextSessionId, sessions.first.id);
@@ -303,12 +303,12 @@ void main() {
       }
     }
 
-    expect((await repo.cycleStatus(regime.id)).isDeload, isFalse);
+    expect(((await repo.cycleStatus(regime.id))!).isDeload, isFalse);
     await runCycle();
-    expect((await repo.cycleStatus(regime.id)).isDeload, isFalse);
+    expect(((await repo.cycleStatus(regime.id))!).isDeload, isFalse);
     await runCycle();
 
-    final third = await repo.cycleStatus(regime.id);
+    final third = (await repo.cycleStatus(regime.id))!;
     expect(third.cycleIndex, 3);
     expect(third.isDeload, isTrue);
   });
@@ -330,13 +330,13 @@ void main() {
         weight: const Value(20), reps: const Value(8), isDone: const Value(true));
     await repo.completeWorkout(id);
 
-    final before = await repo.cycleStatus(regime.id);
+    final before = (await repo.cycleStatus(regime.id))!;
     expect(before.cycleIndex, 1);
     expect(before.remainingSessionIds, isNotEmpty);
 
     await repo.advanceCycle(regime.id);
 
-    final after = await repo.cycleStatus(regime.id);
+    final after = (await repo.cycleStatus(regime.id))!;
     expect(after.cycleIndex, 2);
     expect(after.done, 0);
     // The skipped cycle still counted, so the deload lands on schedule rather
@@ -351,7 +351,7 @@ void main() {
     final push1 = await sessionNamed('Push 1');
 
     Future<void> forceDeload() async {
-      final cycle = await repo.ensureOpenCycle(regime.id);
+      final cycle = (await repo.ensureOpenCycle(regime.id))!;
       await repo.setCycleDeload(cycle.id, true);
     }
 
@@ -396,7 +396,7 @@ void main() {
     await repo.completeWorkout(first);
 
     // Force the open cycle into deload.
-    final cycle = await repo.ensureOpenCycle(regime.id);
+    final cycle = (await repo.ensureOpenCycle(regime.id))!;
     await repo.setCycleDeload(cycle.id, true);
 
     final second =
@@ -712,7 +712,7 @@ void main() {
         .get();
 
     // Cycle 1, closed a week ago.
-    final firstCycle = await repo.ensureOpenCycle(regime.id);
+    final firstCycle = (await repo.ensureOpenCycle(regime.id))!;
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
     await (db.update(db.cycles)..where((t) => t.id.equals(firstCycle.id)))
         .write(CyclesCompanion(
@@ -723,7 +723,7 @@ void main() {
     ));
 
     // Cycle 2 opens where the first one ended.
-    final second = await repo.ensureOpenCycle(regime.id);
+    final second = (await repo.ensureOpenCycle(regime.id))!;
     expect(second.id, isNot(firstCycle.id));
     await (db.update(db.cycles)..where((t) => t.id.equals(second.id))).write(
       CyclesCompanion(
@@ -748,7 +748,7 @@ void main() {
           ..where((t) => t.id.equals(firstCycle.id)))
         .getSingle();
     expect(reread.completedAt, weekAgo.millisecondsSinceEpoch);
-    expect((await repo.cycleStatus(regime.id)).cycleId, second.id);
+    expect(((await repo.cycleStatus(regime.id))!).cycleId, second.id);
 
     // And today's session still lands in the open cycle.
     final today = await repo.startWorkout(
@@ -762,7 +762,7 @@ void main() {
   test('a date older than every cycle belongs to no cycle', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
-    await repo.ensureOpenCycle(regime.id);
+    (await repo.ensureOpenCycle(regime.id))!;
 
     final id = await repo.startWorkout(
       regimeId: regime.id,
@@ -774,7 +774,7 @@ void main() {
     expect(detail!.workout.cycleId, isNull);
     // Finishing it is a no-op for cycles rather than a crash.
     await repo.completeWorkout(id);
-    expect((await repo.cycleStatus(regime.id)).cycleIndex, 1);
+    expect(((await repo.cycleStatus(regime.id))!).cycleIndex, 1);
   });
 
   test('only one workout can be open at a time', () async {
@@ -1095,7 +1095,7 @@ void main() {
       await repo.completeWorkout(id);
     }
 
-    final before = await repo.cycleStatus(regime.id);
+    final before = (await repo.cycleStatus(regime.id))!;
     expect(before.cycleIndex, 1);
     expect(before.isComplete, isFalse);
 
@@ -1104,7 +1104,7 @@ void main() {
         .write(SessionsCompanion(deletedAt: Value(nowMs())));
     expect(await repo.closeCycleIfSatisfied(regime.id), isTrue);
 
-    final after = await repo.cycleStatus(regime.id);
+    final after = (await repo.cycleStatus(regime.id))!;
     expect(after.cycleIndex, 2);
     expect(after.done, 0);
   });
@@ -1729,11 +1729,11 @@ void main() {
     }
 
     // Every session trained: cycle 1 closed and cycle 2 opened.
-    expect((await repo.cycleStatus(regime.id)).cycleIndex, 2);
+    expect(((await repo.cycleStatus(regime.id))!).cycleIndex, 2);
 
     await repo.deleteWorkout(last!);
 
-    final status = await repo.cycleStatus(regime.id);
+    final status = (await repo.cycleStatus(regime.id))!;
     expect(status.cycleIndex, 1, reason: 'the cycle was never finished');
     expect(status.done, sessions.length - 1);
     expect(status.nextSessionId, sessions.last.id);
@@ -1748,7 +1748,7 @@ void main() {
     final second = await logSession(pull1);
     await repo.deleteWorkout(second);
 
-    final status = await repo.cycleStatus(regime.id);
+    final status = (await repo.cycleStatus(regime.id))!;
     expect(status.cycleIndex, 1);
     expect(status.completedSessionIds, {push1.id});
   });

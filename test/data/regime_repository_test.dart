@@ -229,28 +229,35 @@ void main() {
       expect(row.barKind, BarKind.none, reason: 'no starterKey, no guess');
     });
   
-    test('a bar kind that no longer exists is rewritten, not left to throw',
-        () async {
+    test('a bar kind that is not a bar kind cannot be stored at all', () async {
       final squat = await (db.select(db.exercises)
             ..where((t) => t.starterKey.equals('back_squat')))
           .getSingle();
-      // What a v3 database can hold: `standard` was a real member then. The
-      // enum is stored as its name, so reading this row back with no matching
-      // member throws for the whole table, not just this row.
-      await db.customStatement(
-        "UPDATE exercises SET bar_kind = 'standard' WHERE id = ?",
-        [squat.id],
-      );
 
-      // The v4 step, run as the migration runs it.
-      await db.customStatement(
-        "UPDATE exercises SET bar_kind = 'none' WHERE bar_kind = 'standard'",
+      // `standard` was a real member at v3 and was dropped at v4, and this used
+      // to be a test that the re-mapping step ran — because a row carrying a
+      // name no member answers to does not fail on that row. The enum is read
+      // back through `textEnum`, which throws on an unknown string, and the
+      // throw takes the whole result set with it: one bad exercise blanked the
+      // catalog, the log and every history screen at once.
+      //
+      // The column refuses the value outright now, so there is no row to
+      // re-map and no read that can fail. A future version that retires a
+      // member still runs its re-mapping UPDATE — but before the table rebuild
+      // that narrows this constraint, never after it, because rows written
+      // under the old spelling were legal when they were written.
+      await expectLater(
+        db.customStatement(
+          "UPDATE exercises SET bar_kind = 'standard' WHERE id = ?",
+          [squat.id],
+        ),
+        throwsA(isA<SqliteException>()),
       );
 
       final after = await (db.select(db.exercises)
             ..where((t) => t.id.equals(squat.id)))
           .getSingle();
-      expect(after.barKind, BarKind.none);
+      expect(after.barKind, BarKind.olympic, reason: 'the row is untouched');
     });
   });
 

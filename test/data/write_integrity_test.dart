@@ -200,7 +200,7 @@ void main() {
 
   test('a phone already carrying duplicate open cycles is healed', () async {
     final regime = await activeRegime();
-    final keeper = await repo.ensureOpenCycle(regime.id);
+    final keeper = (await repo.ensureOpenCycle(regime.id))!;
 
     // What the old, untransacted `ensureOpenCycle` left behind.
     final stray = newId();
@@ -287,5 +287,181 @@ void main() {
             .getSingle();
     expect(after.isDone, isFalse);
     expect(after.completedAt, isNull);
+  });
+
+  // ── Applying a new order ────────────────────────────────────────────────
+  //
+  // A position is unique among live rows now, checked on every statement
+  // rather than at the commit. So the obvious renumber — walk the list, write
+  // `i` — puts the first row it moves onto a position a surviving row still
+  // holds, and the whole reorder rolls back for a permutation that is
+  // perfectly legal once it has finished. See `renumber`.
+
+  group('a reorder lands whole', () {
+    test('reversing a session\'s slots', () async {
+      final session = await sessionNamed('Push 1');
+      final before = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(session.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      expect(before.length, greaterThan(2), reason: 'a permutation needs room');
+
+      final reversed = before.reversed.map((s) => s.id).toList();
+      await regimes.reorderSessionExercises(reversed);
+
+      final after = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(session.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      expect([for (final s in after) s.id], reversed);
+      expectDistinct([for (final s in after) s.orderIndex]);
+      expect([for (final s in after) s.orderIndex],
+          List.generate(after.length, (i) => i),
+          reason: 'and it comes to rest on 0..n-1, not on the scratch range');
+    });
+
+    test('swapping the first two sessions of a regime', () async {
+      final regime = await activeRegime();
+      final before = await (db.select(db.sessions)
+            ..where((t) => t.regimeId.equals(regime.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      final swapped = [before[1].id, before[0].id, for (final s in before.skip(2)) s.id];
+
+      await regimes.reorderSessions(swapped);
+
+      final after = await (db.select(db.sessions)
+            ..where((t) => t.regimeId.equals(regime.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      expect([for (final s in after) s.id], swapped);
+      expectDistinct([for (final s in after) s.orderIndex]);
+    });
+
+    test('reordering a workout after one of its exercises was dropped',
+        () async {
+      // The case a one-pass renumber survives least: the live rows are at
+      // 0, 2, 3 and the new order wants them at 0, 1, 2.
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+      final workoutId =
+          await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+
+      final before = (await repo.workoutDetail(workoutId))!;
+      await repo
+          .removeExerciseFromWorkout(before.entries[1].workoutExercise.id);
+
+      final live = (await repo.workoutDetail(workoutId))!.entries;
+      final reversed =
+          live.reversed.map((e) => e.workoutExercise.id).toList();
+      await repo.reorderWorkoutExercises(reversed);
+
+      final after = (await repo.workoutDetail(workoutId))!.entries;
+      expect([for (final e in after) e.workoutExercise.id], reversed);
+      expectDistinct([for (final e in after) e.workoutExercise.orderIndex]);
+    });
+
+    test('an empty list is not a reorder', () async {
+      await repo.reorderWorkoutExercises([]);
+      await regimes.reorderSessions([]);
+      await regimes.reorderSessionExercises([]);
+    });
+  });
+
+  group('a bodyweight moved to another day', () {
+    test('leaves nothing behind on the day it left', () async {
+      final from = DateTime(2026, 3, 1);
+      final to = DateTime(2026, 3, 2);
+      await repo.logBodyweight(from, 80);
+
+      await repo.logBodyweight(to, 80, replacing: from);
+
+      final live = await (db.select(db.bodyweightLogs)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(live.length, 1, reason: 'one entry, not two and not none');
+      expect(live.single.dayKey, dayKeyOf(to));
+      expect(live.single.weightKg, 80);
+    });
+
+    test('is one write, so it cannot half-happen', () async {
+      final from = DateTime(2026, 3, 1);
+      await repo.logBodyweight(from, 80);
+
+      // A move onto a day that cannot hold the weight fails at the insert,
+      // *after* the delete has run. Both have to come back together, or the
+      // reading is gone from the day it was on and never arrived anywhere.
+      await expectLater(
+        repo.logBodyweight(DateTime(2026, 3, 2), 900, replacing: from),
+        throwsA(isA<SqliteException>()),
+      );
+
+      final live = await (db.select(db.bodyweightLogs)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(live.single.dayKey, dayKeyOf(from),
+          reason: 'the failed move put it back where it was');
+    });
+
+    test('re-logging the same day is an edit, not a move', () async {
+      final day = DateTime(2026, 3, 1);
+      await repo.logBodyweight(day, 80);
+      await repo.logBodyweight(day, 81, replacing: day);
+
+      final live = await (db.select(db.bodyweightLogs)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(live.single.weightKg, 81);
+    });
+  });
+
+  group('a write says who wrote it and when', () {
+    test('an update re-stamps the device, not just the insert', () async {
+      // `clientDefault` only fires on an insert, so this column used to name
+      // the row's creator for the rest of its life — and last-write-wins breaks
+      // a same-millisecond tie on it, so both devices compared the same
+      // originating id, found it equal, and each kept its own copy.
+      final session = await sessionNamed('Push 1');
+      await db
+          .customStatement("UPDATE sessions SET device_id = 'another-phone'");
+
+      await regimes.renameSession(session.id, 'Push A');
+
+      final after = await (db.select(db.sessions)
+            ..where((t) => t.id.equals(session.id)))
+          .getSingle();
+      expect(after.deviceId, currentDeviceId);
+      expect(after.dirty, isTrue);
+    });
+
+    test('a clock that jumps backwards never issues an earlier stamp',
+        () async {
+      // The number last-write-wins compares. A clock moved back — a network
+      // time correction after a flat battery, a manual change — would make a
+      // row lose to the version it was written to replace.
+      final stamps = [for (var i = 0; i < 500; i++) nowMs()];
+      for (var i = 1; i < stamps.length; i++) {
+        expect(stamps[i], greaterThan(stamps[i - 1]),
+            reason: 'stamp $i went backwards or stood still');
+      }
+    });
+  });
+
+  group('finishing a workout that is no longer there', () {
+    test('says so rather than throwing or pretending', () async {
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+      final workoutId =
+          await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+
+      expect(await repo.completeWorkout(workoutId), isTrue);
+
+      await repo.deleteWorkout(workoutId);
+      // Deleted from History while its own log was open. `getSingle` threw
+      // here, which died in the gesture handler; returning nothing at all sent
+      // the caller on to open a summary of a session that does not exist.
+      expect(await repo.completeWorkout(workoutId), isFalse);
+      expect(await repo.completeWorkout('no-such-workout'), isFalse);
+    });
   });
 }

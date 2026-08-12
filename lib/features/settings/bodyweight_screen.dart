@@ -658,14 +658,26 @@ Future<void> logBodyweightPrompt(
     return;
   }
 
-  // Moving an entry to another date is a delete plus a re-log, since the day
-  // is this table's key.
-  if (date != null && dayKeyOf(result.day) != dayKeyOf(date)) {
-    await repo.deleteBodyweight(dayKeyOf(date));
-  }
+  // Moving an entry to another date is a delete plus a re-log, since the day is
+  // this table's key — and the two halves go down as **one write**. Run as two
+  // calls they were two transactions with a gap between them, and a crash in
+  // that gap took the weight off the day it was on without putting it on the
+  // day it was moved to. Nothing says a day is missing: the readings either
+  // side are simply interpolated across the hole, quietly rescoring every
+  // bodyweight lift in between.
+  //
   // Typed in whatever this phone shows, stored in kilograms.
-  await repo.logBodyweight(result.day, unit.toKg(result.value));
+  await repo.logBodyweight(
+    result.day,
+    unit.toKg(result.value),
+    replacing: date,
+  );
 }
+
+/// Past this and it is a typo, not a bodyweight. Matches the check on
+/// `bodyweight_logs.weight_kg`, which is what makes this a guard rather than
+/// the only thing standing between a slip and a rewritten history.
+const _maxBodyweightKg = 500.0;
 
 /// What the sheet came back with: a weight on a day, or a deletion.
 typedef _BodyweightResult = ({DateTime day, double value, bool delete});
@@ -695,9 +707,18 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
 
   bool get _editing => widget.date != null;
 
+  /// The typed weight, or null when it is not one.
+  ///
+  /// Bounded at both ends, and the ceiling earns its place as much as the
+  /// floor: this number is not read on its own. It is interpolated between its
+  /// neighbours and multiplied into every pull-up and dip around it, so a
+  /// mistyped `1850` silently rescales weeks of history either side of the day
+  /// it lands on while showing one figure that merely looks wrong. The column
+  /// refuses it outright, so without this the Save button would simply fail.
   double? get _value {
     final parsed = double.tryParse(_controller.text.trim());
-    return parsed == null || parsed <= 0 ? null : parsed;
+    if (parsed == null || parsed <= 0) return null;
+    return widget.unit.toKg(parsed) >= _maxBodyweightKg ? null : parsed;
   }
 
   @override

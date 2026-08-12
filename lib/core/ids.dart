@@ -6,7 +6,28 @@ const _uuid = Uuid();
 /// syncs to Postgres without coordination.
 String newId() => _uuid.v7();
 
-int nowMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
+/// The highest stamp this process has handed out. See [nowMs].
+int _lastStamp = 0;
+
+/// Now, in UTC milliseconds, and **never earlier than the last one**.
+///
+/// This is the number last-write-wins compares, so a clock that moves backwards
+/// does not merely mislabel a row — it makes the row lose to the version it was
+/// written to replace, and keep losing until real time catches up. Android moves
+/// this clock without asking: a network time correction after a flat battery, a
+/// manual change, a timezone database update mid-session.
+///
+/// Clamping to the last value issued is the cheap half of the answer and the
+/// half that is entirely local: within one run of the app, an edit made after
+/// another edit always carries a later stamp, whatever the clock did in
+/// between. Two rows written inside the same clamped millisecond are then
+/// separated by `deviceId`, exactly as [currentDeviceId] describes. The other
+/// half — agreeing on time with a *different* device — is a server's job and
+/// belongs with whatever sync is eventually built on these columns.
+int nowMs() {
+  final wall = DateTime.now().toUtc().millisecondsSinceEpoch;
+  return _lastStamp = wall > _lastStamp ? wall : _lastStamp + 1;
+}
 
 /// Which install wrote a row.
 ///
@@ -27,6 +48,10 @@ void setCurrentDeviceId(String id) => _deviceId = id;
 
 /// `app_settings` key holding this install's device id.
 const deviceIdKey = 'device_id';
+
+/// Resets the monotonic clock. Tests only — a fresh in-memory database in the
+/// same process would otherwise inherit the stamps of the one before it.
+void resetStampsForTesting() => _lastStamp = 0;
 
 /// Local calendar day as `yyyyMMdd`. Used for heatmap grouping and bodyweight
 /// entries, where "which day was it for me" matters more than the exact instant.

@@ -218,7 +218,17 @@ Future<void> backfillIdentityIndexes(AppDatabase db) async {
   final live = await query.get();
 
   for (var i = 0; i < live.length; i++) {
-    await (db.update(db.regimes)..where((t) => t.id.equals(live[i].id)))
-        .write(RegimesCompanion(identityIndex: Value(i % identitySlots)));
+    await (db.update(db.regimes)..where((t) => t.id.equals(live[i].id))).write(
+      RegimesCompanion(
+        identityIndex: Value(i % identitySlots),
+        // Stamped like any other write. This changes a value the row carries,
+        // so the row is not the one the file said it was — and a restore that
+        // left it unmarked would hand another device the old colour back, which
+        // is the collision this backfill exists to undo.
+        deviceId: Value(currentDeviceId),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
   }
 }
