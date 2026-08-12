@@ -242,7 +242,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   AppRow(
                     title: 'Targets',
                     subtitle: 'What this day asks for',
-                    trailing: _Value(targetLabel(entry.slot)),
+                    trailing: _PickedValue(targetLabel(entry.slot)),
                     onTap: () => showTargetEditor(
                         context, ref, entry.slot, entry.exercise),
                   ),
@@ -294,7 +294,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ),
                 AppRow(
                   title: 'Muscle',
-                  trailing: _Value.orChoose(muscle?.label),
+                  trailing: _PickedValue.orChoose(muscle?.label),
                   onTap: () async {
                     final picked = await _pick<MuscleGroup>(
                       context,
@@ -320,7 +320,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ),
                 AppRow(
                   title: 'Equipment',
-                  trailing: _Value.orChoose(equipment?.label),
+                  trailing: _PickedValue.orChoose(equipment?.label),
                   onTap: () async {
                     final picked = await _pick<Equipment>(
                       context,
@@ -347,7 +347,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       ? 'Decides what the number you type means'
                       : loadBlurb(loadMode),
                   trailing: loadMode == null
-                      ? _Value.orChoose(null)
+                      ? _PickedValue.orChoose(null)
                       : const Icon(Icons.chevron_right_rounded, size: 20),
                   onTap: () => _editLoadMode(exercise, loadMode),
                 ),
@@ -357,7 +357,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 if (loadMode == LoadMode.total)
                   AppRow(
                     title: 'Bar',
-                    trailing: _Value.orChoose(
+                    trailing: _PickedValue.orChoose(
                       barKind == null
                           ? null
                           : barKind == BarKind.none
@@ -399,7 +399,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   subtitle: measure.isHold
                       ? 'Seconds held, with no reps and no estimated 1RM'
                       : 'Repetitions',
-                  trailing: _Value(measure.label),
+                  trailing: _PickedValue(measure.label),
                   onTap: () => _editMeasure(exercise, measure),
                 ),
                 AppRow(
@@ -796,14 +796,14 @@ String _loadModeName(LoadMode mode) => switch (mode) {
 
 /// A trailing figure on a row, in the value size with the row's own chevron
 /// after it.
-class _Value extends StatelessWidget {
-  const _Value(this.text) : pending = false;
+class _PickedValue extends StatelessWidget {
+  const _PickedValue(this.text) : pending = false;
 
   /// An unanswered question, while a new exercise is being drafted: the word
   /// `Choose` in `textTertiary` where the value will go. Not a dash — a dash is
   /// for a measurement that should exist and doesn't (rule 4), and this is a
   /// question waiting on you.
-  const _Value.orChoose(String? value)
+  const _PickedValue.orChoose(String? value)
       : text = value ?? 'Choose',
         pending = value == null;
 

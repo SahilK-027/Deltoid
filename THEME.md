@@ -514,6 +514,17 @@ button.
 **A section with nothing in it hides rather than printing a shelf of dashes.**
 Dashes are for a card that has a reason to exist and one missing figure.
 
+### Value and unit
+
+`ValueUnit` is rule 5 as a widget: a number with its unit one step down beside
+it, sharing a baseline. `dense` is the row form (`labelLarge`, trailing an
+`AppRow`); the default is the page form (`displaySmall`, the number a card is
+about). `StatTile` is this plus a label under it.
+
+**Every value that carries a unit is this widget.** It was hand-built in seven
+places, each deciding for itself whether the unit was `bodyMedium` or
+`bodySmall` and whether the pair shared a baseline or a centre line.
+
 ### Stat tile
 
 `surface` card: `title` ellipsized to one line → `body` window caption →

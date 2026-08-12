@@ -370,7 +370,7 @@ class _MonthDays extends ConsumerWidget {
                 padding: const EdgeInsets.only(left: Space.xxxl),
                 child: Divider(color: c.border, height: 1),
               ),
-            _EntryRow(
+            _WeighInRow(
               entry: entries[i],
               // The entry before this one in time — the last of the month
               // before, once the list runs out — so a month's first row keeps
@@ -510,12 +510,10 @@ class _TrendCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                formatBodyweight(latest.weightKg, unit),
-                style: context.t.displaySmall,
+              ValueUnit(
+                value: formatBodyweight(latest.weightKg, unit),
+                unit: unit.label,
               ),
-              const SizedBox(width: Space.xs),
-              Text(unit.label, style: context.t.bodyMedium),
               const Spacer(),
               if (change != null)
                 Text('$change over the range', style: context.t.bodySmall),
@@ -569,8 +567,8 @@ class _TrendCard extends ConsumerWidget {
 /// Not an [AppRow]: a row nested under another row has to *read* as nested, so
 /// the date is `body` where its month is `title`, and it starts a column in
 /// from the month's text rather than on the same vertical.
-class _EntryRow extends ConsumerWidget {
-  const _EntryRow({
+class _WeighInRow extends ConsumerWidget {
+  const _WeighInRow({
     required this.entry,
     required this.previous,
     required this.unit,

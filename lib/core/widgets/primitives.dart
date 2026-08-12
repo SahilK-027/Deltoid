@@ -1276,6 +1276,62 @@ class AppRadio extends StatelessWidget {
 
 /// One number and what it means. Built for a row of siblings, so captions line
 /// up across tiles even when one wraps.
+/// **Rule 5, as a widget**: a value with its unit beside it, one step down and
+/// in grey, sharing a baseline.
+///
+/// It was hand-built seven times — the summary's rows, the bodyweight header,
+/// Today's elapsed clock, two volume widgets — each deciding for itself whether
+/// the unit was `bodyMedium` or `bodySmall` and whether the pair shared a
+/// baseline or a centre line. The rule is in THEME; this is the one place that
+/// implements it.
+///
+/// [dense] is the row form: `labelLarge` against a trailing edge, where the
+/// page form is `displaySmall` and is the number a card is about.
+class ValueUnit extends StatelessWidget {
+  const ValueUnit({
+    super.key,
+    required this.value,
+    this.unit,
+    this.dense = false,
+    this.emphasis,
+  });
+
+  final String value;
+
+  /// Null where the value has no unit — a count of sets, a session name.
+  final String? unit;
+
+  /// The row form, for a value trailing an `AppRow` rather than heading a card.
+  final bool dense;
+
+  /// Paints the value. Only for a semantic reading — a record, a deload.
+  final Color? emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    final valueStyle = dense ? context.t.labelLarge : context.t.displaySmall;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Flexible(
+          child: Text(
+            value,
+            style: valueStyle?.copyWith(color: emphasis),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (unit != null) ...[
+          const SizedBox(width: Space.xs),
+          Text(unit!, style: context.t.bodyMedium),
+        ],
+      ],
+    );
+  }
+}
+
 class StatTile extends StatelessWidget {
   const StatTile({
     super.key,
@@ -1299,24 +1355,7 @@ class StatTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Flexible(
-              child: Text(
-                value,
-                style: context.t.displaySmall?.copyWith(color: emphasis),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (unit != null) ...[
-              const SizedBox(width: Space.xs),
-              Text(unit!, style: context.t.bodyMedium),
-            ],
-          ],
-        ),
+        ValueUnit(value: value, unit: unit, emphasis: emphasis),
         const SizedBox(height: Space.xxs),
         Text(label, style: context.t.bodySmall, maxLines: 2),
       ],

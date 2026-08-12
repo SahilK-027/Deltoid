@@ -103,9 +103,9 @@ class _HoldPadState extends State<HoldPad> {
                   if (_startedAt == null)
                     Material(
                       color: c.surfaceHigh,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(Radii.pill),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(Radii.pill),
                         onTap: widget.onType,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(

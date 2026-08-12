@@ -136,7 +136,8 @@ class SessionSummaryScreen extends ConsumerWidget {
                       AppRow(
                         icon: Icons.fitness_center_rounded,
                         title: 'Volume',
-                        trailing: _Value(
+                        trailing: ValueUnit(
+                          dense: true,
                           // A dash, not a zero: a session of chins with no
                           // bodyweight ever logged has an unknown volume, not a
                           // volume of nothing (rule 4).
@@ -147,12 +148,13 @@ class SessionSummaryScreen extends ConsumerWidget {
                       AppRow(
                         icon: Icons.format_list_numbered_rounded,
                         title: 'Sets logged',
-                        trailing: _Value(value: '$sets'),
+                        trailing: ValueUnit(value: '$sets', dense: true),
                       ),
                       AppRow(
                         icon: Icons.schedule_rounded,
                         title: 'Duration',
-                        trailing: _Value(
+                        trailing: ValueUnit(
+                          dense: true,
                           value: minutes == null || minutes < 0
                               ? '—'
                               : '$minutes',
@@ -195,7 +197,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                     inset: 0,
                     children: [
                       for (final entry in detail.entries)
-                        _EntryRow(entry: entry, unit: unit),
+                        _ExerciseEntryRow(entry: entry, unit: unit),
                     ],
                   ),
                 ],
@@ -460,31 +462,6 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
       };
 }
 
-/// A number on the right of a row, with its unit one step down beside it —
-/// rule 5, in the shape a row needs rather than a tile's.
-class _Value extends StatelessWidget {
-  const _Value({required this.value, this.unit});
-
-  final String value;
-  final String? unit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text(value, style: context.t.labelLarge),
-        if (unit != null) ...[
-          const SizedBox(width: Space.xs),
-          Text(unit!, style: context.t.bodyMedium),
-        ],
-      ],
-    );
-  }
-}
-
 /// The session note, written here or nowhere.
 ///
 /// A field, not a row: this is the one screen where writing the note is a thing
@@ -526,8 +503,8 @@ class _NoteBox extends StatelessWidget {
 }
 
 /// One exercise as it ended up, with its note for the day editable in place.
-class _EntryRow extends ConsumerWidget {
-  const _EntryRow({required this.entry, required this.unit});
+class _ExerciseEntryRow extends ConsumerWidget {
+  const _ExerciseEntryRow({required this.entry, required this.unit});
 
   final ExerciseEntry entry;
   final WeightUnit unit;
