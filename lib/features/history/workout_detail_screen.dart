@@ -10,10 +10,10 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
-import 'history_screen.dart' show formatWeight;
 import '../../core/widgets/toast.dart';
 
 /// One day, exactly as it was logged.
@@ -493,13 +493,26 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
   /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
   /// are excluded — a 20 kg warm-up is not what the day was about.
   static String _topLoad(List<SetLog> done, Exercise exercise, WeightUnit unit) {
-    // A copy: [done] is the list the rows below are rendered from, and sorting
-    // it in place would shuffle the sets out of the order they were performed.
-    final counted = done.where((s) => s.setType != SetType.warmup).toList();
-    final pool = counted.isEmpty ? [...done] : counted;
-    pool.sort((a, b) => ((b.weight ?? b.addedWeight) ?? 0)
-        .compareTo((a.weight ?? a.addedWeight) ?? 0));
-    return _SetLine._load(pool.first, exercise, unit);
+    final i = topSetIndex(
+      sets: [
+        for (final s in done)
+          (
+            setType: s.setType,
+            weight: s.weight,
+            addedWeight: s.addedWeight,
+            reps: s.reps,
+          ),
+      ],
+      measureMode: exercise.measureMode,
+    );
+    if (i == null) return '—';
+    final set = done[i];
+    return loadLabel(
+      loadMode: exercise.loadMode,
+      weight: set.weight,
+      addedWeight: set.addedWeight,
+      unit: unit,
+    );
   }
 
   /// The number on the chip. Warm-ups and continuations carry a letter instead,
@@ -619,7 +632,7 @@ class _SetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_load(set, exercise, unit)} × '
+                  '${loadLabel(loadMode: exercise.loadMode, weight: set.weight, addedWeight: set.addedWeight, unit: unit)} × '
                   '${formatCount(set.reps, exercise.measureMode, partial: set.partialReps)}',
                   style: context.t.labelLarge,
                 ),
@@ -633,17 +646,4 @@ class _SetLine extends StatelessWidget {
     );
   }
 
-  static String _load(SetLog set, Exercise exercise, WeightUnit unit) {
-    final added = set.addedWeight;
-    if (exercise.loadMode == LoadMode.bodyweight) return 'Bodyweight';
-    if (exercise.loadMode == LoadMode.bodyweightPlus) {
-      return added == null || added == 0
-          ? 'Bodyweight'
-          : 'BW + ${formatWeight(added, unit)} ${unit.label}';
-    }
-    final weight = set.weight;
-    if (weight == null) return '—';
-    final perSide = exercise.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight, unit)} ${unit.label}$perSide';
-  }
 }

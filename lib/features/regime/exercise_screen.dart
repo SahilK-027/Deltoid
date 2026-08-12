@@ -10,6 +10,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import '../history/exercise_history_screen.dart';
 import 'regime_screen.dart';
@@ -344,7 +345,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   title: 'How the weight is entered',
                   subtitle: loadMode == null
                       ? 'Decides what the number you type means'
-                      : _loadBlurb(loadMode),
+                      : loadBlurb(loadMode),
                   trailing: loadMode == null
                       ? _Value.orChoose(null)
                       : const Icon(Icons.chevron_right_rounded, size: 20),
@@ -616,7 +617,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       values: LoadMode.values,
       current: current,
       labelOf: _loadModeLabel,
-      helperOf: _loadBlurb,
+      helperOf: loadBlurb,
     );
     if (picked == null || picked == current) return;
 
@@ -791,14 +792,6 @@ String _loadModeName(LoadMode mode) => switch (mode) {
       LoadMode.perSide => 'per dumbbell',
       LoadMode.bodyweight => 'bodyweight only',
       LoadMode.bodyweightPlus => 'bodyweight plus the entered load',
-    };
-
-/// What the number you type into this exercise means.
-String _loadBlurb(LoadMode mode) => switch (mode) {
-      LoadMode.total => 'The weight you type is the whole load',
-      LoadMode.perSide => 'The weight you type is per hand, and two are moving',
-      LoadMode.bodyweight => 'Reps only, no external load',
-      LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
     };
 
 /// A trailing figure on a row, in the value size with the row's own chevron

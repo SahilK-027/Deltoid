@@ -6,7 +6,6 @@ import '../../core/ids.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/repositories/training_repository.dart';
-import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
@@ -651,26 +650,4 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
       ],
     );
   }
-}
-
-/// Trailing zeros are noise on a gym screen: 22.5 stays 22.5, 60.0 becomes 60.
-///
-/// Takes a stored kilogram value and renders it in [unit]. Capped at two
-/// decimals because this also formats *computed* numbers — an estimated 1RM is
-/// an arbitrary double, and `55.733333333333334 kg` is not a weight anyone has
-/// ever lifted.
-///
-/// [unit] is required on purpose. It was optional with a kilogram default for
-/// exactly one commit, and in that commit two call sites forgot it and rendered
-/// pounds as kilograms — next to a tooltip that had it right. An optional unit
-/// makes "wrong" the thing that compiles.
-String formatWeight(double kg, WeightUnit unit) {
-  final v = unit.display(kg);
-  if (v == v.roundToDouble()) return v.toStringAsFixed(0);
-  final rounded = (v * 100).round() / 100;
-  if (rounded == rounded.roundToDouble()) return rounded.toStringAsFixed(0);
-  return rounded
-      .toStringAsFixed(2)
-      .replaceFirst(RegExp(r'0$'), '')
-      .replaceFirst(RegExp(r'\.$'), '');
 }

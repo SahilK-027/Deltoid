@@ -14,6 +14,7 @@ import '../../../data/db/database.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../domain/enums.dart';
 import '../../../domain/prefill.dart';
+import '../../../domain/set_format.dart';
 import '../../../domain/units.dart';
 import '../../regime/exercise_screen.dart';
 
@@ -95,7 +96,7 @@ Future<void> showExerciseInfo(
         AppRow(
           icon: Icons.fitness_center_rounded,
           title: '${exercise.muscle.label} · ${exercise.equipment.label}',
-          subtitle: _loadBlurb(exercise.loadMode),
+          subtitle: loadBlurb(exercise.loadMode),
         ),
         if (bar != BarKind.none)
           AppRow(
@@ -123,14 +124,6 @@ Future<void> showExerciseInfo(
     ),
   );
 }
-
-/// What the number you type into this exercise means.
-String _loadBlurb(LoadMode mode) => switch (mode) {
-      LoadMode.total => 'The weight you type is the whole load',
-      LoadMode.perSide => 'The weight you type is per hand, and two are moving',
-      LoadMode.bodyweight => 'Reps only, no external load',
-      LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
-    };
 
 /// Where today's suggested numbers came from, spelled out.
 ///

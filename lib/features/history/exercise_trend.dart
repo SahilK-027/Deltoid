@@ -10,7 +10,6 @@ import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/units.dart';
-import 'history_screen.dart' show formatWeight;
 
 /// Estimated 1RM over time for one movement, split by the session it was
 /// trained in.

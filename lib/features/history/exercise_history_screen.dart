@@ -9,10 +9,10 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import 'exercise_trend.dart';
 import 'history_providers.dart';
-import 'history_screen.dart' show formatWeight;
 
 final _exerciseProvider =
     StreamProvider.autoDispose.family<Exercise?, String>((ref, id) {
@@ -330,7 +330,17 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
             // headline above, so repeating it here in prose would be the same
             // number twice on one row (rule 6).
             Text(
-              done.map((s) => _setLabel(s, exercise, unit)).join('   '),
+              done
+                  .map((s) => setLabel(
+                        loadMode: exercise?.loadMode,
+                        measureMode: exercise?.measureMode ?? MeasureMode.reps,
+                        setType: s.setType,
+                        weight: s.weight,
+                        addedWeight: s.addedWeight,
+                        reps: s.reps,
+                        unit: unit,
+                      ))
+                  .join('   '),
               style: context.t.bodyMedium,
             ),
             // The fold has a height, so it animates to it. It used to appear
@@ -388,39 +398,6 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
     return '${formatWeight(value, unit)} ${unit.label}$reps';
   }
 
-  /// `22.5×8`, with the set type appended when it is not a plain working set.
-  static String _setLabel(SetLog set, Exercise? exercise, WeightUnit unit) {
-    final reps = formatCount(set.reps, exercise?.measureMode ?? MeasureMode.reps);
-    final tag = set.setType.shortLabel;
-    final suffix = tag.isEmpty ? '' : ' $tag';
-
-    if (exercise?.loadMode == LoadMode.bodyweight) return '$reps$suffix';
-    if (exercise?.loadMode == LoadMode.bodyweightPlus) {
-      final added = set.addedWeight;
-      return added == null || added == 0
-          ? '$reps$suffix'
-          : '+${formatWeight(added, unit)}×$reps$suffix';
-    }
-    final weight = set.weight;
-    if (weight == null) return '$reps$suffix';
-    return '${formatWeight(weight, unit)}×$reps$suffix';
-  }
-
-  /// Spelled out rather than compressed, for the expanded rows: `22.5 kg × 2`
-  /// on a dumbbell is the number you'd read off the rack.
-  static String _loadLabel(SetLog set, Exercise? exercise, WeightUnit unit) {
-    final added = set.addedWeight;
-    if (exercise?.loadMode == LoadMode.bodyweight) return 'Bodyweight';
-    if (exercise?.loadMode == LoadMode.bodyweightPlus) {
-      return added == null || added == 0
-          ? 'Bodyweight'
-          : 'BW + ${formatWeight(added, unit)} ${unit.label}';
-    }
-    final weight = set.weight;
-    if (weight == null) return '—';
-    final perSide = exercise?.loadMode == LoadMode.perSide ? ' × 2' : '';
-    return '${formatWeight(weight, unit)} ${unit.label}$perSide';
-  }
 }
 
 /// One set inside an expanded card: what it was, what it weighed, and anything
@@ -465,7 +442,12 @@ class _ExpandedSetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _PerformanceCardState._loadLabel(set, exercise, unit),
+                  loadLabel(
+                    loadMode: exercise?.loadMode,
+                    weight: set.weight,
+                    addedWeight: set.addedWeight,
+                    unit: unit,
+                  ),
                   style: context.t.labelLarge,
                 ),
                 if (set.note != null && set.note!.isNotEmpty)
