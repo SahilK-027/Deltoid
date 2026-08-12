@@ -73,9 +73,9 @@ Future<void> showExerciseInfo(
           AppRow(
             icon: Icons.call_split_rounded,
             title: 'Borrowed from ${prefill!.reference!.sessionName}',
-            subtitle: 'First time here — '
+            subtitle: 'First time here. Showing '
                 '${DateFormat('d MMM').format(dateFromDayKey(prefill.reference!.dayKey))}'
-                "'s numbers, until you log your own",
+                "'s numbers until you log your own",
             tint: sheetContext.c.deload,
             trailing: Container(
               width: 10,
@@ -127,7 +127,7 @@ Future<void> showExerciseInfo(
 /// What the number you type into this exercise means.
 String _loadBlurb(LoadMode mode) => switch (mode) {
       LoadMode.total => 'The weight you type is the whole load',
-      LoadMode.perSide => 'The weight you type is per hand — two are moving',
+      LoadMode.perSide => 'The weight you type is per hand, and two are moving',
       LoadMode.bodyweight => 'Reps only, no external load',
       LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
     };
@@ -140,7 +140,7 @@ String _loadBlurb(LoadMode mode) => switch (mode) {
 String _prefillBlurb(PrefillResult? prefill) {
   final p = prefill;
   if (p == null || !p.hasSuggestion) {
-    return 'First time — nothing to suggest from';
+    return 'First time here, with nothing to suggest from';
   }
   final reference = p.reference!;
   final date = DateFormat('d MMM yyyy')
@@ -153,7 +153,7 @@ String _prefillBlurb(PrefillResult? prefill) {
     // The borrowed case has its own row, in amber, above.
     PrefillSource.otherSession =>
       '${reference.sessionName} · $date$scaled',
-    PrefillSource.none => 'First time — nothing to suggest from',
+    PrefillSource.none => 'First time here, with nothing to suggest from',
   };
 }
 
@@ -197,7 +197,7 @@ Future<void> showExerciseMenu(
               ? 'Add a note for today'
               : "Edit today's note",
           subtitle: entry.workoutExercise.notes ??
-              'This session only — the exercise keeps its cue',
+              'This session only. The exercise keeps its cue.',
           onTap: () async {
             final navigator = Navigator.of(sheetContext);
             final note = await promptForNote(
@@ -215,7 +215,7 @@ Future<void> showExerciseMenu(
         AppRow(
           icon: Icons.swap_horiz,
           title: 'Swap exercise',
-          subtitle: 'Today only — the template keeps its version',
+          subtitle: 'Today only. The template keeps its version.',
           onTap: () async {
             final navigator = Navigator.of(sheetContext);
             final replacement = await pickExercise(context, ref);

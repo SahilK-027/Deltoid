@@ -220,7 +220,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
           ? const EmptyState(
               icon: Icons.history_toggle_off,
               title: 'Your log starts here',
-              message: 'Finish a session and it shows up here — tap any day to '
+              message: 'Finish a session and it appears here. Tap any day to '
                   'see exactly what you did.',
             )
           : EmptyState(

@@ -189,13 +189,13 @@ class _Figures extends StatelessWidget {
           Expanded(
             child: StatTile(
               value: '${series.totalSets}',
-              label: 'hard sets',
+              label: 'Hard sets',
             ),
           ),
           Expanded(
             child: StatTile(
               value: '${series.peakSets}',
-              label: 'best week',
+              label: 'Best week',
             ),
           ),
           Expanded(
@@ -203,7 +203,7 @@ class _Figures extends StatelessWidget {
               value: '${series.weeksTrained}',
               // The denominator is printed rather than implied: `9` alone
               // reads as a score, and `9 of 13 weeks` is a fact.
-              label: 'of $weeks weeks trained',
+              label: 'Of $weeks weeks trained',
             ),
           ),
         ],

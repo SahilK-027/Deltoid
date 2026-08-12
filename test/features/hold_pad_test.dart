@@ -40,7 +40,7 @@ void main() {
     await pump(tester, previous: 62);
     // Minutes, because this one is watched second by second — the set table
     // still prints the bare seconds it stores.
-    expect(find.text('last time 1:02'), findsOneWidget);
+    expect(find.text('Last time 1:02'), findsOneWidget);
     expect(find.text('Start hold'), findsOneWidget);
   });
 
@@ -48,7 +48,7 @@ void main() {
     tester,
   ) async {
     await pump(tester);
-    expect(find.text('nothing to beat yet'), findsOneWidget);
+    expect(find.text('Nothing to beat yet'), findsOneWidget);
     expect(find.textContaining('last time'), findsNothing);
   });
 
@@ -57,7 +57,7 @@ void main() {
   ) async {
     await pump(tester, current: 75, previous: 62);
     expect(find.text('1:15'), findsOneWidget);
-    expect(find.text('past last time by 13s'), findsOneWidget);
+    expect(find.text('Past last time by 13s'), findsOneWidget);
   });
 
   testWidgets('the digits are one tap away, and gone once it is running', (

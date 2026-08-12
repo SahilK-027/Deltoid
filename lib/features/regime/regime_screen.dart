@@ -197,9 +197,9 @@ class _CycleLine extends ConsumerWidget {
     final c = context.c;
     final tail = status.deloadEnabled
         ? (status.isDeload
-            ? 'deload in progress'
+            ? 'Deload in progress'
             : '${status.cyclesUntilDeload} to deload')
-        : 'deload off';
+        : 'Deload off';
 
     return Pressable(
       scale: 0.99,
@@ -275,7 +275,7 @@ Future<void> _showCycleSheet(
               ? '${remaining.map(nameOf).join(', ')} would be skipped'
               : status.done == 0
                   ? 'Nothing trained yet this cycle'
-                  : 'Every day is done — the next workout opens a new one',
+                  : 'Every day is done. The next workout opens a new one.',
           onTap: !canClose
               ? null
               : () async {
@@ -494,7 +494,7 @@ class _DayBody extends ConsumerWidget {
       context,
       title: 'Delete ${session.name}?',
       message: 'It leaves the cycle, and its exercise slots go with it.\n\n'
-          'Workouts already logged under this day stay in History — they hold '
+          'Workouts already logged under this day stay in History. They hold '
           'their own record of what you did.',
       confirmLabel: 'Delete',
     );
@@ -542,7 +542,7 @@ class _SlotRow extends StatelessWidget {
       // Text, not a pill: a chip per row down a list is a column of chips, and
       // the muscle is a fact about the row rather than a state of it.
       subtitle: overridden
-          ? '${exercise.muscle.label} · own deload'
+          ? '${exercise.muscle.label} · Own deload'
           : exercise.muscle.label,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,

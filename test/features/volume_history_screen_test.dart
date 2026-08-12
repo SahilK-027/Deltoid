@@ -154,8 +154,8 @@ void main() {
     expect(find.byType(VolumeTile), findsNothing);
 
     expect(find.byType(VolumeChart), findsOneWidget);
-    expect(find.text('hard sets'), findsOneWidget);
-    expect(find.text('best week'), findsOneWidget);
+    expect(find.text('Hard sets'), findsOneWidget);
+    expect(find.text('Best week'), findsOneWidget);
     expect(
       find.text('Where the sets came from'),
       findsOneWidget,

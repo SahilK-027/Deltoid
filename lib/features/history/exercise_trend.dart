@@ -61,8 +61,23 @@ double? metricValue(
 String metricFormat(double v, WeightUnit unit, MeasureMode measure) =>
     measure.isHold ? '${v.round()}s' : formatWeight(v, unit);
 
-String metricLabel(ExerciseMetric metric, MeasureMode measure) =>
-    measure.isHold ? 'longest hold' : metric.label.toLowerCase();
+/// The same measure named mid-sentence, where it never starts the line.
+String metricNoun(ExerciseMetric metric, MeasureMode measure) =>
+    measure.isHold
+        ? 'hold time'
+        : switch (metric) {
+            ExerciseMetric.e1rm => 'est. 1RM',
+            ExerciseMetric.heaviest => 'heaviest weight',
+          };
+
+/// The same measure, named as the best one on record.
+String metricBestLabel(ExerciseMetric metric, MeasureMode measure) =>
+    measure.isHold
+        ? 'Longest hold'
+        : switch (metric) {
+            ExerciseMetric.e1rm => 'Best est. 1RM',
+            ExerciseMetric.heaviest => 'Heaviest weight',
+          };
 
 final exerciseMetricProvider =
     StateProvider<ExerciseMetric>((ref) => ExerciseMetric.e1rm);
@@ -159,7 +174,7 @@ class _Chart extends ConsumerWidget {
         icon: Icons.timeline,
         message: points.isEmpty
             ? 'Nothing logged in this range.'
-            : 'One session so far — a second one gives this a trend.',
+            : 'One session so far. A second one draws a trend.',
       );
     }
 
@@ -172,8 +187,8 @@ class _Chart extends ConsumerWidget {
       return EmptyBox(
         icon: Icons.timeline,
         message: scored.isEmpty
-            ? 'Nothing here to measure as ${metricLabel(metric, measure)}.'
-            : 'One session so far — a second one gives this a trend.',
+            ? 'No ${metricNoun(metric, measure)} recorded in this range.'
+            : 'One session so far. A second one draws a trend.',
       );
     }
 
@@ -188,7 +203,7 @@ class _Chart extends ConsumerWidget {
         icon: Icons.timeline,
         message: source.isEmpty
             ? 'Only deload weeks in this range.'
-            : 'One ordinary session so far — a second one gives this a trend.',
+            : 'One full-weight session so far. A second one draws a trend.',
       );
     }
 
@@ -219,7 +234,7 @@ class _Chart extends ConsumerWidget {
       tooltip: (v) => measure.isHold
           ? '${metricFormat(v, unit, measure)} held'
           : '${formatWeight(v, unit)} ${unit.label} '
-              '${metric.label.toLowerCase()}',
+              '${metricNoun(metric, measure)}',
     );
   }
 }
@@ -269,7 +284,7 @@ class _Summary extends ConsumerWidget {
           child: StatTile(
             value: best == null ? '—' : metricFormat(best, unit, measure),
             unit: best == null || measure.isHold ? null : unit.label,
-            label: 'best ${metricLabel(metric, measure)}',
+            label: metricBestLabel(metric, measure),
           ),
         ),
         Expanded(
@@ -278,7 +293,7 @@ class _Summary extends ConsumerWidget {
             value: delta == null
                 ? '—'
                 : '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)}%',
-            label: 'change',
+            label: 'Change',
             emphasis:
                 delta == null ? null : (delta >= 0 ? c.positive : c.negative),
           ),
@@ -287,8 +302,8 @@ class _Summary extends ConsumerWidget {
           child: StatTile(
             value: stalled == 0 ? 'Peak' : '$stalled',
             label: stalled == 0
-                ? 'best is the latest'
-                : 'session${stalled == 1 ? '' : 's'} since best',
+                ? 'Best is the latest'
+                : 'Session${stalled == 1 ? '' : 's'} since best',
             emphasis: stalled >= 3 ? c.negative : null,
           ),
         ),

@@ -564,8 +564,8 @@ class _UnitPicker extends ConsumerWidget {
       title: 'Show weights in ${_unitName(to).toLowerCase()}?',
       message:
           'Every weight in the app changes from ${_unitName(from)} to '
-          '${_unitName(to)} — your logs, the charts, the keypad and the plate '
-          'view. Nothing logged changes: weights are stored in kilograms '
+          '${_unitName(to)}: your logs, the charts, the keypad and the plate '
+          'view. Nothing logged changes, because weights are stored in kilograms '
           'either way and converted for the screen.',
       highlight: [_unitName(from), _unitName(to)],
       confirmLabel: 'Switch to ${_unitName(to).toLowerCase()}',

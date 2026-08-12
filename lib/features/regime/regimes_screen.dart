@@ -189,7 +189,7 @@ class RegimesScreen extends ConsumerWidget {
     messenger.hideCurrentSnackBar();
     showToastOn(
       messenger,
-      'Added to the library — still training the old one',
+      'Added to the library. Still training the old one.',
       actionLabel: 'Activate',
       onAction: () => ref.read(regimeRepositoryProvider).setActiveRegime(id),
     );
@@ -235,11 +235,11 @@ class _RegimeRow extends ConsumerWidget {
       // Every 6 *what*. The unit is the whole fact here: a cycle is one pass
       // through all the days, not a week, and the bare number read as days.
       if (!regime.deloadEnabled)
-        'no deload'
+        'No deload'
       else if (regime.deloadAfterCycles == 1)
-        'deload every cycle'
+        'Deload every cycle'
       else
-        'deload every ${regime.deloadAfterCycles} cycles',
+        'Deload every ${regime.deloadAfterCycles} cycles',
     ];
 
     return AppRow(
@@ -320,7 +320,7 @@ class _RegimeRow extends ConsumerWidget {
             title: 'Delete regime',
             subtitle: total > 1
                 ? 'Its days and slots go with it'
-                : 'Not the only one — there would be nothing to train',
+                : 'The only regime, so there would be nothing to train',
             tint: total > 1 ? sheet.c.negative : sheet.c.textTertiary,
             onTap: total > 1
                 ? () async {
@@ -351,7 +351,7 @@ class _RegimeRow extends ConsumerWidget {
               'under this regime.'
           : 'Its days and exercise slots go with it.\n\n'
               'The $logged workout${logged == 1 ? '' : 's'} logged under it '
-              'stay in History — each one holds its own record of what you '
+              'stay in History. Each one holds its own record of what you '
               'actually did.',
       confirmLabel: 'Delete',
     );

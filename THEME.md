@@ -193,6 +193,25 @@ page title or smaller than a nav label.
 - Sentence case everywhere. A title is read by its word shapes, and uppercase
   costs exactly that.
 
+### The words
+
+Every string the user reads is a sentence, or a fragment that could start one.
+
+- **Capital first letter, always.** Titles, subtitles, stat-tile labels, chips,
+  toasts, empty states. A label sitting after a `·` separator is a new item and
+  takes its own capital: `Cycle 4 · 3 of 6 · Deload in progress`.
+- **The one exception is a unit riding on a value** (rule 5): `12 sets`,
+  `82.5 kg est. 1RM`, `since 6:12 pm`. That is one phrase, not two.
+- **Two facts are two sentences, not one dash.** An em dash used to bolt a
+  consequence onto a clause reads as a footnote — write the second half as its
+  own sentence, or join it with a real conjunction. Prose *about* the app, in
+  comments and these documents, keeps the dash; the app itself does not.
+- **A subtitle of one clause takes no full stop**; two sentences take both.
+- **Length is the space, not the sentiment.** A row subtitle is one clause, a
+  toast is six words, a dialog body is one or two sentences that name what
+  happens. Where a screen has room to explain — an empty state, a confirmation
+  — explain, and stop as soon as it is said.
+
 ---
 
 ## 5. Space, radius, elevation

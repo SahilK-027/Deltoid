@@ -172,9 +172,9 @@ extension SetTypeX on SetType {
   bool get isContinuation => this == SetType.drop || this == SetType.restPause;
 
   String get label => switch (this) {
-        SetType.warmup => 'Warmup',
+        SetType.warmup => 'Warm-up',
         SetType.working => 'Working',
-        SetType.backoff => 'Backoff',
+        SetType.backoff => 'Back-off',
         SetType.drop => 'Drop',
         SetType.restPause => 'Rest-pause',
         SetType.amrap => 'AMRAP',
@@ -202,7 +202,7 @@ extension SkipReasonX on SkipReason {
         SkipReason.failed => 'Failed',
         SkipReason.equipmentBusy => 'Equipment busy',
         SkipReason.shortOnTime => 'Short on time',
-        SkipReason.injury => 'Injury / pain',
+        SkipReason.injury => 'Injury or pain',
         SkipReason.other => 'Other',
       };
 }

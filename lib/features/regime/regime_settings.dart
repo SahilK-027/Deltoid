@@ -80,7 +80,7 @@ class _SettingsSheet extends ConsumerWidget {
               ? 'Every ${regime.deloadAfterCycles == 1 ? '' : '${regime.deloadAfterCycles} '}'
                   'cycle${regime.deloadAfterCycles == 1 ? '' : 's'} · '
                   '${regime.deloadWeightPct}% weight'
-              : 'Off — no scheduled light week',
+              : 'Off, with no scheduled light week',
           onTap: () async {
             Navigator.of(context).pop();
             await showDeloadSettings(host, regime.id);

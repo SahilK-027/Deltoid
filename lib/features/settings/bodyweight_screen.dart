@@ -168,8 +168,9 @@ class BodyweightScreen extends ConsumerWidget {
               ? EmptyState(
                   icon: Icons.monitor_weight_outlined,
                   title: 'No weights logged',
-                  message: 'Needed to score bodyweight and BW+ lifts — 7 '
-                      'pull-ups at 70kg and 7 at 76kg are not the same lift.',
+                  message: 'Needed to score bodyweight and BW+ lifts. Seven '
+                      'pull-ups at 70kg and seven at 76kg are not the same '
+                      'lift.',
                   action: FilledButton(
                     onPressed: () => logBodyweightPrompt(context, ref),
                     child: const Text('Log bodyweight'),
@@ -531,7 +532,7 @@ class _TrendCard extends ConsumerWidget {
               icon: Icons.timeline,
               message: points.isEmpty
                   ? 'Nothing logged in this range.'
-                  : 'One weigh-in in this range — a second one gives this a '
+                  : 'One weigh-in in this range. A second one gives it a '
                       'shape.',
             )
           else

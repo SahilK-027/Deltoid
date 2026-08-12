@@ -186,7 +186,7 @@ class _HoldPadState extends State<HoldPad> {
         const SizedBox(height: Space.sm),
         if (previous == null)
           Text(
-            running ? 'holding' : 'nothing to beat yet',
+            running ? 'Holding' : 'Nothing to beat yet',
             style: context.t.labelSmall,
           )
         else ...[
@@ -202,8 +202,8 @@ class _HoldPadState extends State<HoldPad> {
           const SizedBox(height: Space.sm),
           Text(
             beaten
-                ? 'past last time by ${shown - previous}s'
-                : 'last time ${_format(previous)}',
+                ? 'Past last time by ${shown - previous}s'
+                : 'Last time ${_format(previous)}',
             style: context.t.labelSmall?.copyWith(
               color: beaten ? c.positive : c.textTertiary,
             ),

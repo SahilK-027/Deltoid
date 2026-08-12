@@ -353,8 +353,8 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
               child: Text(
                 kept == 0
                     ? '${widget.sessionName} left as it was'
-                    : '${widget.sessionName} updated — '
-                        '$kept change${kept == 1 ? '' : 's'} kept',
+                    : '${widget.sessionName} updated with '
+                        '$kept change${kept == 1 ? '' : 's'}',
                 style: context.t.bodyMedium?.copyWith(
                   color: kept == 0 ? c.textSecondary : c.positive,
                 ),

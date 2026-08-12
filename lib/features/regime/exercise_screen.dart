@@ -231,7 +231,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   AppRow(
                     title: entry.slot.notes == null ? 'Add a note' : 'Note',
                     subtitle: entry.slot.notes ??
-                        'A cue for this day — the exercise keeps its own',
+                        'A cue for this day. The exercise keeps its own.',
                     onTap: () async {
                       final note = await promptForNote(
                         context,
@@ -377,7 +377,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 AppRow(
                   title: 'Measured in',
                   subtitle: measure.isHold
-                      ? 'Seconds held — no reps, and no estimated 1RM'
+                      ? 'Seconds held, with no reps and no estimated 1RM'
                       : 'Repetitions',
                   trailing: _Value(measure.label),
                   onTap: () => _editMeasure(exercise, measure),
@@ -427,7 +427,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                     AppRow(
                       icon: Icons.remove_circle_outline,
                       title: 'Remove from $dayName',
-                      subtitle: 'Future workouts only — past logs keep it',
+                      subtitle: 'Future workouts only. Past logs keep it.',
                       tint: c.negative,
                       onTap: () => _removeFromDay(entry.exercise.name),
                     ),
@@ -670,7 +670,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           message: '$affected logged ${affected == 1 ? 'set' : 'sets'} will be '
               're-read as ${picked.isHold ? 'seconds held' : 'reps'}. '
               '${picked.isHold ? 'Its estimated 1RM and its share of session '
-                  'volume go away — a hold has neither.' : 'It gets an '
+                  'volume go away, because a hold has neither.' : 'It gets an '
                   'estimated 1RM and counts toward session volume again.'}',
           confirmLabel: 'Change it',
           destructive: false,
@@ -788,7 +788,7 @@ String _loadModeName(LoadMode mode) => switch (mode) {
 /// What the number you type into this exercise means.
 String _loadBlurb(LoadMode mode) => switch (mode) {
       LoadMode.total => 'The weight you type is the whole load',
-      LoadMode.perSide => 'The weight you type is per hand — two are moving',
+      LoadMode.perSide => 'The weight you type is per hand, and two are moving',
       LoadMode.bodyweight => 'Reps only, no external load',
       LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
     };
@@ -863,7 +863,7 @@ class _DeloadSetsRow extends ConsumerWidget {
         StepperRow(
           label: 'Sets during deload',
           helper: own == null ? 'Following the regime' : 'This day only',
-          value: live == 0 ? 'unchanged' : '$live',
+          value: live == 0 ? 'Unchanged' : '$live',
           onDecrement: live > -3 ? () => set(live - 1) : null,
           onIncrement: live < 0 ? () => set(live + 1) : null,
         ),

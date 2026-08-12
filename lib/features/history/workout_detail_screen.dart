@@ -340,7 +340,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
         : [
             '${done.length} set${done.length == 1 ? '' : 's'}',
             _topLoad(done, entry.exercise, unit),
-            if (skipped) 'then stopped',
+            if (skipped) 'Then stopped',
           ].join(' · ');
 
     return Column(

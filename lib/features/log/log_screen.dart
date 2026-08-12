@@ -400,8 +400,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     if (saved || !mounted) return;
     showToast(
       context,
-      'Rest set for today. ${entry.exercise.name} is not in this '
-      'session\'s template, so it will not be remembered.',
+      'Rest set for today only. ${entry.exercise.name} is not in this '
+      'session\'s template, so the change is not remembered.',
     );
   }
 
@@ -490,7 +490,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Leaving without finishing is fine — the session keeps running and
         // survives a force-stop — but it has to be said out loud, or the sets
         // logged so far look lost.
-        showToast(context, 'Session still running — resume it from Today');
+        showToast(context, 'Session still running. Resume it from Today.');
         Navigator.of(context).pop();
       },
       child: Scaffold(
@@ -532,9 +532,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
                       icon: Icons.fitness_center_rounded,
                       title: 'Nothing to log yet',
                       message:
-                          'This session has no exercises in it. Add one and it '
-                          'goes into today only — the template keeps its own '
-                          'list.',
+                          'This session has no exercises in it. Anything you '
+                          'add goes into today only. The template keeps its '
+                          'own list.',
                       action: PrimaryButton(
                         label: 'Add an exercise',
                         onPressed: () => _addExercise(detail),
@@ -1803,7 +1803,7 @@ class _ExercisePage extends ConsumerWidget {
                 const SizedBox(width: Space.md),
                 Expanded(
                   child: Text(
-                    'Skipped — ${entry.workoutExercise.skipReason.label.toLowerCase()}',
+                    'Skipped: ${entry.workoutExercise.skipReason.label.toLowerCase()}',
                     style: context.t.bodySmall?.copyWith(color: c.negative),
                   ),
                 ),
@@ -1960,7 +1960,7 @@ Future<_FinishChoice?> _confirmEarlyFinish(
             // typed into it but never ticked is thrown away too, and the sheet
             // promised it wasn't. Unticked is the rule everywhere else —
             // `completeWorkout` tombstones on `isDone`, not on blankness.
-            'Any set you did not tick is discarded — the session is saved with '
+            'Any set you did not tick is discarded. The session is saved with '
             'exactly what you did.',
             style: sheet.t.bodyMedium?.copyWith(color: c.textSecondary),
           ),

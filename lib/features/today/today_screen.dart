@@ -112,9 +112,9 @@ class _SessionPickRow extends StatelessWidget {
               if (done) ...[
                 Icon(Icons.check_rounded, size: 16, color: c.positive),
                 const SizedBox(width: Space.xs),
-                Text('done this cycle', style: context.t.labelSmall),
+                Text('Done this cycle', style: context.t.labelSmall),
               ] else if (isNext)
-                // Sentence case, like `done this cycle` two lines up. An
+                // Sentence case, like `Done this cycle` two lines up. An
                 // uppercase micro-label is what makes a screen look like a
                 // template (THEME → Type) — uppercase belongs to the masthead.
                 Text('Next up', style: context.t.labelSmall)
@@ -240,7 +240,7 @@ Future<void> _logPastSession(
     showToastOn(
       messenger,
       cycle == null
-          ? 'Older than this regime — counts towards no cycle'
+          ? 'Older than this regime, so it counts towards no cycle'
           : 'Counts towards cycle ${cycle.cycleIndex}',
     );
     await navigator.push(
@@ -1030,7 +1030,7 @@ class _ResumeHero extends ConsumerWidget {
         if (foreignRegime != null) ...[
           const SizedBox(height: Space.sm),
           Text(
-            'finishing it advances $foreignRegime, not $activeRegimeName',
+            'Finishing it advances $foreignRegime, not $activeRegimeName',
             style: context.t.bodyMedium,
           ),
         ],
@@ -1493,7 +1493,7 @@ class _ConsistencyCard extends StatelessWidget {
   static String _summary(Consistency c) {
     final perWeek = c.perWeek;
     if (c.isEmpty) {
-      return ['— of 7 this week', 'avg. — per week', 'nothing logged yet']
+      return ['— of 7 this week', 'Avg. — per week', 'Nothing logged yet']
           .join('  ·  ');
     }
     return [
@@ -1504,7 +1504,7 @@ class _ConsistencyCard extends StatelessWidget {
       // Whole sessions. `5.3 per week` is a decimal on a count of things you
       // either did or did not do, and it is rounded **down**: the app never
       // reports a session it cannot point at.
-      perWeek == null ? '— per week' : 'avg. ${perWeek.floor()} per week',
+      perWeek == null ? '— per week' : 'Avg. ${perWeek.floor()} per week',
       // The window is only worth naming once it *is* a window. "1 in 1 day"
       // was the app dividing by the length of its own history and reporting
       // the result as a habit.

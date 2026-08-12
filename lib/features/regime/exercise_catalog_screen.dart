@@ -220,8 +220,8 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
 
 /// The short form, for a row that has already said the muscle and the kit.
 String loadModeLabel(LoadMode mode) => switch (mode) {
-  LoadMode.total => 'total load',
-  LoadMode.perSide => 'per side',
-  LoadMode.bodyweight => 'bodyweight',
-  LoadMode.bodyweightPlus => 'bodyweight +',
+  LoadMode.total => 'Total load',
+  LoadMode.perSide => 'Per side',
+  LoadMode.bodyweight => 'Bodyweight',
+  LoadMode.bodyweightPlus => 'Bodyweight +',
 };

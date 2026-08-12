@@ -120,7 +120,7 @@ class PlateView extends StatelessWidget {
                     // bar that is not the weight in the field.
                     Text(
                       '${_fmt(load.remainderKg, unit)} '
-                      '${unit.label} short — no plate for it',
+                      '${unit.label} short, with no plate for it',
                       style: context.t.labelSmall?.copyWith(color: c.deload),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -140,7 +140,7 @@ class PlateView extends StatelessWidget {
   static String _sentence(PlateLoad load, WeightUnit unit) {
     final u = unit.label;
     if (load.isBarOnly) {
-      return 'Empty bar — ${_fmt(load.barKg, unit)} $u';
+      return 'Empty bar, ${_fmt(load.barKg, unit)} $u';
     }
     final each = load.perSide
         .map(
