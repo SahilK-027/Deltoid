@@ -2763,25 +2763,33 @@ class TrainingRepository {
     final covering = await cycleCovering(workout.regimeId, moved);
     final movedCycle = covering?.id != workout.cycleId;
 
-    await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
-      WorkoutsCompanion(
-        dayKey: Value(dayKeyOf(moved)),
-        startedAt: Value(moved.millisecondsSinceEpoch),
-        endedAt: workout.endedAt == null
-            ? const Value.absent()
-            : Value(workout.endedAt! + shift),
-        cycleId: movedCycle ? Value(covering?.id) : const Value.absent(),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
+    // One transaction: the move and the two cycles it disturbs are a single
+    // act. Run loose, a crash between them left the workout on its new date
+    // with the cycle it left still closed — the deload-lands-early failure this
+    // method's own doc warns about, reached by the route that fixes it.
+    await db.transaction(() async {
+      await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
+          .write(
+        WorkoutsCompanion(
+          dayKey: Value(dayKeyOf(moved)),
+          startedAt: Value(moved.millisecondsSinceEpoch),
+          endedAt: workout.endedAt == null
+              ? const Value.absent()
+              : Value(workout.endedAt! + shift),
+          cycleId: movedCycle ? Value(covering?.id) : const Value.absent(),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
 
-    if (!movedCycle) return;
-    // In this order, and only after the row above has landed: the cycle it left
-    // is judged on what is still in it, and `workout` still carries the old
-    // cycle id for exactly that lookup.
-    await _reopenCycleIfIncomplete(workout);
-    await closeCycleIfSatisfied(workout.regimeId);
+      if (!movedCycle) return;
+      // In this order, and only after the row above has landed — within the
+      // transaction it already has: the cycle it left is judged on what is
+      // still in it, and `workout` still carries the old cycle id for exactly
+      // that lookup.
+      await _reopenCycleIfIncomplete(workout);
+      await closeCycleIfSatisfied(workout.regimeId);
+    });
   }
 
   /// The context that explains a bad week when you read it back in six months.
@@ -2808,6 +2816,12 @@ class TrainingRepository {
     if (workout == null) return;
 
     final stamp = nowMs();
+    // Reopening the cycle is part of the delete, not a follow-up to it. It ran
+    // after the transaction committed, which left a window — a crash or a kill
+    // between the two — where the workout was gone and its cycle still carried
+    // `completedAt`. The programme then counts a cycle for a day that never
+    // happened and the deload lands early, which is the exact failure
+    // [_reopenCycleIfIncomplete] exists to prevent.
     await db.transaction(() async {
       await _tombstoneChildren(workoutId, stamp);
 
@@ -2819,9 +2833,9 @@ class TrainingRepository {
           dirty: const Value(true),
         ),
       );
-    });
 
-    await _reopenCycleIfIncomplete(workout);
+      await _reopenCycleIfIncomplete(workout);
+    });
   }
 
   /// A cycle closes the moment its last owed session is logged. Deleting that
