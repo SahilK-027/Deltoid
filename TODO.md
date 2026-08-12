@@ -132,10 +132,31 @@ firing with the screen off have only been built, not felt.
 
 ## Left
 
-- [ ] **Supabase sync.** This is the one feature still outstanding, and it needs
-      the project URL and the anon key before it can be started. Every table
-      already carries the sync columns (`updatedAt`, `deletedAt`, `deviceId` and
-      `dirty`), so the work is additive and needs no migration.
+- [ ] **Supabase sync.** The one feature still outstanding. Scope-approved —
+      see [RULES.md § 6](RULES.md#6-scope) for what that decision does and does
+      not open. Needs the project URL and the anon key before anything can
+      connect, though the whole layer can be built and tested behind a seam
+      without them. Every table already carries the sync columns (`updatedAt`,
+      `deletedAt`, `deviceId` and `dirty`), so the local schema needs no
+      migration for it.
+
+      **Four decisions come before code**, because each one changes the shape of
+      the layer and the last two are expensive to reverse:
+
+      - **Identity.** Supabase Auth with a real sign-in, or the anon key plus a
+        client-asserted `user_id`. The second has no login screen and no
+        security: the anon key ships inside the APK, so anyone who extracts it
+        can read and write that id's rows. Worth stating out loud before it is
+        chosen by default.
+      - **Merge granularity.** Whole-row last-write-wins is simplest and loses
+        concurrent edits to different fields of one set; column-level is right
+        for `set_logs` and overkill elsewhere.
+      - **What syncs.** The nine tables carrying `SyncColumns`, and never
+        `app_settings` — `device_id` in particular must stay on its device.
+      - **Concurrency.** `journal_mode` is `delete` today, so a sync reader and
+        a writer serialise completely; WAL fixes that and trades a little
+        durability. `busy_timeout` is 5 s, which a long restore exceeds while
+        holding the write lock.
 
       The data layer has been audited for it and the local half is done: every
       invariant the repository held in Dart is now held by the database too, a
@@ -161,3 +182,12 @@ firing with the screen off have only been built, not felt.
         natural key and is not unique.
       - `busy_timeout` is 5 s and a restore holds the write lock for longer than
         that on a long history, so a second connection would fail against it.
+
+- [ ] **The migration ladder, as a prerequisite of sync rather than a
+      consequence.** `schemaVersion` is 1 with no `onUpgrade`, which holds only
+      while every database is one we can throw away. Sync ends that: two devices
+      can run different builds and exchange rows, so a released schema change
+      needs both an upgrade path for the local file and a wire format that
+      survives a row carrying one column more or fewer than the reader knows.
+      See [RULES.md § 3](RULES.md#3-schema-and-migrations) for the rules the
+      ladder itself has to follow.

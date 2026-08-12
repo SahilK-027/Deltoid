@@ -115,6 +115,19 @@ earlier build comes back with the structure in place and the stamp behind it,
 and the bare form throws on launch before any screen), and a test that runs a
 full upgrade over a database that already has everything.
 
+**Sync is that day, and it arrives before any second phone does.** The ladder is
+a prerequisite of the sync work rather than a consequence of it, for a reason
+worth stating plainly: sync does not merely put the app on a second device, it
+lets two devices running *different builds* exchange rows. So a released schema
+change needs two things this section has never needed — an upgrade path for the
+local file, and a wire format that survives a row from a build that knows one
+more column, or one fewer, than the reader does. A pull that drops a column it
+has not heard of loses data silently; one that refuses the row stops the sync.
+Neither is decided yet, and neither can be decided after the first release.
+
+Until that is built, the four steps above still hold and the reinstall is still
+the upgrade path.
+
 Step 3 stays true whether or not a ladder exists, and it is the easy one to
 miss and the expensive one to get wrong. `Exercise.fromJson` is generated
 against _today's_ columns and reads every one of them unconditionally, so a
@@ -298,9 +311,9 @@ requirement, and the answer to "should we add…" is usually no.
 **Deliberately absent, and staying that way:** social features, macros /
 nutrition, AI coaching, an exercise GIF or video library, Apple Health /
 Google Fit, 1RM testing protocols, streaks, levels, muscle maps, motivational
-copy, programme sharing or marketplaces, accounts, and **effort / RIR
-ratings** — a number you rate yourself with after the set, which is one more
-thing to answer at the bar and nothing downstream reads.
+copy, programme sharing or marketplaces, and **effort / RIR ratings** — a
+number you rate yourself with after the set, which is one more thing to answer
+at the bar and nothing downstream reads.
 
 **A PR feed and a PR badge stay out.** A record is a number you can already read
 on the day it was set, and `beatsPrevious` says "you beat last time" where it
@@ -318,6 +331,28 @@ else has to pass: **no new screen, and no new question asked.**
   normalised to your own biggest muscle rather than to a target this app has no
   business inventing. What stays ruled out is the thing that made it a non-goal:
   a dashboard you navigate to, a feed to scroll, targets to fail against.
+
+**Accounts came off it too, and did _not_ pass that test — so the reason has to
+be written down rather than assumed.** Sync across your own phones needs an
+identity to sync to, and an identity needs somewhere to say who you are, which
+is a new screen and a new question. It is here because the alternative is worse
+than the cost: this app is the only copy of a training history that takes years
+to accumulate, and a lost phone currently loses it. A backup file is a real
+answer and an unreliable one, because it depends on the user remembering.
+
+What that decision opens is **one account, for one person, to reach their own
+data from their own devices.** What it does not open is everything the word
+usually drags with it, all of which stays on the list above: no other people, no
+sharing, no profiles, no feed, no account as a *feature* — a login you see once
+and never again is the whole of it. The rules that follow from this live in
+[§ 2](#2-data) and [§ 3](#3-schema-and-migrations); the work it needs is in
+[TODO.md](TODO.md).
+
+**Offline-first is not softened by it.** Every screen reads local disk, no read
+waits on a server, and the app is fully usable with the radio off — a sync is a
+background reconciliation of tables the screens already read. A change that
+makes a screen wait on the network is a change that breaks this rule, whatever
+sync needs.
 
 The app should stay small enough to open mid-set and understand at a glance.
 When in doubt, don't add the screen.

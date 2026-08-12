@@ -1,8 +1,13 @@
 # Deltoid
 
 Deltoid is a personal, offline-first training log built with Flutter and SQLite.
-It runs on Android, keeps everything on the device, and has no accounts and no
-network calls.
+It runs on Android and keeps everything on the device.
+
+Offline-first is finished and is the architecture, not a stage: every screen
+reads local disk and nothing waits on a server. **Online sync across your own
+devices is in scope and not yet built** — the schema has carried the columns for
+it from the start (`updatedAt`, `deletedAt`, `deviceId`, `dirty`), and the app
+makes no network call until it lands.
 
 **No programme is baked in.** A fresh install ships with an exercise catalog and
 nothing else. You either build your own split or start from one of the two
@@ -111,9 +116,13 @@ dart run tool/seed_years.dart --years 5 --out seed.json
 ## How it is built
 
 The app is built with Flutter, Riverpod and drift. Everything lives on local
-disk: there is no server, no account and no network call anywhere in it. State
-is a layer of Riverpod providers over drift streams, so a write in one place
-re-renders whatever was watching that table.
+disk, and there is no network call anywhere in it today. State is a layer of
+Riverpod providers over drift streams, so a write in one place re-renders
+whatever was watching that table.
+
+That stays true after sync lands: local disk is what the screens read, and a
+sync is a background reconciliation of the same tables rather than a thing any
+screen waits on. Reads never learn about the network.
 
 There are four layers, and the dependencies point one way only — `features`
 depends on `data`, which depends on `domain` — while `core` is available to all
