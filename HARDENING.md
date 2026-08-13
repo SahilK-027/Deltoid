@@ -1,9 +1,13 @@
-# The plan to first real data
+# Hardening — the road to first real data
 
 The order of work between here and trusting this app with a real training
 history, and then with sync. Five stages, sequential, each with an exit
 criterion that is a **check rather than a feeling**, and each with the prompt
 that runs it.
+
+**This document retires.** It is one campaign with an end, not a roadmap — when
+stage 5 passes and DEBT.md is empty, delete it. What comes after lives in
+[TODO.md](TODO.md), which is still the only place status lives.
 
 This exists because "is it ready yet" has no answer. Asking an AI — or yourself
 — to find bugs is an unbounded generator: it can always produce one more, and a
@@ -289,7 +293,7 @@ conversion up to thirty-four more times.
 One entry per session:
 
 ```
-Read DEBT.md § N and PLAN.md stage 4, then close § N and nothing else.
+Read DEBT.md § N and HARDENING.md stage 4, then close § N and nothing else.
 
 Constraints:
   - The full suite, including test/integrity/, passes before and after. If a

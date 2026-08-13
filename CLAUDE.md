@@ -20,7 +20,7 @@ code and a stale one about the plan.
 | **[SYNC.md](SYNC.md)**     | Before touching cloud backup. What syncs, what never does, how a conflict resolves, and the eight things sync may never do                              |
 | **[README.md](README.md)** | Setup, commands, project layout, how the layers fit                                                                                                     |
 | **[TODO.md](TODO.md)**     | What is done and what is left. Status lives there and nowhere else                                                                                      |
-| **[PLAN.md](PLAN.md)**     | What to work on next, in what order, and the prompt that runs each stage. It carries [DEBT.md](DEBT.md) — the known weaknesses — with it                |
+| **[HARDENING.md](HARDENING.md)** | What to work on next, in what order, and the prompt that runs each stage — the road to trusting this with real data. Carries [DEBT.md](DEBT.md) with it |
 
 This file holds no facts of its own. If anything here contradicts one of those
 six documents, the other document is the correct one.
