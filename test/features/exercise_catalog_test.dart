@@ -102,4 +102,37 @@ void main() {
     expect(find.byType(ExerciseCatalogScreen), findsOneWidget);
     expect(find.text('Exercises'), findsOneWidget);
   });
+
+  testWidgets('the new-exercise button floats over the list, bottom right',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pump(tester);
+
+    final button = find.widgetWithText(PrimaryButton, 'New exercise');
+    expect(button, findsOneWidget);
+
+    final rect = tester.getRect(button);
+    // Its own words, at the corner a thumb rests on — not a bar across the foot
+    // spending a row of the list on page background (THEME → Buttons).
+    expect(rect.width, lessThan(300));
+    expect(rect.right, greaterThan(300));
+    expect(rect.bottom, greaterThan(700));
+
+    // Over the rows, not below them: the list runs to the bottom of the screen.
+    expect(tester.getRect(find.byType(ListView).last).bottom, 800);
+  });
+
+  testWidgets('it stands aside for an empty state, which asks once',
+      (tester) async {
+    await pump(tester);
+
+    await tester.enterText(find.byType(TextField), 'zzzz');
+    await settle(tester);
+
+    expect(find.text('Nothing matches'), findsOneWidget);
+    // One button, and it is the empty state's own full-width one.
+    expect(find.widgetWithText(PrimaryButton, 'New exercise'), findsNothing);
+    expect(find.textContaining('Create "zzzz"'), findsOneWidget);
+  });
 }

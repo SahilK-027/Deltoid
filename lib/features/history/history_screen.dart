@@ -365,12 +365,15 @@ class _FeedFilterBar extends ConsumerWidget {
       return null;
     }();
 
+    // 12 + a 40pt chip + 12. It was 52 with no bottom padding at all, so the
+    // chips sat flush on the strip's edge and the first row of the feed ran
+    // straight into them — the row below has to clear a control, not touch it.
     return SizedBox(
-      height: 52,
+      height: 64,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(
-            Space.gutter, Space.md, Space.gutter, 0),
+        padding: const EdgeInsets.symmetric(
+            horizontal: Space.gutter, vertical: Space.md),
         children: [
           AppChip(
             // The chip states the filter when there is one, and the question

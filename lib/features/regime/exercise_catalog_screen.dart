@@ -72,6 +72,27 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
           ];
 
     return Scaffold(
+      // **Floating, not a bar across the foot.** A strip at the bottom is a
+      // band of page background stealing a row's worth of list on the one
+      // screen that is nothing but list — and it reads as the end of a flow
+      // when it is one more thing you can add. It floats over the rows
+      // instead, at the corner a thumb rests on, and the list scrolls under it
+      // with room at the end so the last movement is never the one you cannot
+      // read. No shadow: depth here is surface colour, and the fill is already
+      // the brightest thing on the screen (THEME → Space, radius, elevation).
+      //
+      // Hidden while the empty state is up — that state's own button *is* this
+      // action, and offering it twice on one screen makes the pair read as two
+      // different things.
+      floatingActionButton: _showArchived || filtered.isEmpty
+          ? null
+          : PrimaryButton(
+              compact: true,
+              label: 'New exercise',
+              icon: Icons.add_rounded,
+              onPressed: () =>
+                  createExerciseFlow(context, initialName: _query.trim()),
+            ),
       appBar: AppBar(
         title: Text(_showArchived ? 'Archived' : 'Exercises'),
         actions: [
@@ -165,7 +186,8 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
               // History is built: a card per movement made a list of eighty
               // into eighty boxes.
               child: ListView.separated(
-                padding: const EdgeInsets.only(bottom: Space.lg),
+                // Room to scroll the last row clear of the floating button.
+                padding: const EdgeInsets.only(bottom: Space.huge * 2),
                 itemCount: filtered.length,
                 separatorBuilder: (_, _) => Divider(height: 1, color: c.border),
                 itemBuilder: (context, i) {
@@ -192,24 +214,6 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                     onTap: () => openExercise(context, exerciseId: e.id),
                   );
                 },
-              ),
-            ),
-          if (!_showArchived)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.gutter,
-                Space.sm,
-                Space.gutter,
-                Space.md,
-              ),
-              child: SafeArea(
-                top: false,
-                child: PrimaryButton(
-                  label: 'New exercise',
-                  icon: Icons.add_rounded,
-                  onPressed: () =>
-                      createExerciseFlow(context, initialName: _query.trim()),
-                ),
               ),
             ),
         ],

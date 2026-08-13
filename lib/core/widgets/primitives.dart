@@ -671,6 +671,7 @@ class PrimaryButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.tone,
+    this.compact = false,
   });
 
   final String label;
@@ -679,6 +680,16 @@ class PrimaryButton extends StatelessWidget {
 
   /// Overrides the fill. Only for a destructive confirm, never for emphasis.
   final Color? tone;
+
+  /// The width of its own words, 46 tall, rather than the width of the screen.
+  ///
+  /// **For an action that adds one more of something**, not for one that ends a
+  /// flow. Full width is a commitment — *this is what the screen is for* — and
+  /// spending it on "New exercise" under a list of eighty of them put the
+  /// loudest shape on the page under the quietest intention, and made a
+  /// three-word label look like a banner. Finishing a session, saving an
+  /// exercise, confirming a delete: those stay full width.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -695,13 +706,17 @@ class PrimaryButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: Motion.base,
         curve: Motion.curve,
-        height: 54,
+        height: compact ? 46 : 54,
+        padding: compact
+            ? const EdgeInsets.symmetric(horizontal: Space.xl)
+            : null,
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
           children: [
             if (icon != null) ...[
               Icon(icon, size: 20, color: fg),
