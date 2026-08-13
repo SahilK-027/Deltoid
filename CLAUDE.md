@@ -20,11 +20,10 @@ code and a stale one about the plan.
 | **[SYNC.md](SYNC.md)**     | Before touching cloud backup. What syncs, what never does, how a conflict resolves, and the eight things sync may never do                              |
 | **[README.md](README.md)** | Setup, commands, project layout, how the layers fit                                                                                                     |
 | **[TODO.md](TODO.md)**     | What is done and what is left. Status lives there and nowhere else                                                                                      |
-| **[DEBT.md](DEBT.md)**     | The known weaknesses, with evidence and a check for each. Read before deciding what to work on — and add to it rather than fixing quietly               |
-| **[PLAN.md](PLAN.md)**     | The order of work between here and real data, and then sync. Five stages, each with an exit criterion that is a check rather than a feeling             |
+| **[PLAN.md](PLAN.md)**     | What to work on next, in what order, and the prompt that runs each stage. It carries [DEBT.md](DEBT.md) — the known weaknesses — with it                |
 
 This file holds no facts of its own. If anything here contradicts one of those
-seven documents, the other document is the correct one.
+six documents, the other document is the correct one.
 
 ## The rules most easily broken
 
