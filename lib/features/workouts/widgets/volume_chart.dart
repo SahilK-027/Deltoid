@@ -248,34 +248,53 @@ class _Months extends StatelessWidget {
     final n = bars.length;
     final count = n < _axisLabels ? n : _axisLabels;
 
-    // The bars the labels sit on, evenly spread and including both ends.
+    // **The line chart's geometry, exactly.** Its axis pads half a step either
+    // side and then ticks every step, which puts label *k* at `(k + ½) / count`
+    // of the width — evenly spaced, all of them interior, no end treated
+    // differently from the middle.
+    //
+    // The strip used to spread indices from the first bar to the last and
+    // anchor the outer two flush to the edges. Both of those bend the spacing:
+    // rounding to whole bars makes the gaps differ by a slot, and anchoring the
+    // ends makes the two outer gaps unlike the five inner ones. The result read
+    // as *nearly* even, which is worse than either even or obviously not.
     final indices = [
       for (var k = 0; k < count; k++)
-        count == 1 ? 0 : (k * (n - 1) / (count - 1)).round(),
+        (((k + 0.5) * n / count) - 0.5).round().clamp(0, n - 1),
     ];
 
-    List<({int index, String label})> pickedWith(DateFormat f) {
-      final out = <({int index, String label})>[];
-      for (final i in indices) {
-        final label = f.format(bars[i].start);
-        // Two picks inside one month would print `Jul Jul`. Dropping the second
-        // is better than printing a word that says nothing new.
-        if (out.isNotEmpty && out.last.label == label) continue;
-        out.add((index: i, label: label));
+    List<({int index, double at, String label})> pickedWith(DateFormat f) {
+      final out = <({int index, double at, String label})>[];
+      for (var k = 0; k < indices.length; k++) {
+        final label = f.format(bars[indices[k]].start);
+        out.add((
+          index: indices[k],
+          // The fraction of the plot this label sits at — see [indices].
+          at: (k + 0.5) / count,
+          label: label,
+        ));
       }
       return out;
     }
 
+    // **A collision is a format that is too coarse, not a label too many.**
+    //
+    // Dropping the repeat was the obvious fix and the wrong one: the positions
+    // are fixed at `(k + ½) / count`, so removing one leaves a double-width gap
+    // where it was. Thirteen weeks over three months collided four times and
+    // came out as three labels spaced 42, 126 — which is exactly the uneven
+    // strip this was supposed to cure.
+    //
+    // So the words get more specific instead. Which way depends on what the
+    // picks disagree about: inside one year `Mar` becomes `9 Mar`, and across a
+    // boundary — a year of weekly bars reaching back from August covers
+    // *thirteen* months, so `Aug` lands at both ends — it becomes `Aug '25`.
     var picks = pickedWith(format);
-
-    // **A repeat at the two ends is a different problem from a repeat in the
-    // middle.** A year of weekly bars reaching back from August covers thirteen
-    // months, so `Aug` lands at both edges — and dropping one of them would
-    // take away an end of the axis rather than a duplicate. When the labels
-    // cannot tell those two apart, the fix is to say which year each is in,
-    // not to print one of them fewer times.
-    if (picks.map((p) => p.label).toSet().length != picks.length) {
-      picks = pickedWith(DateFormat("MMM ''yy"));
+    if (_collides(picks)) {
+      final spansYears =
+          bars.first.start.year != bars.last.start.year;
+      picks = pickedWith(DateFormat(spansYears ? "MMM ''yy" : 'd MMM'));
+      if (_collides(picks)) picks = pickedWith(DateFormat("d MMM ''yy"));
     }
 
     return Padding(
@@ -287,12 +306,11 @@ class _Months extends StatelessWidget {
         height: 16,
         child: LayoutBuilder(
           builder: (context, box) {
-            final slot = box.maxWidth / n;
             return Stack(
               clipBehavior: Clip.none,
               children: [
                 for (var k = 0; k < picks.length; k++)
-                  _label(context, picks[k], k, picks.length, slot),
+                  _label(context, picks[k], box.maxWidth),
               ],
             );
           },
@@ -301,32 +319,26 @@ class _Months extends StatelessWidget {
     );
   }
 
+  static bool _collides(List<({int index, double at, String label})> picks) =>
+      picks.map((p) => p.label).toSet().length != picks.length;
+
   Widget _label(
     BuildContext context,
-    ({int index, String label}) pick,
-    int k,
-    int total,
-    double slot,
+    ({int index, double at, String label}) pick,
+    double width,
   ) {
-    final text = Text(
-      pick.label,
-      style: context.t.bodySmall,
-      maxLines: 1,
-      softWrap: false,
-    );
-
-    // The ends are anchored rather than centred: half of `2024` hanging past
-    // the plot is the overflow this replaced.
-    if (k == 0) return Positioned(left: 0, child: text);
-    if (k == total - 1) return Positioned(right: 0, child: text);
-
-    // Centred on its bar without measuring the word: place the box at the bar's
-    // centre, then shift it left by half of whatever width it turns out to be.
+    // Centred on its position without measuring the word: place the box at the
+    // point, then shift it left by half of whatever width it turns out to be.
     return Positioned(
-      left: (pick.index + 0.5) * slot,
+      left: pick.at * width,
       child: FractionalTranslation(
         translation: const Offset(-0.5, 0),
-        child: text,
+        child: Text(
+          pick.label,
+          style: context.t.bodySmall,
+          maxLines: 1,
+          softWrap: false,
+        ),
       ),
     );
   }

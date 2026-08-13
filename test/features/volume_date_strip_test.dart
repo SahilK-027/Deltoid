@@ -47,7 +47,10 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    // Settled, not just pumped: the strip lives inside an `AnimatedSwitcher`,
+    // which holds the outgoing labels while the new ones fade in — so a single
+    // pump measures two strips laid over each other.
+    await tester.pumpAndSettle();
     return [
       for (final e in find.byType(Text).evaluate())
         tester.getRect(find.byWidget(e.widget)),
@@ -57,6 +60,14 @@ void main() {
   List<String> labelsOf(WidgetTester tester) => [
         for (final w in tester.widgetList<Text>(find.byType(Text)))
           if (w.data != null) w.data!,
+      ];
+
+  /// The date labels only — the value axis is bare integers.
+  List<({String label, Rect rect})> stripOf(WidgetTester tester) => [
+        for (final e in find.byType(Text).evaluate())
+          if ((e.widget as Text).data case final d?)
+            if (int.tryParse(d) == null)
+              (label: d, rect: tester.getRect(find.byWidget(e.widget))),
       ];
 
   testWidgets('a month of weekly bars labels every bar, not two of them',
@@ -82,8 +93,8 @@ void main() {
     // A year reaching back from August covers thirteen months, so plain `Aug`
     // would land at both ends. The axis says which year each one is rather than
     // printing one of them fewer times and losing an end.
-    expect(months.toSet().length, months.length);
-    expect(months.first, contains("'"), reason: 'the ends were not told apart');
+    expect(months.toSet().length, months.length,
+        reason: 'a repeated label is a format that is too coarse');
   });
 
   testWidgets('a whole label is drawn, never a fragment of one',
@@ -109,6 +120,30 @@ void main() {
           reason: 'a label was drawn off the left edge');
       expect(r.right, lessThanOrEqualTo(width + 0.5),
           reason: 'a label was drawn off the right edge');
+    }
+  });
+
+  testWidgets('the gaps between labels are equal, at every range',
+      (tester) async {
+    // The complaint that produced this file's second rewrite: the labels were
+    // *nearly* evenly spaced, which reads worse than either even or obviously
+    // not. They now sit where the line chart's ticks sit — `(k + ½) / count` of
+    // the plot — so every gap is the same and the two ends are not special.
+    for (final weeks in [13, 26, 52, 52 * 3]) {
+      await pump(tester, weeks, Granularity.weekly);
+      final strip = stripOf(tester);
+      final centres = [for (final l in strip) l.rect.center.dx]..sort();
+      expect(centres.length, greaterThanOrEqualTo(5),
+          reason: '$weeks weeks drew ${centres.length} date labels');
+
+      final gaps = [
+        for (var i = 1; i < centres.length; i++) centres[i] - centres[i - 1],
+      ];
+      final widest = gaps.reduce((a, b) => a > b ? a : b);
+      final narrowest = gaps.reduce((a, b) => a < b ? a : b);
+      expect(widest - narrowest, lessThan(1.0),
+          reason: '$weeks weeks: gaps ran $narrowest..$widest '
+              '(${[for (final l in strip) l.label]})');
     }
   });
 
