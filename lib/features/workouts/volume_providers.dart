@@ -78,7 +78,7 @@ final regionExercisesProvider = StreamProvider.family<
 
 /// Weekly sets per muscle across [volumeWindowProvider].
 ///
-/// Watches the same three tables Today's bars do, so a set ticked mid-session
+/// Watches the same three tables Workouts' bars do, so a set ticked mid-session
 /// moves this week's bar while you are standing in the session — the screens
 /// agree because they read the same rows through the same filters.
 final volumeHistoryProvider = StreamProvider<VolumeHistory>((ref) {

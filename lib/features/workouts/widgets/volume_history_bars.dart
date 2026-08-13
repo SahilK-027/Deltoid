@@ -9,7 +9,7 @@ import '../../../domain/volume_history.dart';
 /// value between two weeks means something. Weekly sets are buckets — you did
 /// eleven that week and nine the next, and nothing in between happened. Bars
 /// are the honest mark, and they are the mark THEME's bar list already uses for
-/// the same number on Today.
+/// the same number on Workouts.
 ///
 /// No axis and no gridlines, exactly as a sparkline drops them (THEME →
 /// Components → Charts). The figures live in the row above and below.

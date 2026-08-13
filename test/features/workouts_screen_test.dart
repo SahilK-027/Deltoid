@@ -7,16 +7,16 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
-import 'package:deltoid/features/today/today_screen.dart';
-import 'package:deltoid/features/today/widgets/volume_bars.dart';
-import 'package:deltoid/features/today/widgets/heatmap.dart';
+import 'package:deltoid/features/workouts/workouts_screen.dart';
+import 'package:deltoid/features/workouts/widgets/volume_bars.dart';
+import 'package:deltoid/features/workouts/widgets/heatmap.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Today used to assemble itself from a dozen watched queries in dependency
+/// Workouts used to assemble itself from a dozen watched queries in dependency
 /// layers, so it revealed itself in stages and flashed an empty state on the
 /// way. These tests are about *what the user sees between frames*, not about
 /// the final tree — pump one frame at a time rather than `pumpAndSettle`.
@@ -35,13 +35,13 @@ void main() {
 
   tearDown(() => db.close());
 
-  Future<void> pumpToday(WidgetTester tester) async {
+  Future<void> pumpWorkouts(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
         child: MaterialApp(
           theme: buildTheme(Brightness.dark),
-          home: const TodayScreen(),
+          home: const WorkoutsScreen(),
         ),
       ),
     );
@@ -66,7 +66,7 @@ void main() {
   testWidgets('never flashes "no sessions" at a regime that has them',
       (tester) async {
     await createRegimeFromTemplate(db, ppl);
-    await pumpToday(tester);
+    await pumpWorkouts(tester);
 
     final seen = await frames(tester);
 
@@ -81,7 +81,7 @@ void main() {
 
   testWidgets('arrives in one frame, not in layers', (tester) async {
     await createRegimeFromTemplate(db, ppl);
-    await pumpToday(tester);
+    await pumpWorkouts(tester);
 
     final seen = await frames(tester);
     final populated = seen.where((f) => f.contains('Cycle 1'));
@@ -116,7 +116,7 @@ void main() {
       ),
     );
 
-    await pumpToday(tester);
+    await pumpWorkouts(tester);
     await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 16));
 
@@ -152,7 +152,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     await createRegimeFromTemplate(db, ppl);
-    await pumpToday(tester);
+    await pumpWorkouts(tester);
     await frames(tester);
 
     final grid = tester.getRect(find.byType(ConsistencyHeatmap));
@@ -167,7 +167,7 @@ void main() {
 
   testWidgets('a fresh install offers a regime instead of a blank page',
       (tester) async {
-    await pumpToday(tester);
+    await pumpWorkouts(tester);
 
     final seen = await frames(tester);
 
@@ -220,7 +220,7 @@ void main() {
 
     testWidgets('is there on a fresh install, at zero', (tester) async {
       await createRegimeFromTemplate(db, ppl);
-      await pumpToday(tester);
+      await pumpWorkouts(tester);
       await frames(tester);
 
       // It used to be held back until something was logged, on the grounds
@@ -240,7 +240,7 @@ void main() {
 
       final regimeId = await createRegimeFromTemplate(db, ppl);
       await logSession(regimeId);
-      await pumpToday(tester);
+      await pumpWorkouts(tester);
       await frames(tester);
 
       expect(find.text('Weekly volume'), findsOneWidget);
@@ -263,7 +263,7 @@ void main() {
 
       final regimeId = await createRegimeFromTemplate(db, ppl);
       await logSession(regimeId);
-      await pumpToday(tester);
+      await pumpWorkouts(tester);
       await frames(tester);
 
       expect(find.text('Quads'), findsNothing);

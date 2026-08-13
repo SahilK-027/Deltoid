@@ -100,7 +100,13 @@ class _RegionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final content = Padding(
-      padding: const EdgeInsets.symmetric(vertical: Space.sm),
+      // The right inset matches the one the opened block's own padding puts on
+      // its rows ([_Parts]). Without it a region's bar ran 8pt further right
+      // than its muscles' bars and its count sat 8pt outboard of theirs — two
+      // columns that are read as one, misaligned by exactly that padding. The
+      // fix is the parent moving in, not the child losing its inset and
+      // printing its counts against the block's edge.
+      padding: const EdgeInsets.fromLTRB(0, Space.sm, Space.sm, Space.sm),
       child: Row(
         children: [
           SizedBox(
@@ -293,6 +299,10 @@ class _Count extends StatelessWidget {
         children: [
           Text(
             '$sets',
+            // Same size in both rows, parent and part — a column of counts is
+            // one column, and a figure that shrinks halfway down it reads as a
+            // different kind of number. The child says it is a child with
+            // colour, which is what `small` is.
             style: small
                 ? context.t.labelLarge?.copyWith(
                     color: context.c.textSecondary,
@@ -305,18 +315,4 @@ class _Count extends StatelessWidget {
       ),
     );
   }
-}
-
-/// What the card says with nothing in the window.
-///
-/// A week with no sets is a real answer, not a missing one — the rows still
-/// draw, each with an empty track, and this line explains the flat card rather
-/// than letting six empty bars read as a chart that failed to load.
-String volumeSummary(WeeklyVolume volume) {
-  if (volume.isEmpty) {
-    return 'No sets in the last ${volume.windowDays} days.';
-  }
-  final trained = volume.rows.where((r) => !r.isEmpty).length;
-  return '${volume.totalSets} hard sets across $trained of '
-      '${volume.rows.length} in the last ${volume.windowDays} days.';
 }

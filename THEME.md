@@ -46,7 +46,7 @@ For any decision not covered below.
    `kg` one step down in grey.
 6. **Say it once.** A fact appears in one place on a screen. When it appears
    twice, one is **deleted** — not shrunk, not moved somewhere quieter.
-   - The screen's subject is named once. A card inside Today does not say
+   - The screen's subject is named once. A card inside Workouts does not say
      "today".
    - A number gets one representation: a bar *or* a count. Where a graphic and a
      figure say the same thing, the graphic stays only if it says it faster.
@@ -827,7 +827,7 @@ text is rendered, counted in `label`, turning `negative` on the last character.
 | The re-order sheet | `lib/core/widgets/reorder_sheet.dart` |
 | Scroll physics | `lib/core/widgets/scroll.dart` |
 | Table, keypad, stopwatch pad | `lib/features/log/widgets/` |
-| Bar list | `lib/features/today/widgets/volume_bars.dart` |
+| Bar list | `lib/features/workouts/widgets/volume_bars.dart` |
 
 Feature code composes these; it does not restyle them. **A component nothing
 calls is deleted**, not left for later — it is a second answer to a question

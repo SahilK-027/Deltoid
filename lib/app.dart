@@ -13,7 +13,7 @@ import 'core/theme/tokens.dart';
 import 'core/widgets/scroll.dart';
 import 'core/widgets/toast.dart';
 import 'features/shell/app_shell.dart';
-import 'features/today/today_providers.dart';
+import 'features/workouts/workouts_providers.dart';
 
 class DeltoidApp extends ConsumerWidget {
   const DeltoidApp({super.key});
@@ -146,7 +146,7 @@ class _Boot extends ConsumerWidget {
     // Waiting on Today here rather than inside the shell keeps the tab bar from
     // sliding in over an empty page. It is one local query behind the seeder,
     // so this costs a frame or two, not a visible wait.
-    final today = ref.watch(todayProvider);
+    final today = ref.watch(workoutsProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlay,

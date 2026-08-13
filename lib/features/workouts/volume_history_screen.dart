@@ -12,12 +12,12 @@ import 'widgets/volume_tile.dart';
 
 /// Sets per muscle per week, over months and years.
 ///
-/// Today's bar list answers "have I trained this muscle enough lately" over
+/// Workouts' bar list answers "have I trained this muscle enough lately" over
 /// seven days. This is the other question — "have I ever" — and it is the one
 /// the app could not answer at all: a rolling window recomputed on every open
 /// and forgotten, with no way to ask what a year looked like.
 ///
-/// Reached from the volume card on Today, exactly as the year heatmap is
+/// Reached from the volume card on Workouts, exactly as the year heatmap is
 /// reached from the consistency card above it.
 class VolumeHistoryScreen extends ConsumerWidget {
   const VolumeHistoryScreen({super.key});

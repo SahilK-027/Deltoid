@@ -34,7 +34,7 @@ class HeatmapData {
 
 /// Folds completed workouts into the grid.
 ///
-/// Takes rows rather than fetching them: they arrive with the rest of Today in
+/// Takes rows rather than fetching them: they arrive with the rest of Workouts in
 /// one query, so the grid is no longer a card that fills in a few frames late.
 HeatmapData buildHeatmap(List<Workout> completed) {
   final days = <int, HeatDay>{};

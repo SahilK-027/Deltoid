@@ -13,7 +13,7 @@ import 'widgets/volume_tile.dart';
 /// One region: the chart at full size, what it adds up to, which movements
 /// produced it, and the muscles under it.
 ///
-/// The screen the fold on Today's bar list becomes when it has room. `Legs 18`
+/// The screen the fold on Workouts' bar list becomes when it has room. `Legs 18`
 /// is a number you can read at a glance and cannot act on; `Quads 12 ·
 /// Hamstrings 2` is the same training saying something you would change your
 /// next session over — and over a year rather than a week, that split is the

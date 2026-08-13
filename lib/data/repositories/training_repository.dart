@@ -351,7 +351,7 @@ class TrainingRepository {
   /// been started or the previous cycle just closed.
   ///
   /// Find-and-create in one transaction, because this is a *write* reached from
-  /// several watched reads at once — `todayProvider` and `cycleStatusProvider`
+  /// several watched reads at once — `workoutsProvider` and `cycleStatusProvider`
   /// both land here, and on a regime with no cycle yet each of them found
   /// nothing and inserted one. Three open cycles for one regime, and every
   /// count downstream — the deload counter included — reading whichever came

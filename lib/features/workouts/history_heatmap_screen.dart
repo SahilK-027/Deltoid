@@ -6,13 +6,13 @@ import '../../core/ids.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import 'heatmap_data.dart';
-import 'today_providers.dart';
+import 'workouts_providers.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/year_heatmap.dart';
 
 /// Everything ever logged, a year at a time.
 ///
-/// Today's grid is eighteen weeks because that is what fits above the fold and
+/// The Workouts grid is eighteen weeks because that is what fits above the fold and
 /// what you act on. This is the other question — "how has this year gone" — and
 /// a year here means a **whole** year on screen: no horizontal scrolling, cells
 /// sized to fit. A year you have to drag through is not a year at a glance,

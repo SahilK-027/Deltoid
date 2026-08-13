@@ -20,7 +20,7 @@ import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
-import 'today_providers.dart';
+import 'workouts_providers.dart';
 import 'volume_history_screen.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/volume_bars.dart';
@@ -435,17 +435,17 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
 /// card, then the same sessions again as a tappable list — which is what pushed
 /// the consistency grid off the bottom of the screen. The hero's track is the
 /// only rendering of cycle progress now; the sessions live in a sheet.
-class TodayScreen extends ConsumerWidget {
-  const TodayScreen({super.key});
+class WorkoutsScreen extends ConsumerWidget {
+  const WorkoutsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // One value, one frame. `valueOrNull` keeps the last snapshot on screen
     // while a reload runs, so a write on another tab never blanks this one.
-    final today = ref.watch(todayProvider).valueOrNull;
+    final today = ref.watch(workoutsProvider).valueOrNull;
     // Warmed here, drawn two screens away. `Consistency` and the backfill
     // calendar both read every day ever logged, and both used to *start* that
-    // query when they opened — so both opened empty and filled in. Today is
+    // query when they opened — so both opened empty and filled in. Workouts is
     // where you are before you go to either, and this costs one aggregated
     // query per change to `workouts`.
     ref.watch(fullHeatmapProvider);
@@ -471,7 +471,7 @@ class TodayScreen extends ConsumerWidget {
           last: today!.lastCompleted,
         ),
         // The masthead and the one action are a single band, and the record
-        // scrolls under it. See [_TodayHeader] for why the hero is not a card:
+        // scrolls under it. See [_WorkoutsHeader] for why the hero is not a card:
         // `AppCard` and `HeaderBand` are the same grey, so a card here grouped
         // nothing — it drew a rounded seam between two identical surfaces,
         // 16pt below a band it matched exactly. The band is also the answer to
@@ -483,7 +483,7 @@ class TodayScreen extends ConsumerWidget {
         // looked at the heatmap.
         (_, final r?, false) => Column(
           children: [
-            _TodayHeader(
+            _WorkoutsHeader(
               last: today!.lastCompleted,
               actions: [
                 CircleIconButton(
@@ -607,8 +607,8 @@ class TodayScreen extends ConsumerWidget {
 /// opened with, but it is not the page's name and does not want title type:
 /// `NO SESSIONS YET` at 27sp was the loudest thing on a screen whose whole
 /// message was that nothing had happened yet.
-class _TodayHeader extends StatelessWidget {
-  const _TodayHeader({required this.last, this.actions = const []});
+class _WorkoutsHeader extends StatelessWidget {
+  const _WorkoutsHeader({required this.last, this.actions = const []});
 
   final ({Workout workout, String? sessionName})? last;
   final List<Widget> actions;
@@ -759,7 +759,7 @@ class _NoRegimeState extends ConsumerWidget {
     // seen rather than replacing one.
     return Column(
       children: [
-        _TodayHeader(last: last),
+        _WorkoutsHeader(last: last),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.only(bottom: Space.huge),
@@ -824,7 +824,7 @@ class _NoSessionsState extends ConsumerWidget {
     return Column(
       children: [
         // No backfill action: there is nothing to log a past session against.
-        _TodayHeader(last: last),
+        _WorkoutsHeader(last: last),
         Expanded(
           child: EmptyState(
             icon: Icons.playlist_add_rounded,
@@ -1044,7 +1044,7 @@ class _ResumeHero extends ConsumerWidget {
         ),
         // Two ways out, offered only once the session has gone stale. A
         // running session needs neither: they are one tap deep in the log
-        // screen, and putting them on Today would make quitting as prominent
+        // screen, and putting them on Workouts would make quitting as prominent
         // as training.
         if (stale) ...[
           const SizedBox(height: Space.sm),
@@ -1445,8 +1445,19 @@ class _ConsistencyCard extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const HistoryHeatmapScreen()),
           ),
         ),
+        // The volume tile (THEME → Components → Stat tile): caption, chart,
+        // hairline, figure + unit + chevron. Same padding, same gaps, same
+        // styles — see [VolumeTile], which is the widget this is deliberately
+        // shaped after.
+        //
+        // Without that tile's title row: a volume tile carries its own because
+        // six of them sit in a header-less grid, and here the section heading
+        // above the card already names it. Two headings, one card.
+        //
+        // It used to be a grid over a three-fact sentence, which is a shape no
+        // other card in the app has.
         AppCard(
-          padding: const EdgeInsets.all(Space.md),
+          padding: const EdgeInsets.all(Space.lg),
           onTap: !hasHistory
               ? null
               : () => Navigator.of(context).push(
@@ -1457,28 +1468,78 @@ class _ConsistencyCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // The caption slot, where a volume tile names the span its bars
+              // cover — and this one names the span its cells cover, in days,
+              // because the grid draws whole weeks either side of today.
+              Text(
+                'Last ${heatmapWeeks * 7} days',
+                style: context.t.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: Space.lg),
               ConsistencyHeatmap(days: data.days),
+              const SizedBox(height: Space.lg),
+              Divider(color: context.c.border, height: 1),
               const SizedBox(height: Space.md),
-              // The figures sit *under the grid they describe*, not in the
-              // heading. As a subtitle they made this section start at a
-              // different distance from its card than every other heading on
-              // the app, and they were read a line away from the thing they
-              // are about.
-              //
-              // Always a sentence, dashes and all: dropping the line on a fresh
-              // install would move the grid the first time you finish a
-              // workout.
-              Text(_summary(data.consistency), style: context.t.bodySmall),
               // No legend here. It is reference material rather than something
               // you read at a glance, and the screen this card opens carries it
               // in full.
-              if (!hasHistory) ...[
-                const SizedBox(height: Space.xs),
-                Text(
-                  'Finish a session and it lands here, and in History.',
-                  style: context.t.bodyMedium,
-                ),
-              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _thisWeek(data.consistency),
+                            style: context.t.labelLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: Space.xs),
+                        Flexible(
+                          child: Text(
+                            'this week',
+                            style: context.t.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: Space.sm),
+                        Text('·', style: context.t.bodyMedium),
+                        const SizedBox(width: Space.sm),
+                        // Both figures are `valueSm` and both units are `body`:
+                        // a number is a number, and the row is one column of
+                        // them read left to right.
+                        Flexible(
+                          child: Text(
+                            _average(data.consistency),
+                            style: context.t.labelLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: Space.xs),
+                        Flexible(
+                          child: Text(
+                            'avg/wk',
+                            style: context.t.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (hasHistory)
+                    Icon(Icons.chevron_right_rounded,
+                        size: 20, color: context.c.textSecondary),
+                ],
+              ),
             ],
           ),
         ),
@@ -1486,32 +1547,31 @@ class _ConsistencyCard extends StatelessWidget {
     );
   }
 
-  /// One line where three stat tiles used to be, and always three slots wide so
-  /// the header does not change shape as history accumulates. An em dash rather
-  /// than a fabricated rate — under a fortnight of history there is no honest
-  /// number (see [computeConsistency]).
-  static String _summary(Consistency c) {
+  /// The figure the card is about, under the hairline, with `this week` beside
+  /// it where a volume tile prints `sets/wk`.
+  ///
+  /// Out of seven, because that is what the row of cells above it shows — a
+  /// bare `4` under a week of squares invites you to count them to find out
+  /// what it is four of. It counts **days trained**, not sessions: two sessions
+  /// on a Tuesday are one cell, and a figure the grid contradicts is worse than
+  /// no figure.
+  ///
+  /// A dash rather than `0` with nothing logged — a zero is a measurement and a
+  /// dash is "nothing here yet" (THEME rule 4) — and the row keeps its shape
+  /// either way, which is the stat tile's zero state.
+  static String _thisWeek(Consistency c) =>
+      c.isEmpty ? '—/7' : '${c.thisWeek}/7';
+
+  /// Sessions per week over [Consistency.windowDays], beside the week's count.
+  ///
+  /// Whole sessions and rounded **down** — the app never reports a session it
+  /// cannot point at — and an em dash under a fortnight of history, where the
+  /// rate would be a number divided by weeks that have not happened yet (see
+  /// [computeConsistency]). The dash keeps the row's shape rather than dropping
+  /// the fact, so the card does not change width the day it becomes true.
+  static String _average(Consistency c) {
     final perWeek = c.perWeek;
-    if (c.isEmpty) {
-      return ['— of 7 this week', 'Avg. — per week', 'Nothing logged yet']
-          .join('  ·  ');
-    }
-    return [
-      // Out of seven, because that is what the row of cells beside it shows —
-      // a bare `4` next to a week of squares invites you to count them to find
-      // out what it is four of.
-      '${c.thisWeek} of 7 this week',
-      // Whole sessions. `5.3 per week` is a decimal on a count of things you
-      // either did or did not do, and it is rounded **down**: the app never
-      // reports a session it cannot point at.
-      perWeek == null ? '— per week' : 'Avg. ${perWeek.floor()} per week',
-      // The window is only worth naming once it *is* a window. "1 in 1 day"
-      // was the app dividing by the length of its own history and reporting
-      // the result as a habit.
-      perWeek == null
-          ? '${c.sessions} logged so far'
-          : '${c.sessions} in ${c.windowDays} days',
-    ].join('  ·  ');
+    return perWeek == null ? '—' : '${perWeek.floor()}';
   }
 }
 
@@ -1557,17 +1617,11 @@ class _VolumeCard extends ConsumerWidget {
         AppCard(
           padding: const EdgeInsets.all(Space.md),
           onTap: volume.isEmpty ? null : openHistory,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              VolumeBars(volume: volume),
-              const SizedBox(height: Space.sm),
-              // The sentence under the bars, where Consistency puts its
-              // figures, and for the same reason: a total in the heading is a
-              // line away from the rows it is the sum of.
-              Text(volumeSummary(volume), style: context.t.bodySmall),
-            ],
-          ),
+          // Just the bars. The sentence that used to sit under them restated
+          // what every row already prints — a total, a count of trained
+          // regions, and the window named in the heading — and no other card in
+          // the app explains its own chart in prose.
+          child: VolumeBars(volume: volume),
         ),
       ],
     );

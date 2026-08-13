@@ -17,13 +17,13 @@ import 'heatmap_data.dart';
 /// matters, because it has to clear the fold.
 const heatmapWeeks = 18;
 
-/// Today, as one value that arrives all at once.
+/// Workouts, as one value that arrives all at once.
 ///
 /// See [TodaySnapshot] for why this is a single query rather than the dozen
 /// watched providers it replaced. The screen holds the last value while a
 /// reload is in flight, so a write elsewhere never blanks it either.
-class TodayData {
-  const TodayData({required this.snapshot, required this.heatmap});
+class WorkoutsData {
+  const WorkoutsData({required this.snapshot, required this.heatmap});
 
   final TodaySnapshot snapshot;
   final HeatmapData heatmap;
@@ -36,9 +36,9 @@ class TodayData {
       snapshot.lastCompleted;
 }
 
-/// Every day ever logged, for the full-history heatmap behind Today's grid.
+/// Every day ever logged, for the full-history heatmap behind the Workouts grid.
 ///
-/// **Kept alive, and warmed while Today is on screen.** It was `autoDispose`,
+/// **Kept alive, and warmed while Workouts is on screen.** It was `autoDispose`,
 /// on the grounds that a year-by-year view is worth a query when it is opened —
 /// but "when it is opened" is precisely the moment there is nothing to draw,
 /// and the screen rendered blank until the query came back. The data is on
@@ -56,13 +56,13 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
 
 /// This week's hard sets per muscle, for the bar list under the heatmap.
 ///
-/// Its own provider rather than a field on [TodayData], and this is the one
+/// Its own provider rather than a field on [WorkoutsData], and this is the one
 /// place that split is right: `todaySnapshot` is what the screen *is* — a
 /// missing field there is a frame where "no sessions" is indistinguishable from
 /// "not loaded yet" (RULES § Data). The bars are a section further down that
 /// has an
 /// honest empty state of its own, so a frame without them costs nothing, and
-/// they are the only thing in the app that reads `set_logs` for Today. Folding
+/// they are the only thing in the app that reads `set_logs` for Workouts. Folding
 /// this query into the snapshot would re-run the whole screen's read on every
 /// set you tick mid-session.
 final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
@@ -81,7 +81,7 @@ final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
 
 /// Ticked and total sets in the open workout, kept in step with the log.
 ///
-/// Its own query rather than a field read off [todayProvider], for the same
+/// Its own query rather than a field read off [workoutsProvider], for the same
 /// reason [weeklyVolumeProvider] is one: `todaySnapshot` does not watch
 /// `set_logs`, and must not, or every keystroke in a live session would re-run
 /// the whole screen's read. But the resume card counts sets and the stale
@@ -107,7 +107,7 @@ final openWorkoutSetsProvider =
   );
 });
 
-final todayProvider = StreamProvider<TodayData>((ref) {
+final workoutsProvider = StreamProvider<WorkoutsData>((ref) {
   // Gated on the seeder rather than racing it: this watches `exercises` for
   // renames, and a first launch would otherwise load an empty catalog and then
   // immediately reload when the starter rows land.
@@ -131,7 +131,7 @@ final todayProvider = StreamProvider<TodayData>((ref) {
         DateTime.now().subtract(const Duration(days: heatmapWeeks * 7 + 7)),
       );
       final snapshot = await repo.todaySnapshot(heatmapFromDayKey: from);
-      return TodayData(
+      return WorkoutsData(
         snapshot: snapshot,
         heatmap: buildHeatmap(snapshot.recentCompleted),
       );

@@ -83,7 +83,7 @@ class _VolumeTileState extends State<VolumeTile> {
                     Flexible(
                       child: Text(
                         // One decimal, deliberately unlike the sessions-per-week
-                        // figure on Today, which floors. That one counts whole
+                        // figure on Workouts, which floors. That one counts whole
                         // sessions you either did or did not do; this is a rate
                         // over a span, where `11` and `11.4` are different
                         // training.
