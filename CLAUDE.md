@@ -20,9 +20,10 @@ code and a stale one about the plan.
 | **[SYNC.md](SYNC.md)**     | Before touching cloud backup. What syncs, what never does, how a conflict resolves, and the eight things sync may never do                              |
 | **[README.md](README.md)** | Setup, commands, project layout, how the layers fit                                                                                                     |
 | **[TODO.md](TODO.md)**     | What is done and what is left. Status lives there and nowhere else                                                                                      |
+| **[DEBT.md](DEBT.md)**     | The known weaknesses, with evidence and a check for each. Read before deciding what to work on — and add to it rather than fixing quietly               |
 
 This file holds no facts of its own. If anything here contradicts one of those
-five documents, the other document is the correct one.
+six documents, the other document is the correct one.
 
 ## The rules most easily broken
 
