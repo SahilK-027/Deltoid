@@ -42,6 +42,7 @@ class VolumeChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final gutter = _yAxisWidth(context, _Axis.of(series.peakPerWeek(by)).max);
     // Coarsened against the weeks in hand — see [autoGranularityFor]. A window
     // and its data disagree for a frame when the range changes, and that frame
     // must not ask for two and a half thousand bars in a phone's width.
@@ -95,12 +96,9 @@ class VolumeChart extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: Space.sm),
+            const SizedBox(width: Space.xs),
             SizedBox(
-              // Fixed, not intrinsic: the labels are counts of sets, and a
-              // gutter that resizes with them would shift the plot every time
-              // the axis crossed 100. Wide enough for three digits at `label`.
-              width: _yAxisWidth,
+              width: gutter,
               height: height,
               child: AnimatedSwitcher(
                 duration: Motion.base,
@@ -130,6 +128,7 @@ class VolumeChart extends StatelessWidget {
             key: ValueKey('${bars.length}:${safe.name}'),
             bars: bars,
             by: safe,
+            gutter: gutter + Space.xs,
           ),
         ),
       ],
@@ -137,8 +136,23 @@ class VolumeChart extends StatelessWidget {
   }
 }
 
-/// The gutter the y labels sit in, to the right of the plot.
-const _yAxisWidth = 26.0;
+/// The gutter the y labels sit in, to the right of the plot — **measured, not
+/// guessed.**
+///
+/// It was a flat 26 plus an 8pt gap: 34 points spent on `12`, which is nine
+/// points of ink. The room comes off the plot and therefore off the date labels
+/// under it, which are the ones that were running out of space.
+///
+/// Still fixed rather than intrinsic, in the sense the old comment meant: it is
+/// derived from the axis *maximum*, so it changes when the chart rescales and
+/// not as bars move under it.
+double _yAxisWidth(BuildContext context, int max) {
+  final painter = TextPainter(
+    text: TextSpan(text: '$max', style: context.t.bodySmall),
+    textDirection: Directionality.of(context),
+  )..layout();
+  return painter.width + 2;
+}
 
 /// How many date labels the strip prints at most — the same seven the line
 /// charts keep, so both kinds of chart are read at the same rhythm.
@@ -228,10 +242,19 @@ class _Gridlines extends CustomPainter {
 /// packed into a slot, with the outermost two pulled flush to the edges so a
 /// wide word cannot hang off either end.
 class _Months extends StatelessWidget {
-  const _Months({super.key, required this.bars, required this.by});
+  const _Months({
+    super.key,
+    required this.bars,
+    required this.by,
+    required this.gutter,
+  });
 
   final List<VolumeBar> bars;
   final Granularity by;
+
+  /// The room the value labels take on the right, so the strip lines up with
+  /// the plot rather than with the row that contains it.
+  final double gutter;
 
   @override
   Widget build(BuildContext context) {
@@ -298,9 +321,7 @@ class _Months extends StatelessWidget {
     }
 
     return Padding(
-      // The gutter the y labels take on the right, so the strip lines up with
-      // the plot rather than with the row that contains it.
-      padding: const EdgeInsets.only(right: _yAxisWidth + Space.sm),
+      padding: EdgeInsets.only(right: gutter),
       child: SizedBox(
         // One line of `label`, which is 13/16.
         height: 16,

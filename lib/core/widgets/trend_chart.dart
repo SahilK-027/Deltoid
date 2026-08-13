@@ -719,7 +719,10 @@ class _TrendChartState extends State<TrendChart>
                   sideTitles: SideTitles(
                     showTitles: true,
                     interval: step,
-                    reservedSize: _yGutter,
+                    reservedSize: _yGutter(
+                      context,
+                      [formatValue(minY), formatValue(maxY)],
+                    ),
                     getTitlesWidget: (value, meta) => _edgeSafe(
                       value,
                       meta,
@@ -929,7 +932,9 @@ class EmptyTrendChart extends StatelessWidget {
                     interval: step,
                     // Held open even when there is nothing to write in it, so
                     // the plot does not widen the moment data lands.
-                    reservedSize: _yGutter,
+                    reservedSize: _yGutter(context, [
+                      if (formatValue case final f?) ...[f(minY), f(maxY)],
+                    ]),
                     getTitlesWidget: (value, meta) {
                       final format = formatValue;
                       if (scale == null || format == null) {
@@ -983,12 +988,31 @@ class EmptyTrendChart extends StatelessWidget {
   }
 }
 
-/// The gutter the value labels sit in, on the right.
+/// The gutter the value labels sit in, on the right — **measured, not guessed.**
 ///
-/// Wide enough for `1250` at `label` size and no wider: it was 52, which left a
-/// finger's width of nothing between the plot and the card's own padding, and
-/// made every chart look as though it had been laid out against the wrong edge.
-const _yGutter = 36.0;
+/// It was 52, then 36. Both were a constant picked for the widest number a
+/// chart might one day print, which means every chart that prints `70` and
+/// `102` gives up a third of that gutter to nothing and the time axis under it
+/// loses the room. Laying out the two extreme labels costs one text measurement
+/// per build and gives the plot back whatever it does not need.
+///
+/// Still stable rather than intrinsic: it is derived from the axis *bounds*, so
+/// it changes when the chart rescales and not when a value inside it moves —
+/// the plot cannot shift sideways while you watch a line grow.
+double _yGutter(BuildContext context, Iterable<String> labels) {
+  final style = context.t.bodySmall;
+  var widest = 0.0;
+  for (final label in labels) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+    )..layout();
+    if (painter.width > widest) widest = painter.width;
+  }
+  // The label, the gap `_edgeSafe` puts before it, and a point of air so a
+  // rounded glyph does not touch the card's padding.
+  return widest + Space.xs + 2;
+}
 
 /// A tick at the very edge has half a line of room and ends up printed over
 /// its neighbour — `Dec 19Jul 26`, `330 Jul`. Both axes drop theirs.

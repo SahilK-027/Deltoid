@@ -151,4 +151,18 @@ void main() {
     await pump(tester, 1, Granularity.weekly);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the value gutter is sized to its widest number', (tester) async {
+    // 34 points were reserved for labels like `12`, and the room came off the
+    // plot — and therefore off the date labels under it.
+    await pump(tester, 13, Granularity.weekly);
+    final strip = stripOf(tester);
+    final rightmost =
+        strip.map((l) => l.rect.right).reduce((a, b) => a > b ? a : b);
+
+    // 360 wide, 16 of page padding either side: the last date label should
+    // reach close to where the plot ends rather than stopping a gutter short.
+    expect(rightmost, greaterThan(300),
+        reason: 'the date strip is being squeezed by the value gutter');
+  });
 }
