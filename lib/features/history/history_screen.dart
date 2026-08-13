@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../core/ids.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
+import '../log/widgets/exercise_sheets.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
@@ -603,31 +605,47 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
 
   @override
   Widget build(BuildContext context) {
-    final all = ref.watch(exercisesWithHistoryProvider).valueOrNull;
+    final trained = ref.watch(exercisesWithHistoryProvider).valueOrNull;
     final c = context.c;
     final q = _query.trim().toLowerCase();
-    final filtered = all == null
-        ? const <ExerciseHistorySummary>[]
-        : q.isEmpty
-            ? all
-            : all
-                .where((e) => e.exercise.name.toLowerCase().contains(q))
-                .toList();
 
-    if (all == null) {
+    if (trained == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (all.isEmpty) {
-      return const EmptyState(
-        icon: Icons.fitness_center,
-        title: 'No exercise history',
-        message: 'Once a session is finished, every movement in it gets its '
-            'own history here.',
-      );
-    }
+
+    // **The catalog is only read while you are searching.** At rest this is an
+    // index of what you have trained, ordered by when — padding it with every
+    // movement you have ever defined would bury the rows you came for under a
+    // list you already have two other ways into. But a search that answers
+    // "no such exercise" about an exercise you created this morning is telling
+    // you it is gone, and the answer that is actually true is "you have not
+    // trained it yet".
+    final catalog = q.isEmpty
+        ? const <Exercise>[]
+        : (ref.watch(exerciseCatalogProvider).valueOrNull ?? const []);
+
+    final matches = q.isEmpty
+        ? trained
+        : [
+            for (final e in trained)
+              if (e.exercise.name.toLowerCase().contains(q)) e,
+          ];
+    final untrained = q.isEmpty
+        ? const <Exercise>[]
+        : () {
+            final logged = {for (final e in matches) e.exercise.id};
+            return [
+              for (final e in catalog)
+                if (!logged.contains(e.id) && e.name.toLowerCase().contains(q))
+                  e,
+            ];
+          }();
 
     return Column(
       children: [
+        // Above the empty state as well as above the list: an empty history is
+        // exactly when you want to look an exercise up and find out it has one
+        // waiting.
         Padding(
           padding: searchFieldPadding,
           child: SearchField(
@@ -636,29 +654,76 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.only(bottom: Space.huge),
-            itemCount: filtered.length,
-            separatorBuilder: (_, _) => Divider(height: 1, color: c.border),
-            itemBuilder: (context, i) {
-              final e = filtered[i];
-              return AppRow(
-                title: e.exercise.name,
-                subtitle: '${e.timesPerformed} session'
-                    '${e.timesPerformed == 1 ? '' : 's'} · last '
-                    '${DateFormat('d MMM yyyy').format(dateFromDayKey(e.lastDayKey))}',
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ExerciseHistoryScreen(exerciseId: e.exercise.id),
-                  ),
+          child: matches.isEmpty && untrained.isEmpty
+              ? EmptyState(
+                  icon: Icons.fitness_center,
+                  title: q.isEmpty ? 'No exercise history' : 'No matches',
+                  message: q.isEmpty
+                      ? 'Once a session is finished, every movement in it gets '
+                          'its own history here.'
+                      : 'Nothing in your exercises is called that.',
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.only(bottom: Space.huge),
+                  // The heading is a row of its own, and only when both groups
+                  // are on screen — a lone "Not yet logged" over the one thing
+                  // you searched for labels the obvious.
+                  itemCount: matches.length +
+                      untrained.length +
+                      (matches.isNotEmpty && untrained.isNotEmpty ? 1 : 0),
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 1, color: c.border),
+                  itemBuilder: (context, i) {
+                    if (i < matches.length) {
+                      final e = matches[i];
+                      return _exerciseRow(
+                        id: e.exercise.id,
+                        name: e.exercise.name,
+                        subtitle: '${e.timesPerformed} session'
+                            '${e.timesPerformed == 1 ? '' : 's'} · last '
+                            '${DateFormat('d MMM yyyy').format(dateFromDayKey(e.lastDayKey))}',
+                      );
+                    }
+                    var j = i - matches.length;
+                    if (matches.isNotEmpty) {
+                      if (j == 0) {
+                        return const Padding(
+                          padding: EdgeInsets.fromLTRB(
+                              Space.gutter, Space.xl, Space.gutter, Space.sm),
+                          child: SectionHeader('Not yet logged'),
+                        );
+                      }
+                      j -= 1;
+                    }
+                    final e = untrained[j];
+                    return _exerciseRow(
+                      id: e.id,
+                      name: e.name,
+                      subtitle: 'Never logged',
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
+    );
+  }
+
+  Widget _exerciseRow({
+    required String id,
+    required String name,
+    required String subtitle,
+  }) {
+    return AppRow(
+      title: name,
+      subtitle: subtitle,
+      chevron: true,
+      // An untrained exercise opens the same screen as a trained one, which is
+      // the screen saying it has never been logged.
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ExerciseHistoryScreen(exerciseId: id),
+        ),
+      ),
     );
   }
 }
