@@ -9,6 +9,38 @@ rather than rediscovered.
 Each entry says what to change and how to know it worked. An entry leaves this
 file when the check it names passes, not when it feels handled.
 
+## This comes before sync
+
+**Nothing in [SYNC.md](SYNC.md) should be written until this file is empty.**
+
+Not because sync is hard — it is designed in full and the design is good — but
+because every weakness below is one that a sync layer *multiplies*:
+
+- **§1, invariants in prose.** Sync is fifteen sections of rules about what may
+  never happen: a write never lost, never fabricated, never refused. If this
+  codebase's existing invariants can rot into comments that lie — and they have,
+  three times — then sync's will too, and sync's failures are silent and
+  permanent rather than a slow screen. A conflict rule that is only a paragraph
+  is a data-loss bug waiting for the second device.
+- **§2, nothing enforces the gate.** A sync layer is the first part of this app
+  where a regression cannot be seen by looking at the screen. Merging that with
+  no CI means the test that would have caught it is the one nobody ran.
+- **§3 and §4, unbounded queries on hot tables.** Sync adds a *second* writer to
+  every syncable table. Today `volumeHistoryProvider` recomputes thirty years on
+  every set you tick; after sync it recomputes on every set another device ticks,
+  arriving in batches, on the UI isolate.
+- **§5, painters that crash on their own geometry.** A pull that lands more rows
+  than the local log has ever held is exactly the input that made the last one
+  throw.
+- **§6, twelve features never used in a gym.** Sync is the point after which
+  deleting a feature stops being free — there will be rows of it on a server and
+  a migration to write. Everything that should be deleted should be deleted
+  first.
+
+The order to work in: **§2 first** (it is an hour and it protects every other
+fix), then **§1 and §5** (they are the same habit — make the rule mechanical),
+then **§3 and §4**, then **§6**. §7, §8 and §9 are ongoing rather than blocking.
+
 ---
 
 ## 1. The invariants live in prose
@@ -218,7 +250,56 @@ than an accident.
 
 ---
 
-## 8. Smaller things, unranked
+## 8. Comments that grant themselves exceptions to the docs
+
+A specific failure inside §1, and the one most likely to spread, because each
+instance is individually reasonable.
+
+The pattern: a comment states a global rule, notes that this code breaks it, and
+explains why — and that is the whole approval process. THEME is never told. So
+the rule stays written down as absolute while the code accumulates exceptions,
+and the next person to read THEME believes something about the app that is no
+longer true.
+
+**Done right** (keep doing this): `hold_pad.dart:180` runs its clock at 44sp over
+the 30sp type cap, and says *"the one place in the app that goes over it — see
+THEME → Type"*. THEME → Type says the same thing from the other side: *"One
+exception, a clock. The hold pad's timer runs at 44sp."* Two documents, one
+fact, neither surprising.
+
+**Done wrong**, currently:
+
+- THEME → Fields: *"Fields are declared once, in the theme. Fill, radius, focused
+  outline, hint colour and insets belong to the input theme; a call site passes a
+  hint, a prefix or a suffix **and nothing else**."* Three call sites pass more:
+  `exercise_screen.dart:1054` (type, alignment **and** `contentPadding`, with a
+  comment declaring itself *"the one field that overrides the theme's insets"*),
+  `bodyweight_screen.dart:793` (type and suffix style),
+  `regime_screen.dart:736` (type). The rule reads as absolute and has three
+  standing exceptions, one of which announces itself.
+- `exercise_history_screen.dart:207` builds the 28 between sections out of
+  `Space.xl` plus an 8 separator, calling itself *"the one place the gap is built
+  out of two pieces"*. The value obeys THEME; the construction is a local
+  invention that the next spacing change will not find.
+- `exercise_screen.dart:46` says the General section *"was the exception"* to
+  editing one question at a time. It reads as historical, and I could not tell
+  from the code whether it still is — which is its own problem: a comment about
+  a rule should not need archaeology to evaluate.
+
+**What to do.** One rule, and it is cheap: **an exception to a documented rule is
+a change to the document.** If code needs to break THEME or RULES, the fix is a
+sentence in THEME naming the exception and why — as the hold pad already does —
+and the comment then points at it rather than arguing its own case. An exception
+that is not worth writing into the document is not worth taking.
+
+**Done when**: every comment in `lib/` that cites THEME or RULES either conforms
+or points at a named exception in the document it cites. The three field call
+sites above are the immediate work: either widen the theme's input decoration to
+cover them, or write the exception down.
+
+---
+
+## 9. Smaller things, unranked
 
 - **`pastPerformances` still builds a `WHERE … IN (…)` with one parameter per
   performance** (`training_repository.dart:1370`). The chart no longer uses it,
