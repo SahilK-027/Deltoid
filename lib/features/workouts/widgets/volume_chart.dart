@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/trend_chart.dart';
 import '../../../domain/chart_buckets.dart';
 import '../../../domain/volume_history.dart';
 import 'volume_history_bars.dart';
@@ -211,79 +212,121 @@ class _Gridlines extends CustomPainter {
       old.max != max || old.colour != colour || old.ticks.length != ticks.length;
 }
 
-/// Month names under the baseline, each spanning the weeks it covers.
+/// The date strip under the baseline: the same seven labels, in the same words,
+/// that a line chart prints (THEME → Charts).
 ///
-/// Calendar-shaped ticks, as THEME asks: a label every *n* weeks would print
-/// three different months at the same interval and read as noise. Each month
-/// takes as many slots as it has weeks, so the labels line up with the bars
-/// above them without a single measurement.
+/// It used to be built out of *runs* — one `Expanded` per calendar period,
+/// flexed by how many bars it covered, with every *n*th one printed. Three
+/// things were wrong with that and all three were visible. The count was
+/// whatever the calendar happened to produce, so a month showed two labels and
+/// six months showed seven. Each label was clipped to its own run's box, so
+/// `2024` under a narrow year came out as `2`. And a run's box is not centred on
+/// anything, so the words drifted away from the bars they name.
+///
+/// Positions are chosen the way the line chart chooses ticks — evenly across the
+/// plot, at most seven — and each label is **centred on its bar** rather than
+/// packed into a slot, with the outermost two pulled flush to the edges so a
+/// wide word cannot hang off either end.
 class _Months extends StatelessWidget {
   const _Months({super.key, required this.bars, required this.by});
 
   final List<VolumeBar> bars;
   final Granularity by;
 
-  /// What names a bar at this fold. Months over weekly bars, years over monthly
-  /// ones — a strip of `Jan Jan Jan` under twelve monthly bars of the same year
-  /// is a label that has stopped saying anything.
-  String get _pattern => switch (by) {
-        Granularity.yearly => 'yyyy',
-        Granularity.monthly => "MMM ''yy",
-        _ => 'MMM',
-      };
-
   @override
   Widget build(BuildContext context) {
     if (bars.isEmpty) return const SizedBox.shrink();
 
-    // Runs of consecutive bars sharing a label, in order.
-    final runs = <({String label, int weeks})>[];
-    for (final week in bars) {
-      // A bar belongs to the period its first Monday is in — the same rule it
-      // was counted by, so a label can never sit over a bar counted into a
-      // different one.
-      final label = DateFormat(_pattern).format(week.start);
-      if (runs.isNotEmpty && runs.last.label == label) {
-        runs[runs.length - 1] =
-            (label: label, weeks: runs.last.weeks + 1);
-      } else {
-        runs.add((label: label, weeks: 1));
+    // Named by how much time is on screen, not by how it is folded — the same
+    // rule and the same function the line charts use. A fortnight of monthly
+    // bars is still a fortnight.
+    final span = bars.last.end.difference(bars.first.start).inDays.toDouble();
+    final format = DateFormat(axisDateFormat(span));
+
+    // At most seven, and never more than there are bars: four bars get four
+    // labels rather than seven crowded onto four positions.
+    final n = bars.length;
+    final count = n < _axisLabels ? n : _axisLabels;
+
+    // The bars the labels sit on, evenly spread and including both ends.
+    final indices = [
+      for (var k = 0; k < count; k++)
+        count == 1 ? 0 : (k * (n - 1) / (count - 1)).round(),
+    ];
+
+    List<({int index, String label})> pickedWith(DateFormat f) {
+      final out = <({int index, String label})>[];
+      for (final i in indices) {
+        final label = f.format(bars[i].start);
+        // Two picks inside one month would print `Jul Jul`. Dropping the second
+        // is better than printing a word that says nothing new.
+        if (out.isNotEmpty && out.last.label == label) continue;
+        out.add((index: i, label: label));
       }
+      return out;
     }
 
-    // **Seven labels at most, the same ceiling the line charts keep.** A year is
-    // twelve runs across a phone — four weeks of slot each, narrower than the
-    // word `Sep` — and `MMM ''yy` under monthly bars is wider still. Rather than
-    // let them collide, ellipsize into `Se…` or spill past their slot, every
-    // *n*th run is kept and the rest are blanked, so the strip stays
-    // calendar-shaped: what is dropped is a whole period, never a word.
-    final stride = (runs.length / _axisLabels).ceil().clamp(1, runs.length);
+    var picks = pickedWith(format);
+
+    // **A repeat at the two ends is a different problem from a repeat in the
+    // middle.** A year of weekly bars reaching back from August covers thirteen
+    // months, so `Aug` lands at both edges — and dropping one of them would
+    // take away an end of the axis rather than a duplicate. When the labels
+    // cannot tell those two apart, the fix is to say which year each is in,
+    // not to print one of them fewer times.
+    if (picks.map((p) => p.label).toSet().length != picks.length) {
+      picks = pickedWith(DateFormat("MMM ''yy"));
+    }
 
     return Padding(
       // The gutter the y labels take on the right, so the strip lines up with
       // the plot rather than with the row that contains it.
       padding: const EdgeInsets.only(right: _yAxisWidth + Space.sm),
-      child: Row(
-        children: [
-          for (var i = 0; i < runs.length; i++)
-            Expanded(
-              flex: runs[i].weeks,
-              child: i % stride == 0
-                  // Clipped to its own slot rather than laid out at its natural
-                  // width: a `Row` of `Expanded` children will happily paint a
-                  // word wider than the box it was given, over its neighbour.
-                  ? ClipRect(
-                      child: Text(
-                        runs[i].label,
-                        style: context.t.bodySmall,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.clip,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-        ],
+      child: SizedBox(
+        // One line of `label`, which is 13/16.
+        height: 16,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final slot = box.maxWidth / n;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var k = 0; k < picks.length; k++)
+                  _label(context, picks[k], k, picks.length, slot),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _label(
+    BuildContext context,
+    ({int index, String label}) pick,
+    int k,
+    int total,
+    double slot,
+  ) {
+    final text = Text(
+      pick.label,
+      style: context.t.bodySmall,
+      maxLines: 1,
+      softWrap: false,
+    );
+
+    // The ends are anchored rather than centred: half of `2024` hanging past
+    // the plot is the overflow this replaced.
+    if (k == 0) return Positioned(left: 0, child: text);
+    if (k == total - 1) return Positioned(right: 0, child: text);
+
+    // Centred on its bar without measuring the word: place the box at the bar's
+    // centre, then shift it left by half of whatever width it turns out to be.
+    return Positioned(
+      left: (pick.index + 0.5) * slot,
+      child: FractionalTranslation(
+        translation: const Offset(-0.5, 0),
+        child: text,
       ),
     );
   }

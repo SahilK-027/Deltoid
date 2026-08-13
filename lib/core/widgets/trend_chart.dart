@@ -1002,6 +1002,12 @@ Widget _edgeSafe(double value, TitleMeta meta, Widget child) {
 ///
 /// A week is named by its days — `Fri Sat Sun … Thu` — because at that range
 /// the day of the week *is* the question you are asking.
+///
+/// Public because the bar charts read their labels by the same rule. Two kinds
+/// of chart may draw different marks; they may not name the same fortnight two
+/// different ways (THEME → Charts).
+String axisDateFormat(double spanDays) => _axisFormat(spanDays);
+
 String _axisFormat(double spanDays) {
   if (spanDays <= 8) return 'EEE';
   if (spanDays <= 45) return 'd MMM';
