@@ -1794,17 +1794,29 @@ class TrainingRepository {
   /// Points carry their session so the chart can draw Push 1 and Push 2 as
   /// separate lines — averaging them would hide the very progression the
   /// per-session split exists to protect.
+  ///
+  /// Unbounded on purpose. This used to ask for the most recent 400
+  /// performances, which silently cut the chart off: the year picker is built
+  /// from the points that came back, so a movement trained more than 400 times
+  /// lost its early years from the axis *and* from the list of years you are
+  /// allowed to ask for, with nothing on screen to say a horizon existed.
+  ///
+  /// **Two raw statements, and both the raw part and the two part are the
+  /// point.** This used to run on [pastPerformances], which hydrates whole
+  /// `SetLog` row objects — every column, sync bookkeeping included — and
+  /// gathers them with `WHERE workout_exercise_id IN (…)`, one bound parameter
+  /// per performance. Thirty years of one movement is 130ms of that before the
+  /// chart can be drawn, which is why it landed a beat after the list beneath
+  /// it. Nearly all of it is drift's row mapping rather than SQLite: the same
+  /// five thousand rows cost 120ms through `readTable`, 90ms through
+  /// `TypedResult.read`, and **16ms** read positionally off a `QueryRow` — so
+  /// the two queries the chart needs ask for the columns it reads, by name, and
+  /// map them here.
+  ///
+  /// The price of raw SQL is that a renamed column compiles and then fails on a
+  /// device, so this is covered by tests that assert the shape it returns
+  /// rather than only that it returns something.
   Future<List<ProgressPoint>> exerciseProgress(String exerciseId) async {
-    // Unbounded on purpose. This used to ask for the most recent 400
-    // performances, which silently cut the chart off: the year picker is built
-    // from the points that came back, so a movement trained more than 400 times
-    // lost its early years from the axis *and* from the list of years you are
-    // allowed to ask for, with nothing on screen to say a horizon existed. Fifty
-    // years of one movement is under two thousand rows and costs about the same
-    // as four hundred did, because the price is the set rows underneath them.
-    final performances = await pastPerformances(exerciseId, limit: null);
-    if (performances.isEmpty) return const [];
-
     // Missing for the reasons [exerciseHistoryPage] gives. A chart with no
     // catalog row behind it has no load mode to read its numbers through, so
     // there is nothing honest to plot.
@@ -1812,31 +1824,84 @@ class TrainingRepository {
           ..where((t) => t.id.equals(exerciseId)))
         .getSingleOrNull();
     if (exercise == null) return const [];
-    final bodyweight = await bodyweightSeries();
+
+    // The same predicate in both statements: a performance is a live slot on a
+    // completed, live workout. Skipped slots stay in for the reason
+    // [_performances] gives — sets logged before you stopped did happen.
+    const live = 'we.deleted_at IS NULL AND wo.deleted_at IS NULL '
+        "AND wo.status = 'completed'";
+
+    final slots = await db.customSelect(
+      'SELECT we.id AS slot, wo.day_key AS day_key, wo.session_id AS session_id, '
+      'wo.is_deload AS is_deload, se.name AS session_name '
+      'FROM workout_exercises we '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'LEFT JOIN sessions se ON se.id = wo.session_id '
+      'WHERE we.exercise_id = ?1 AND $live '
+      // Ordered here rather than sorted afterwards. The chart reads left to
+      // right in calendar time, and a backdated workout is not where
+      // `started_at` would put it.
+      'ORDER BY wo.day_key',
+      variables: [Variable.withString(exerciseId)],
+      readsFrom: {db.workoutExercises, db.workouts, db.sessions},
+    ).get();
+    if (slots.isEmpty) return const [];
+
+    // No ORDER BY: scoring a performance is an aggregate over its sets and does
+    // not care which order they arrive in, so five thousand rows are not sorted
+    // to be folded.
+    final setRows = await db.customSelect(
+      'SELECT s.workout_exercise_id AS slot, s.set_type AS set_type, '
+      's.weight AS weight, s.reps AS reps, s.added_weight AS added_weight '
+      'FROM set_logs s '
+      'INNER JOIN workout_exercises we ON we.id = s.workout_exercise_id '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'WHERE we.exercise_id = ?1 AND $live '
+      'AND s.deleted_at IS NULL AND s.is_done = 1',
+      variables: [Variable.withString(exerciseId)],
+      readsFrom: {db.setLogs, db.workoutExercises, db.workouts},
+    ).get();
+
+    final setsBySlot = <String, List<ScoredSet>>{};
+    for (final r in setRows) {
+      setsBySlot.putIfAbsent(r.read<String>('slot'), () => []).add(ScoredSet(
+            type: SetType.values.byName(r.read<String>('set_type')),
+            weight: r.readNullable<double>('weight'),
+            reps: r.readNullable<int>('reps'),
+            addedWeight: r.readNullable<double>('added_weight'),
+          ));
+    }
+
+    // Only the two modes that read it pay for it. A barbell press does not need
+    // a bodyweight history to be scored, and loading one to hand `null` to
+    // every call was a query plus a lookup per performance for nothing.
+    final needsBodyweight = exercise.loadMode == LoadMode.bodyweight ||
+        exercise.loadMode == LoadMode.bodyweightPlus;
+    // Ordered once, then binary-searched per performance — see [orderedByDay].
+    final bodyweight = needsBodyweight
+        ? orderedByDay(await bodyweightSeries())
+        : const <({int dayKey, double weightKg})>[];
 
     final points = <ProgressPoint>[];
-    for (final p in performances) {
+    for (final r in slots) {
+      final sets = setsBySlot[r.read<String>('slot')];
+      if (sets == null) continue;
+      final dayKey = r.read<int>('day_key');
+
       final score = scorePerformance(
         mode: exercise.loadMode,
         measure: exercise.measureMode,
-        bodyweightKg: bodyweightOn(p.dayKey, bodyweight),
-        sets: [
-          for (final s in p.sets)
-            ScoredSet(
-              type: s.type,
-              weight: s.weight,
-              reps: s.reps,
-              addedWeight: s.addedWeight,
-            ),
-        ],
+        bodyweightKg:
+            needsBodyweight ? bodyweightOnOrdered(dayKey, bodyweight) : null,
+        sets: sets,
       );
       if (score.isEmpty) continue;
 
       points.add(ProgressPoint(
-        dayKey: p.dayKey,
-        sessionId: p.sessionId,
-        sessionName: p.sessionName,
-        isDeload: p.isDeload,
+        dayKey: dayKey,
+        sessionId: r.readNullable<String>('session_id'),
+        sessionName: r.readNullable<String>('session_name') ?? 'Ad-hoc',
+        isDeload: r.read<bool>('is_deload'),
         topSetLoad: score.topSetLoad,
         topSetReps: score.topSetReps,
         best1RM: score.best1RM,
@@ -1844,7 +1909,6 @@ class TrainingRepository {
       ));
     }
 
-    points.sort((a, b) => a.dayKey.compareTo(b.dayKey));
     return points;
   }
 

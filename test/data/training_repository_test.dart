@@ -1637,6 +1637,64 @@ void main() {
     expect(await repo.exerciseProgress(exerciseId), hasLength(13));
   });
 
+  test('the chart reads left to right in the day trained, not the day logged',
+      () async {
+    final push1 = await sessionNamed('Push 1');
+    final first = await logSession(push1, weight: 60);
+    final second = await logSession(push1, weight: 65);
+    // Logged second, trained first: a session written down a week late is not
+    // where `startedAt` would put it, and the chart draws calendar time.
+    await repo.setWorkoutDate(
+      second,
+      DateTime.now().subtract(const Duration(days: 30)),
+    );
+
+    final entry = (await repo.workoutDetail(first))!.entries.first;
+    final points = await repo.exerciseProgress(entry.exercise.id);
+
+    expect(points, hasLength(2));
+    expect(points.first.dayKey, lessThan(points.last.dayKey));
+    // Through the slot's load mode, which is what makes these effective loads
+    // rather than the numbers typed in.
+    expect(points.first.topSetLoad, greaterThan(points.last.topSetLoad!));
+  });
+
+  test('a chart point knows its session and whether the week was light',
+      () async {
+    // The chart reads its columns by name out of a raw statement, so this is
+    // the test that fails if one of them is ever renamed — a mistake that
+    // otherwise compiles and only shows up on a phone.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final first = await logSession(push1, weight: 40);
+
+    await repo.setCycleDeload(
+        (await repo.cycleStatus(regime.id))!.cycleId, true);
+    await logSession(push1, weight: 30);
+
+    final entry = (await repo.workoutDetail(first))!.entries.first;
+    final points = await repo.exerciseProgress(entry.exercise.id);
+
+    expect(points, hasLength(2));
+    expect(points.every((p) => p.sessionName == 'Push 1'), isTrue);
+    expect(points.first.isDeload, isFalse);
+    expect(points.last.isDeload, isTrue);
+    expect(points.last.topSetReps, 8);
+    expect(points.last.best1RM, isNotNull);
+  });
+
+  test('a set taken back is not on the chart, and an emptied day is not either',
+      () async {
+    final push1 = await sessionNamed('Push 1');
+    final id = await logSession(push1, weight: 80);
+    final entry = (await repo.workoutDetail(id))!.entries.first;
+
+    expect(await repo.exerciseProgress(entry.exercise.id), hasLength(1));
+
+    await repo.updateSet(entry.sets.first.id, isDone: const Value(false));
+    expect(await repo.exerciseProgress(entry.exercise.id), isEmpty);
+  });
+
   test('deleting a workout removes it from every history view', () async {
     final push1 = await sessionNamed('Push 1');
     final id = await logSession(push1);

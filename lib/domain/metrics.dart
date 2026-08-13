@@ -227,16 +227,34 @@ double sessionVolume({
 /// movement is a thousand-odd calls over a thousand-odd entries, and doing the
 /// copy, the sort and a linear scan on each of them cost most of a second
 /// before the chart could be drawn.
-double? bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) {
-  if (log.isEmpty) return null;
+double? bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) =>
+    bodyweightOnOrdered(dayKey, orderedByDay(log));
 
-  var ordered = log;
+/// [log] ordered by day, copying only when it is not already.
+///
+/// The verification is a linear scan, which is nothing once — and everything
+/// when it is inside the loop that scores fifty years of chin-ups against ten
+/// thousand weigh-ins. A caller with a series in hand and many days to look up
+/// orders it once here and then calls [bodyweightOnOrdered].
+List<({int dayKey, double weightKg})> orderedByDay(
+  List<({int dayKey, double weightKg})> log,
+) {
   for (var i = 1; i < log.length; i++) {
     if (log[i - 1].dayKey > log[i].dayKey) {
-      ordered = [...log]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
-      break;
+      return [...log]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
     }
   }
+  return log;
+}
+
+/// [bodyweightOn] for a series already through [orderedByDay]. Binary search
+/// and nothing else, so looking up a thousand days costs a thousand log-n
+/// probes rather than a thousand passes over the series.
+double? bodyweightOnOrdered(
+  int dayKey,
+  List<({int dayKey, double weightKg})> ordered,
+) {
+  if (ordered.isEmpty) return null;
 
   if (dayKey <= ordered.first.dayKey) return ordered.first.weightKg;
   if (dayKey >= ordered.last.dayKey) return ordered.last.weightKg;
