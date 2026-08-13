@@ -185,8 +185,8 @@ firing with the screen off have only been built, not felt.
 
 ## Left
 
-- [ ] **Clear [DEBT.md](DEBT.md) first.** Not a feature, and it comes before the
-      one below. Every weakness in it is one a sync layer multiplies: invariants
+- [ ] **Work through [PLAN.md](PLAN.md).** Five stages between here and real
+      data, then sync. Not a feature, and it comes before the one below. Every weakness in it is one a sync layer multiplies: invariants
       that live in comments become conflict rules that live in comments, and a
       regression you cannot see on screen is merged by a project with no CI.
 - [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
