@@ -866,34 +866,60 @@ class TrainingRepository {
   /// The volume rules are [setsByMuscleSince]'s, exactly — same joins, same
   /// filters, same definition of a hard set.
   ///
-  /// Bounded, never open-ended: a year of training is a few hundred rows here,
-  /// and the range control means nothing ever asks for more than a year at
-  /// once. That bound is why this is a day-level query and not a paging one.
+  /// **No longer bounded**, and that is why it is raw. This used to lean on the
+  /// range control never asking for more than a year — a few hundred rows —
+  /// and then `All` arrived and asked for fifty. Forty thousand grouped rows
+  /// through drift's `TypedResult.read` is over half a second on the UI
+  /// isolate, which is the pause between picking `All` and seeing bars. Read
+  /// positionally off a `QueryRow` it is a fraction of that, for the same rows
+  /// and the same numbers — see [exerciseProgress], which is where this
+  /// measurement was taken.
   Future<List<({int dayKey, MuscleGroup muscle, int sets})>> setsByMuscleDaily({
     required int fromDayKey,
     required int toDayKey,
   }) async {
-    final counted = db.setLogs.id.count();
-    final muscle = _loggedMuscle;
-    final rows = await (_volumeQuery()
-          ..addColumns(<Expression<Object>>[
-            db.workouts.dayKey,
-            muscle,
-            counted,
-          ])
-          ..where(db.workouts.dayKey.isBetweenValues(fromDayKey, toDayKey))
-          ..groupBy([db.workouts.dayKey, muscle]))
-        .get();
+    final rows = await db.customSelect(
+      'SELECT wo.day_key AS day_key, '
+      // The muscle the row was logged with, falling back to the catalog's —
+      // exactly [_loggedMuscle], which is what keeps refiling an exercise from
+      // rewriting every week it ever appeared in.
+      'COALESCE(we.muscle, e.muscle) AS logged_muscle, '
+      'COUNT(s.id) AS n '
+      'FROM set_logs s '
+      'INNER JOIN workout_exercises we ON we.id = s.workout_exercise_id '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'INNER JOIN exercises e ON e.id = we.exercise_id '
+      // [_volumeQuery]'s filters, one for one.
+      "WHERE wo.status <> 'abandoned' AND wo.deleted_at IS NULL "
+      "AND we.deleted_at IS NULL AND we.skip_reason = 'none' "
+      'AND s.is_done = 1 AND s.deleted_at IS NULL '
+      'AND s.set_type IN ($_volumeSetTypes) '
+      'AND wo.day_key BETWEEN ?1 AND ?2 '
+      // Grouped on the expression, not on the alias: `muscle` is a column on
+      // two of the joined tables and SQLite calls it ambiguous.
+      'GROUP BY wo.day_key, COALESCE(we.muscle, e.muscle)',
+      variables: [Variable.withInt(fromDayKey), Variable.withInt(toDayKey)],
+      readsFrom: {db.setLogs, db.workoutExercises, db.workouts, db.exercises},
+    ).get();
 
     return [
       for (final r in rows)
         (
-          dayKey: r.read(db.workouts.dayKey)!,
-          muscle: MuscleGroup.values.byName(r.read(muscle)!),
-          sets: r.read(counted) ?? 0,
+          dayKey: r.read<int>('day_key'),
+          muscle: MuscleGroup.values.byName(r.read<String>('logged_muscle')),
+          sets: r.read<int>('n'),
         ),
     ];
   }
+
+  /// The set types that count as volume, as a SQL list.
+  ///
+  /// Built from [countsAsVolume] rather than written out, so the raw statement
+  /// above cannot drift from the rule the rest of the app counts by.
+  static final String _volumeSetTypes = [
+    for (final t in SetType.values)
+      if (countsAsVolume(t)) "'${t.name}'",
+  ].join(', ');
 
   /// Which movements produced a region's sets, most first.
   ///

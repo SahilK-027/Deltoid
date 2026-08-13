@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -20,27 +22,31 @@ import '../../../domain/volume_history.dart';
 class WeeklyBars extends StatefulWidget {
   const WeeklyBars({
     super.key,
-    required this.series,
+    required this.bars,
     required this.hue,
     required this.height,
     this.scaleTo,
     this.onSelected,
   });
 
-  final VolumeSeries series;
+  /// One entry per mark, oldest first — weeks, months or years, already folded
+  /// by [foldWeeks]. Whatever the fold, a bar's height is **sets per week**, so
+  /// coarsening the averaging smooths the shape without rescaling the axis.
+  final List<VolumeBar> bars;
+
   final Color hue;
   final double height;
 
-  /// The count a full-height bar means. Defaults to the series' own peak, which
-  /// is what a tile wants: no axis, so the tallest bar filling the card is the
-  /// clearest reading of "this was the most". A chart with a y axis passes its
-  /// rounded maximum instead, or the tallest bar covers the top gridline.
-  final int? scaleTo;
+  /// The rate a full-height bar means. Defaults to the tallest bar on screen,
+  /// which is what a tile wants: no axis, so the tallest bar filling the card is
+  /// the clearest reading of "this was the most". A chart with a y axis passes
+  /// its rounded maximum instead, or the tallest bar covers the top gridline.
+  final double? scaleTo;
 
   /// Fired with the week under the finger, and with null when it is lifted
   /// clear. The caller prints the readout, because on a card this narrow a
   /// tooltip covers the chart it is describing.
-  final ValueChanged<VolumeWeek?>? onSelected;
+  final ValueChanged<VolumeBar?>? onSelected;
 
   @override
   State<WeeklyBars> createState() => _WeeklyBarsState();
@@ -64,7 +70,9 @@ class _WeeklyBarsState extends State<WeeklyBars>
   int _fromWeeks = 0;
   double _fromMax = 0;
 
-  int get _max => widget.scaleTo ?? widget.series.peakSets;
+  double get _max =>
+      widget.scaleTo ??
+      widget.bars.fold<double>(0, (m, b) => b.setsPerWeek > m ? b.setsPerWeek : m);
 
   @override
   void didUpdateWidget(WeeklyBars old) {
@@ -73,16 +81,15 @@ class _WeeklyBarsState extends State<WeeklyBars>
     // Only a change of *range* zooms. Ticking a set rewrites the weeks list and
     // moves one bar's height, and animating a zoom at that would make logging a
     // set look like navigating somewhere.
-    final spanChanged =
-        old.series.weeks.length != widget.series.weeks.length ||
-            (old.series.weeks.isNotEmpty &&
-                widget.series.weeks.isNotEmpty &&
-                old.series.weeks.first.start !=
-                    widget.series.weeks.first.start);
+    final spanChanged = old.bars.length != widget.bars.length ||
+        (old.bars.isNotEmpty &&
+            widget.bars.isNotEmpty &&
+            old.bars.first.start != widget.bars.first.start);
     if (!spanChanged) return;
 
-    _fromWeeks = old.series.weeks.length;
-    _fromMax = (old.scaleTo ?? old.series.peakSets).toDouble();
+    _fromWeeks = old.bars.length;
+    _fromMax = old.scaleTo ??
+        old.bars.fold<double>(0, (m, b) => b.setsPerWeek > m ? b.setsPerWeek : m);
     // Scrubbing a chart that is no longer the chart you were scrubbing.
     //
     // The parent is told **after** the frame, never here: `onSelected` sets
@@ -114,7 +121,7 @@ class _WeeklyBarsState extends State<WeeklyBars>
   /// any parent that asks for one throws. Gestures only arrive after layout, so
   /// the render box is always there to ask.
   void _selectAt(double dx) {
-    final weeks = widget.series.weeks;
+    final weeks = widget.bars;
     final width = context.size?.width ?? 0;
     if (weeks.isEmpty || width <= 0) return;
     final i = (dx / width * weeks.length).floor().clamp(0, weeks.length - 1);
@@ -153,7 +160,7 @@ class _WeeklyBarsState extends State<WeeklyBars>
         width: double.infinity,
         child: CustomPaint(
           painter: _BarsPainter(
-            weeks: widget.series.weeks,
+            weeks: widget.bars,
             max: _max,
             fromWeeks: _fromWeeks,
             fromMax: _fromMax,
@@ -182,8 +189,8 @@ class _BarsPainter extends CustomPainter {
     required this.touched,
   }) : super(repaint: zoom);
 
-  final List<VolumeWeek> weeks;
-  final int max;
+  final List<VolumeBar> weeks;
+  final double max;
 
   /// How many weeks were on screen before the range changed, and what they were
   /// scaled against. Zero means there is nothing to zoom from.
@@ -212,8 +219,8 @@ class _BarsPainter extends CustomPainter {
         : _lerp(size.width / fromWeeks, size.width / count, t);
 
     final scale = fromWeeks <= 0 || t >= 1
-        ? max.toDouble()
-        : _lerp(fromMax <= 0 ? max.toDouble() : fromMax, max.toDouble(), t);
+        ? max
+        : _lerp(fromMax <= 0 ? max : fromMax, max, t);
 
     // Weeks that were off-screen a moment ago are drawn outside the box while
     // they travel in.
@@ -224,7 +231,11 @@ class _BarsPainter extends CustomPainter {
         : slot >= 4
             ? 1.0
             : 0.0;
-    final barWidth = (slot - gap).clamp(1.0, slot);
+    // **Never `clamp(1.0, slot)`.** A slot narrower than a point makes the lower
+    // bound exceed the upper one, and `clamp` throws rather than picking a
+    // side — which is a painter that crashes the frame, mid-scroll, with no way
+    // back. A bar is a point of ink or the whole slot, whichever is smaller.
+    final barWidth = math.max(slot - gap, math.min(slot, 1.0));
     // A 2pt radius on a 2pt bar is a lozenge, not a bar (THEME → Bar list).
     final radius = barWidth >= 5 ? const Radius.circular(2) : Radius.zero;
 
@@ -255,7 +266,7 @@ class _BarsPainter extends CustomPainter {
             : (Paint()..color = track.withValues(alpha: fade)),
       );
 
-      final sets = weeks[i].sets;
+      final sets = weeks[i].setsPerWeek;
       if (sets <= 0 || scale <= 0) continue;
 
       // At least a point of ink for a week that was trained: rounded down, one

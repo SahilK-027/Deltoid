@@ -12,6 +12,7 @@ import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
 import '../../data/db/database.dart';
 import '../../data/db/watch.dart';
+import '../../domain/chart_buckets.dart';
 import '../../domain/units.dart';
 
 /// One month of the log, summarised — never its entries.
@@ -221,6 +222,11 @@ class _MonthListState extends State<_MonthList> {
   /// record, the chart is the reading.
   TrendWindow _window = const TrendWindow.rolling(ChartRange.threeMonths);
 
+  /// The averaging the user picked, or null for "let the range decide". See
+  /// [chartGranularityProvider] for why the choice is stored and not the
+  /// granularity it resolved to.
+  Granularity? _granularity;
+
   /// Years there is something to look at, for the picker. Derived from the
   /// month summaries, which is at most one entry per month rather than one per
   /// weigh-in, and recomputed only when those change.
@@ -273,6 +279,8 @@ class _MonthListState extends State<_MonthList> {
                 unit: unit,
                 window: _window,
                 onWindow: (w) => setState(() => _window = w),
+                granularity: _granularity,
+                onGranularity: (g) => setState(() => _granularity = g),
               ),
               const SizedBox(height: Space.section),
             ],
@@ -472,6 +480,8 @@ class _TrendCard extends ConsumerWidget {
     required this.unit,
     required this.window,
     required this.onWindow,
+    required this.granularity,
+    required this.onGranularity,
   });
 
   /// The newest weigh-in, which the card leads with whatever the window is.
@@ -484,6 +494,10 @@ class _TrendCard extends ConsumerWidget {
   final TrendWindow window;
   final ValueChanged<TrendWindow> onWindow;
 
+  /// Null means auto.
+  final Granularity? granularity;
+  final ValueChanged<Granularity?> onGranularity;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Oldest first, which is the direction a chart reads — and the query
@@ -495,10 +509,37 @@ class _TrendCard extends ConsumerWidget {
       );
     }
 
+    // The change over the range is the *log's* first and last reading, not the
+    // first and last bucket: averaging is how the line is drawn, and this line
+    // is a fact about two weigh-ins.
     final change = points.length < 2
         ? null
         : formatBodyweightDelta(
             points.last.weightKg, points.first.weightKg, unit);
+
+    // `All` starts where the log does. Every other window knows its own left
+    // edge, and for `All` the query returned everything, so the first row is it.
+    final earliest = !window.isAll || points.isEmpty
+        ? null
+        : dateFromDayKey(points.first.dayKey);
+    final (from, to) = window.xBoundsSince(earliest);
+    final by = resolveGranularity(granularity, to.difference(from).inDays);
+
+    // Plotted in display units, which is what the axis and the tooltip read in.
+    // The mean of a week of weigh-ins is a weigh-in; the sum of them is not a
+    // weight anybody has ever been.
+    final marks = [
+      for (final b in bucketize(
+        rows: [
+          for (final e in points)
+            (dayKey: e.dayKey, value: unit.fromKg(e.weightKg)),
+        ],
+        by: by,
+        from: from,
+        to: to,
+      ))
+        if (b.value != null) b,
+    ];
 
     return AppCard(
       child: Column(
@@ -525,24 +566,38 @@ class _TrendCard extends ConsumerWidget {
             style: context.t.bodyMedium,
           ),
           const SizedBox(height: Space.lg),
-          if (points.length < 2)
-            EmptyBox(
-              icon: Icons.timeline,
-              message: points.isEmpty
+          if (marks.length < 2)
+            // The chart, empty, rather than a box where the chart was: the
+            // range chips under it stay a zoom rather than a thing that
+            // resizes the card (THEME → Charts).
+            EmptyTrendChart(
+              height: 190,
+              window: window,
+              earliest: earliest,
+              // Scaled around the last weigh-in, in the same display units the
+              // real chart plots in. An axis with no numbers on it reads as a
+              // chart that failed to draw (THEME → Charts).
+              scale: (
+                unit.fromKg(latest.weightKg) - 5,
+                unit.fromKg(latest.weightKg) + 5,
+              ),
+              formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
+              message: marks.isEmpty
                   ? 'Nothing logged in this range.'
-                  : 'One weigh-in in this range. A second one gives it a '
-                      'shape.',
+                  : 'One ${by.noun} with a weigh-in in it. A second one gives '
+                      'it a shape.',
             )
           else
             TrendChart(
               height: 190,
+              window: window,
+              earliest: earliest,
               series: [
                 TrendSeries(
                   name: 'Bodyweight',
                   color: context.c.seriesPrimary,
                   spots: [
-                    for (final e in points)
-                      FlSpot(trendX(e.dayKey), unit.fromKg(e.weightKg)),
+                    for (final b in marks) FlSpot(bucketX(b), b.value!),
                   ],
                 ),
               ],
@@ -551,7 +606,15 @@ class _TrendCard extends ConsumerWidget {
                   '${unit.label}',
             ),
           const SizedBox(height: Space.lg),
-          TrendRangeBar(window: window, years: years, onChanged: onWindow),
+          TrendRangeBar(
+            window: window,
+            years: years,
+            onChanged: onWindow,
+            earliest: earliest,
+            granularity: by,
+            granularityIsAuto: granularity == null,
+            onGranularity: onGranularity,
+          ),
         ],
       ),
     );
@@ -778,12 +841,17 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
             textInputAction: TextInputAction.done,
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _save(),
-            style: context.t.displaySmall?.copyWith(fontFeatures: tabular),
+            // `valueSm`, the size every other number you type in this app is
+            // entered at — the set row's load and reps, the rest seconds. It
+            // was `value` (22), the size a number is *displayed* at once it is
+            // a fact on a card, and a field wearing a readout's type reads as a
+            // headline you are somehow editing.
+            style: context.t.labelLarge,
             cursorColor: c.textPrimary,
             decoration: InputDecoration(
               suffixText: widget.unit.label,
               suffixStyle:
-                  context.t.titleSmall?.copyWith(color: c.textSecondary),
+                  context.t.labelSmall?.copyWith(color: c.textSecondary),
             ),
           ),
         ),

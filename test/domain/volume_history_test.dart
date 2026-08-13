@@ -1,4 +1,5 @@
 import 'package:deltoid/core/ids.dart';
+import 'package:deltoid/domain/chart_buckets.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
 import 'package:deltoid/domain/volume_history.dart';
@@ -255,5 +256,98 @@ void main() {
       h.byRegion[MuscleRegion.chest]!.totalSets,
       daily.length * 3,
     );
+  });
+
+
+  group('folding weeks into bars', () {
+    VolumeWeek week(int y, int m, int d, int sets) =>
+        VolumeWeek(start: DateTime(y, m, d), sets: sets);
+
+    test('weekly is the identity', () {
+      final weeks = [week(2026, 8, 3, 10), week(2026, 8, 10, 12)];
+      final bars = foldWeeks(weeks, Granularity.weekly);
+
+      expect(bars, hasLength(2));
+      expect(bars.first.setsPerWeek, 10);
+      expect(bars.first.weeks, 1);
+    });
+
+    test('a month is the rate, not the total — and untrained weeks divide', () {
+      // Four Mondays in June 2026: 1, 8, 15, 22, 29 — five, in fact.
+      final weeks = [
+        week(2026, 6, 1, 12),
+        week(2026, 6, 8, 0),
+        week(2026, 6, 15, 8),
+        week(2026, 6, 22, 0),
+        week(2026, 6, 29, 10),
+      ];
+      final bars = foldWeeks(weeks, Granularity.monthly);
+
+      expect(bars, hasLength(1));
+      expect(bars.single.totalSets, 30);
+      expect(bars.single.weeks, 5);
+      // Not 10.0 — the two weeks you did nothing are part of the month.
+      expect(bars.single.setsPerWeek, 6);
+    });
+
+    test('a week belongs to the bucket its Monday is in', () {
+      // Monday 29 June 2026 runs into July, and counts as June.
+      final bars = foldWeeks(
+        [week(2026, 6, 29, 7), week(2026, 7, 6, 3)],
+        Granularity.monthly,
+      );
+
+      expect(bars, hasLength(2));
+      expect(bars.first.start, DateTime(2026, 6, 29));
+      expect(bars.first.setsPerWeek, 7);
+      expect(bars.last.setsPerWeek, 3);
+    });
+
+    test('a year averages every week in it, and the peak follows the fold', () {
+      final weeks = [
+        for (var i = 0; i < 52; i++)
+          week(2025, 1, 6 + 7 * i > 28 ? 6 : 6, i.isEven ? 20 : 0),
+      ];
+      final series = VolumeSeries(label: 'Chest', weeks: weeks);
+
+      // Alternating 20 and 0 is ten a week however it is folded, but the peak a
+      // chart scales to drops from 20 to 10 the moment you average.
+      expect(series.peakPerWeek(Granularity.weekly), 20);
+      expect(series.averagePerWeek, 10);
+    });
+
+    test('nothing in, nothing out', () {
+      expect(foldWeeks(const [], Granularity.monthly), isEmpty);
+    });
+  });
+
+
+  group('the fold follows the data, not the control', () {
+    test('a short history is never folded into one bar', () {
+      // The frame between picking `All` and the query returning: the control
+      // says fifty years, the series is still thirteen weeks. Folded by the
+      // control that is a single bar stretched across the chart — the flash.
+      final thirteenWeeks = [
+        for (var i = 0; i < 13; i++)
+          VolumeWeek(
+            start: DateTime(2026, 5, 4).add(Duration(days: 7 * i)),
+            sets: 10 + i,
+          ),
+      ];
+
+      // Measured from the weeks in hand, the level suits them.
+      const noDaily = [
+        Granularity.weekly,
+        Granularity.monthly,
+        Granularity.yearly,
+      ];
+      final by = resolveGranularity(null, thirteenWeeks.length * 7,
+          allowed: noDaily, ceiling: 400);
+      expect(by, Granularity.weekly);
+      expect(foldWeeks(thirteenWeeks, by), hasLength(13));
+
+      // And folded by the control, it is the one bar this guards against.
+      expect(foldWeeks(thirteenWeeks, Granularity.yearly), hasLength(1));
+    });
   });
 }

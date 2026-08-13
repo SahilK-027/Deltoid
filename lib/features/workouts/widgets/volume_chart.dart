@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../domain/chart_buckets.dart';
 import '../../../domain/volume_history.dart';
 import 'volume_history_bars.dart';
 
@@ -20,20 +21,32 @@ class VolumeChart extends StatelessWidget {
   const VolumeChart({
     super.key,
     required this.series,
+    required this.by,
     required this.hue,
     this.height = 150,
     this.onSelected,
   });
 
   final VolumeSeries series;
+
+  /// How finely the weeks are folded — see [foldWeeks]. The bars are drawn in
+  /// sets per week whatever it is, so this smooths the shape without moving the
+  /// axis under it.
+  final Granularity by;
+
   final Color hue;
   final double height;
-  final ValueChanged<VolumeWeek?>? onSelected;
+  final ValueChanged<VolumeBar?>? onSelected;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final axis = _Axis.of(series.peakSets);
+    // Coarsened against the weeks in hand — see [autoGranularityFor]. A window
+    // and its data disagree for a frame when the range changes, and that frame
+    // must not ask for two and a half thousand bars in a phone's width.
+    final safe = autoGranularityFor(series.weeks.length, by);
+    final bars = series.bars(safe);
+    final axis = _Axis.of(series.peakPerWeek(safe));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,13 +81,13 @@ class VolumeChart extends StatelessWidget {
                       ),
                     ),
                     WeeklyBars(
-                      series: series,
+                      bars: bars,
                       hue: hue,
                       height: height,
                       // Bars are drawn against the axis rather than the peak,
                       // or the tallest bar touches the top of the plot and the
                       // gridline it should sit under is invisible behind it.
-                      scaleTo: axis.max,
+                      scaleTo: axis.max.toDouble(),
                       onSelected: onSelected,
                     ),
                   ],
@@ -113,8 +126,9 @@ class VolumeChart extends StatelessWidget {
         AnimatedSwitcher(
           duration: Motion.base,
           child: _Months(
-            key: ValueKey(series.weeks.length),
-            weeks: series.weeks,
+            key: ValueKey('${bars.length}:${safe.name}'),
+            bars: bars,
+            by: safe,
           ),
         ),
       ],
@@ -124,6 +138,10 @@ class VolumeChart extends StatelessWidget {
 
 /// The gutter the y labels sit in, to the right of the plot.
 const _yAxisWidth = 26.0;
+
+/// How many date labels the strip prints at most — the same seven the line
+/// charts keep, so both kinds of chart are read at the same rhythm.
+const _axisLabels = 7;
 
 /// A y axis: a round maximum at or above the peak, and the rules to draw inside
 /// it.
@@ -141,7 +159,10 @@ class _Axis {
   ///
   /// Anchored at zero, unlike the trend chart, and for the opposite reason —
   /// zero sets *is* in the data. A week you skipped has to sit on the baseline.
-  factory _Axis.of(int peak) {
+  factory _Axis.of(double rawPeak) {
+    // Rounded up before it is snapped: a peak of 6.4 sets a week has to fit
+    // under the axis, not sit on its top gridline.
+    final peak = rawPeak.ceil();
     if (peak <= 0) return const _Axis(max: 1, ticks: []);
     final step = peak <= 10
         ? 2
@@ -197,21 +218,31 @@ class _Gridlines extends CustomPainter {
 /// takes as many slots as it has weeks, so the labels line up with the bars
 /// above them without a single measurement.
 class _Months extends StatelessWidget {
-  const _Months({super.key, required this.weeks});
+  const _Months({super.key, required this.bars, required this.by});
 
-  final List<VolumeWeek> weeks;
+  final List<VolumeBar> bars;
+  final Granularity by;
+
+  /// What names a bar at this fold. Months over weekly bars, years over monthly
+  /// ones — a strip of `Jan Jan Jan` under twelve monthly bars of the same year
+  /// is a label that has stopped saying anything.
+  String get _pattern => switch (by) {
+        Granularity.yearly => 'yyyy',
+        Granularity.monthly => "MMM ''yy",
+        _ => 'MMM',
+      };
 
   @override
   Widget build(BuildContext context) {
-    if (weeks.isEmpty) return const SizedBox.shrink();
+    if (bars.isEmpty) return const SizedBox.shrink();
 
-    // Runs of consecutive weeks sharing a month, in order.
+    // Runs of consecutive bars sharing a label, in order.
     final runs = <({String label, int weeks})>[];
-    for (final week in weeks) {
-      // A week belongs to the month its Monday is in — the same rule the bar
-      // itself is bucketed by, so a label can never sit over a bar counted
-      // into a different month.
-      final label = DateFormat('MMM').format(week.start);
+    for (final week in bars) {
+      // A bar belongs to the period its first Monday is in — the same rule it
+      // was counted by, so a label can never sit over a bar counted into a
+      // different one.
+      final label = DateFormat(_pattern).format(week.start);
       if (runs.isNotEmpty && runs.last.label == label) {
         runs[runs.length - 1] =
             (label: label, weeks: runs.last.weeks + 1);
@@ -220,11 +251,13 @@ class _Months extends StatelessWidget {
       }
     }
 
-    // A year is twelve labels across a phone — about four weeks of slot each,
-    // which is narrower than the word `Sep`. Every other one is dropped rather
-    // than letting them collide or ellipsize into `Se…`, and the strip stays
-    // calendar-shaped because what is dropped is a whole month.
-    final everyOther = runs.length > 8;
+    // **Seven labels at most, the same ceiling the line charts keep.** A year is
+    // twelve runs across a phone — four weeks of slot each, narrower than the
+    // word `Sep` — and `MMM ''yy` under monthly bars is wider still. Rather than
+    // let them collide, ellipsize into `Se…` or spill past their slot, every
+    // *n*th run is kept and the rest are blanked, so the strip stays
+    // calendar-shaped: what is dropped is a whole period, never a word.
+    final stride = (runs.length / _axisLabels).ceil().clamp(1, runs.length);
 
     return Padding(
       // The gutter the y labels take on the right, so the strip lines up with
@@ -235,13 +268,20 @@ class _Months extends StatelessWidget {
           for (var i = 0; i < runs.length; i++)
             Expanded(
               flex: runs[i].weeks,
-              child: Text(
-                everyOther && i.isOdd ? '' : runs[i].label,
-                style: context.t.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                softWrap: false,
-              ),
+              child: i % stride == 0
+                  // Clipped to its own slot rather than laid out at its natural
+                  // width: a `Row` of `Expanded` children will happily paint a
+                  // word wider than the box it was given, over its neighbour.
+                  ? ClipRect(
+                      child: Text(
+                        runs[i].label,
+                        style: context.t.bodySmall,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
         ],
       ),

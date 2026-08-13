@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
+import '../../domain/chart_buckets.dart';
 import '../../domain/muscle_volume.dart';
 import '../../domain/volume_history.dart';
 import 'volume_history_screen.dart';
@@ -49,6 +50,12 @@ class RegionVolumeScreen extends ConsumerWidget {
                   region: region,
                   history: h,
                   hue: c.forRegion(region),
+                  // From the history being drawn, not from the control — see
+                  // [volumeGranularityOf].
+                  by: volumeGranularityOf(
+                    h,
+                    ref.watch(volumeGranularityProvider),
+                  ),
                 ),
             },
           ),
@@ -63,11 +70,13 @@ class _Body extends StatefulWidget {
     required this.region,
     required this.history,
     required this.hue,
+    required this.by,
   });
 
   final MuscleRegion region;
   final VolumeHistory history;
   final Color hue;
+  final Granularity by;
 
   @override
   State<_Body> createState() => _BodyState();
@@ -75,7 +84,7 @@ class _Body extends StatefulWidget {
 
 class _BodyState extends State<_Body> {
   /// The week under the finger on the big chart, if any.
-  VolumeWeek? _week;
+  VolumeBar? _week;
 
   @override
   Widget build(BuildContext context) {
@@ -98,9 +107,14 @@ class _BodyState extends State<_Body> {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
+                    // Both readings are a rate, so the big figure never changes
+                    // unit under your finger: the span's sets per week at rest,
+                    // and the scrubbed bar's own sets per week — which for a
+                    // weekly bar is simply the sets in it.
                     week == null
                         ? series.averagePerWeek.toStringAsFixed(1)
-                        : '${week.sets}',
+                        : week.setsPerWeek.toStringAsFixed(
+                            widget.by == Granularity.weekly ? 0 : 1),
                     style: context.t.displaySmall,
                   ),
                   const SizedBox(width: Space.xs),
@@ -108,7 +122,8 @@ class _BodyState extends State<_Body> {
                     child: Text(
                       week == null
                           ? 'sets per week · ${weekSpanLabel(series).toLowerCase()}'
-                          : 'sets · ${weekReadout(week).split(' · ').first}',
+                          : '${widget.by == Granularity.weekly ? 'sets' : 'sets per week'} · '
+                              '${weekReadout(week, widget.by).split(' · ').first}',
                       style: context.t.bodyMedium,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -119,6 +134,7 @@ class _BodyState extends State<_Body> {
               const SizedBox(height: Space.lg),
               VolumeChart(
                 series: series,
+                by: widget.by,
                 hue: widget.hue,
                 onSelected: (w) => setState(() => _week = w),
               ),
@@ -145,6 +161,7 @@ class _BodyState extends State<_Body> {
                   Expanded(
                     child: VolumeTile(
                       series: widget.history.byMuscle[parts[j]]!,
+                      by: widget.by,
                       // A muscle carries its region's hue, because that is the
                       // bar it is read against (`forMuscle`).
                       hue: widget.hue,

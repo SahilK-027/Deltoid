@@ -4,6 +4,7 @@ import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/trend_chart.dart';
 import '../../data/db/watch.dart';
+import '../../domain/chart_buckets.dart';
 import '../../domain/muscle_volume.dart';
 import '../../domain/volume_history.dart';
 
@@ -19,6 +20,49 @@ import '../../domain/volume_history.dart';
 final volumeWindowProvider = StateProvider<TrendWindow>(
   (ref) => const TrendWindow.rolling(ChartRange.threeMonths),
 );
+
+/// How finely the weekly bars are folded, or null for "let the range decide".
+///
+/// Shared by the grid and a region for the same reason [volumeWindowProvider]
+/// is: two charts of the same data, one control.
+final volumeGranularityProvider = StateProvider<Granularity?>((ref) => null);
+
+/// The most bars this screen will draw. See [volumeGranularityOf].
+const _barCeiling = 400;
+
+/// The averaging in force, **measured from the weeks actually in hand**.
+///
+/// Deliberately not from the window. The two disagree for as long as a query
+/// takes: pick `All` on a thirty-year log and for a frame the control says
+/// `All` — so the fold says yearly — while the series is still the thirteen
+/// weeks of the range you left. Thirteen weeks folded yearly is *one bar*,
+/// stretched across the whole chart, and that flash is what you see before the
+/// real data lands.
+///
+/// Reading the span off the data cannot produce that: whatever is on screen is
+/// folded at a level that suits it, and the level changes when the data does,
+/// in the same frame.
+///
+/// Weekly is this feature's floor — a day is not a unit weekly volume has — so
+/// `Auto` never resolves below it however short the span is.
+Granularity volumeGranularityOf(VolumeHistory? history, Granularity? chosen) {
+  // A span of at least a week, so an empty history resolves to something rather
+  // than dividing by nothing.
+  final days = ((history?.weekCount ?? 0) * 7).clamp(7, 1 << 30);
+  return resolveGranularity(
+    chosen,
+    days,
+    // A bar needs a point of width to be a bar; past this the chart is a solid
+    // block of ink. A line has no such floor, which is why it offers more.
+    ceiling: _barCeiling,
+    // No daily: a week is this feature's smallest honest unit.
+    allowed: const [
+      Granularity.weekly,
+      Granularity.monthly,
+      Granularity.yearly,
+    ],
+  );
+}
 
 /// Years the picker offers: every year from your first logged set to this one,
 /// newest first.
@@ -40,18 +84,39 @@ final volumeYearsProvider = FutureProvider<List<int>>((ref) async {
   ];
 });
 
-/// The span the screens are showing, clamped to today.
+/// The span the screens are showing, clamped at both ends.
 ///
 /// A calendar year that has not finished yet ends today, not on 31 December:
 /// the span decides how many weeks an average divides by, and counting weeks
 /// that have not happened would report a year in progress as a year of
 /// half-training.
-({int from, int to}) _spanOf(TrendWindow window) {
+///
+/// And `All` starts where **the log** starts, not where [TrendWindow.fromDayKey]
+/// does — that is `0`, which is day zero of year zero, and folding a hundred
+/// thousand empty weeks is not a chart, it is a hang. With nothing logged at
+/// all it falls back to a year, which is what "all" honestly is then.
+({int from, int to}) _spanOf(TrendWindow window, int? firstLogged) {
   final todayKey = dayKeyOf(DateTime.now());
+  final from = window.isAll
+      ? (firstLogged ??
+          dayKeyOf(DateTime.now().subtract(const Duration(days: 365))))
+      : window.fromDayKey;
   return (
-    from: window.fromDayKey,
+    from: from,
     to: window.toDayKey > todayKey ? todayKey : window.toDayKey,
   );
+}
+
+/// The first day anything was logged, which `All` needs before it can name its
+/// own left edge. Null on an empty log.
+final firstLoggedDayProvider = FutureProvider<int?>((ref) async {
+  return ref.watch(trainingRepositoryProvider).firstLoggedDayKey();
+});
+
+/// The same, as a date a chart can be scaled against.
+DateTime? firstLoggedDay(WidgetRef ref) {
+  final key = ref.watch(firstLoggedDayProvider).valueOrNull;
+  return key == null ? null : dateFromDayKey(key);
 }
 
 /// Which movements produced a region's sets, over the selected span.
@@ -61,11 +126,12 @@ final regionExercisesProvider = StreamProvider.family<
     final db = ref.watch(databaseProvider);
     final repo = ref.watch(trainingRepositoryProvider);
     final window = ref.watch(volumeWindowProvider);
+    final firstLogged = ref.watch(firstLoggedDayProvider).valueOrNull;
 
     return db.watchQuery(
       [db.setLogs, db.workoutExercises, db.workouts, db.exercises],
       () async {
-        final span = _spanOf(window);
+        final span = _spanOf(window, firstLogged);
         return repo.setsByExercise(
           fromDayKey: span.from,
           toDayKey: span.to,
@@ -86,8 +152,10 @@ final volumeHistoryProvider = StreamProvider<VolumeHistory>((ref) {
   final repo = ref.watch(trainingRepositoryProvider);
   final window = ref.watch(volumeWindowProvider);
 
+  final firstLogged = ref.watch(firstLoggedDayProvider).valueOrNull;
+
   return db.watchQuery([db.setLogs, db.workoutExercises, db.workouts], () async {
-    final span = _spanOf(window);
+    final span = _spanOf(window, firstLogged);
     return computeVolumeHistory(
       daily: await repo.setsByMuscleDaily(
         fromDayKey: span.from,

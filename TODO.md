@@ -97,6 +97,31 @@ The app currently has **503 tests** and is analyzer clean.
       the column existed, ask the catalog" — not `other`.
 - [x] The bodyweight log is one tap from Settings, groups by month with deltas,
       has its own trend, and is interpolated into every bodyweight lift's score.
+- [x] The trend chart is drawn in the same frame as the list under it. Scoring
+      thirty years of one movement was 130ms of drift row mapping — whole
+      `SetLog` objects gathered by a two-thousand-parameter `IN` — so the
+      chart's two queries read the five columns they use off a `QueryRow`
+      instead: **26ms**, same numbers, asserted equal. The header now draws at a
+      fixed height before its numbers arrive, so the rows no longer jump.
+- [x] An empty chart is a chart: gridlines, the window's own time axis, the
+      whole history's value axis, and no sentence written across it. One session
+      plots its dot. Never-logged is that same page with dashes in it rather
+      than a screen of its own.
+- [x] History's exercise search falls through to the catalog, so a movement you
+      created and have not trained is findable — listed under the matches, and
+      saying it has never been logged rather than not existing.
+- [x] **Every chart is one chart.** `lib/domain/chart_buckets.dart` folds any
+      dated series into daily / weekly / monthly / yearly buckets — measurements
+      averaged, counts summed and stated per week — and every chart in the app
+      draws through it, so fifty years is fifty marks rather than eighteen
+      thousand. `Auto` takes the finest level under a ~60-mark ceiling and is
+      named on the chip. The exercise trend, bodyweight, the volume grid and a
+      region's chart share one control row (`1W 1M 3M 6M 1Y All`, year,
+      averaging), one axis (seven labels, the last one today, counted back from
+      it), and one transition — the frame holds its size while the scale and the
+      marks interpolate. The consistency heatmap and the muscle bar list keep
+      the shared colour and type but not the axis: a calendar and a ranked row
+      list have no time axis to range over.
 
 ### Around the edges
 

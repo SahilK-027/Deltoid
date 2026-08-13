@@ -295,12 +295,27 @@ The vocabulary. Everything on every screen is one of these.
 | **Text link** | `title` size, primary colour, **no underline**, followed by an 18dp chevron. The "See all / Collapse" affordance. |
 | **Circular icon** | 40dp `surfaceHigh` circle, white glyph at 18. Add, close, refresh. **Its label is required** — a glyph alone cannot say what it does, so the name is what has to be written for the code to compile, and it carries `Semantics` as well as a tooltip (a tooltip needs a long press, which is not a gesture made mid-set). |
 | **Compact pill** | Height 36, radius 999, `surfaceHigh`, `label` text. "Edit", "Change". |
+| **Primary, compact** | The same fill and label at height 46, sized to its own words. The floating form: *one more of something* — "New exercise" — resting over the list at the bottom right. |
 
 Disabled is a `surfaceHigh` fill with a `textTertiary` label — never a faded
 accent, never an enabled button that errors when tapped.
 
 **When a surface ends in two actions, stack them**: secondary above, primary
 below, both full width. Never side by side.
+
+**Full width is a commitment, not a default.** It says *this is what the screen
+is for*: finish the session, save the exercise, confirm the delete — and an
+empty state's one button, which is the whole point of a page with nothing on it.
+
+**An action that adds one more row to a list you are browsing floats instead.**
+Compact, bottom right, over the rows rather than in a strip beneath them: a bar
+across the foot of a screen that is nothing but list spends a row's worth of it
+on page background, and reads as the end of a flow when it is the beginning of
+one. The list keeps enough padding to scroll its last row clear of it, and it
+carries no shadow — depth is surface colour, and the fill is already the
+brightest thing on the screen. It hides while an empty state is up, because that
+state's own button is the same action and two of them read as two different
+things.
 
 ### Chips
 
@@ -485,6 +500,18 @@ glyph over a `section` title, a `body` message and one primary button.
 **A section with nothing in it hides rather than printing a shelf of dashes.**
 Dashes are for a card that has a reason to exist and one missing figure.
 
+**"Not here" and "not yet" are different sentences.** An index built from what
+you have *done* — History's exercises, the days in a filter — must not answer a
+search with "no such thing" about something you own and have not used. At rest
+it lists what happened; searched, it falls through to the catalog and lists the
+rest **below** the matches, under one heading, each saying plainly that it has
+never been logged. Only a name nothing is called gets an empty state.
+
+**A thing with no data still has a page**, and it is the same page it will have
+once there is some — the name, the controls, the figures as dashes. A separate
+"nothing here yet" screen that disappears the first time you finish a set means
+the first thing you learn about a screen is a layout you will never see again.
+
 ### Value and unit
 
 `ValueUnit` is rule 5 as a widget: a number with its unit one step down beside
@@ -522,10 +549,48 @@ under your finger while scrubbing.
 comes back with a different range control, no edge suppression and no
 calendar-aware ticks. A chart is a language, not a per-screen widget.
 
-- **Both axes drop their edge ticks.** A label at min or max has half a line of
-  room and prints over its neighbour.
-- **Tick spacing is calendar-shaped** — week, fortnight, month, quarter, year.
-  Ticks every 97 days label three different months and read as noise.
+**Every chart is driven by the same row**: `1W 1M 3M 6M 1Y All`, then the year
+picker, then the averaging chip. A screen may offer *fewer* chips than that — a
+week of weekly bars is one bar, so volume starts at `1M` — but never different
+ones, never in a different order, and never a second control of its own
+somewhere else on the page.
+
+**No chart ever plots raw rows.** Fifty years of daily entries is eighteen
+thousand marks across a phone, which is not a chart, it is a texture. Every
+chart folds its data into buckets — daily, weekly, monthly, yearly — and draws
+one mark per bucket, so the mark count stays under about sixty at *any* range.
+`Auto` picks the **finest** level that stays under that ceiling rather than the
+coarsest that fits, which is what makes a week open on days and fifty years open
+on years without either being a special case. The chip always names the level in
+force, because a silently smoothed chart is a chart lying about its resolution.
+
+- **A measurement averages; a count totals — into a rate.** Bodyweight in March
+  is the mean of March's weigh-ins, because the mean of measurements is a
+  measurement. Sets are counted, so a coarser bucket sums them — and then states
+  them **per week**, the unit the training is written in. A monthly bar reading
+  `62` beside a weekly one reading `14` is the same training drawn twice, and
+  the axis would rescale by four every time you changed the averaging; holding
+  the unit still is what makes the control a smoothing control rather than a
+  different chart.
+- **An empty bucket is not a zero, except when it is.** A month with no weigh-in
+  breaks the line — there is no weight to draw. A month with no training is zero
+  sets and the bar sits on the baseline. Same absence, two truths, and the fold
+  reports emptiness so each chart can say which its own data means.
+- **A bucket is drawn at its middle, not its first day.** A month plotted on the
+  1st is half a month early, and a yearly mark on New Year's Day reads as the
+  wrong year.
+- **Buckets are walked as calendar dates.** Adding seven days to a local date
+  crosses a clock change correctly; adding `7 × 86400` seconds does not.
+
+- **Seven date labels, and the last one is today.** The count is fixed at every
+  range, and the ladder is anchored on the **right** and counted back, because
+  every rolling window ends on the day you are standing in. Laid out from the
+  left instead, `1W` printed whichever day the data happened to start on and
+  never printed today at all. The plot is padded half a step either side so the
+  first and last labels sit inside it with room to print.
+- **The labels are named by how much time is on screen**: a week by its weekdays
+  (`Fri Sat Sun … Thu`), a season by dates, a year by months, a decade by years.
+  Four ticks a day apart all render as the same month and read as mush.
 - Y bounds are the data plus air, snapped to a round step, and **never anchored
   at zero** unless zero is in the data — anchoring draws a year of bodyweight as
   a flat line an inch off the bottom.
@@ -547,15 +612,24 @@ calendar-aware ticks. A chart is a language, not a per-screen widget.
   with the gap — a 2pt radius on a 2pt bar is a lozenge.
 - **A week that was trained never draws as a week that was not.** A bar rounded
   to zero pixels is the chart contradicting the data; clamp it to a point of ink.
+- **Bars and lines share everything except the mark.** A line is a measurement
+  taken at a moment, a bar is a count over a period, and no amount of visual
+  consistency makes one honest as the other. What they do share is the whole of
+  the rest of it: the range row, the averaging, the gridlines, the right-hand
+  axis, the label ladder, and the motion.
 - **Changing range zooms; it does not cut.** Every range ends today, so motion
   is anchored on the **right edge**: widening from three months to a year is
   stepping back from the same wall — the weeks you were looking at stay put and
   more arrive on the left. Scaling about the centre slides this week sideways,
   and this week is the bar the eye is holding. Bar pitch and value scale both
   interpolate; weeks that were off-screen fade in rather than arriving drawn.
-- **Only a change of range animates.** New data in the same range moves a bar
-  and nothing else — animating a zoom when a set is ticked makes logging look
-  like navigating.
+- **Only a change of range animates** — and a change of averaging, which is the
+  same act one level down. New data in the same range moves a bar and nothing
+  else; animating a zoom when a set is ticked makes logging look like
+  navigating.
+- **The frame never resizes during a transition.** The box keeps its height and
+  width and only its contents rescale, or the page under the chart moves while
+  you are reading it.
 - **Axis furniture cross-fades, it does not travel.** Gridlines and month labels
   belong to a scale that was replaced, not moved: `Jul` cannot slide to where
   `Jan` is, and a gridline snapping under moving bars reads as a glitch. Swap
@@ -590,6 +664,33 @@ calendar-aware ticks. A chart is a language, not a per-screen widget.
 - **Zoom is horizontal only.** Time is the axis with too much in it; scaling the
   value axis makes the same progress look like whatever you last pinched.
 - **A point the metric cannot score is not a zero** — it is left out.
+- **One session is a chart with one dot on it.** A single point is where you
+  are, and the next one is read against it; refusing to draw until there are two
+  makes the first month of a new movement look like a bug. Its span is zero
+  days, so a fortnight of air goes either side of it.
+- **An empty range is an empty chart, not a box where the chart was.** Same
+  height, same gridlines, same right-hand gutter, and the **time axis of the
+  window you asked for** — so the range chips still mean something with nothing
+  under them, and changing range zooms rather than resizing the page under your
+  thumb. The value axis keeps the scale of the *whole* history, so an untrained
+  month reads as an empty stretch of the same chart.
+- **An empty chart still states its value axis.** With a history to scale
+  against it uses that; with none it falls back to a plain zero-to-round-number
+  band in the unit being counted — the one place the trend chart anchors at
+  zero, because the rule against it exists to stop a real line being flattened
+  and there is no line here. Dropping the labels was tried and reads as a chart
+  that failed to draw. A scale under an empty plot claims nothing: there is
+  nothing on it to read against.
+- **A chart explains itself under the plot, never across it.** A sentence in the
+  middle of the frame is a dialog box wearing a chart's clothes. And it only
+  speaks when the emptiness is something you could not read off the plot —
+  unscoreable days, or a range that is all deloads. A range you simply did not
+  train in needs no caption; the empty graph is the sentence.
+- **A chart that has not loaded yet claims nothing.** It draws its frame and
+  waits. "Nothing logged" is a statement about the log, and a frame that has not
+  read the log is not entitled to make it — and a header that collapses to
+  nothing while it reads shoves the list under it down a chart's height when it
+  arrives.
 
 ### Bar list
 

@@ -11,6 +11,7 @@
 library;
 
 import '../core/ids.dart';
+import 'chart_buckets.dart';
 import 'enums.dart';
 import 'muscle_volume.dart';
 
@@ -36,6 +37,102 @@ class VolumeWeek {
 
   /// The last day the week covers, for a readout that names a span.
   DateTime get end => start.add(const Duration(days: 6));
+}
+
+/// One bar: a stretch of weeks folded into the rate they averaged.
+///
+/// **The value is sets per week at every granularity**, never sets in the
+/// bucket. A monthly bar reading `62` and a weekly one reading `14` are the same
+/// training drawn twice, and switching between them would rescale the axis by
+/// four and read as a different chart rather than as a zoom. Holding the unit
+/// still is what makes the granularity control a smoothing control — and it is
+/// the unit the whole feature already speaks, because "sets per week" is how a
+/// training plan is written.
+class VolumeBar {
+  const VolumeBar({
+    required this.start,
+    required this.end,
+    required this.weeks,
+    required this.totalSets,
+  });
+
+  /// Monday of the first week in the bar.
+  final DateTime start;
+
+  /// The last day the bar covers.
+  final DateTime end;
+
+  /// How many weeks were folded in — **including the ones you did nothing in**,
+  /// for the reason [VolumeSeries.averagePerWeek] gives. Never zero: a bar with
+  /// no weeks in it is not drawn.
+  final int weeks;
+
+  final int totalSets;
+
+  /// What the bar's height means.
+  double get setsPerWeek => weeks == 0 ? 0 : totalSets / weeks;
+
+  /// Whether anything at all was trained in it. A bar of nothing still draws —
+  /// as its full-height empty track — because a stretch you skipped that closes
+  /// up is a stretch you cannot see.
+  bool get isEmpty => totalSets == 0;
+}
+
+/// Folds weeks into the bars a chart draws at [by].
+///
+/// [Granularity.weekly] is the identity: one bar per week, which is what this
+/// feature's base unit already was. [Granularity.daily] is not offered and is
+/// treated as weekly — a day is not a unit weekly volume has, and "sets per
+/// week" of a single Tuesday is a number about nothing.
+///
+/// Bars are folded from the weeks rather than re-counted from the sets, so
+/// every figure on the screen — the bars, the average, the peak — comes off one
+/// list and cannot disagree with itself.
+List<VolumeBar> foldWeeks(List<VolumeWeek> weeks, Granularity by) {
+  if (weeks.isEmpty) return const [];
+  if (by == Granularity.weekly || by == Granularity.daily) {
+    return [
+      for (final w in weeks)
+        VolumeBar(start: w.start, end: w.end, weeks: 1, totalSets: w.sets),
+    ];
+  }
+
+  final out = <VolumeBar>[];
+  DateTime? open;
+  var count = 0;
+  var total = 0;
+  VolumeWeek? last;
+
+  void close() {
+    final from = open;
+    final to = last;
+    if (from == null || to == null) return;
+    out.add(VolumeBar(
+      start: from,
+      end: to.end,
+      weeks: count,
+      totalSets: total,
+    ));
+  }
+
+  for (final w in weeks) {
+    // A week belongs to the bucket its Monday is in — the same rule the bar
+    // itself is counted by, so a label can never sit over a week counted
+    // somewhere else.
+    final bucket = bucketStartOf(w.start, by);
+    final from = open;
+    if (from == null || bucket != bucketStartOf(from, by)) {
+      close();
+      open = w.start;
+      count = 0;
+      total = 0;
+    }
+    count++;
+    total += w.sets;
+    last = w;
+  }
+  close();
+  return out;
 }
 
 /// A muscle or a region's weeks, with the figures a card prints.
@@ -83,6 +180,15 @@ class VolumeSeries {
   int get peakSets => weeks.fold(0, (m, w) => w.sets > m ? w.sets : m);
 
   bool get isEmpty => totalSets == 0;
+
+  /// The weeks folded into the marks a chart draws at [by] — see [foldWeeks].
+  List<VolumeBar> bars(Granularity by) => foldWeeks(weeks, by);
+
+  /// The tallest bar at [by], which is what the axis is scaled against. Coarser
+  /// averaging flattens the peaks, so this moves with the granularity and the
+  /// axis has to be asked again rather than reusing [peakSets].
+  double peakPerWeek(Granularity by) => bars(by)
+      .fold<double>(0, (m, b) => b.setsPerWeek > m ? b.setsPerWeek : m);
 }
 
 /// Every region's weeks over one span, and the muscles under them.

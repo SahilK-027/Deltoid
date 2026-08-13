@@ -101,6 +101,17 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
     );
   }
 
+  /// The head of the list, and the whole of it while there is nothing under it.
+  /// It draws at a fixed height whether or not its numbers have arrived, which
+  /// is what keeps the rows from being shoved down when they do.
+  Widget _trend(Exercise? exercise) => ExerciseTrend(
+        exerciseId: widget.exerciseId,
+        measure: exercise?.measureMode ?? MeasureMode.reps,
+      );
+
+  static const _padding = EdgeInsets.fromLTRB(
+      Space.gutter, Space.lg, Space.gutter, Space.huge);
+
   Widget _body(
     AsyncValue<PagedHistory<ExercisePerformance>> history,
     Exercise? exercise,
@@ -108,7 +119,27 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
     return history.when(
         // The chart and the list stay put while a write reloads the page.
         skipLoadingOnReload: true,
-        loading: () => const Center(child: CircularProgressIndicator()),
+        // The trend, not a spinner in the middle of the screen. Two async reads
+        // feed this page — the chart's and the list's — and whichever lands
+        // second used to redraw the whole body, so opening an exercise flashed
+        // a spinner, then rows, then jumped. The header is the same widget in
+        // every state, so only the rows under it appear.
+        loading: () => ListView(
+          padding: _padding,
+          children: [
+            _trend(exercise),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: Space.xl),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(Space.xxxl),
@@ -117,11 +148,15 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
           ),
         ),
         data: (page) {
+          // Never logged is the chart's empty state, not a screen of its own.
+          // A movement you have not trained still has a name, a range control
+          // and three dashes where its figures go — which is the same page you
+          // will see once you have, rather than a different screen that
+          // disappears the first time you finish a set.
           if (page.isEmpty) {
-            return const EmptyState(
-              icon: Icons.history_toggle_off,
-              title: 'Never logged',
-              message: 'Do this one in a session and every set lands here.',
+            return ListView(
+              padding: _padding,
+              children: [_trend(exercise)],
             );
           }
 
@@ -136,17 +171,11 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
 
           return ListView.separated(
             controller: _controller,
-            padding: const EdgeInsets.fromLTRB(
-                Space.gutter, Space.lg, Space.gutter, Space.huge),
+            padding: _padding,
             itemCount: rows.length + 2,
             separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
             itemBuilder: (context, i) {
-              if (i == 0) {
-                return ExerciseTrend(
-                  exerciseId: widget.exerciseId,
-                  measure: exercise?.measureMode ?? MeasureMode.reps,
-                );
-              }
+              if (i == 0) return _trend(exercise);
               i -= 1;
               if (i == rows.length) {
                 return page.hasMore

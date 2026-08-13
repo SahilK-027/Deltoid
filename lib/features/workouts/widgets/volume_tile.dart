@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/primitives.dart';
+import '../../../domain/chart_buckets.dart';
 import '../../../domain/volume_history.dart';
 import 'volume_history_bars.dart';
 
@@ -18,11 +19,16 @@ class VolumeTile extends StatefulWidget {
     super.key,
     required this.series,
     required this.hue,
+    required this.by,
     this.onTap,
     this.chartHeight = 44,
   });
 
   final VolumeSeries series;
+
+  /// How finely the weeks are folded, so six tiles read at one granularity
+  /// rather than each at its own.
+  final Granularity by;
   final Color hue;
   final VoidCallback? onTap;
   final double chartHeight;
@@ -32,7 +38,7 @@ class VolumeTile extends StatefulWidget {
 }
 
 class _VolumeTileState extends State<VolumeTile> {
-  VolumeWeek? _week;
+  VolumeBar? _week;
 
   @override
   Widget build(BuildContext context) {
@@ -53,14 +59,19 @@ class _VolumeTileState extends State<VolumeTile> {
             overflow: TextOverflow.ellipsis,
           ),
           Text(
-            week == null ? weekSpanLabel(series) : weekReadout(week),
+            week == null
+                ? weekSpanLabel(series)
+                : weekReadout(week, widget.by),
             style: context.t.bodyMedium,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: Space.lg),
           WeeklyBars(
-            series: series,
+            bars: series.bars(
+              // Against the weeks in hand, not the window's opinion of them.
+              autoGranularityFor(series.weeks.length, widget.by),
+            ),
             hue: widget.hue,
             height: widget.chartHeight,
             onSelected: (w) => setState(() => _week = w),
@@ -134,14 +145,26 @@ String weekSpanLabel(VolumeSeries series) {
   return 'Last $weeks ${weeks == 1 ? 'week' : 'weeks'}';
 }
 
-/// One week, named by the days it covers.
+/// One bar, named by what it covers and what it came to.
 ///
-/// `15–21 Jun · 11 sets`, and the month is printed once when the week does not
-/// cross one. A week that does reads `29 Jun–5 Jul`.
-String weekReadout(VolumeWeek week) {
-  final sameMonth = week.start.month == week.end.month;
-  final from = DateFormat(sameMonth ? 'd' : 'd MMM').format(week.start);
-  final to = DateFormat('d MMM').format(week.end);
-  final sets = week.sets == 1 ? '1 set' : '${week.sets} sets';
-  return '$from–$to · $sets';
+/// `15–21 Jun · 11 sets` for a week, `June 2026 · 14.2 sets a week` for a month.
+/// A folded bar states its **rate**, because that is its height, and never its
+/// total, which would be a number the bar is not drawn to.
+String weekReadout(VolumeBar bar, Granularity by) {
+  if (by == Granularity.weekly || by == Granularity.daily) {
+    // The month is printed once when the week does not cross one. A week that
+    // does reads `29 Jun–5 Jul`.
+    final sameMonth = bar.start.month == bar.end.month;
+    final from = DateFormat(sameMonth ? 'd' : 'd MMM').format(bar.start);
+    final to = DateFormat('d MMM').format(bar.end);
+    final sets = bar.totalSets == 1 ? '1 set' : '${bar.totalSets} sets';
+    return '$from–$to · $sets';
+  }
+
+  final period = DateFormat(by == Granularity.yearly ? 'yyyy' : 'MMMM yyyy')
+      .format(bar.start);
+  final rate = bar.setsPerWeek == bar.setsPerWeek.roundToDouble()
+      ? bar.setsPerWeek.toStringAsFixed(0)
+      : bar.setsPerWeek.toStringAsFixed(1);
+  return '$period · $rate sets a week';
 }

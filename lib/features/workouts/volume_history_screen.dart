@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
+import '../../domain/chart_buckets.dart';
 import '../../domain/muscle_volume.dart';
 import '../../domain/volume_history.dart';
 import 'region_volume_screen.dart';
@@ -62,6 +63,8 @@ class VolumeRangeBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final window = ref.watch(volumeWindowProvider);
     final years = ref.watch(volumeYearsProvider).valueOrNull ?? const <int>[];
+    final chosen = ref.watch(volumeGranularityProvider);
+    final history = ref.watch(volumeHistoryProvider).valueOrNull;
 
     return Padding(
       // A real gap under the app bar. At zero the chips sat against the bar's
@@ -76,10 +79,23 @@ class VolumeRangeBar extends ConsumerWidget {
         ranges: const [
           ChartRange.month,
           ChartRange.threeMonths,
+          ChartRange.sixMonths,
           ChartRange.year,
         ],
         onChanged: (w) =>
             ref.read(volumeWindowProvider.notifier).state = w,
+        earliest: firstLoggedDay(ref),
+        granularity: volumeGranularityOf(history, chosen),
+        granularityIsAuto: chosen == null,
+        // No daily: a week is this feature's smallest honest unit.
+        granularities: const [
+          Granularity.weekly,
+          Granularity.monthly,
+          Granularity.yearly,
+        ],
+        granularityCeiling: 400,
+        onGranularity: (g) =>
+            ref.read(volumeGranularityProvider.notifier).state = g,
       ),
     );
   }
@@ -149,7 +165,7 @@ class _Grid extends StatelessWidget {
   }
 }
 
-class _RegionTile extends StatelessWidget {
+class _RegionTile extends ConsumerWidget {
   const _RegionTile({
     required this.region,
     required this.series,
@@ -161,9 +177,13 @@ class _RegionTile extends StatelessWidget {
   final Color hue;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return VolumeTile(
       series: series,
+      by: volumeGranularityOf(
+        ref.watch(volumeHistoryProvider).valueOrNull,
+        ref.watch(volumeGranularityProvider),
+      ),
       hue: hue,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(

@@ -35,6 +35,12 @@ void main() {
       ),
     );
 
+    // The chip row is eight choices wide now — six ranges, `All`, the year —
+    // so on a 390pt phone the year chip starts off the right edge. That is the
+    // strip working as designed (a clipped chip is the scroll affordance), and
+    // it means this test has to scroll to it exactly as a thumb would.
+    await tester.ensureVisible(find.text('2026'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('2026'));
     await tester.pumpAndSettle();
   }

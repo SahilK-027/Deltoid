@@ -2,10 +2,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
+import '../../domain/chart_buckets.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
@@ -81,6 +83,14 @@ String metricBestLabel(ExerciseMetric metric, MeasureMode measure) =>
 final exerciseMetricProvider =
     StateProvider<ExerciseMetric>((ref) => ExerciseMetric.e1rm);
 
+/// The averaging the *user* picked, or null for "let the range decide".
+///
+/// Deliberately stores the choice rather than the granularity auto resolved to:
+/// storing the resolved one pins the chart at, say, weekly, and then switching
+/// from a year to a week leaves it drawing one mark per week on a seven-day
+/// chart — auto's whole job is to move when the window does.
+final chartGranularityProvider = StateProvider<Granularity?>((ref) => null);
+
 final chartRangeProvider =
     StateProvider<TrendWindow>((ref) => const TrendWindow.rolling(
           ChartRange.year,
@@ -114,19 +124,38 @@ class ExerciseTrend extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final all = ref.watch(exerciseProgressProvider(exerciseId)).valueOrNull;
+    final progress = ref.watch(exerciseProgressProvider(exerciseId));
+    final all = progress.valueOrNull;
     final window = ref.watch(chartRangeProvider);
     final metric = ref.watch(exerciseMetricProvider);
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+    final chosen = ref.watch(chartGranularityProvider);
 
-    // Nothing at all is the history screen's own empty state, not a chart's.
-    if (all == null || all.isEmpty) return const SizedBox.shrink();
+    // The first day there is anything for. Only `All` reads it, and without it
+    // `All` would open on a year and call that everything.
+    final earliest = all == null || all.isEmpty
+        ? null
+        : dateFromDayKey(all.first.dayKey);
+    final (from, to) = window.xBoundsSince(earliest);
+    final by = resolveGranularity(chosen, to.difference(from).inDays);
 
-    final points = all.where((p) => window.contains(p.dayKey)).toList();
+    // **The same shape whatever the answer is**, and that is the whole point of
+    // this method. Scoring the chart is a walk over every performance ever, so
+    // it lands a beat after the list beneath it — and while it was absent the
+    // header collapsed to nothing, so the rows drew at the top of the screen
+    // and were then shoved down a chart's height when it arrived. Range bar,
+    // plot, three figures: the layout is built before the numbers are known and
+    // only its contents change.
+    final points = all == null
+        ? const <ProgressPoint>[]
+        : [for (final p in all) if (window.contains(p.dayKey)) p];
 
     // Only years there is something to look at. A picker offering 2019 to a
     // log that starts in 2024 is a list of empty charts.
-    final years = {for (final p in all) p.dayKey ~/ 10000}.toList()
-      ..sort((a, b) => b.compareTo(a));
+    final years = all == null
+        ? const <int>[]
+        : ({for (final p in all) p.dayKey ~/ 10000}.toList()
+          ..sort((a, b) => b.compareTo(a)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,12 +164,39 @@ class ExerciseTrend extends ConsumerWidget {
           window: window,
           years: years,
           onChanged: (w) => ref.read(chartRangeProvider.notifier).state = w,
+          earliest: earliest,
+          granularity: by,
+          granularityIsAuto: chosen == null,
+          onGranularity: (g) =>
+              ref.read(chartGranularityProvider.notifier).state = g,
         ),
         const SizedBox(height: Space.lg),
-        _Chart(points: points, metric: metric, measure: measure),
+        if (all == null || all.isEmpty)
+          // Loading, or never trained. Both are the empty chart and neither
+          // says anything: one has not read the log yet, and the other is a
+          // graph with nothing on it, which is already the sentence. Both keep
+          // their axes — see [scaleOf].
+          EmptyTrendChart(
+            window: window,
+            earliest: earliest,
+            scale: blankScale(measure),
+            formatValue: (v) => metricFormat(v, unit, measure),
+          )
+        else
+          _Chart(
+            points: points,
+            scale: scaleOf(all, metric, measure),
+            metric: metric,
+            measure: measure,
+            window: window,
+            earliest: earliest,
+            from: from,
+            to: to,
+            by: by,
+          ),
         const SizedBox(height: Space.lg),
         _Summary(
-          all: all,
+          all: all ?? const [],
           windowed: points,
           metric: metric,
           measure: measure,
@@ -150,59 +206,114 @@ class ExerciseTrend extends ConsumerWidget {
   }
 }
 
+/// The band this movement's numbers live in, over its whole history — what the
+/// y axis is scaled to even in a range that has nothing in it, so an empty
+/// month reads as an empty stretch of the same chart rather than as a chart
+/// that lost its axis.
+///
+/// With nothing scoreable anywhere it falls back to [blankScale] rather than
+/// dropping the labels. An axis with no numbers on it reads as a chart that
+/// failed to draw, and a scale under an empty plot claims nothing: there is no
+/// line on it to be read against.
+(double, double) scaleOf(
+  List<ProgressPoint> all,
+  ExerciseMetric metric,
+  MeasureMode measure,
+) {
+  double? lowest;
+  double? highest;
+  for (final p in all) {
+    if (p.isDeload) continue;
+    final v = metricValue(p, metric, measure);
+    if (v == null) continue;
+    if (lowest == null || v < lowest) lowest = v;
+    if (highest == null || v > highest) highest = v;
+  }
+  return lowest == null ? blankScale(measure) : (lowest, highest!);
+}
+
+/// The axis a movement with no history is drawn against: a plain zero to a
+/// round number, in kg or in seconds, which the chart then labels in whatever
+/// unit is being displayed.
+///
+/// Anchored at zero, which the trend chart otherwise never is — there the rule
+/// exists because zero is not in the data and anchoring flattens a real line.
+/// There is no data here, and zero is where an axis starts when nothing has
+/// been measured yet.
+(double, double) blankScale(MeasureMode measure) =>
+    measure.isHold ? (0, 60) : (0, 100);
+
 class _Chart extends ConsumerWidget {
   const _Chart({
     required this.points,
+    required this.scale,
     required this.metric,
     required this.measure,
+    required this.window,
+    required this.earliest,
+    required this.from,
+    required this.to,
+    required this.by,
   });
 
   final List<ProgressPoint> points;
+
+  /// All-time bounds for the y axis — see [scaleOf].
+  final (double, double) scale;
+
   final ExerciseMetric metric;
   final MeasureMode measure;
+  final TrendWindow window;
+  final DateTime? earliest;
+
+  /// The span being drawn, and how finely it is folded.
+  final DateTime from;
+  final DateTime to;
+  final Granularity by;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     // The y axis is estimated 1RM in kilograms; only the labels change.
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-    if (points.length < 2) {
-      // Sized to the message rather than reserving chart height for a chart
-      // that isn't there — an empty 200px box reads as a rendering failure.
-      return EmptyBox(
-        icon: Icons.timeline,
-        message: points.isEmpty
-            ? 'Nothing logged in this range.'
-            : 'One session so far. A second one draws a trend.',
-      );
-    }
+
+    // Every "there is nothing to draw" below is the chart itself, empty, on the
+    // axes it would have had. It used to be a short captioned box, which
+    // changed the height of the header — so moving from a full year to an
+    // untrained week pulled the performances up under your thumb, and the box
+    // read as the chart having failed rather than as a range you did not train
+    // in.
+    //
+    // **One session is a chart, not an empty state.** A single dot is where you
+    // are, and the next one is read against it; refusing to draw it until there
+    // are two made the first month of a new movement look like a bug.
 
     // A performance the metric cannot score is not a zero. Chin-ups with no
     // bodyweight ever logged have no load and no e1RM, and plotting them at 0
     // drew a flat line along the axis and called it a year of training.
     final scored =
         points.where((p) => metricValue(p, metric, measure) != null).toList();
-    if (scored.length < 2) {
-      return EmptyBox(
-        icon: Icons.timeline,
-        message: scored.isEmpty
-            ? 'No ${metricNoun(metric, measure)} recorded in this range.'
-            : 'One session so far. A second one draws a trend.',
-      );
-    }
 
     // Deload weeks never appear. A light week is periodisation, not a drop in
     // strength, and an estimated 1RM taken off 80% of your working weight is a
-    // number about the programme rather than about you. It used to fall back to
-    // including them when there were fewer than two ordinary sessions, which
-    // put the one misleading kind of point on the emptiest kind of chart.
+    // number about the programme rather than about you.
     final source = scored.where((p) => !p.isDeload).toList();
-    if (source.length < 2) {
-      return EmptyBox(
-        icon: Icons.timeline,
-        message: source.isEmpty
-            ? 'Only deload weeks in this range.'
-            : 'One full-weight session so far. A second one draws a trend.',
+
+    if (source.isEmpty) {
+      return EmptyTrendChart(
+        window: window,
+        earliest: earliest,
+        scale: scale,
+        formatValue: (v) => metricFormat(v, unit, measure),
+        // Silent when the range is simply empty — an empty graph says that
+        // better than a sentence does. It speaks only when the emptiness is
+        // something you could not have read off the plot: days that are there
+        // but unscoreable, or days that are all deloads.
+        message: points.isEmpty
+            ? null
+            : scored.isEmpty
+                ? 'No ${metricNoun(metric, measure)} recorded in this range.'
+                : 'Only deload weeks in this range.',
       );
     }
 
@@ -214,18 +325,38 @@ class _Chart extends ConsumerWidget {
     // One line per session slot is the point, not a detail: 22.5 in Push 1 and
     // 20 in Push 2 are two progressions, and drawing them as one is the mistake
     // this app exists to avoid.
+    //
+    // **And each of them is folded on its own.** Averaging the two together
+    // into one monthly mark would do exactly what drawing them as one line
+    // does, one layer further down where it cannot be seen.
     final palette = [c.seriesPrimary, c.seriesSecondary, c.deload, c.positive];
     final names = bySession.keys.toList();
 
     return TrendChart(
+      window: window,
+      earliest: earliest,
       series: [
         for (var i = 0; i < names.length; i++)
           TrendSeries(
             name: names[i],
             color: palette[i % palette.length],
             spots: [
-              for (final p in bySession[names[i]]!)
-                FlSpot(trendX(p.dayKey), metricValue(p, metric, measure)!),
+              for (final b in bucketize(
+                rows: [
+                  for (final p in bySession[names[i]]!)
+                    (
+                      dayKey: p.dayKey,
+                      value: metricValue(p, metric, measure)!,
+                    ),
+                ],
+                by: by,
+                from: from,
+                to: to,
+              ))
+                // Empty buckets are skipped rather than plotted at zero: a month
+                // you did not train this movement is a gap in the line, and a
+                // zero would draw a crash to the axis and back.
+                if (b.value != null) FlSpot(bucketX(b), b.value!),
             ],
           ),
       ],
@@ -298,11 +429,21 @@ class _Summary extends ConsumerWidget {
           ),
         ),
         Expanded(
+          // "Peak" is a claim about a best that exists. With nothing scored —
+          // still loading, or never trained — the honest answer is the dash the
+          // other two tiles are already showing, not a word that reads as good
+          // news.
           child: StatTile(
-            value: stalled == 0 ? 'Peak' : '$stalled',
-            label: stalled == 0
-                ? 'Best is the latest'
-                : 'Session${stalled == 1 ? '' : 's'} since best',
+            value: best == null
+                ? '—'
+                : stalled == 0
+                    ? 'Peak'
+                    : '$stalled',
+            label: best == null
+                ? 'Sessions since best'
+                : stalled == 0
+                    ? 'Best is the latest'
+                    : 'Session${stalled == 1 ? '' : 's'} since best',
             emphasis: stalled >= 3 ? c.negative : null,
           ),
         ),
