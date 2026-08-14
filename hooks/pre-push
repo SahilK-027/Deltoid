@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# Deltoid pre-push gate: the repo's own rule, enforced.
+#
+# CLAUDE.md says `flutter analyze && flutter test` must be clean before a
+# change is done. This is the thing that checks that anyone did it.
+#
+# Install:  git config core.hooksPath hooks
+# Bypass:   git push --no-verify   (deliberate, and visible in your shell history)
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+if ! command -v flutter >/dev/null 2>&1; then
+  echo "pre-push: flutter not on PATH; refusing to push unverified." >&2
+  exit 1
+fi
+
+echo "pre-push: flutter analyze"
+if ! flutter analyze; then
+  echo >&2
+  echo "pre-push: analyze failed — push refused." >&2
+  exit 1
+fi
+
+echo "pre-push: flutter test"
+if ! flutter test; then
+  echo >&2
+  echo "pre-push: tests failed — push refused." >&2
+  exit 1
+fi
+
+echo "pre-push: clean."

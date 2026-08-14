@@ -189,6 +189,9 @@ firing with the screen off have only been built, not felt.
       data, then sync. Not a feature, and it comes before the one below. Every weakness in it is one a sync layer multiplies: invariants
       that live in comments become conflict rules that live in comments, and a
       regression you cannot see on screen is merged by a project with no CI.
+      Stage 1 is done: `hooks/pre-push` runs the gate and refuses a failing
+      push, and the four lints are on with the tree clean under them. Stage 2,
+      the two audits, is next.
 - [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
       document to read before writing any of it. Scope-approved and bounded by
       [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to

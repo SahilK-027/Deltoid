@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 
@@ -37,7 +39,10 @@ class RestAlert {
   Future<void> warmUp() async {
     if (_unsupported || _player != null) return;
     try {
-      final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      final player = AudioPlayer();
+      // Fire and forget: the release mode is applied before anything can play,
+      // and awaiting it buys nothing but a slower warm-up.
+      unawaited(player.setReleaseMode(ReleaseMode.stop));
       await player.setAudioContext(
         AudioContext(
           android: const AudioContextAndroid(
@@ -66,11 +71,14 @@ class RestAlert {
   /// Fires the alert. Haptics first — they are the half that works with the
   /// phone in a pocket, on silent, and with headphones in someone else's ears.
   Future<void> fire() async {
-    HapticFeedback.heavyImpact();
-    // A second pulse a beat later: one is easy to miss mid-set.
-    Future.delayed(
-      const Duration(milliseconds: 220),
-      HapticFeedback.heavyImpact,
+    unawaited(HapticFeedback.heavyImpact());
+    // A second pulse a beat later: one is easy to miss mid-set. Deliberately
+    // not awaited — the alert must not hold the caller for 220ms.
+    unawaited(
+      Future.delayed(
+        const Duration(milliseconds: 220),
+        HapticFeedback.heavyImpact,
+      ),
     );
 
     if (_unsupported) return;

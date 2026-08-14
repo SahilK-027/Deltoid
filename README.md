@@ -55,6 +55,17 @@ dart run build_runner build
 `build_runner` writes the drift database code in `lib/data/db/database.g.dart`,
 and it has to be run again after **any** edit to `lib/data/db/tables.dart`.
 
+Then install the git hooks — once per clone, because `.git/hooks` is not
+version-controlled:
+
+```bash
+git config core.hooksPath hooks
+```
+
+That points git at [`hooks/`](hooks/), where `pre-push` runs
+`flutter analyze && flutter test` and refuses the push if either fails. The only
+way past it is `git push --no-verify`.
+
 ## Running it
 
 Start the app on a connected device or emulator:

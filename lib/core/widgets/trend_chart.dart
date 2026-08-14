@@ -894,7 +894,7 @@ class EmptyTrendChart extends StatelessWidget {
     // draws four gridlines and claims nothing.
     final (lowest, highest) = scale ?? (0.0, 1.0);
     final step = _niceStep((highest - lowest) / 4);
-    var maxY = ((highest + step * 0.5) / step).ceilToDouble() * step;
+    final maxY = ((highest + step * 0.5) / step).ceilToDouble() * step;
     var minY = ((lowest - step * 0.5) / step).floorToDouble() * step;
     if (lowest >= 0 && minY < 0) minY = 0;
 

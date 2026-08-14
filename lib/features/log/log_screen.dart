@@ -1447,9 +1447,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // Replaces the log rather than sitting on top of it: the session is closed,
     // and back from the summary belongs to Today, not to a set table that can
     // no longer be edited. Done on the summary is the same single pop.
-    navigator.pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => SessionSummaryScreen(workoutId: detail.workout.id),
+    // Not awaited: this future completes when the summary is popped, which is
+    // long after finishing is done.
+    unawaited(
+      navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => SessionSummaryScreen(workoutId: detail.workout.id),
+        ),
       ),
     );
   }

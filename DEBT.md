@@ -22,9 +22,6 @@ because every weakness below is one that a sync layer *multiplies*:
   three times — then sync's will too, and sync's failures are silent and
   permanent rather than a slow screen. A conflict rule that is only a paragraph
   is a data-loss bug waiting for the second device.
-- **§2, nothing enforces the gate.** A sync layer is the first part of this app
-  where a regression cannot be seen by looking at the screen. Merging that with
-  no CI means the test that would have caught it is the one nobody ran.
 - **§3 and §4, unbounded queries on hot tables.** Sync adds a *second* writer to
   every syncable table. Today `volumeHistoryProvider` recomputes thirty years on
   every set you tick; after sync it recomputes on every set another device ticks,
@@ -37,9 +34,13 @@ because every weakness below is one that a sync layer *multiplies*:
   a migration to write. Everything that should be deleted should be deleted
   first.
 
-The order to work in: **§2 first** (it is an hour and it protects every other
-fix), then **§1 and §5** (they are the same habit — make the rule mechanical),
-then **§3 and §4**, then **§6**. §7, §8 and §9 are ongoing rather than blocking.
+The order to work in: **§1 and §5** first (they are the same habit — make the
+rule mechanical), then **§3 and §4**, then **§6**. §7, §8 and §9 are ongoing
+rather than blocking.
+
+The gate itself — a pre-push hook and a linter with rules in it — was §2 and is
+done. The numbering below keeps its gap deliberately, because
+[HARDENING.md](HARDENING.md) names the remaining entries by number.
 
 ---
 
@@ -80,30 +81,6 @@ mechanism. Roughly in order of value:
 **Done when**: every comment in `lib/` containing the words *bounded*, *never*,
 *must not* or *always* either has an assert/test beside it or has been rewritten
 to stop making a promise nothing keeps.
-
----
-
-## 2. Nothing enforces the gate
-
-`CLAUDE.md` says to run `flutter analyze && flutter test` before calling a change
-done. Nothing checks that anyone did.
-
-- No CI: no `.github/workflows`, no pipeline of any kind.
-- No git hooks — `.git/hooks` is stock samples only.
-- `analysis_options.yaml` is the stock Flutter template with **zero** custom
-  rules. Every lint in it is a default.
-
-For a one-person project this is defensible right up until the day a broken
-commit lands and the bisect that finds it has to build fifty revisions by hand.
-
-**What to do.** A pre-push hook running `flutter analyze && flutter test` is ten
-minutes of work and removes the whole class. If this ever gets a second
-contributor or a release build, promote it to CI. Separately, the linter is
-free enforcement being left on the table — `prefer_final_locals`,
-`unawaited_futures`, `always_declare_return_types` and
-`avoid_slow_async_io` would all pay for themselves here.
-
-**Done when**: a deliberately broken test cannot be pushed.
 
 ---
 
