@@ -659,12 +659,35 @@ void main() {
           'WHERE c.deleted_at IS NULL AND r.deleted_at IS NOT NULL',
         );
 
+    /// Live `workouts` pointing at a tombstoned `cycles` **of a live regime**.
+    ///
+    /// The odd one out, and the qualifier is load-bearing. A cycle is not a
+    /// workout's parent the way the four above are: `workouts` → `regimes` is
+    /// deliberately allowed to dangle, because a deleted programme keeps its
+    /// history and the snapshots are what make that safe. `deleteRegime`
+    /// tombstones that programme's cycles and keeps its workouts, so every
+    /// deleted regime leaves live workouts naming dead cycles **by design** —
+    /// which INVARIANTS § 23 states the invariant too broadly to allow.
+    ///
+    /// Under a *live* regime there is no such licence. The cycle is the counter
+    /// the deload is scheduled off, and a workout naming a dead one there is a
+    /// reference to nothing rather than a reference to something intentionally
+    /// gone. INVARIANTS.md § 23.
+    Future<int> orphanedWorkoutCycles() => countOf(
+          'workouts w JOIN cycles c ON c.id = w.cycle_id '
+          'JOIN regimes r ON r.id = c.regime_id '
+          'WHERE w.deleted_at IS NULL AND c.deleted_at IS NOT NULL '
+          'AND r.deleted_at IS NULL',
+        );
+
     Future<void> expectNoOrphans() async {
       expect(await orphanedSets(), 0, reason: 'live sets under a dead slot');
       expect(await orphanedSnapshots(), 0,
           reason: 'live snapshots under a dead workout');
       expect(await orphanedSlots(), 0, reason: 'live slots under a dead session');
       expect(await orphanedCycles(), 0, reason: 'live cycles under a dead regime');
+      expect(await orphanedWorkoutCycles(), 0,
+          reason: 'live workouts naming a dead cycle');
     }
 
     test('removing an exercise mid-session takes its sets', () async {
@@ -755,6 +778,49 @@ void main() {
       expect(liveSessions.map((s) => s.id), contains(session.id),
           reason: 'a deleted programme keeps its sessions, or History loses '
               'the only way to page by them');
+    });
+
+    test('reopening a cycle does not orphan an open workout', () async {
+      // `_reopenCycleIfIncomplete` tombstones every cycle later than the one it
+      // reopens, and judges "is there anything in this one worth keeping" on
+      // **completed** sessions alone. A session still running is not counted,
+      // so the cycle it belongs to is tombstoned out from under it and the
+      // workout is left naming a dead row. INVARIANTS.md § 23.
+      final regime = await activeRegime();
+      final sessions = await (db.select(db.sessions)
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+
+      // The whole first cycle, which closes it.
+      var lastOfFirst = '';
+      for (final s in sessions) {
+        final id =
+            await repo.startWorkout(regimeId: regime.id, sessionId: s.id);
+        final detail = await repo.workoutDetail(id);
+        final set = detail!.entries.first.sets.first;
+        await repo.updateSet(set.id,
+            weight: const Value(20),
+            reps: const Value(8),
+            isDone: const Value(true));
+        await repo.completeWorkout(id);
+        lastOfFirst = id;
+      }
+
+      // The second cycle opens under this one, and holds nothing finished.
+      final running = await repo.startWorkout(
+          regimeId: regime.id, sessionId: sessions.first.id);
+      final secondCycle = (await (db.select(db.workouts)
+                ..where((t) => t.id.equals(running)))
+              .getSingle())
+          .cycleId;
+      expect(secondCycle, isNotNull,
+          reason: 'the fixture must have a second cycle to tombstone');
+
+      // Deleting a finished day reopens the first cycle — and takes the second
+      // with it, because nothing in it was finished.
+      await repo.deleteWorkout(lastOfFirst);
+
+      await expectNoOrphans();
     });
   });
 }

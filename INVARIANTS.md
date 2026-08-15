@@ -1252,8 +1252,52 @@ open cycles and assert the counts from § 11 and § 1 are zero without a relaunc
 
 ## 23. `workouts.cycle_id` names a live cycle
 
-**Invariant.** For every live `workouts` row with a non-null `cycle_id`, that
-cycle has `deleted_at IS NULL`.
+> **CLOSED, with the invariant itself corrected and the reachability widened.**
+> `_reopenCycleIfIncomplete` now keeps a later cycle that holds **any live
+> workout**, not just one with a completed session
+> (`training_repository.dart:3348-3356`). The fifth count is the one this entry
+> asked for and lives beside § 1's four in `write_integrity_test.dart`'s
+> `expectNoOrphans`, driven by `reopening a cycle does not orphan an open
+> workout`. Red first.
+>
+> **The invariant as stated here is wrong, and the existing suite said so.**
+> Adding the count unqualified turned `deleting a programme takes its cycles and
+> nothing else` red — `deleteRegime` tombstones a programme's cycles and
+> **deliberately keeps its workouts**, which is the same licence § 1 grants the
+> `workouts` → `regimes` edge and for the same reason: a deleted programme keeps
+> its history, and the snapshots are what make that safe. So live workouts
+> naming dead cycles is a designed state, not a fault, whenever the regime is
+> gone. The count carries the qualifier the entry should have: **under a live
+> regime**. Restated:
+>
+> ```sql
+> SELECT COUNT(*) FROM workouts w JOIN cycles c ON c.id = w.cycle_id
+>   JOIN regimes r ON r.id = c.regime_id
+>   WHERE w.deleted_at IS NULL AND c.deleted_at IS NOT NULL
+>     AND r.deleted_at IS NULL;
+> ```
+>
+> **SUSPECT was too cautious.** The entry said reaching it "needs a backdate
+> (`setWorkoutDate`) that moves a workout across a cycle boundary". It does not.
+> `deleteWorkout` calls the same helper, so the sequence is: finish a cycle,
+> start the next session, then delete any finished day — two ordinary taps and
+> no backdating. **PROVED and driven**, not merely reachable in principle.
+>
+> **Severity STALE stands**, for the reason the entry gives: nothing reads a
+> workout's cycle through a `deleted_at` filter, so the cost is a dangling
+> reference on the wire rather than a wrong number on a screen.
+>
+> The fix refuses rather than repoints. The reopen exists to stop the deload
+> landing early, so bailing out costs at most that; repointing another cycle's
+> workouts would move logged work into a cycle it was not done in.
+>
+> The §3b half of the check — the same count asserted after *every* operation by
+> the crash harness — stays with § 3b.
+
+**Invariant.** ~~For every live `workouts` row with a non-null `cycle_id`, that
+cycle has `deleted_at IS NULL`.~~ **Too broad — see the banner.** For every live
+`workouts` row whose `cycle_id` names a cycle of a **live** regime, that cycle
+has `deleted_at IS NULL`.
 
 **Enforced today: nothing enforces this.** The column is a real reference, so
 the id must *exist*; nothing says it is not tombstoned.
@@ -1276,10 +1320,12 @@ a dangling reference on the wire once there is a second device.
 **Severity: STALE.**
 
 **The check that closes it.** A fifth count beside § 1's four —
-`SELECT COUNT(*) FROM workouts w JOIN cycles c ON c.id = w.cycle_id
-WHERE w.deleted_at IS NULL AND c.deleted_at IS NOT NULL` — asserted by the § 3b
+~~`SELECT COUNT(*) FROM workouts w JOIN cycles c ON c.id = w.cycle_id
+WHERE w.deleted_at IS NULL AND c.deleted_at IS NOT NULL`~~ **which needs the
+live-regime join, see the banner** — asserted by the § 3b
 harness after every operation, plus `write_integrity_test.dart` →
-`reopening a cycle does not orphan an open workout`. **Does not exist.**
+`reopening a cycle does not orphan an open workout`. ~~**Does not exist.**~~
+**Both exist; the § 3b half stays with § 3b.**
 
 ---
 

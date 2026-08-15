@@ -3343,8 +3343,25 @@ class TrainingRepository {
               t.cycleIndex.isBiggerThanValue(cycle.cycleIndex)))
         .get();
 
+    // Anything *live* in a later cycle keeps it, not just anything finished.
+    //
+    // This read `_completedSessionIds(c.id).isNotEmpty`, which asks a narrower
+    // question than the one that matters: a session still running, or one that
+    // was abandoned, is not a completed session but it is still a row pointing
+    // at this cycle. Tombstoning the cycle under it left the workout naming a
+    // dead one — invisible on this phone, because nothing reads a workout's
+    // cycle through a `deleted_at` filter, and a dangling reference on the wire
+    // the moment there is a second device. INVARIANTS.md § 23.
+    //
+    // Refusing to reopen is the conservative half of the trade. The reopen
+    // exists to stop the deload landing early; leaving the earlier cycle closed
+    // costs at most that, where repointing another cycle's workouts would move
+    // logged work to a cycle it was not done in.
     for (final c in later) {
-      if ((await _completedSessionIds(c.id)).isNotEmpty) return;
+      final held = await (db.select(db.workouts)
+            ..where((t) => t.cycleId.equals(c.id) & t.deletedAt.isNull()))
+          .get();
+      if (held.isNotEmpty) return;
     }
 
     await db.transaction(() async {
