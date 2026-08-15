@@ -1177,6 +1177,58 @@ not. **Neither exists.**
 
 ## 18. A restore round-trips every column
 
+> **CLOSED**, and the entry's own sketch of the test was wrong in a way worth
+> recording.
+>
+> **"Assert each name is either in the default map or in a freshly written
+> payload" cannot fail.** There is no default map — the defaults are spread
+> inline in each codec's `parse` closure, and one of them (§ 9's
+> `tzOffsetMinutes`) is *derived from the row* rather than constant, so it could
+> not live in a map. And the second half is vacuous: the export writes every row
+> through `toJson`, so **every** column is in a freshly written payload by
+> construction. Written as specified the test would have been green forever, on
+> both halves, while proving nothing. That is the exact shape
+> [INTERPRETATION.md](INTERPRETATION.md) exists to flag, arrived at from the
+> other direction — a check that agrees with itself.
+>
+> **What actually closes it is behavioural.** For each codec, take a real
+> exported row, delete one key, and hand it to that codec's own `parse`. Either
+> it survives — which is what having a default *means*, constant or derived —
+> or the column is named in `_presentInEveryFile`, a hand-derived record of the
+> schema as it stood when the format was fixed. A column added tomorrow is in
+> neither and the test says so by name, quoting RULES § 3 step 3.
+>
+> **Red first, on the derived default specifically**, by removing
+> `tzOffsetMinutes` from the workouts codec:
+>
+> ```
+> Which: does not contain 'tzOffsetMinutes'
+> workouts.tzOffsetMinutes has no default in `_codecs` and is not recorded as
+> present in every file ever written.
+> ```
+>
+> Two guards around it, both shown to bite:
+>
+> - **the row must be the columns.** The probe walks a row, so it only covers a
+>   column the row carries; `row.keys` is asserted equal to
+>   `table.$columns` mapped through the snake→camel rule. A column `toJson`
+>   named differently, or a table the fixture leaves empty, fails here rather
+>   than passing silently.
+> - **the record may not outlive its columns.** A name in `_presentInEveryFile`
+>   that is no longer a column is refused (`bodyweight_logs is excused columns
+>   it does not have`), so a deleted column cannot leave an entry behind
+>   excusing the next column to take its name.
+>
+> The list itself was derived by hand from `tables.dart` — every non-nullable
+> column of each table, less the six codec defaults — and then agreed, table by
+> table, with what the probe reports. **Nullable columns need nothing**: a
+> missing key and an explicit null both arrive as null, which is why
+> `partialReps` and `muscle` would have been fine without their spreads.
+>
+> The second residual gap — a *newer* file's extra column being dropped — is
+> untouched and stays where the entry put it: unreachable through the file path,
+> and [SYNC.md § 14](SYNC.md#14-two-builds-one-account)'s question for pull.
+
 **Enforced today, and well tested.** Defaults are spread under each restored row
 for every column added after v1 — `barKind` and `measureMode`
 (`backup_service.dart:141-143`), `identityIndex` (`:161`), `muscle` (`:229`),

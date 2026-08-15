@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -126,6 +127,14 @@ class _TableCodec<T extends Insertable<dynamic>> {
 }
 
 String _idOf(Map<String, dynamic> row) => row['id']! as String;
+
+/// What a test sees of one codec: enough to ask a table's columns what the
+/// parser does without them. See [BackupService.codecsForTesting].
+typedef BackupCodecView = ({
+  String name,
+  TableInfo<Table, dynamic> table,
+  Insertable<dynamic> Function(Map<String, dynamic> row) parse,
+});
 
 /// The `app_settings` keys a backup carries, and the only ones it restores.
 ///
@@ -323,6 +332,20 @@ class BackupService {
       clear: () => db.delete(db.bodyweightLogs).go(),
     ),
   ];
+
+  /// Each codec's table and its JSON → row parser, for the one test that has to
+  /// see all of them at once.
+  ///
+  /// [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3 — *give a new
+  /// column a default here* — is prose, and prose is remembered rather than
+  /// enforced. The check that makes it mechanical has to walk `table.$columns`
+  /// and ask each parser what it does with the column missing, which needs both
+  /// halves of a codec and nothing else in it.
+  @visibleForTesting
+  List<BackupCodecView> get codecsForTesting => [
+        for (final c in _codecs)
+          (name: c.name, table: c.table, parse: c.parse),
+      ];
 
   /// One page of [table] as JSON, ordered by id, resuming after [after].
   ///

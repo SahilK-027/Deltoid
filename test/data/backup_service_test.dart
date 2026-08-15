@@ -503,6 +503,61 @@ void main() {
     expect(after.value, freshDeviceId);
   });
 
+  test('every column of every codec has a default or has always been in the '
+      'file', () async {
+    await setWeightUnit(db, WeightUnit.lb);
+    await logASession();
+    final payload = (await backup.buildPayload())['data'] as Map;
+
+    for (final codec in backup.codecsForTesting) {
+      final rows = payload[codec.name] as List;
+      // A codec whose table the fixture never populates would pass this test by
+      // testing nothing.
+      expect(rows, isNotEmpty, reason: 'no ${codec.name} row in the fixture');
+      final row = Map<String, dynamic>.from(rows.first as Map);
+
+      // The probe below walks the *row*, so it only covers every column if the
+      // row carries every column. `toJson` derives its keys from the Dart
+      // getters and the schema from the SQL names; this is where a column that
+      // serialises under some third name would show up.
+      expect(
+        row.keys.toSet(),
+        codec.table.$columns.map((c) => _jsonKeyOf(c.name)).toSet(),
+        reason: 'the exported ${codec.name} row is not its columns',
+      );
+
+      for (final key in row.keys) {
+        final without = Map<String, dynamic>.from(row)..remove(key);
+        var restorable = true;
+        try {
+          codec.parse(without);
+        } on Object {
+          restorable = false;
+        }
+        if (restorable) continue;
+        expect(
+          _presentInEveryFile[codec.name],
+          contains(key),
+          reason: '${codec.name}.$key has no default in `_codecs` and is not '
+              'recorded as present in every file ever written. Give it one — '
+              'RULES.md § 3 step 3 — or add it to `_presentInEveryFile` and '
+              'say why no file can lack it.',
+        );
+      }
+    }
+
+    // A name left behind by a column that no longer exists would sit here
+    // quietly excusing nothing.
+    for (final codec in backup.codecsForTesting) {
+      final keys = codec.table.$columns.map((c) => _jsonKeyOf(c.name)).toSet();
+      expect(
+        _presentInEveryFile[codec.name]!.difference(keys),
+        isEmpty,
+        reason: '${codec.name} is excused columns it does not have',
+      );
+    }
+  });
+
   test('a backup from a newer schema is refused rather than half-applied',
       () async {
     await logASession();
@@ -768,3 +823,74 @@ void main() {
 /// month boundary where subtracting from the integer does not.
 int _dayBefore(int key, int days) =>
     dayKeyOf(daysBefore(dateFromDayKey(key), days));
+
+/// `day_key` → `dayKey`. A column's SQL name is what the schema holds; a
+/// column's JSON key is what `toJson` writes, which is the Dart getter. The
+/// test above asserts the two really do line up rather than assuming it.
+String _jsonKeyOf(String columnName) {
+  final parts = columnName.split('_');
+  return parts.first +
+      parts
+          .skip(1)
+          .map((p) => p[0].toUpperCase() + p.substring(1))
+          .join();
+}
+
+/// The columns a restore may require, because no backup file in existence was
+/// written without them.
+///
+/// **This is the schema as it stood when the backup format was fixed**, and
+/// every column added since is absent from it on purpose — each one carries a
+/// default in `_codecs` instead, spread under the row so an older file lands
+/// anyway. `barKind`, `measureMode`, `identityIndex`, `muscle`, `partialReps`
+/// and `tzOffsetMinutes` are the six, and the last is derived from the row
+/// rather than constant.
+///
+/// Adding a name here is a claim that no file anywhere lacks the column. That
+/// is only ever true of a column that predates the first export, which is why
+/// this list should not grow: it is a record, not a place to put a column you
+/// did not want to write a default for.
+///
+/// Derived by hand from `tables.dart` — it is every non-nullable column of each
+/// table, less the six defaults above. Nullable columns are absent because a
+/// missing key and a null both come back null, so they need nothing.
+const _presentInEveryFile = <String, Set<String>>{
+  'app_settings': {'key', 'value'},
+  'exercises': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'name', 'muscle', 'equipment', 'loadMode', 'formVideoUrls', 'archived',
+  },
+  'regimes': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'name', 'isActive', 'deloadEnabled', 'deloadAfterCycles',
+    'deloadSetDelta', 'deloadWeightPct', 'createdAt',
+  },
+  'sessions': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'regimeId', 'name', 'orderIndex',
+  },
+  'session_exercises': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'sessionId', 'exerciseId', 'orderIndex', 'targetSets',
+  },
+  'cycles': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'regimeId', 'cycleIndex', 'startedAt', 'isDeload',
+  },
+  'workouts': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'regimeId', 'dayKey', 'startedAt', 'isDeload', 'status',
+  },
+  'workout_exercises': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'workoutId', 'exerciseId', 'orderIndex', 'targetSets', 'skipReason',
+  },
+  'set_logs': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'workoutExerciseId', 'setIndex', 'setType', 'isDone',
+  },
+  'bodyweight_logs': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'dayKey', 'weightKg',
+  },
+};
