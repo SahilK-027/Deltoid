@@ -558,6 +558,47 @@ survives a restore`.
 
 # 6. Nothing asserts a hand-computed score through the repository
 
+> **CLOSED.** `training_repository_test.dart` → `a charted point is the number
+> worked out by hand`. `bodyweightPlus` and the hold, through **both** readers:
+> `exerciseProgress`' pair of raw statements and `exerciseHistoryPage`' drift
+> query. Bodyweight 80 on the day trained, one chin of 6 with 10kg hung off it
+> → 90 effective, Epley `90 × (1 + 6/30) = 108.0`, volume `90 × 6 = 540`. A
+> plank of 45s then 62s → top set 62 (the *longer*, not the heavier), load 80,
+> no e1RM, volume 0.
+>
+> **Green on arrival, which is what an absence-of-coverage entry should do —
+> the wiring was right, nothing said so.** Four perturbations, each one a
+> mistake that compiles:
+>
+> ```
+> the chart stops looking up bodyweight
+>   Expected: within <1e-9> of <90>   Actual: <10.0>
+> measureMode does not reach scorePerformance
+>   Expected: <62>                    Actual: <45>
+> the raw statement's weight and added_weight aliases swap
+>   Expected: within <1e-9> of <90>   Actual: <80.0>
+> the history feed stops looking up bodyweight
+>   Expected: within <1e-9> of <90>   Actual: <10.0>
+> ```
+>
+> The second is the one worth keeping. With `measure` lost, the hold is scored
+> as reps, both sets carry the same 80, `load > topLoad` is never true, and the
+> top set becomes **whichever set arrived first** — 45 seconds reported as the
+> best plank of the day, with no null, no zero and nothing on screen to say the
+> number is wrong. The third is the failure mode the raw SQL's own doc warns
+> about, made to happen.
+>
+> **The entry's sketch spends its example on the mode that was already
+> pinned.** `45 × (1 + 8/30) = 57.0` is correct arithmetic for a `perSide`
+> movement — and `perSide` is exactly what `a chart point knows its session and
+> whether the week was light` had already pinned when the UNVERIFIED list was
+> converted. Writing the sketch as given would have closed nothing. The two
+> modes that were genuinely unasserted are the two written here.
+>
+> **Bodyweight is logged on the day trained, deliberately.** Scoring off an
+> interpolated bodyweight would put § 1's `yyyyMMdd` arithmetic inside this
+> test and make a failure mean either thing.
+
 **Rank 6, and the widest gap in the document.** Not a bug — an absence.
 
 `metrics_test.dart` verifies the formulas properly:

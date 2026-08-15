@@ -2016,6 +2016,105 @@ void main() {
     expect(points.last.volume, closeTo(480, 1e-9));
   });
 
+  test('a charted point is the number worked out by hand', () async {
+    // INTERPRETATION.md § 6. The formulas are proved in `metrics_test.dart`
+    // against hand values; what nothing asserted is that the repository hands
+    // them the right inputs. Which `loadMode` was read, whether `measureMode`
+    // reached `scorePerformance`, whether the bodyweight series was found at
+    // all, and whether the raw statement's columns still line up positionally
+    // — every one of those is invisible to a shape assertion, and every one of
+    // them is wrong-on-a-phone rather than wrong-at-compile-time.
+    //
+    // The `perSide` point is pinned above. This is the other two modes, and
+    // both of them through both readers: the chart's raw SQL and the history
+    // feed's drift query score the same performance independently, so a number
+    // is only pinned once it has been pinned on both.
+    final regime = await activeRegime();
+    final sessionId = await regimes.addSession(regime.id, 'Odd modes');
+
+    final chin = await regimes.createExercise(
+      name: 'Weighted Chin-up',
+      muscle: MuscleGroup.back,
+      equipment: Equipment.bodyweight,
+      loadMode: LoadMode.bodyweightPlus,
+    );
+    final plank = await regimes.createExercise(
+      name: 'Plank',
+      muscle: MuscleGroup.core,
+      equipment: Equipment.bodyweight,
+      loadMode: LoadMode.bodyweight,
+      measureMode: MeasureMode.hold,
+    );
+    await regimes.addExerciseToSession(sessionId, chin);
+    await regimes.addExerciseToSession(sessionId, plank);
+
+    // Weighed on the day trained, so this is the bodyweight lookup and not the
+    // interpolation between two entries — that has its own entry (§ 1) and its
+    // own arithmetic, and pinning a score on top of it would test both at once
+    // and tell you neither.
+    final today = DateTime.now();
+    await repo.logBodyweight(today, 80);
+
+    final workoutId =
+        await repo.startWorkout(regimeId: regime.id, sessionId: sessionId);
+    final detail = await repo.workoutDetail(workoutId);
+    final chinEntry =
+        detail!.entries.firstWhere((e) => e.exercise.id == chin);
+    final plankEntry = detail.entries.firstWhere((e) => e.exercise.id == plank);
+
+    // One working set of 6 with 10kg hung off it. Bodyweight 80 + 10 = 90
+    // effective. Epley: 90 × (1 + 6/30) = 90 × 1.2 = 108.0. Volume 90 × 6 = 540.
+    await repo.updateSet(
+      chinEntry.sets.first.id,
+      addedWeight: const Value(10),
+      reps: const Value(6),
+      isDone: const Value(true),
+    );
+
+    // A hold's seconds live in `reps` — CLAUDE.md rule 3. 45 seconds then 62,
+    // and the top set is the *longer* one rather than the heavier one, because
+    // both carry the same body. So topSetReps 62, topSetLoad 80 (the
+    // bodyweight, through `LoadMode.bodyweight`), no e1RM, and no volume at
+    // all: kg × seconds is not the unit this figure is in.
+    await repo.updateSet(
+      plankEntry.sets[0].id,
+      reps: const Value(45),
+      isDone: const Value(true),
+    );
+    await repo.updateSet(
+      plankEntry.sets[1].id,
+      reps: const Value(62),
+      isDone: const Value(true),
+    );
+    await repo.completeWorkout(workoutId);
+
+    final chinPoint = (await repo.exerciseProgress(chin)).single;
+    expect(chinPoint.topSetLoad, closeTo(90, 1e-9));
+    expect(chinPoint.topSetReps, 6);
+    expect(chinPoint.best1RM, closeTo(108, 1e-9));
+    expect(chinPoint.volume, closeTo(540, 1e-9));
+
+    final plankPoint = (await repo.exerciseProgress(plank)).single;
+    expect(plankPoint.topSetLoad, closeTo(80, 1e-9));
+    expect(plankPoint.topSetReps, 62);
+    expect(plankPoint.best1RM, isNull);
+    expect(plankPoint.volume, closeTo(0, 1e-9));
+
+    // The same two performances down the other path. `exerciseHistoryPage`
+    // scores them with its own query, its own bodyweight lookup and its own
+    // call, so agreement here is two implementations meeting the same hand
+    // number rather than one of them being read twice.
+    final chinRow = (await repo.exerciseHistoryPage(chin)).single;
+    expect(chinRow.topSetLoad, closeTo(90, 1e-9));
+    expect(chinRow.topSetReps, 6);
+    expect(chinRow.best1RM, closeTo(108, 1e-9));
+
+    final plankRow = (await repo.exerciseHistoryPage(plank)).single;
+    expect(plankRow.topSetLoad, closeTo(80, 1e-9));
+    expect(plankRow.topSetReps, 62);
+    expect(plankRow.best1RM, isNull);
+  });
+
   test('a set taken back is not on the chart, and an emptied day is not either',
       () async {
     final push1 = await sessionNamed('Push 1');
