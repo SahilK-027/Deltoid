@@ -271,6 +271,102 @@ void main() {
     expect((await fresh.select(fresh.workouts).get()).length, 1);
   });
 
+  group('an export reads a moving table without losing its place', () {
+    // Its own database, holding one populated table. The seam below fires at
+    // every page boundary the export crosses, and the shared fixture's starter
+    // catalog would trip it long before `bodyweight_logs` is reached — the
+    // injected row would land while the export was still on `exercises`, and
+    // the table under test would be stable by the time it was read. An empty
+    // table returns a short page and no boundary, so here only the rows below
+    // can fire it.
+    late AppDatabase own;
+
+    /// A bodyweight row with a chosen id, written straight to the table.
+    ///
+    /// The id is the whole point, so it is not `newId()`: these tests need to
+    /// place a row on a known side of a page boundary. `dayKey` only has to be
+    /// unique — one live row per day is a partial index.
+    Future<void> weighIn(String id, int day) =>
+        own.into(own.bodyweightLogs).insert(
+              BodyweightLogsCompanion.insert(
+                dayKey: 20260100 + day,
+                weightKg: 80,
+                id: Value(id),
+                deviceId: const Value('this-phone'),
+              ),
+            );
+
+    /// Every `bodyweight_logs` id in the file [service] writes, in file order.
+    Future<List<String>> exportedIds(BackupService service) async {
+      final file = File(
+        '${Directory.systemTemp.createTempSync('deltoid').path}/moving.json',
+      );
+      addTearDown(() => file.parent.deleteSync(recursive: true));
+      await service.writeBackup(file);
+      final rows = (jsonDecode(file.readAsStringSync())
+          as Map)['data']['bodyweight_logs'] as List;
+      return [for (final r in rows) (r as Map)['id'] as String];
+    }
+
+    setUp(() async {
+      own = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(own.close);
+      for (var i = 0; i < 4; i++) {
+        await weighIn('id-${(i + 1) * 2}', i + 1);
+      }
+    });
+
+    test('a row arriving behind the cursor is not written twice', () async {
+      // `id-1` sorts before every seeded row, so under offset paging it shifts
+      // all of them one place *forward* and the row on the boundary is read a
+      // second time. A duplicate id is refused by the restore's primary key,
+      // so this is the loud half of the hole — but it means an export taken at
+      // the wrong moment produces a file that cannot be restored at all.
+      //
+      // An id below every existing one is not hypothetical once sync lands: a
+      // row merged from the other phone was created there, earlier, and UUID v7
+      // carries that earlier time in its leading bits.
+      var injected = false;
+      final service = BackupService(own, pageSize: 2, betweenPages: () async {
+        if (injected) return;
+        injected = true;
+        await weighIn('id-1', 9);
+      });
+
+      final ids = await exportedIds(service);
+
+      expect(injected, isTrue, reason: 'the seam never fired; no boundary');
+      expect(ids.toSet().length, ids.length, reason: 'a row was written twice');
+    });
+
+    test('a row leaving behind the cursor does not take a neighbour', () async {
+      // The silent half, and the one that matters more. A delete behind the
+      // cursor shifts every later row one place *back*, so the row sitting on
+      // the boundary is stepped over and is absent from the file with nothing
+      // said.
+      //
+      // Nothing in the app hard-deletes outside the restore's `clear()`
+      // closures (entry 30), which is the only reason this is not reachable
+      // today. That is a property of a different file, and the export should
+      // not be resting on it.
+      var injected = false;
+      final service = BackupService(own, pageSize: 2, betweenPages: () async {
+        if (injected) return;
+        injected = true;
+        await (own.delete(own.bodyweightLogs)
+              ..where((t) => t.id.equals('id-2')))
+            .go();
+      });
+
+      final ids = await exportedIds(service);
+
+      expect(injected, isTrue, reason: 'the seam never fired; no boundary');
+      // `id-2` is gone by the time the file closes, so it is allowed to be
+      // missing. Every row that outlived the export has to be in there.
+      expect(ids, containsAll(['id-4', 'id-6', 'id-8']));
+    });
+  });
+
   test('an empty database still writes a file that restores', () async {
     final empty = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(empty.close);

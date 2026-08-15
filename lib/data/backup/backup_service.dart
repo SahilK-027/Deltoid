@@ -84,14 +84,17 @@ class _TableCodec<T extends Insertable<dynamic>> {
 
   final String name;
 
-  /// One window of rows, oldest id first.
+  /// One window of rows, oldest id first, starting after the id `after`.
   ///
   /// A page rather than the whole table, because the export writes as it reads:
   /// `set_logs` alone is 168k rows at fifty years, and turning all of them into
   /// maps before a byte reaches the disk is most of what an export used to cost.
   /// Ordered by id so the windows tile exactly — ids are UUID v7, so this is
   /// also creation order.
-  final Future<List<Map<String, dynamic>>> Function(int limit, int offset) page;
+  ///
+  /// **Keyset, not offset.** See [BackupService._pageOf].
+  final Future<List<Map<String, dynamic>>> Function(int limit, String? after)
+      page;
 
   /// How many rows there are, for the header the file carries and for progress.
   final Future<int> Function() count;
@@ -115,21 +118,31 @@ class _TableCodec<T extends Insertable<dynamic>> {
 /// the app corrupting its own data, and it is what makes moving to a new phone
 /// a copy rather than a migration.
 class BackupService {
-  BackupService(this.db);
+  BackupService(this.db, {this.pageSize = _defaultPageSize, this.betweenPages});
 
   final AppDatabase db;
+
+  /// Rows read per pass. Big enough that the query overhead disappears, small
+  /// enough that a chunk of encoded JSON is a megabyte rather than a hundred.
+  ///
+  /// Injectable only so a test can put a page boundary between two rows instead
+  /// of between two thousand.
+  final int pageSize;
+
+  /// Run after every page the export reads, before the next one is asked for.
+  ///
+  /// **A test seam, and the only way to stand in the gap this class is built
+  /// around.** The export deliberately yields between pages — that is what
+  /// keeps the app usable while it runs — so the interesting states are the
+  /// ones where a write lands in that gap. Null in every production path.
+  final Future<void> Function()? betweenPages;
 
   /// Parents before children, so a restore never inserts a row whose foreign
   /// key has not been written yet.
   late final List<_TableCodec> _codecs = [
     _TableCodec(
       name: 'exercises',
-      page: (limit, offset) async => (await (db.select(db.exercises)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.exercises, limit, after),
       count: () => _countOf(db.exercises),
       // `fromJson` is generated against *today's* columns and reads every one
       // of them unconditionally, so a file written before a column existed
@@ -146,12 +159,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'regimes',
-      page: (limit, offset) async => (await (db.select(db.regimes)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.regimes, limit, after),
       count: () => _countOf(db.regimes),
       table: db.regimes,
       // A file written before v5 has no identity slot in it, and
@@ -163,12 +171,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'sessions',
-      page: (limit, offset) async => (await (db.select(db.sessions)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.sessions, limit, after),
       count: () => _countOf(db.sessions),
       table: db.sessions,
       parse: Session.fromJson,
@@ -176,12 +179,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'session_exercises',
-      page: (limit, offset) async => (await (db.select(db.sessionExercises)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.sessionExercises, limit, after),
       count: () => _countOf(db.sessionExercises),
       table: db.sessionExercises,
       parse: SessionExercise.fromJson,
@@ -189,12 +187,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'cycles',
-      page: (limit, offset) async => (await (db.select(db.cycles)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.cycles, limit, after),
       count: () => _countOf(db.cycles),
       table: db.cycles,
       parse: Cycle.fromJson,
@@ -202,12 +195,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'workouts',
-      page: (limit, offset) async => (await (db.select(db.workouts)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.workouts, limit, after),
       count: () => _countOf(db.workouts),
       table: db.workouts,
       parse: Workout.fromJson,
@@ -215,12 +203,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'workout_exercises',
-      page: (limit, offset) async => (await (db.select(db.workoutExercises)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.workoutExercises, limit, after),
       count: () => _countOf(db.workoutExercises),
       table: db.workoutExercises,
       // A file written before the muscle snapshot existed has no key for it,
@@ -231,12 +214,7 @@ class BackupService {
     ),
     _TableCodec(
       name: 'set_logs',
-      page: (limit, offset) async => (await (db.select(db.setLogs)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.setLogs, limit, after),
       count: () => _countOf(db.setLogs),
       table: db.setLogs,
       // Partials arrived at v8. Nullable, so a file written before it simply
@@ -247,18 +225,67 @@ class BackupService {
     ),
     _TableCodec(
       name: 'bodyweight_logs',
-      page: (limit, offset) async => (await (db.select(db.bodyweightLogs)
-                ..orderBy([(t) => OrderingTerm(expression: t.id)])
-                ..limit(limit, offset: offset))
-              .get())
-          .map((e) => e.toJson())
-          .toList(),
+      page: (limit, after) => _pageOf(db.bodyweightLogs, limit, after),
       count: () => _countOf(db.bodyweightLogs),
       table: db.bodyweightLogs,
       parse: BodyweightLog.fromJson,
       clear: () => db.delete(db.bodyweightLogs).go(),
     ),
   ];
+
+  /// One page of [table] as JSON, ordered by id, resuming after [after].
+  ///
+  /// **Keyset, and for the reason [CLAUDE.md](CLAUDE.md) rule 6 gives.** Offset
+  /// paging is only correct over a table nothing is writing, and this one is
+  /// read across minutes while the app stays usable — that is the whole point
+  /// of the flush between pages. Under `..limit(n, offset: k)` any row that
+  /// appears or disappears *behind* the cursor renumbers everything after it:
+  ///
+  /// - a row inserted behind the cursor shifts the rest one place forward, and
+  ///   the row on the boundary is read a **second** time. A restore refuses the
+  ///   duplicate on the primary key, so the file is simply unusable.
+  /// - a row hard-deleted behind the cursor shifts the rest one place back, and
+  ///   the row on the boundary is **stepped over**. It is absent from the file
+  ///   with nothing said, and that is found out on the new phone, after the old
+  ///   one has been wiped.
+  ///
+  /// Neither was reachable today, by accident rather than by design: ids are
+  /// UUID v7, so a locally created row always sorts *after* every existing one,
+  /// and nothing outside the restore's own `clear()` closures hard-deletes.
+  /// Both of those are properties of other files, neither is written down as
+  /// load-bearing, and **the first stops being true the day sync lands** — a row
+  /// merged from the other phone was created there, earlier, and carries that
+  /// earlier time in its leading bits. A cursor cannot be renumbered, so this
+  /// stops depending on either.
+  ///
+  /// **Not wrapped in a transaction, deliberately.** That is the other way to
+  /// get a stable read, and here it is the wrong one: drift serialises on one
+  /// connection, so a transaction spanning a minutes-long export blocks every
+  /// write the app makes for its whole duration — exactly the freeze the paging
+  /// exists to avoid, and worse, because it would freeze mid-session. Keyset
+  /// gives the guarantee that matters, which is that no row present for the
+  /// whole export is missed. Rows written *during* one may or may not be in the
+  /// file; a backup is a moment, and that moment is when it started.
+  Future<List<Map<String, dynamic>>>
+      _pageOf<T extends HasResultSet, D extends DataClass>(
+    ResultSetImplementation<T, D> table,
+    int limit,
+    String? after,
+  ) async {
+    final id = table.columnsByName['id']! as GeneratedColumn<String>;
+    final q = db.select(table)
+      ..orderBy([(_) => OrderingTerm(expression: id)])
+      ..limit(limit);
+    if (after != null) q.where((_) => id.isBiggerThanValue(after));
+    return (await q.get()).map((row) => row.toJson()).toList();
+  }
+
+  /// The id to resume a keyset page after: the last one written.
+  ///
+  /// Every syncable table takes its `id` from `SyncColumns`, so this key is
+  /// always there — and [_pageOf] has already required the column to build the
+  /// query that produced this row.
+  String _cursorOf(Map<String, dynamic> row) => row['id']! as String;
 
   /// How many rows a table holds, asked of SQLite rather than of Dart.
   Future<int> _countOf(TableInfo<Table, dynamic> table) async {
@@ -269,9 +296,7 @@ class BackupService {
     return row.read<int>('c');
   }
 
-  /// Rows read per pass. Big enough that the query overhead disappears, small
-  /// enough that a chunk of encoded JSON is a megabyte rather than a hundred.
-  static const _pageSize = 2000;
+  static const _defaultPageSize = 2000;
 
   /// The whole database as one map. Kept for the tests and the seed tool, which
   /// want a payload in hand; **the app writes files with [writeBackup]**, which
@@ -284,10 +309,13 @@ class BackupService {
     for (var i = 0; i < _codecs.length; i++) {
       final codec = _codecs[i];
       final rows = <Map<String, dynamic>>[];
-      for (var offset = 0;; offset += _pageSize) {
-        final page = await codec.page(_pageSize, offset);
+      String? after;
+      while (true) {
+        final page = await codec.page(pageSize, after);
         rows.addAll(page);
-        if (page.length < _pageSize) break;
+        if (page.length < pageSize) break;
+        after = _cursorOf(page.last);
+        if (betweenPages != null) await betweenPages!();
       }
       data[codec.name] = rows;
       counts[codec.name] = rows.length;
@@ -352,8 +380,9 @@ class BackupService {
         sink.write('${jsonEncode(codec.name)}:[');
 
         var first = true;
-        for (var offset = 0;; offset += _pageSize) {
-          final page = await codec.page(_pageSize, offset);
+        String? after;
+        while (true) {
+          final page = await codec.page(pageSize, after);
           if (page.isNotEmpty) {
             final buffer = StringBuffer();
             for (final row in page) {
@@ -374,7 +403,9 @@ class BackupService {
               fraction: total == 0 ? null : (written / total).clamp(0.0, 1.0),
             ));
           }
-          if (page.length < _pageSize) break;
+          if (page.length < pageSize) break;
+          after = _cursorOf(page.last);
+          if (betweenPages != null) await betweenPages!();
         }
         sink.write(']');
       }

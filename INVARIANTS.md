@@ -32,7 +32,8 @@ lib/`, of which 28 are in the two repositories, 2 in `seeder.dart` and 1 in
 `backup_service.dart`. The places where a rule is only prose are mostly narrow.
 The catalogue below is 31 entries; **eight are CORRUPTION**, four of those were
 the same shape — a parent tombstoned without its children, entry 1, now
-**closed** — and two more are the export path, which pages over a live database.
+**closed** — and two more were the export and restore paths, both now closed
+too.
 
 The audit checked the six writers HARDENING named. `ensureOpenCycle`,
 `_healDuplicateOpenCycles`, `logBodyweight` and `completeWorkout` each open their
@@ -49,10 +50,10 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries, **four closed**. Four were one bug in four places — that is entry
+Eight entries, **five closed**. Four were one bug in four places — that is entry
 1, closed; entry 2 is closed with it. Entries 4 and 6 are the restore, also
-closed. Entry 5 is the export, still open; entry 3 belongs to § 3b; entries 7
-and 8 are positions.
+closed, and entry 5 is the export, closed. Entry 3 belongs to § 3b; entries 7
+and 8 are positions and are what is left.
 
 ---
 
@@ -401,6 +402,45 @@ id after a restore that throws.
 ---
 
 ## 5. A backup holds every row the database held when it was written
+
+> **CLOSED.** `_pageOf` (`backup_service.dart:269`) pages by cursor, not by
+> offset, and both loops carry the last id written forward. Two checks in
+> `backup_service_test.dart` → `an export reads a moving table without losing
+> its place`, red first against the offset paging:
+>
+> ```
+> a row arriving behind the cursor is not written twice
+>   Expected: <5>  Actual: <4>   a row was written twice
+> a row leaving behind the cursor does not take a neighbour
+>   Expected: contains all of ['id-4', 'id-6', 'id-8']
+>     Actual: ['id-2', 'id-4', 'id-8']
+>      Which: has no match for 'id-6' at index 1
+> ```
+>
+> **This entry had the direction backwards** and the correction is worth
+> keeping. An *insert* behind the cursor shifts later rows one place **forward**
+> and re-reads the boundary row — a duplicate, refused by the restore's primary
+> key, loud. A *hard delete* shifts them **back** and steps over the boundary
+> row — silently absent. The entry assigned the silent loss to the insert.
+>
+> Which matters, because it moves what was reachable. Ids are UUID v7, so a
+> locally created row always sorts after every existing one and can never land
+> behind a cursor; nothing outside the restore's `clear()` closures hard-deletes
+> (entry 30). **Neither variant was reachable today.** Both are held off by
+> properties of other files that nobody had written down as load-bearing, and
+> the first one **stops being true the day sync lands**: a row merged from the
+> other phone was created there, earlier, and carries that earlier time in its
+> leading bits. That is the argument for fixing it now rather than in Stage 5.
+>
+> **No transaction, and that is the decision, not an omission.** Drift
+> serialises on one connection, so a transaction around a minutes-long export
+> blocks every write the app makes for its duration — the freeze the paging
+> exists to avoid, arriving mid-session instead. Keyset buys the guarantee that
+> matters: no row present for the whole export is missed. A row written *during*
+> one may or may not be in the file, and that is what a backup is.
+>
+> The `betweenPages` seam this needed is `@visibleForTesting` in spirit and null
+> in every production path; `pageSize` is injectable for the same reason.
 
 **Invariant.** The file `writeBackup` produces carries exactly the rows each
 table contained, none skipped and none written twice.
@@ -1080,7 +1120,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fourteen, of which **four are done**. Every one is executable, and every one must
+Fourteen, of which **five are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
