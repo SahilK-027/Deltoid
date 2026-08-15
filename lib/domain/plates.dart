@@ -56,9 +56,14 @@ class PlateLoad {
 /// Breaks [totalKg] down into bar plus plates, or null when there is nothing
 /// to draw.
 ///
-/// Null — not an empty load — for a target at or under the bar: an unloaded or
-/// impossible weight has no plate diagram, and drawing a bare bar for "I typed
-/// 15 on a 20kg bar" would answer a question nobody asked.
+/// Null — not an empty load — for a target **under** the bar: an impossible
+/// weight has no plate diagram, and drawing a bare bar for "I typed 15 on a
+/// 20kg bar" would answer a question nobody asked.
+///
+/// The bar weight exactly is a load, and a drawn one: `isBarOnly`, no plates,
+/// asserted by `an empty bar loads nothing`. This said "at or under" and meant
+/// it about neither the code nor the test beneath it — the boundary is
+/// `totalKg < barKg`.
 ///
 /// Greedy from the heaviest plate down, which is both optimal for this set
 /// (every plate divides the next one up, or is half of it) and what you

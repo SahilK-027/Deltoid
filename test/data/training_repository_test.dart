@@ -313,6 +313,143 @@ void main() {
     expect(third.isDeload, isTrue);
   });
 
+  test('a deload cycle dropped by a delete does not push the next one late',
+      () async {
+    // INTERPRETATION § 9's tail. `_cyclesSinceDeload` counts cycles with
+    // `completed_at IS NOT NULL AND deleted_at IS NULL`, and
+    // `_reopenCycleIfIncomplete` tombstones the cycles after the one it
+    // reopens. If a deload cycle can be tombstoned that way, the entry says
+    // the counter never resets and the next deload lands late.
+    final regime = await activeRegime();
+    await (db.update(db.regimes)..where((t) => t.id.equals(regime.id)))
+        .write(const RegimesCompanion(deloadAfterCycles: Value(2)));
+
+    final sessions = await (db.select(db.sessions)
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    /// Logs every session of the open cycle, returning the last workout id so
+    /// it can be deleted again.
+    Future<String> runCycle() async {
+      var last = '';
+      for (final s in sessions) {
+        final id = await repo.startWorkout(regimeId: regime.id, sessionId: s.id);
+        final detail = await repo.workoutDetail(id);
+        final set = detail!.entries.first.sets.first;
+        await repo.updateSet(set.id,
+            weight: const Value(20),
+            reps: const Value(8),
+            isDone: const Value(true));
+        await repo.completeWorkout(id);
+        last = id;
+      }
+      return last;
+    }
+
+    await runCycle();
+    final lastOfSecond = await runCycle();
+
+    // Cycle 3 is the deload, and it is empty — which is exactly the shape
+    // `_reopenCycleIfIncomplete` is allowed to drop.
+    final deload = (await repo.cycleStatus(regime.id))!;
+    expect(deload.cycleIndex, 3);
+    expect(deload.isDeload, isTrue);
+
+    // Delete the last workout of cycle 2. Cycle 2 reopens; the empty deload
+    // cycle 3 is tombstoned out from under it.
+    await repo.deleteWorkout(lastOfSecond);
+    final tombstoned = await (db.select(db.cycles)
+          ..where((t) => t.id.equals(deload.cycleId) & t.deletedAt.isNotNull()))
+        .getSingleOrNull();
+    expect(tombstoned, isNotNull,
+        reason: 'the sequence has to actually drop a deload cycle, or this '
+            'test is about nothing');
+
+    // Log it again. Cycle 2 closes for the second time and the next cycle
+    // opens — and it is still the third, and still the deload.
+    final again = await repo.startWorkout(
+        regimeId: regime.id, sessionId: sessions.last.id);
+    final detail = await repo.workoutDetail(again);
+    await repo.updateSet(detail!.entries.first.sets.first.id,
+        weight: const Value(20),
+        reps: const Value(8),
+        isDone: const Value(true));
+    await repo.completeWorkout(again);
+
+    final reopened = (await repo.cycleStatus(regime.id))!;
+    expect(reopened.cycleIndex, 3);
+    expect(reopened.isDeload, isTrue,
+        reason: 'two completed cycles are still two completed cycles — a '
+            'placeholder that was dropped was never in the count');
+  });
+
+  test('a deload closed early is not dropped once training follows it',
+      () async {
+    // The near miss, and the reason the entry's worry is not reachable.
+    //
+    // `advanceCycle` closes a cycle with nothing logged in it, so a deload can
+    // carry `completed_at` — where `_cyclesSinceDeload` counts it — while
+    // still having no completed sessions, which is what
+    // `_reopenCycleIfIncomplete` is allowed to drop. Both filters are
+    // satisfied at once. What stops it is the guard on the whole tail: every
+    // later cycle must be empty, so a deload with real training after it is
+    // never dropped, and a deload with nothing after it takes the rest of the
+    // tail with it and leaves no gap to miscount.
+    final regime = await activeRegime();
+    await (db.update(db.regimes)..where((t) => t.id.equals(regime.id)))
+        .write(const RegimesCompanion(deloadAfterCycles: Value(2)));
+
+    final sessions = await (db.select(db.sessions)
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    Future<String> logInto(Session s) async {
+      final id = await repo.startWorkout(regimeId: regime.id, sessionId: s.id);
+      final detail = await repo.workoutDetail(id);
+      await repo.updateSet(detail!.entries.first.sets.first.id,
+          weight: const Value(20),
+          reps: const Value(8),
+          isDone: const Value(true));
+      await repo.completeWorkout(id);
+      return id;
+    }
+
+    var lastOfSecond = '';
+    for (var cycle = 0; cycle < 2; cycle++) {
+      for (final s in sessions) {
+        lastOfSecond = await logInto(s);
+      }
+    }
+
+    // Cycle 3 is the deload. Close it without training it.
+    final deload = (await repo.cycleStatus(regime.id))!;
+    expect(deload.cycleIndex, 3);
+    expect(deload.isDeload, isTrue);
+    await repo.advanceCycle(regime.id);
+
+    // The counter reset, so cycle 4 is an ordinary week.
+    final fourth = (await repo.cycleStatus(regime.id))!;
+    expect(fourth.cycleIndex, 4);
+    expect(fourth.isDeload, isFalse);
+
+    // Real training under cycle 4 is what makes the tail non-empty.
+    await logInto(sessions.first);
+
+    await repo.deleteWorkout(lastOfSecond);
+
+    final stillThere = await (db.select(db.cycles)
+          ..where((t) => t.id.equals(deload.cycleId)))
+        .getSingle();
+    expect(stillThere.deletedAt, isNull,
+        reason: 'a cycle with training after it genuinely happened, and a '
+            'deload that is dropped after being counted is the one way the '
+            'next one could land late');
+
+    final after = (await repo.cycleStatus(regime.id))!;
+    expect(after.cycleIndex, 4);
+    expect(after.isDeload, isFalse);
+  });
+
   test('closing a cycle early skips what is left and counts towards the deload',
       () async {
     // The escape hatch for "I'm not training Leg 2 this round". Without it a

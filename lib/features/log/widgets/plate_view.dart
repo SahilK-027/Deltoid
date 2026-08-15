@@ -44,8 +44,10 @@ double _plateHeightFactor(double kg) => switch (kg) {
 /// What to draw for what is currently typed, or null for "draw nothing".
 ///
 /// Null on every doubtful case rather than a diagram that might be wrong:
-/// nothing typed yet, no bar on this movement, a weight at or under the bar,
-/// or a display unit the plates do not exist in. The rack is metric — 45s and
+/// nothing typed yet, no bar on this movement, a weight under the bar, or a
+/// display unit the plates do not exist in. The bar weight exactly is not a
+/// doubtful case — it draws as a bare bar, which is what
+/// [solvePlateLoad] returns for it. The rack is metric — 45s and
 /// 25s are a different set of plates, and inventing a pound breakdown from
 /// kilogram plates would put a diagram on screen that no gym can load.
 PlateLoad? plateLoadFor({

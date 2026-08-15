@@ -49,6 +49,10 @@ and `plateLoadFor`, the wrapper between the keypad and the best-covered function
 in the app, has none (§ 9). All three sit at the edge between a proven
 calculation and a screen, which is where this document keeps finding the holes.
 
+**§§ 8 and 9's tails are now closed**, and both corrected the entry that named
+them: § 8's grep was wrong and the untested tier was the middle one, and
+§ 9's `plateLoadFor` was correct while the two comments describing it were not.
+
 ---
 
 # 1. `bodyweightOnOrdered` interpolates on `yyyyMMdd`, not on days
@@ -841,12 +845,36 @@ drift. **Good.**
 property test that catches an off-by-one). Through the database:
 `training_repository_test.dart:284`, `:316`, `:347`, `:385`.
 
-**One thing nothing covers.** `_cyclesSinceDeload` counts only cycles with
-`completed_at IS NOT NULL` (`training_repository.dart:336`). A deload cycle that
-was tombstoned by `_reopenCycleIfIncomplete` (`:3293-3302`) rather than completed
-does not reset the counter, so the next deload lands late. **SUSPECT** — the
-sequence needs a deload cycle to be the successor that gets dropped. **Test
-status: NONE.**
+~~**One thing nothing covers.**~~ **CLOSED, and the worry is not reachable —
+the entry did not say why, and the why is the interesting part.**
+
+`_cyclesSinceDeload` counts only cycles with `completed_at IS NOT NULL`
+(`training_repository.dart:336`), and `_reopenCycleIfIncomplete` (`:3293-3302`)
+tombstones the cycles after the one it reopens. The entry supposed a deload
+cycle dropped that way would stop resetting the counter and the next deload
+would land late.
+
+**Two tests, both green on arrival**, in `training_repository_test.dart`:
+
+- `a deload cycle dropped by a delete does not push the next one late` — drives
+  the sequence the entry describes and asserts the deload cycle really was
+  tombstoned before checking the count, so the test is about something.
+- `a deload closed early is not dropped once training follows it` — the near
+  miss. `advanceCycle` closes a cycle with nothing logged in it, so a deload
+  **can** carry `completed_at` while having no completed sessions: both filters
+  are satisfied at once, which is what the entry needed.
+
+What stops it is neither filter on its own but the guard over the whole tail
+(`:3345-3347`): **every** later cycle must be empty or nothing is dropped. So a
+deload with real training after it is never touched, and a deload with nothing
+after it takes the rest of the tail with it — leaving no surviving cycle on the
+far side of the gap for the counter to be wrong about. It can only ever remove a
+contiguous, untrained tail, never a deload from the middle of a counted run.
+
+**Recorded rather than fixed**, per
+[HARDENING § 3](HARDENING.md#stage-3--build-the-net) rule 1. The pair is kept
+because the composition is not obvious from either function alone, and
+`_reopenCycleIfIncomplete` is where a sync pull applier will want to reach.
 
 ## `dayKey ↔ DateTime`, week starts, DST and leap days
 
@@ -931,11 +959,39 @@ drawing a kilo breakdown for a pounds user would put a diagram on screen that no
 gym can load. The guard is there (`:56`) and the reasoning is written down
 (`:44-50`); it is simply unasserted.
 
+> **CLOSED.** `test/features/plate_view_test.dart`, four tests. The three null
+> branches and the `unit.toKg` pass-through were green on arrival, which is
+> what an untested-but-correct wrapper should do.
+>
+> **One assertion was red, and the code was right — the comments were wrong.**
+>
+> ```
+> no plate diagram in pounds, and none without a bar
+>   Expected: null
+>     Actual: <Instance of 'PlateLoad'>
+> ```
+>
+> That is `plateLoadFor(buffer: '20', barKg: 20)` — the bar weight exactly.
+> Both doc comments on this path said null for a weight *"at or under the
+> bar"*: `plates.dart:58` and `plate_view.dart:47`, the second copied from the
+> first. The boundary in the code is `totalKg < barKg` (`plates.dart:70`) and
+> `plates_test.dart:23` — `an empty bar loads nothing` — has always asserted a
+> bare bar at exactly the bar, deliberately.
+>
+> **The comment is what produced the wrong expectation**, which is
+> [DEBT § 7](DEBT.md)'s category exactly: prose stating a fact about the code
+> beneath it, rotting silently, with nothing pointing back at it. Both comments
+> corrected, and `the bar weight exactly draws a bare bar, not nothing` now
+> holds the boundary from the wrapper's side so it cannot be written that way
+> again.
+
 **The check that closes it.** `test/features/` → `no plate diagram in pounds,
 and none without a bar` — four cases against `plateLoadFor`, each expecting
 null, plus one kg case expecting the same `PlateLoad` `solvePlateLoad` returns.
 Cheap, and it pins the one branch that turns a correct function into a wrong
-picture.
+picture. **Exists** — with the kg case written as hand literals (100 on a 20
+bar → a 25 and a 15 a side) rather than against `solvePlateLoad`, which would
+have been `expect(f(x), f(x))`.
 
 ## Backup round trip
 
