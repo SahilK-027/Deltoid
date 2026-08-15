@@ -1,24 +1,5 @@
 # Deltoid — can it corrupt or lose data
 
-**Empty.** The round that produced this file ran to completion: every entry it
-raised was closed, corrected or recorded, and the closed text was deleted rather
-than kept, because a catalogue of solved problems is a file people stop reading.
-Read it back with `git log -- INVARIANTS.md` and `git show <commit>:INVARIANTS.md`.
-
-What stays here is what the file *is*, and the prompt that fills it again.
-
-**Nothing in `lib/` or `test/` cites this file, deliberately.** Thirty-six
-comments used to carry section numbers from the last round — *"INVARIANTS
-§ 19"*, *"entry 5's export race"*. They were rewritten to state the rule
-instead, because a numbered pointer into a cleared catalogue reads like a
-reference and resolves to nothing, and the next round renumbers from 1 anyway.
-**Keep it that way**: a comment should name the rule it protects, not the
-paragraph that once described it. Cite [RULES.md](RULES.md) or
-[CLAUDE.md](CLAUDE.md) — documents that do not get cleared — or say the rule in
-the comment.
-
----
-
 ## What an invariant is, in this project
 
 A statement about stored data that must be true after every operation, whatever

@@ -10,6 +10,8 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../integrity/invariant_oracle.dart';
+
 /// What a write leaves behind when it is not the only one happening.
 ///
 /// Two shapes of the same fault, both of which used to be reachable with a
@@ -624,67 +626,20 @@ void main() {
   /// and filters `deleted_at`. These are live rows carrying `dirty`, which is
   /// what the first sync push sends, and no tombstone will ever follow them.
   group('a tombstoned parent leaves nothing live beneath it', () {
-    Future<int> countOf(String from) async => (await db
-            .customSelect('SELECT COUNT(*) AS n FROM $from')
-            .getSingle())
-        .read<int>('n');
-
-    /// Live `set_logs` under a tombstoned `workout_exercises`.
-    Future<int> orphanedSets() => countOf(
-          'set_logs s JOIN workout_exercises we ON we.id = s.workout_exercise_id '
-          'WHERE s.deleted_at IS NULL AND we.deleted_at IS NOT NULL',
-        );
-
-    /// Live `workout_exercises` under a tombstoned `workouts`. The one
-    /// `healOrphanedSnapshots` already repairs at launch — asserted here so the
-    /// heal keeps working, not because it is open.
-    Future<int> orphanedSnapshots() => countOf(
-          'workout_exercises we JOIN workouts w ON w.id = we.workout_id '
-          'WHERE we.deleted_at IS NULL AND w.deleted_at IS NOT NULL',
-        );
-
-    /// Live `session_exercises` under a tombstoned `sessions`.
-    Future<int> orphanedSlots() => countOf(
-          'session_exercises se JOIN sessions ss ON ss.id = se.session_id '
-          'WHERE se.deleted_at IS NULL AND ss.deleted_at IS NOT NULL',
-        );
-
-    /// Live `cycles` under a tombstoned `regimes`.
-    Future<int> orphanedCycles() => countOf(
-          'cycles c JOIN regimes r ON r.id = c.regime_id '
-          'WHERE c.deleted_at IS NULL AND r.deleted_at IS NOT NULL',
-        );
-
-    /// Live `workouts` pointing at a tombstoned `cycles` **of a live regime**.
+    /// The five counts this group used to carry privately now live in
+    /// `test/integrity/invariant_oracle.dart`, alongside the positions and the
+    /// single-open rows, because a fuzz harness needs one judge it can call
+    /// after any operation rather than a helper inside one test file. The
+    /// oracle asserts strictly more than the helper did — every structural rule
+    /// rather than the five cascade ones — which is what makes the swap worth
+    /// making here: these sequences are now checked for collisions they were
+    /// never watched for.
     ///
-    /// The odd one out, and the qualifier is load-bearing. A cycle is not a
-    /// workout's parent the way the four above are: `workouts` → `regimes` is
-    /// deliberately allowed to dangle, because a deleted programme keeps its
-    /// history and the snapshots are what make that safe. `deleteRegime`
-    /// tombstones that programme's cycles and keeps its workouts, so every
-    /// deleted regime leaves live workouts naming dead cycles **by design** —
-    /// which a flat reading of the invariant would forbid.
-    ///
-    /// Under a *live* regime there is no such licence. The cycle is the counter
-    /// the deload is scheduled off, and a workout naming a dead one there is a
-    /// reference to nothing rather than a reference to something intentionally
-    /// gone.
-    Future<int> orphanedWorkoutCycles() => countOf(
-          'workouts w JOIN cycles c ON c.id = w.cycle_id '
-          'JOIN regimes r ON r.id = c.regime_id '
-          'WHERE w.deleted_at IS NULL AND c.deleted_at IS NOT NULL '
-          'AND r.deleted_at IS NULL',
-        );
-
-    Future<void> expectNoOrphans() async {
-      expect(await orphanedSets(), 0, reason: 'live sets under a dead slot');
-      expect(await orphanedSnapshots(), 0,
-          reason: 'live snapshots under a dead workout');
-      expect(await orphanedSlots(), 0, reason: 'live slots under a dead session');
-      expect(await orphanedCycles(), 0, reason: 'live cycles under a dead regime');
-      expect(await orphanedWorkoutCycles(), 0,
-          reason: 'live workouts naming a dead cycle');
-    }
+    /// The qualifier on the workout/cycle count is documented there, and it is
+    /// load-bearing: a deleted programme keeps its workouts and loses its
+    /// cycles, so live workouts naming dead cycles is by design under a *dead*
+    /// regime and corruption under a live one.
+    Future<void> expectNoOrphans() => expectInvariants(db);
 
     test('removing an exercise mid-session takes its sets', () async {
       final regime = await activeRegime();

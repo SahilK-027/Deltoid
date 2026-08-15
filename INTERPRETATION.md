@@ -1,15 +1,5 @@
 # Deltoid — are the numbers right
 
-**Empty.** The round that produced this file ran to completion: eight ranked
-entries closed, a ninth section of verified-and-recorded results retired with
-them, and the UNVERIFIED table emptied — all seven of its tests now carry a
-hand-computed literal. The closed text was deleted rather than kept. Read it
-back with `git log -- INTERPRETATION.md` and `git show <commit>:INTERPRETATION.md`.
-
-What stays here is what the file *is*, and the prompt that fills it again.
-
----
-
 ## What an interpretation is, in this project
 
 A **derived** number — anything the app computes rather than stores. An e1RM, a
