@@ -2172,13 +2172,25 @@ class TrainingRepository {
       if (target != null) return target;
     }
 
+    // Every tombstone on the way up, not only the set's own.
+    //
+    // This filtered `set_logs.deleted_at` alone, which made it the one read in
+    // the app that could see an orphan — a live set under a slot or a workout
+    // that had been deleted out from under it (INVARIANTS § 31). No write path
+    // leaves that shape any more, but a restore or a merge can still deliver
+    // one, and a rest taken in a session that was deleted is not a rest this
+    // movement ever took.
     final last = await (db.select(db.setLogs).join([
       innerJoin(db.workoutExercises,
           db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId)),
+      innerJoin(
+          db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
     ])
           ..where(db.workoutExercises.exerciseId.equals(exerciseId) &
               db.setLogs.restSeconds.isNotNull() &
-              db.setLogs.deletedAt.isNull())
+              db.setLogs.deletedAt.isNull() &
+              db.workoutExercises.deletedAt.isNull() &
+              db.workouts.deletedAt.isNull())
           ..orderBy([
             OrderingTerm(
                 expression: db.setLogs.completedAt, mode: OrderingMode.desc)

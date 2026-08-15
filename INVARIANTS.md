@@ -45,7 +45,8 @@ its callers — entry 29.
 Two of HARDENING's sweeps came back clean and are recorded rather than omitted:
 every hard delete in the app is one of the restore's nine `clear()` closures
 (entry 30), and no read path outside the backup codecs drops
-`deleted_at IS NULL` except the one entry 31 names.
+`deleted_at IS NULL` except the one entry 31 named — **which is now closed too**,
+with [INTERPRETATION.md](INTERPRETATION.md) § 8.
 
 ---
 
@@ -172,12 +173,13 @@ joins the parent and filters `deleted_at IS NULL` — `_volumeQuery` at
 `training_repository.dart:841-855`, `workoutDetail` at `:2291`,
 `exerciseProgress`'s `live` predicate at `:1857`.
 
-**One read does not, and it is worth naming**: `restTargetFor` (`:2175-2187`)
-joins `workout_exercises` but filters only `set_logs.deleted_at`, so the rest
-timer can open on a value logged into a slot that was later swapped away. A rest
-target rather than a logged number, so it costs nothing on disk — but "nothing
-reads an orphan" is not true, and the next path added will not be checked
-against a rule nobody wrote down. See entry 31.
+**One read did not, and it was worth naming**: `restTargetFor` (`:2175-2187`)
+joined `workout_exercises` but filtered only `set_logs.deleted_at`, so the rest
+timer could open on a value logged into a slot that was later swapped away. A
+rest target rather than a logged number, so it cost nothing on disk — but
+"nothing reads an orphan" was not true, and the next path added would not have
+been checked against a rule nobody wrote down. **Closed with
+[INTERPRETATION.md](INTERPRETATION.md) § 8**; see entry 31.
 
 **And it removes the bound entry 2 relies on.** `doneSetCount` (`:3008-3021`)
 filters `workout_exercises.deleted_at IS NULL`, so ticked sets orphaned by
@@ -1227,13 +1229,20 @@ filtered query and the caller wants that row's own state — and the nine backup
 codecs, which **must** carry tombstones or a restore would resurrect every
 deleted row.
 
-**One genuine exception, and it belongs to entry 1**: `restTargetFor`
-(`training_repository.dart:2175-2187`) joins `workout_exercises` and filters only
-`set_logs.deleted_at`, so it can read a rest value off a set orphaned by
-`removeExerciseFromWorkout`. A rest target rather than a logged number, so
-**COSMETIC** on its own — listed because it is the counter-example to entry 1's
-"nothing visible reads an orphan", and because nothing tests `restTargetFor` at
-all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
+**One genuine exception, and it belongs to entry 1 — now closed.**
+`restTargetFor` (`training_repository.dart:2175-2187`) joined
+`workout_exercises` and filtered only `set_logs.deleted_at`, so it could read a
+rest value off a set orphaned by `removeExerciseFromWorkout`. A rest target
+rather than a logged number, so **COSMETIC** on its own — listed because it was
+the counter-example to entry 1's "nothing visible reads an orphan".
+
+**Closed with [INTERPRETATION.md](INTERPRETATION.md) § 8**, which is what
+happened when a test finally existed that could state it: red at `Expected:
+<120> Actual: <240>`, and red again for the identical shape one level up — the
+query did not join `workouts` at all, which this entry had not noticed. Both
+tombstones are now in the `where`. **The sweep's conclusion stands with no
+exceptions left**: no read path outside the backup codecs drops
+`deleted_at IS NULL`.
 
 ---
 

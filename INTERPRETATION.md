@@ -646,6 +646,45 @@ cross-check alone is exactly the UNVERIFIED shape this document exists to flag.
 
 # 8. Nothing tests the number the rest timer opens on
 
+> **CLOSED, and the entry was wrong about its own evidence.**
+>
+> **"`grep -rn restTarget test/` returns nothing" is false.**
+> `training_repository_test.dart:1171` — `rest is recorded, and its target is
+> remembered per exercise` — calls `restTargetFor` three times and asserts
+> tier 1 (180) and tier 3 (120) with literals. The grep in the entry was run
+> against the wrong string. What was genuinely untested was **tier 2**, the
+> fallback to the last rest actually taken, which is the tier that makes the
+> timer remember anything across sessions at all.
+>
+> Four tests added in `training_repository_test.dart`. Three were **green on
+> arrival** and are characterisation:
+>
+> - `rest comes from the slot, then the last set, then 120` — 120, then 150
+>   (the newer of two rested sets, so `completed_at` ordering is pinned rather
+>   than row order), then 150 again through `sessionId: null`, then 180 when a
+>   slot target outranks it.
+> - `Push 2 does not open on Push 1's rest target` — incline press is in both
+>   push days on purpose, and tier 1 is scoped by session. [RULES § 1](RULES.md#1-the-one-rule)
+>   in a smaller place, and it holds.
+>
+> **The fourth case was red, and so was a fifth the entry did not name**:
+>
+> ```
+> a tombstoned slot's sets are not the rest fallback     Expected: <120>  Actual: <240>
+> a tombstoned workout's sets are not the rest fallback  Expected: <120>  Actual: <240>
+> ```
+>
+> The entry asked for the slot case. The workout case is the identical shape
+> one level up — the query did not join `workouts` at all — and was found by
+> asking whether the fix was the whole of it. Both are now filtered, in the one
+> `where`.
+>
+> **This closes [INVARIANTS § 31](INVARIANTS.md)'s single exception**, which
+> was catalogued as a recorded result rather than a hole because it is
+> COSMETIC on its own. It was still the only read in the app that could see an
+> orphan, and it stopped being cheap to leave the moment a test existed that
+> could state it.
+
 **Rank 8.** A timer counting to the wrong target, on every set of a session.
 
 **The rule.** The session slot's rest, if it has one; otherwise the last rest
@@ -664,24 +703,28 @@ place. An exercise added mid-session has no slot at all — `setRestTarget` retu
 false for exactly that case (`:2192-2199`) — so it must reach the second tier and
 not the floor.
 
-**One thing the second tier does not filter.** It joins `workout_exercises` and
-constrains only `set_logs.deleted_at` (`:2181`) — not the slot's tombstone, not
-the workout's. So it will read a rest value off a set orphaned by
-`removeExerciseFromWorkout`. Those orphans are
-[INVARIANTS.md](INVARIANTS.md) § 1, and this is the one read path that sees them;
-recorded there as § 31.
+**One thing the second tier did not filter — now fixed.** It joined
+`workout_exercises` and constrained only `set_logs.deleted_at` (`:2181`) — not
+the slot's tombstone, not the workout's. So it would read a rest value off a set
+orphaned by `removeExerciseFromWorkout`. Those orphans are
+[INVARIANTS.md](INVARIANTS.md) § 1, and this was the one read path that saw them;
+recorded there as § 31. It now joins `workouts` and filters all three tombstones.
 
 **Time to notice.** Minutes — the timer is on screen and counting down in front
 of you. That is the only reason this sits at rank 8 rather than higher.
 
-**Test status: NONE.** `grep -rn restTarget test/` returns nothing.
+~~**Test status: NONE.** `grep -rn restTarget test/` returns nothing.~~ **Wrong,
+and corrected on close — see the banner.** Three call sites existed and pinned
+tiers 1 and 3; tier 2 was the untested one.
 `training_repository_test.dart:1204` writes a `restSeconds` and reads it back
-through the workout, which asserts the column, not the resolution.
+through the workout, which asserts the column, not the resolution — that part
+was right.
 
 **The check that closes it.**
 `test/data/training_repository_test.dart` → `rest comes from the slot, then the
 last set, then 120` — three cases, three literals, plus a fourth asserting a
-tombstoned slot's sets are not the fallback. Cheap, and it is the only thing that
+tombstoned slot's sets are not the fallback. **Exists**, with a fifth for the
+tombstoned workout beside it. Cheap, and it is the only thing that
 would notice the three tiers being reordered.
 
 ---
