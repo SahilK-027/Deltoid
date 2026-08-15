@@ -503,6 +503,51 @@ void main() {
     expect(after.value, freshDeviceId);
   });
 
+  test('a restored database satisfies the invariants a launched one does',
+      () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+    final data = payload['data']! as Map<String, dynamic>;
+
+    // A file from the build that tombstoned a discarded workout and left its
+    // snapshots alive underneath it — INVARIANTS § 1, and the state
+    // `healOrphanedSnapshots` exists for. Nothing in the schema refuses it: a
+    // tombstone is a column, not a foreign key.
+    final workouts = (data['workouts']! as List).cast<Map<String, dynamic>>();
+    expect(workouts, hasLength(1));
+    data['workouts'] = [
+      {...workouts.first, 'deletedAt': 1750000000000},
+    ];
+
+    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(fresh.close);
+    await BackupService(fresh).restore(jsonEncode(payload));
+
+    // No relaunch. `appInitProvider` resolves once per process, so a restore
+    // from Settings is followed by writes against whatever landed.
+    final orphans = await fresh.customSelect(
+      'SELECT COUNT(*) AS c FROM workout_exercises we '
+      'JOIN workouts w ON w.id = we.workout_id '
+      'WHERE we.deleted_at IS NULL AND w.deleted_at IS NOT NULL',
+    ).getSingle();
+    expect(orphans.read<int>('c'), 0, reason: 'a live snapshot under a dead '
+        'workout is exactly what a first sync push would send');
+  });
+
+  test('a restore of an empty file leaves a catalog to train from', () async {
+    // The one file that carries no exercises and is still consistent: an export
+    // taken before anything was seeded. Emptying `exercises` in a file that has
+    // history is a different thing — the foreign keys refuse it, and refusing
+    // is right.
+    final blank = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(blank.close);
+    final json = jsonEncode(await BackupService(blank).buildPayload());
+
+    await backup.restore(json);
+    expect((await db.select(db.exercises).get()), isNotEmpty,
+        reason: 'a database with no catalog cannot start a session');
+  });
+
   test('every column of every codec has a default or has always been in the '
       'file', () async {
     await setWeightUnit(db, WeightUnit.lb);

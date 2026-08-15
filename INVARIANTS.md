@@ -1360,6 +1360,49 @@ Tested at `training_repository_test.dart:1304`, `:1326`, `:1438`.
 
 ## 22. A restore is checked by the same repairs a launch is
 
+> **CLOSED, and § 11's index took most of the entry with it before this was
+> written. What was left was still real, and it was not the half the entry
+> leads on.**
+>
+> The four launch steps, re-examined one at a time rather than as a list:
+>
+> | Step | Can a file still deliver the state it repairs? |
+> | --- | --- |
+> | `healDuplicateOpenCycles` | **No.** `idx_cycles_regime_open_live` refuses the insert and the whole restore with it (§ 11). This is the case the entry names in *How it is violated*, and it is gone |
+> | `healOrphanedSnapshots` | **Yes**, and it is the whole of what was left. A tombstone is a column, not a foreign key, so nothing in the schema refuses a live `workout_exercises` row under a dead `workouts` row |
+> | `sweepAbandonedWorkouts` | Yes, and skipping it is defensible — an in-progress session in a file is a session you want back. Running it sooner is what the shared list does; nothing is lost that the next launch would have kept |
+> | `ensureStarterCatalog` | Yes, from exactly one file: an export taken before anything was seeded. The entry calls it the mildest and it is |
+>
+> **The fix is the shared list, not four calls copied into `restore`.** The two
+> drifting apart is the entry's actual subject, so `repairDatabase`
+> (`lib/data/repositories/repairs.dart`) is now the list, and
+> `appInitProvider` and `BackupService.restore` are its two callers. A repair
+> added to one is in the other by construction.
+>
+> **After the commit, not inside it.** The transaction is § 4's all-or-nothing
+> guarantee about the *file*; a repair is a judgement about the rows once they
+> are there. Folding it in would mean a healer throwing took the user's restored
+> history back down with it — the file correctly landed, and the app reporting
+> that nothing had been restored.
+>
+> Red first, both halves:
+>
+> ```
+> a restored database satisfies the invariants a launched one does
+>   Expected: <0>   Actual: <6>
+>   a live snapshot under a dead workout is exactly what a first sync push would send
+>
+> a restore of an empty file leaves a catalog to train from
+>   Expected: non-empty   Actual: []
+> ```
+>
+> **One thing the entry's proposed test could not have been written as stated.**
+> *"Restore a fixture carrying two open cycles"* — that file is refused now, so
+> the test would have been asserting on a `FormatException`. And the catalog
+> case cannot be built by emptying `exercises` in a file that has history: the
+> foreign keys refuse it, and refusing is right. It needs a genuinely empty
+> export, which is a different file.
+
 **Invariant.** Whatever validates the database at launch also validates it after
 a restore, because a restore is the one act that replaces every row at once.
 

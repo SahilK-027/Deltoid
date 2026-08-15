@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/backup/backup_service.dart';
 import '../data/db/database.dart';
+import '../data/repositories/repairs.dart';
 import '../data/repositories/training_repository.dart';
-import '../data/seed/seeder.dart';
 import '../domain/cycle_engine.dart';
 import '../domain/units.dart';
 
@@ -19,22 +19,11 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// Resolves once the schema exists and the exercise catalog has its starting
 /// rows. No programme is created here — the user picks or builds their own.
 /// The UI waits on this before rendering anything data-driven.
+///
+/// The list itself is [repairDatabase], shared with `BackupService.restore` so
+/// a launch and a restore cannot check different things.
 final appInitProvider = FutureProvider<void>((ref) async {
-  final db = ref.watch(databaseProvider);
-  await ensureStarterCatalog(db);
-  // A mis-tapped Start leaves a workout that blocks every other session behind
-  // "finish the one you are in". Only the ones with nothing logged in them go —
-  // see [TrainingRepository.sweepAbandonedWorkouts].
-  await ref.watch(trainingRepositoryProvider).sweepAbandonedWorkouts();
-  // A phone that ran a build where `ensureOpenCycle` was not a transaction can
-  // be carrying two or three open cycles for one regime — see
-  // [TrainingRepository.healDuplicateOpenCycles]. Nothing else notices.
-  await ref.watch(trainingRepositoryProvider).healDuplicateOpenCycles();
-  // Discarding a session used to tombstone only the workout row, leaving its
-  // snapshots and sets alive underneath it — see
-  // [TrainingRepository.healOrphanedSnapshots]. Invisible on screen, and
-  // precisely what a first sync push would send.
-  await ref.watch(trainingRepositoryProvider).healOrphanedSnapshots();
+  await repairDatabase(ref.watch(databaseProvider));
 });
 
 /// The regime being trained. Exactly one row is active at a time, but the query

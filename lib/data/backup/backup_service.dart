@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../repositories/repairs.dart';
 import '../seed/seeder.dart';
 
 /// Bumped whenever the export shape changes in a way an older build could not
@@ -875,6 +876,22 @@ class BackupService {
     // are planned against them. `beforeOpen` would fix it on the following
     // launch; this fixes it now.
     await db.customStatement('ANALYZE');
+
+    // The same list a launch runs, and deliberately the same list rather than a
+    // second one written here — INVARIANTS.md § 22.
+    //
+    // **After the commit, not inside it.** The transaction above is the
+    // all-or-nothing guarantee entry 4 rests on: what it holds is that the
+    // *file* landed whole. A repair is a judgement about the rows once they are
+    // there, and folding it in would mean a healer failing took the user's
+    // history back down with it — the file would be correctly restored and the
+    // app would say nothing had been. `healOrphanedSnapshots` opens its own
+    // transaction anyway, which is not a thing to nest for no reason.
+    //
+    // Nothing was reading the restored rows before this point: `restore` is
+    // awaited by the screen that called it, and the streams behind Today rebuild
+    // on the table updates the commit emits.
+    await repairDatabase(db);
 
     return ImportResult(summary: summary, rowsWritten: written);
   }
