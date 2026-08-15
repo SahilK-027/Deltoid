@@ -6918,6 +6918,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_regimes_single_active',
     'CREATE UNIQUE INDEX idx_regimes_single_active ON regimes (is_active) WHERE is_active = 1 AND deleted_at IS NULL',
   );
+  late final Index idxRegimesIdentityLive = Index(
+    'idx_regimes_identity_live',
+    'CREATE UNIQUE INDEX idx_regimes_identity_live ON regimes (identity_index) WHERE deleted_at IS NULL',
+  );
   late final Index idxSessionsRegime = Index(
     'idx_sessions_regime',
     'CREATE INDEX idx_sessions_regime ON sessions (regime_id)',
@@ -7014,6 +7018,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     bodyweightLogs,
     appSettings,
     idxRegimesSingleActive,
+    idxRegimesIdentityLive,
     idxSessionsRegime,
     idxSessionsPositionLive,
     idxSessionsNameLive,

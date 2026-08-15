@@ -114,6 +114,24 @@ class Exercises extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_regimes_single_active '
   'ON regimes (is_active) WHERE is_active = 1 AND deleted_at IS NULL',
 )
+/// And no two live regimes wear the same identity hue.
+///
+/// `nextIdentitySlot` (`regime_repository.dart:158`) hands out the lowest free
+/// one and `createRegime` refuses when all six are taken, which covers every
+/// write that comes through a tap. A file does not: `identity_index` defaults
+/// to 0 and the CHECK below bounds the range only, so an export carrying the
+/// key on every regime is taken at its word — the restore's backfill runs only
+/// when a row *lacks* it (`backup_service.dart:723-726`). A hand-edited or
+/// merged file with the same slot twice restored two programmes onto one
+/// colour, and the mark is what History and Today are scanned by.
+///
+/// Partial on `deleted_at IS NULL` because deleting a regime hands its slot
+/// back — an unscoped index would keep it held by a programme that is gone
+/// from every screen. INVARIANTS.md § 20.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_regimes_identity_live '
+  'ON regimes (identity_index) WHERE deleted_at IS NULL',
+)
 class Regimes extends Table with SyncColumns {
   TextColumn get name => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(false))();

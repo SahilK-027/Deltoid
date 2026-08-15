@@ -331,14 +331,30 @@ void main() {
 
   test('the backfill hands existing rows one slot each, oldest first', () async {
     // Simulates a v4 database coming forward: every row on the column default.
+    //
+    // `idx_regimes_identity_live` now refuses that state outright, so the only
+    // way to build the database the backfill exists for is to stand the index
+    // down while writing it — which is honest about where such a phone comes
+    // from: a build that predates the column, or a file written by one.
+    //
+    // The index goes back *after* the backfill, not before, because SQLite
+    // will not create a unique index over rows that already violate it. The
+    // rebuild succeeding is itself the assertion that the backfill left a
+    // state the shipped schema accepts.
     for (var i = 0; i < 3; i++) {
       await repo.createRegime('R$i');
     }
+    await db.customStatement('DROP INDEX idx_regimes_identity_live');
     await db.update(db.regimes).write(const RegimesCompanion(
           identityIndex: Value(0),
         ));
 
     await backfillIdentityIndexes(db);
+
+    await db.customStatement(
+      'CREATE UNIQUE INDEX idx_regimes_identity_live '
+      'ON regimes (identity_index) WHERE deleted_at IS NULL',
+    );
 
     final all = await living();
     expect(all.map((r) => r.identityIndex), [0, 1, 2]);

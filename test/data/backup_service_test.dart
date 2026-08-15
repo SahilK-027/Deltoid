@@ -575,5 +575,37 @@ void main() {
 
       expect((await db.select(db.bodyweightLogs).get()).length, declared + 1);
     });
+
+    test('a file with two regimes on one hue is refused', () async {
+      // The route INVARIANTS § 20 names. The backfill at the end of the
+      // restore only runs when a row *lacks* `identityIndex`, so a file that
+      // carries the key on every regime is taken at its word — and a file
+      // carrying it twice with the same value landed two programmes on one
+      // colour, which RULES § 2 says must never happen. No app path writes
+      // such a file; a hand edit or a merge does.
+      await createRegimeFromTemplate(
+        db,
+        regimeTemplates.firstWhere((t) => t.key == 'blank'),
+        name: 'Second',
+        // Inactive, so `logASession` still finds the seeded PPL regime and its
+        // Push 1 rather than an empty programme with no sessions in it.
+        activate: false,
+      );
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      final regimes = payload['data']['regimes'] as List;
+      expect(regimes.length, 2, reason: 'the fixture must hold two regimes');
+      final hue = (regimes.first as Map)['identityIndex'];
+      expect(hue, isNotNull, reason: 'a file that omits the key is backfilled');
+      (regimes.last as Map)['identityIndex'] = hue;
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
   });
 }

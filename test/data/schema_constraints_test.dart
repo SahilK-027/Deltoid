@@ -22,18 +22,30 @@ void main() {
 
   late AppDatabase db;
 
+  /// Identity slots are unique among live regimes, so a helper that put every
+  /// regime on slot 0 would fail the tests that need two of them for reasons
+  /// that have nothing to do with what they assert. Dealt out in order unless
+  /// a test names the slot, because in those the slot is the thing under test.
+  /// Reset per test: there are only [identitySlots] of them and the CHECK
+  /// bounds the column to that range.
+  var nextSlot = 0;
+
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
+    nextSlot = 0;
     // beforeOpen carries `PRAGMA foreign_keys = ON`.
     await db.customSelect('SELECT 1').get();
   });
   tearDown(() => db.close());
 
-  Future<String> aRegime({bool active = false}) async {
+  Future<String> aRegime({bool active = false, int? slot}) async {
     final id = newId();
     await db.into(db.regimes).insert(
         RegimesCompanion.insert(
-            id: Value(id), name: 'R', isActive: Value(active)));
+            id: Value(id),
+            name: 'R',
+            isActive: Value(active),
+            identityIndex: Value(slot ?? nextSlot++)));
     return id;
   }
 
@@ -118,6 +130,34 @@ void main() {
     await aRegime();
     await aRegime(active: true);
     expect(await db.regimes.count().getSingle(), 3);
+  });
+
+  test('two live regimes cannot share a hue', () async {
+    // The identity mark is what History and Today are scanned by, so two
+    // programmes wearing one hue is the failure the column exists to prevent —
+    // and `nextIdentitySlot` only defends the writes that come through it. The
+    // route in is a file: `identity_index` defaults to 0 and the CHECK bounds
+    // the range only, so a hand-edited or merged export carrying the key twice
+    // restored two regimes onto one colour. INVARIANTS.md § 20.
+    await aRegime(slot: 3);
+    await expectLater(aRegime(slot: 3), throwsA(isA<SqliteException>()));
+  });
+
+  test('a deleted regime hands its hue back', () async {
+    // Why the index is partial. `deleteRegime` tombstones, and the slot is
+    // documented as returning to the pool — an unscoped index would keep it
+    // held by a programme that is gone from every screen.
+    final first = await aRegime(slot: 2);
+    await (db.update(db.regimes)..where((t) => t.id.equals(first)))
+        .write(RegimesCompanion(deletedAt: Value(nowMs())));
+
+    await aRegime(slot: 2);
+    expect(
+      await (db.select(db.regimes)..where((t) => t.deletedAt.isNull()))
+          .get()
+          .then((r) => r.length),
+      1,
+    );
   });
 
   test('a regime cannot hold one cycle number twice', () async {
@@ -373,7 +413,12 @@ void main() {
       // added to the enum and not to the column.
       // One exercise, one set each: `aWorkoutExercise` opens a workout, and
       // only one may be open at a time now.
-      final we = await aWorkoutExercise(await aRegime());
+      // One regime for the whole test. There are only [identitySlots] hues and
+      // no two live regimes may wear one, so a regime per workout status runs
+      // out of colours long before it runs out of statuses — and nothing here
+      // is about the regime, which is only an FK target.
+      final regime = await aRegime();
+      final we = await aWorkoutExercise(regime);
       for (var i = 0; i < SetType.values.length; i++) {
         await db.into(db.setLogs).insert(SetLogsCompanion.insert(
               id: Value(newId()),
@@ -394,7 +439,7 @@ void main() {
         final id = newId();
         await db.into(db.workouts).insert(WorkoutsCompanion.insert(
               id: Value(id),
-              regimeId: await aRegime(),
+              regimeId: regime,
               dayKey: 20260101,
               status: Value(status),
             ));
@@ -428,7 +473,6 @@ void main() {
         }
       }
       for (final reason in SkipReason.values) {
-        final regime = await aRegime();
         final workout = newId();
         await db.into(db.workouts).insert(WorkoutsCompanion.insert(
               id: Value(workout),

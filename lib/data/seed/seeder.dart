@@ -208,9 +208,13 @@ Future<void> backfillSeededMeasureModes(AppDatabase db) async {
 /// to prevent. Ordered by `createdAt` so the assignment is stable: run it twice
 /// and each regime lands on the same hue.
 ///
-/// A database already holding more than [identitySlots] regimes wraps rather
-/// than failing. The cap is enforced when a regime is *created*; an upgrade is
-/// not the moment to tell someone one of their programmes is surplus.
+/// A database already holding more than [identitySlots] regimes wraps, and
+/// since `idx_regimes_identity_live` the wrap is refused: the seventh live
+/// regime lands back on slot 0 and collides with the first. Only reachable
+/// from a hand-edited pre-v5 file — `createRegime` caps a real shelf at
+/// [identitySlots] — and a restore is all of the file or none of it, so such a
+/// file is refused whole rather than restored with two programmes on one hue.
+/// INVARIANTS.md § 20.
 Future<void> backfillIdentityIndexes(AppDatabase db) async {
   final query = db.select(db.regimes)
     ..where((t) => t.deletedAt.isNull())

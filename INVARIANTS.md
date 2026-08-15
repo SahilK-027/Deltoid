@@ -24,8 +24,8 @@ training data?* Anything that cannot belongs in [DEBT.md](DEBT.md).
 
 ## The short version
 
-The schema is in unusually good shape. **Ten unique indexes (nine when this was
-written — entry 11 added the tenth), fifty-one CHECK
+The schema is in unusually good shape. **Eleven unique indexes (nine when this
+was written — entry 11 added the tenth, entry 20 the eleventh), fifty-one CHECK
 constraints and thirty-one transactions already hold most of what matters** —
 counted at `grep -c 'CREATE UNIQUE INDEX' lib/data/db/tables.dart`, `grep -o
 'CHECK (' lib/data/db/tables.dart | wc -l`, and `grep -rn 'db.transaction('
@@ -1092,6 +1092,42 @@ than snapshotted (`:932-936`), which is a documented exception, not a leak.
 
 ## 20. A restore leaves a state the app's own invariants accept
 
+> **CLOSED.** `idx_regimes_identity_live` — an eleventh partial unique index,
+> `ON regimes (identity_index) WHERE deleted_at IS NULL` (`tables.dart:117`) —
+> and three checks, all red first:
+> `schema_constraints_test.dart` → `two live regimes cannot share a hue` and
+> `a deleted regime hands its hue back`, plus `backup_service_test.dart` →
+> `a file with two regimes on one hue is refused`.
+>
+> **The third one is the entry's actual claim and the entry did not ask for
+> it.** The route named here is a *file*, not a write, so a schema test alone
+> proves the index exists and not that the restore path meets it — the backfill
+> at `backup_service.dart:723-726` runs only when a row *lacks* the key, and
+> whether a file carrying it twice was refused was the open question. It is:
+> the insert fails inside the restore's transaction and the pre-restore
+> database is intact, asserted by the same census the rest of that group uses.
+>
+> **Severity confirmed as STALE**, and the index is not what makes it so — the
+> collision was always a colour. What the index changes is that it is now
+> refused rather than repaired.
+>
+> **One consequence the entry did not anticipate.**
+> `backfillIdentityIndexes` (`seeder.dart:214`) wraps with `i % identitySlots`,
+> so a pre-v5 file holding more than six live regimes lands its seventh back on
+> slot 0 and the restore now **fails** where it used to deal out duplicates.
+> Acceptable, and the doc comment that promised the wrap "rather than failing"
+> was corrected in place: `createRegime` caps a real shelf at six, so only a
+> hand-edited file reaches it, and entry 4 makes the refusal whole rather than
+> partial.
+>
+> Two existing tests constructed the state the index forbids and were rebuilt
+> around it: `schema_constraints_test`'s `aRegime` helper now deals slots out
+> instead of putting every regime on 0, and `regime_repository_test` →
+> `the backfill hands existing rows one slot each` uses the healer shape from
+> entry 11 — drop the index, write the pre-v5 state, backfill, **rebuild the
+> index as the assertion**, because SQLite will not create a unique index over
+> rows that already violate it.
+
 **PROVED that it can fail in one narrow way.** A pre-v5 file carries no identity
 slots, every regime lands on 0, and the backfill at `backup_service.dart:668`
 deals them out — inside the transaction, correctly. But the backfill only runs
@@ -1108,7 +1144,8 @@ on `identity_index`; the CHECK at `tables.dart:160` bounds the range only.
 **The check that closes it.** A partial unique index on
 `regimes (identity_index) WHERE deleted_at IS NULL`, plus
 `schema_constraints_test.dart` → `two live regimes cannot share a hue`.
-**Neither exists.**
+~~**Neither exists.**~~ **Both exist — see the banner, which adds a third for
+the file route this entry actually names.**
 
 ---
 
