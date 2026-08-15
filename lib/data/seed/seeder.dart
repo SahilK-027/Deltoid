@@ -214,7 +214,6 @@ Future<void> backfillSeededMeasureModes(AppDatabase db) async {
 /// from a hand-edited pre-v5 file — `createRegime` caps a real shelf at
 /// [identitySlots] — and a restore is all of the file or none of it, so such a
 /// file is refused whole rather than restored with two programmes on one hue.
-/// INVARIANTS.md § 20.
 Future<void> backfillIdentityIndexes(AppDatabase db) async {
   final query = db.select(db.regimes)
     ..where((t) => t.deletedAt.isNull())

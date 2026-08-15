@@ -127,7 +127,7 @@ class Exercises extends Table with SyncColumns {
 ///
 /// Partial on `deleted_at IS NULL` because deleting a regime hands its slot
 /// back — an unscoped index would keep it held by a programme that is gone
-/// from every screen. INVARIANTS.md § 20.
+/// from every screen.
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_regimes_identity_live '
   'ON regimes (identity_index) WHERE deleted_at IS NULL',
@@ -572,7 +572,7 @@ class SetLogs extends Table with SyncColumns {
   /// (`training_repository.dart:2513`) and `setSetType` (`:2581`) only ever
   /// pass a head from the same slot; a restore and a merge do not come through
   /// either, and the walk that draws a group is scoped to one slot's list, so a
-  /// cross-slot head draws a leg with no head at all. INVARIANTS.md § 14.
+  /// cross-slot head draws a leg with no head at all.
   ///
   /// SQLite requires the referenced columns to carry a unique index, which
   /// `idx_set_logs_slot_identity` above exists for and nothing else reads. It

@@ -2179,7 +2179,7 @@ class TrainingRepository {
     //
     // This filtered `set_logs.deleted_at` alone, which made it the one read in
     // the app that could see an orphan — a live set under a slot or a workout
-    // that had been deleted out from under it (INVARIANTS § 31). No write path
+    // that had been deleted out from under it. No write path
     // leaves that shape any more, but a restore or a merge can still deliver
     // one, and a rest taken in a session that was deleted is not a rest this
     // movement ever took.
@@ -2883,7 +2883,7 @@ class TrainingRepository {
     await db.transaction(() async {
       // The displaced slot's sets go with it. Two sets logged into a movement
       // you then swapped away are not the new movement's, and leaving them live
-      // under a tombstoned slot is what INVARIANTS.md § 1 is about — the sets
+      // under a tombstoned slot is the whole of the cascade rule — the sets
       // stay `dirty` and unreachable, and `doneSetCount` stops seeing them,
       // which is what lets the launch sweep call the whole session empty.
       await _tombstoneSetsOf([workoutExerciseId], stamp);
@@ -3105,7 +3105,7 @@ class TrainingRepository {
     // was created**, and this runs before first paint on every launch — so
     // opening the backfill sheet, getting the log screen and being killed by
     // Android before you ticked anything lost the whole session with no
-    // message. INVARIANTS.md § 2.
+    // message.
     //
     // `updatedAt` is never backdated: it is stamped by `nowMs` on the insert
     // and re-stamped on every write to this row. Ticking a set writes
@@ -3160,7 +3160,7 @@ class TrainingRepository {
   /// every read that carries a number joins the slot and filters `deletedAt` —
   /// but they are live rows with `dirty` set, so the first push hands another
   /// device sets belonging to a slot that does not exist, and no tombstone ever
-  /// follows to clear them. See INVARIANTS.md § 1.
+  /// follows to clear them.
   ///
   /// **Not a transaction of its own**, so every caller owes one: this is half
   /// of a cascade and the other half is the parent's own write.
@@ -3360,7 +3360,7 @@ class TrainingRepository {
     // at this cycle. Tombstoning the cycle under it left the workout naming a
     // dead one — invisible on this phone, because nothing reads a workout's
     // cycle through a `deleted_at` filter, and a dangling reference on the wire
-    // the moment there is a second device. INVARIANTS.md § 23.
+    // the moment there is a second device.
     //
     // Refusing to reopen is the conservative half of the trade. The reopen
     // exists to stop the deload landing early; leaving the earlier cycle closed

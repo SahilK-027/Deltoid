@@ -559,8 +559,6 @@ void main() {
     });
   });
 
-  /// INVARIANTS.md § 2.
-  ///
   /// The sweep exists for a mis-tapped Start: a workout with nothing in it,
   /// opened long enough ago that you are not coming back. It decided "long
   /// enough ago" from `startedAt` — the one column the app **deliberately
@@ -610,8 +608,6 @@ void main() {
     });
   });
 
-  /// INVARIANTS.md § 1.
-  ///
   /// **The rule is not "no live row under a tombstoned parent".** It is: a
   /// tombstoned row takes the rows that only exist to *describe* it, and never
   /// the rows that *record what was done*. `session_exercises` describe a
@@ -667,12 +663,12 @@ void main() {
     /// history and the snapshots are what make that safe. `deleteRegime`
     /// tombstones that programme's cycles and keeps its workouts, so every
     /// deleted regime leaves live workouts naming dead cycles **by design** —
-    /// which INVARIANTS § 23 states the invariant too broadly to allow.
+    /// which a flat reading of the invariant would forbid.
     ///
     /// Under a *live* regime there is no such licence. The cycle is the counter
     /// the deload is scheduled off, and a workout naming a dead one there is a
     /// reference to nothing rather than a reference to something intentionally
-    /// gone. INVARIANTS.md § 23.
+    /// gone.
     Future<int> orphanedWorkoutCycles() => countOf(
           'workouts w JOIN cycles c ON c.id = w.cycle_id '
           'JOIN regimes r ON r.id = c.regime_id '
@@ -785,7 +781,7 @@ void main() {
       // reopens, and judges "is there anything in this one worth keeping" on
       // **completed** sessions alone. A session still running is not counted,
       // so the cycle it belongs to is tombstoned out from under it and the
-      // workout is left naming a dead row. INVARIANTS.md § 23.
+      // workout is left naming a dead row.
       final regime = await activeRegime();
       final sessions = await (db.select(db.sessions)
             ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))

@@ -25,8 +25,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// - `Pacific/Chatham` sits at a **:45 offset**, `Australia/Lord_Howe` shifts by
 ///   **thirty minutes** — the case an hour-shaped assumption misses entirely.
 /// - `America/New_York` is the ordinary Sunday 02:00 rule. Its `weekStartOf` is
-///   fine, exactly as INTERPRETATION § 2 reasoned; its **`historyDays` is not**,
-///   which the entry did not say. Every DST zone on earth got that one wrong.
+///   fine, exactly as the Sunday-transition argument predicts; its
+///   **`historyDays` is not**, which that argument does not reach. Every DST
+///   zone on earth got that one wrong.
 /// - `UTC` is the control, and must come back clean.
 void main() {
   const probe = 'test/tools/dst_probe.dart';

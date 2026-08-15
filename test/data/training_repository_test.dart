@@ -315,11 +315,12 @@ void main() {
 
   test('a deload cycle dropped by a delete does not push the next one late',
       () async {
-    // INTERPRETATION § 9's tail. `_cyclesSinceDeload` counts cycles with
+    // `_cyclesSinceDeload` counts cycles with
     // `completed_at IS NOT NULL AND deleted_at IS NULL`, and
     // `_reopenCycleIfIncomplete` tombstones the cycles after the one it
-    // reopens. If a deload cycle can be tombstoned that way, the entry says
-    // the counter never resets and the next deload lands late.
+    // reopens. If a deload cycle can be tombstoned that way, the counter
+    // would never reset and the next deload would land late — which is the
+    // worry this test exists to settle.
     final regime = await activeRegime();
     await (db.update(db.regimes)..where((t) => t.id.equals(regime.id)))
         .write(const RegimesCompanion(deloadAfterCycles: Value(2)));
@@ -385,7 +386,7 @@ void main() {
 
   test('a deload closed early is not dropped once training follows it',
       () async {
-    // The near miss, and the reason the entry's worry is not reachable.
+    // The near miss, and the reason that worry is not reachable.
     //
     // `advanceCycle` closes a cycle with nothing logged in it, so a deload can
     // carry `completed_at` — where `_cyclesSinceDeload` counts it — while
@@ -1476,10 +1477,10 @@ void main() {
   });
 
   test('a tombstoned slot\'s sets are not the rest fallback', () async {
-    // INVARIANTS § 31: the tier-2 query joins `workout_exercises` and filters
+    // The tier-2 query joins `workout_exercises` and filters
     // only `set_logs.deleted_at`, so a live set under a tombstoned slot is
     // visible to it. Every write path in the app now tombstones a slot's sets
-    // with the slot (INVARIANTS § 1), so the only thing that can deliver this
+    // with the slot, so the only thing that can deliver this
     // shape is a restore — or, after 5b, a merge. Written the way those
     // deliver it: straight into the tables.
     final regime = await activeRegime();
@@ -2017,7 +2018,7 @@ void main() {
   });
 
   test('a charted point is the number worked out by hand', () async {
-    // INTERPRETATION.md § 6. The formulas are proved in `metrics_test.dart`
+    // The formulas are proved in `metrics_test.dart`
     // against hand values; what nothing asserted is that the repository hands
     // them the right inputs. Which `loadMode` was read, whether `measureMode`
     // reached `scorePerformance`, whether the bodyweight series was found at
@@ -2049,7 +2050,7 @@ void main() {
     await regimes.addExerciseToSession(sessionId, plank);
 
     // Weighed on the day trained, so this is the bodyweight lookup and not the
-    // interpolation between two entries — that has its own entry (§ 1) and its
+    // interpolation between two entries — a different calculation with its
     // own arithmetic, and pinning a score on top of it would test both at once
     // and tell you neither.
     final today = DateTime.now();
@@ -2250,7 +2251,7 @@ void main() {
     /// **Not `startedAt`.** The comment that used to sit here said
     /// `startWorkout(at:)` moved only the day key, which is false: it backdates
     /// `startedAt` too, so keying the sweep on that column deleted every
-    /// backfilled session at the next launch. INVARIANTS.md § 2. Moving
+    /// backfilled session at the next launch. Moving
     /// `updatedAt` is how you make a row old without also claiming the training
     /// happened at another time.
     Future<void> age(String workoutId, Duration by) async {

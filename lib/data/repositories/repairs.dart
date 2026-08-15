@@ -11,7 +11,7 @@ import 'training_repository.dart';
 /// `appInitProvider` is a `FutureProvider` that resolves once per process — so
 /// a restore from Settings, which is every restore that is not a first launch,
 /// left the file's rows unexamined until the next cold start while the user
-/// carried on training on top of them. INVARIANTS.md § 22.
+/// carried on training on top of them.
 ///
 /// Order is the launch order and matters in one place: the catalog has to exist
 /// before anything else asks a question about exercises.
@@ -34,7 +34,7 @@ Future<void> repairDatabase(AppDatabase db) async {
   // [TrainingRepository.healDuplicateOpenCycles]. Nothing else notices.
   //
   // A *file* can no longer deliver this state: `idx_cycles_regime_open_live`
-  // refuses the insert and the whole restore with it (INVARIANTS.md § 11). The
+  // refuses the insert and the whole restore with it. The
   // call stays because the list is the point — a repair that is in one caller
   // and not the other is how the two drifted apart in the first place.
   await repo.healDuplicateOpenCycles();

@@ -208,7 +208,7 @@ class RegimeRepository {
   /// this regime reads them: `loggedSessions` filters `sessions.deletedAt`, so
   /// tombstoning them removes every one from History's session filter and
   /// takes away the only way to page a retired programme's history. That
-  /// asymmetry is INVARIANTS.md § 1, and it is a stop rather than a tidy-up.
+  /// asymmetry is deliberate, and it is a stop rather than a tidy-up.
   Future<void> deleteRegime(String regimeId) async {
     await db.transaction(() async {
       final stamp = nowMs();
@@ -458,7 +458,8 @@ class RegimeRepository {
   ///
   /// Its **slots** go with it, because a `session_exercises` row exists only to
   /// describe the session; its **workouts** do not, because they record what
-  /// was done. That distinction is the whole of INVARIANTS.md § 1, and widening
+  /// was done. A row that *describes* goes with its parent and a row that
+  /// *records* stays: that distinction is the whole of the cascade, and widening
   /// it here would delete training rather than a template.
   Future<void> deleteSession(String sessionId) async {
     final stamp = nowMs();

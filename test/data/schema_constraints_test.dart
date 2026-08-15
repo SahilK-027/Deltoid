@@ -138,7 +138,7 @@ void main() {
     // said *where*. A leg under Bench could name a head under Row, or a head in
     // last March's workout, and SQLite took it. `addDropLeg` and `setSetType`
     // always pass a head from the same slot; a restore does not go through
-    // either. INVARIANTS.md § 14.
+    // either.
     final bench = await aWorkoutExercise(await aRegime());
     final row = await aSiblingSlot(bench);
     final head = await aSet(bench, 0);
@@ -210,7 +210,7 @@ void main() {
     // and `nextIdentitySlot` only defends the writes that come through it. The
     // route in is a file: `identity_index` defaults to 0 and the CHECK bounds
     // the range only, so a hand-edited or merged export carrying the key twice
-    // restored two regimes onto one colour. INVARIANTS.md § 20.
+    // restored two regimes onto one colour.
     await aRegime(slot: 3);
     await expectLater(aRegime(slot: 3), throwsA(isA<SqliteException>()));
   });
@@ -391,7 +391,7 @@ void main() {
     // under either, a power cut mid-transaction leaves a half-applied
     // transaction on disk with nothing to undo it. The other four each keep a
     // journal the next open can recover from, which is what every durability
-    // claim in INVARIANTS.md rests on.
+    // claim about this database rests on.
     expect(mode, anyOf('delete', 'truncate', 'persist', 'wal'),
         reason: 'nothing in lib/ sets journal_mode, so this is whatever the '
             'packaged sqlite3 defaults to — read it rather than assume it');

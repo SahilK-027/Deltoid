@@ -836,7 +836,7 @@ class BackupService {
       // **`landed < declared`, not `!=`.** The header is counted before the
       // pages are read, so a set logged while the export was running makes the
       // body honestly longer than the header. That file is complete and must
-      // not be refused. INVARIANTS.md § 6.
+      // not be refused.
       for (final codec in _codecs) {
         final declared = summary.counts[codec.name];
         if (declared == null) continue;
@@ -878,10 +878,10 @@ class BackupService {
     await db.customStatement('ANALYZE');
 
     // The same list a launch runs, and deliberately the same list rather than a
-    // second one written here — INVARIANTS.md § 22.
+    // second one written here.
     //
     // **After the commit, not inside it.** The transaction above is the
-    // all-or-nothing guarantee entry 4 rests on: what it holds is that the
+    // all-or-nothing guarantee a restore rests on: what it holds is that the
     // *file* landed whole. A repair is a judgement about the rows once they are
     // there, and folding it in would mean a healer failing took the user's
     // history back down with it — the file would be correctly restored and the

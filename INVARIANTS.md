@@ -7,13 +7,15 @@ Read it back with `git log -- INVARIANTS.md` and `git show <commit>:INVARIANTS.m
 
 What stays here is what the file *is*, and the prompt that fills it again.
 
-**About twenty test files cite section numbers from that round** — *"INVARIANTS
-§ 19"*, *"§ 1's exception list"*. Those numbers are correct against the last
-revision before this one and are deliberately left alone: they name the reason a
-test exists, and the reason did not stop being true when the catalogue was
-cleared. `git show <commit>:INVARIANTS.md` resolves any of them. **A new round
-starts numbering from 1 again**, so if one is ever regenerated, re-point the
-comments or drop them rather than letting them read against the new numbers.
+**Nothing in `lib/` or `test/` cites this file, deliberately.** Thirty-six
+comments used to carry section numbers from the last round — *"INVARIANTS
+§ 19"*, *"entry 5's export race"*. They were rewritten to state the rule
+instead, because a numbered pointer into a cleared catalogue reads like a
+reference and resolves to nothing, and the next round renumbers from 1 anyway.
+**Keep it that way**: a comment should name the rule it protects, not the
+paragraph that once described it. Cite [RULES.md](RULES.md) or
+[CLAUDE.md](CLAUDE.md) — documents that do not get cleared — or say the rule in
+the comment.
 
 ---
 

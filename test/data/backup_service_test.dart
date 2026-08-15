@@ -349,7 +349,7 @@ void main() {
       // said.
       //
       // Nothing in the app hard-deletes outside the restore's `clear()`
-      // closures (entry 30), which is the only reason this is not reachable
+      // closures, which is the only reason this is not reachable
       // today. That is a property of a different file, and the export should
       // not be resting on it.
       var injected = false;
@@ -510,7 +510,7 @@ void main() {
     final data = payload['data']! as Map<String, dynamic>;
 
     // A file from the build that tombstoned a discarded workout and left its
-    // snapshots alive underneath it — INVARIANTS § 1, and the state
+    // snapshots alive underneath it, which is the state
     // `healOrphanedSnapshots` exists for. Nothing in the schema refuses it: a
     // tombstone is a column, not a foreign key.
     final workouts = (data['workouts']! as List).cast<Map<String, dynamic>>();
@@ -624,8 +624,8 @@ void main() {
   // for — a row that arrives without a column this build reads — is covered
   // properly by 'a file written before a column existed still restores'.
 
-  /// INVARIANTS.md 4 and 6 — a restore replaces the database entirely or
-  /// changes nothing, and it lands every row the file claims to carry.
+  /// A restore replaces the database entirely or changes nothing, and it
+  /// lands every row the file claims to carry.
   ///
   /// Both are about the same moment: `restore` empties every table before it
   /// inserts anything, so from the first `clear()` until the commit the only
@@ -674,7 +674,7 @@ void main() {
       final payload = await backup.buildPayload();
       // A leaf table, so dropping a row models a short body without also
       // breaking a foreign key and failing for the wrong reason. This is
-      // exactly what entry 5's export race produces: the header counted the
+      // exactly what the export race produces: the header counted the
       // rows before the pages were read, and one row never made it out.
       final rows = payload['data']['bodyweight_logs'] as List;
       expect(rows, isNotEmpty, reason: 'the fixture must have a row to drop');
@@ -711,7 +711,7 @@ void main() {
     });
 
     test('a file with two regimes on one hue is refused', () async {
-      // The route INVARIANTS § 20 names. The backfill at the end of the
+      // The route a file takes in. The backfill at the end of the
       // restore only runs when a row *lacks* `identityIndex`, so a file that
       // carries the key on every regime is taken at its word — and a file
       // carrying it twice with the same value landed two programmes on one
@@ -747,7 +747,7 @@ void main() {
       // `parent_set_id` was a reference to `set_logs (id)` and nothing more, so
       // the head had to exist but could sit under any slot in the file. The app
       // cannot write one — `addDropLeg` walks one slot's list — and this is the
-      // route INVARIANTS § 14 names for it.
+      // route a file takes to it.
       await logASession();
       final (workoutId, before) = await census();
 
@@ -768,7 +768,7 @@ void main() {
     });
 
     test('a file with a workout on two days at once is refused', () async {
-      // The route INVARIANTS § 9 names. `day_key` is what the heatmap and the
+      // The route a file takes in. `day_key` is what the heatmap and the
       // calendar ring; `started_at` is what History pages by. A row where they
       // disagree is drawn on one day and filed under another.
       await logASession();

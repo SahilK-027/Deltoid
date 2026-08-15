@@ -229,7 +229,7 @@ void main() {
     });
 
     test('a set with no load does not outrank one that has a load', () {
-      // The third disagreement in INTERPRETATION.md § 4. A `total` exercise has
+      // The one real disagreement between the two rankers. A `total` exercise has
       // no belt, so `addedWeight` is not load on it — but the old ranking read
       // `weight ?? addedWeight`, so the second set here sorted as 100 kg while
       // the chart scored it as having no weight at all. One set, two answers.
