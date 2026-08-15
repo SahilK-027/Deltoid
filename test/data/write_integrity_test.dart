@@ -235,7 +235,17 @@ void main() {
     final regime = await activeRegime();
     final keeper = (await repo.ensureOpenCycle(regime.id))!;
 
-    // What the old, untransacted `ensureOpenCycle` left behind.
+    // What the old, untransacted `ensureOpenCycle` left behind — and which
+    // `idx_cycles_regime_open_live` now refuses outright, so the only way to
+    // build the state the healer exists for is to stand the index down while
+    // writing it. That is honest about where such a phone comes from: a build
+    // that did not have the index, or a file written by one.
+    //
+    // The index is put back *after* the heal rather than before it, because a
+    // unique index cannot be created over rows that already violate it — which
+    // is the point: the successful rebuild at the end is itself the assertion
+    // that the heal left a state the shipped schema accepts.
+    await db.customStatement('DROP INDEX idx_cycles_regime_open_live');
     final stray = newId();
     await db.into(db.cycles).insert(
           CyclesCompanion.insert(
@@ -269,6 +279,15 @@ void main() {
     expect(workout.cycleId, keeper.id);
     // And running it again on a healthy database does nothing.
     expect(await repo.healDuplicateOpenCycles(), 0);
+
+    // The heal left a database the shipped schema accepts. A unique index
+    // refuses to be built over rows that violate it, so this statement
+    // completing is the assertion — and it is a stronger one than counting the
+    // open cycles above, because it is the database's own opinion.
+    await db.customStatement(
+      'CREATE UNIQUE INDEX idx_cycles_regime_open_live '
+      'ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL',
+    );
   });
 
   test('a second session cannot be opened while one is running', () async {

@@ -269,6 +269,23 @@ class SessionExercises extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_cycles_regime_index_live '
   'ON cycles (regime_id, cycle_index) WHERE deleted_at IS NULL',
 )
+/// And a regime cannot hold two cycles that are both *open*.
+///
+/// The index above is on `(regime_id, cycle_index)`, so two cycles could be
+/// open at once as long as they were numbered differently — which is exactly
+/// the state `healDuplicateOpenCycles` (`training_repository.dart:446`) exists
+/// to repair, and the evidence that a build reached it. The healer keeps its
+/// job: it repairs a file that already carries the state, and this refuses the
+/// write that would create it. A pull applier is the second writer that makes
+/// that distinction matter.
+///
+/// Scoped on `deleted_at IS NULL` for the healer's sake as much as anyone's —
+/// it repairs by tombstoning the duplicates, and an unscoped index would
+/// refuse the repair.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_cycles_regime_open_live '
+  'ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL',
+)
 class Cycles extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   IntColumn get cycleIndex => integer()();

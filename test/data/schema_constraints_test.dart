@@ -131,6 +131,61 @@ void main() {
     );
   });
 
+  test('a regime cannot hold two open cycles', () async {
+    // The index that existed was on `(regime_id, cycle_index)`, which lets two
+    // cycles be open at once as long as they are numbered differently — and
+    // `healDuplicateOpenCycles` exists because a build once did exactly that.
+    // The healer repairs the phones that already went wrong; this refuses the
+    // row, which is what a pull applier will need.
+    final regime = await aRegime();
+    await db.into(db.cycles).insert(CyclesCompanion.insert(
+        id: Value(newId()), regimeId: regime, cycleIndex: 1));
+
+    await expectLater(
+      db.into(db.cycles).insert(CyclesCompanion.insert(
+          id: Value(newId()), regimeId: regime, cycleIndex: 2)),
+      throwsA(isA<SqliteException>()),
+      reason: 'the first cycle has no completed_at, so it is still open',
+    );
+  });
+
+  test('closing a cycle makes room for the next one', () async {
+    // The guard that the refusal above is scoped to *open* cycles rather than
+    // to cycles: a programme that could not open its second cycle would be a
+    // worse bug than the one being fixed.
+    final regime = await aRegime();
+    final first = newId();
+    await db.into(db.cycles).insert(CyclesCompanion.insert(
+        id: Value(first), regimeId: regime, cycleIndex: 1));
+    await (db.update(db.cycles)..where((t) => t.id.equals(first)))
+        .write(CyclesCompanion(completedAt: Value(nowMs())));
+
+    await db.into(db.cycles).insert(CyclesCompanion.insert(
+        id: Value(newId()), regimeId: regime, cycleIndex: 2));
+    expect(await db.cycles.count().getSingle(), 2);
+  });
+
+  test('a tombstoned open cycle frees the slot', () async {
+    // `healDuplicateOpenCycles` repairs by tombstoning the duplicates, so the
+    // index has to be scoped `deleted_at IS NULL` or the healer's own write
+    // would be refused by the rule it exists to restore.
+    final regime = await aRegime();
+    final first = newId();
+    await db.into(db.cycles).insert(CyclesCompanion.insert(
+        id: Value(first), regimeId: regime, cycleIndex: 1));
+    await (db.update(db.cycles)..where((t) => t.id.equals(first)))
+        .write(CyclesCompanion(deletedAt: Value(nowMs())));
+
+    await db.into(db.cycles).insert(CyclesCompanion.insert(
+        id: Value(newId()), regimeId: regime, cycleIndex: 2));
+    expect(
+      await (db.select(db.cycles)..where((t) => t.deletedAt.isNull()))
+          .get()
+          .then((r) => r.length),
+      1,
+    );
+  });
+
   test('two live sets cannot share a position under one exercise', () async {
     final we = await aWorkoutExercise(await aRegime());
     await aSet(we, 0);

@@ -6946,6 +6946,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_cycles_regime_index_live',
     'CREATE UNIQUE INDEX idx_cycles_regime_index_live ON cycles (regime_id, cycle_index) WHERE deleted_at IS NULL',
   );
+  late final Index idxCyclesRegimeOpenLive = Index(
+    'idx_cycles_regime_open_live',
+    'CREATE UNIQUE INDEX idx_cycles_regime_open_live ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL',
+  );
   late final Index idxWorkoutsSessionLookup = Index(
     'idx_workouts_session_lookup',
     'CREATE INDEX idx_workouts_session_lookup ON workouts (session_id, status)',
@@ -7017,6 +7021,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxSessionExercisesPositionLive,
     idxCyclesRegime,
     idxCyclesRegimeIndexLive,
+    idxCyclesRegimeOpenLive,
     idxWorkoutsSessionLookup,
     idxWorkoutsDay,
     idxWorkoutsCycle,

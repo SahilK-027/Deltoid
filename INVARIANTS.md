@@ -24,7 +24,8 @@ training data?* Anything that cannot belongs in [DEBT.md](DEBT.md).
 
 ## The short version
 
-The schema is in unusually good shape. **Nine unique indexes, fifty-one CHECK
+The schema is in unusually good shape. **Ten unique indexes (nine when this was
+written — entry 11 added the tenth), fifty-one CHECK
 constraints and thirty-one transactions already hold most of what matters** —
 counted at `grep -c 'CREATE UNIQUE INDEX' lib/data/db/tables.dart`, `grep -o
 'CHECK (' lib/data/db/tables.dart | wc -l`, and `grep -rn 'db.transaction('
@@ -775,6 +776,44 @@ held.**
 
 ## 11. One cycle open per regime, numbered from 1, no duplicates
 
+> **CLOSED.** `idx_cycles_regime_open_live` — a tenth partial unique index,
+> `ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL`.
+> Red first:
+>
+> ```
+> a regime cannot hold two open cycles
+>   Expected: throws <Instance of 'SqliteException'>
+>     Actual: <Instance of 'Future<int>'>
+>      Which: emitted <2>
+> ```
+>
+> Two guards beside it, both green, because an index that refuses too much
+> would be the worse bug: `closing a cycle makes room for the next one` pins
+> the scope to *open* cycles rather than to cycles, and `a tombstoned open
+> cycle frees the slot` pins the `deleted_at IS NULL` half — the healer repairs
+> by tombstoning, so an unscoped index would refuse the repair it exists to
+> perform.
+>
+> **The index made `healDuplicateOpenCycles`' own test impossible to set up**,
+> which is the interesting consequence and is not a problem with either. The
+> test built the broken state with a plain insert; the database now refuses
+> that insert. It drops the index, writes the stray cycle, heals, and then
+> **rebuilds the index** — and the rebuild is the assertion, because SQLite
+> will not create a unique index over rows that already violate it. That is a
+> stronger check than counting the open cycles, because it is the database's
+> own opinion rather than the test's.
+>
+> Standing the index down to write the row is also honest about provenance:
+> the only way a phone carries this state is a build that did not have the
+> index, or a file written by one.
+>
+> **A restore of such a file is now refused outright** rather than landing and
+> being repaired at the next launch. That is [entry 4](#4-a-restore-either-replaces-the-database-entirely-or-changes-nothing)'s
+> rule working as written — all or nothing, loudly — and it sharpens entry 22
+> rather than conflicting with it: the launch repairs a restore does not run
+> can no longer be the difference between a good database and a bad one for
+> *this* invariant, because the bad one cannot be written at all.
+
 **Enforced today.** `idx_cycles_regime_index_live` (`tables.dart:268-271`),
 `CHECK (cycle_index >= 1)` and `completed_at >= started_at` (`:284-289`).
 `ensureOpenCycle` is a transaction (`training_repository.dart:368`), `advanceCycle`
@@ -789,16 +828,18 @@ inside the transaction at `:477`.
 
 Tested at `write_integrity_test.dart:180`, `:201`, `schema_constraints_test.dart:123`.
 
-**Residual: nothing enforces *one open cycle per regime* in the schema.** The
-unique index is on `(regime_id, cycle_index)`, not on
-`(regime_id) WHERE completed_at IS NULL`. `healDuplicateOpenCycles` exists
-because that gap was reached once. **SUSPECT** that it is now unreachable — the
-only writer is a transaction, but a pull applier would be a second one.
+~~**Residual: nothing enforces *one open cycle per regime* in the schema.**~~
+**Closed — see the banner.** The unique index was on `(regime_id, cycle_index)`,
+not on `(regime_id) WHERE completed_at IS NULL`.
+`healDuplicateOpenCycles` exists because that gap was reached once. The healer
+stays: it repairs a file that already carries the state, and the index refuses
+the write that would create it — two different jobs, and a pull applier is the
+second writer that makes the distinction matter.
 
 **The check that closes it.** A tenth partial unique index,
 `ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL`, plus
 `schema_constraints_test.dart` → `a regime cannot hold two open cycles`.
-**Neither exists.**
+**Both exist**, with two scope guards beside the test.
 
 ---
 
