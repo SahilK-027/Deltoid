@@ -49,8 +49,10 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries, **two closed**. Four were one bug in four places — that is entry
-1, closed; entry 2 is closed with it. Two more are the backup export.
+Eight entries, **four closed**. Four were one bug in four places — that is entry
+1, closed; entry 2 is closed with it. Entries 4 and 6 are the restore, also
+closed. Entry 5 is the export, still open; entry 3 belongs to § 3b; entries 7
+and 8 are positions.
 
 ---
 
@@ -354,6 +356,19 @@ write rather than to the 300 ms debounce).
 
 ## 4. A restore either replaces the database entirely or changes nothing
 
+> **CLOSED — and the check was green the moment it was written.**
+> `backup_service_test.dart` → `a row violating a CHECK leaves the pre-restore
+> database intact`: a payload carrying `cycleIndex: 0` against
+> `CHECK (cycle_index >= 1)`, restored, expecting a throw and an unchanged
+> census. It passed on the first run.
+>
+> [HARDENING § 3](HARDENING.md#stage-3--build-the-net) rule 1 says to record
+> that rather than dress it up, and this entry had already predicted it: *"the
+> current behaviour is correct"*. So it is a **characterisation test**, not a
+> bug fixed — it holds the transaction boundary in place for whoever touches
+> `restore` next, which is the pull applier. That is the only reason it is
+> worth having, and it is a good one.
+
 **Invariant.** After `restore`, the database holds exactly the file's rows, or
 exactly what it held before.
 
@@ -444,6 +459,25 @@ compares the streamed file against `buildPayload`, which pages identically.
 ---
 
 ## 6. A restore lands every row the file claims to carry
+
+> **CLOSED.** `backup_service_test.dart` → `a file whose body is shorter than
+> its header is refused`, **red first**:
+>
+> ```
+> Expected: throws anything
+>   Actual: <Instance of 'Future<ImportResult>'>
+>    Which: emitted <Instance of 'ImportResult'>
+> ```
+>
+> A file with one `bodyweight_logs` row removed from the body and its header
+> untouched restored silently and reported success, on a database that had
+> already been cleared.
+>
+> `restore` now counts each table after inserting and refuses on
+> `landed < declared`, inside the transaction, so the clear rolls back. A third
+> test — `a body longer than its header is accepted` — pins the comparison as
+> `<` rather than `!=`, because a set logged mid-export makes the body honestly
+> longer and refusing that file would be the worse bug.
 
 **Invariant.** After `restore`, each table holds the number of rows that file's
 own `counts` header names.
@@ -1046,7 +1080,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fourteen, of which **two are done**. Every one is executable, and every one must
+Fourteen, of which **four are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1087,12 +1121,15 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 10. `every column of every codec has a default or is in every file` — entry 18,
     the one that makes [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3
     mechanical.
-11. `a restore that throws leaves the database exactly as it was` — entry 4.
+11. ✅ `a restore that throws leaves the database exactly as it was` — entry 4.
+    **Written, and green on arrival** — the entry said it would be. Kept as a
+    characterisation test for the pull applier.
 12. `an export taken while rows are being written loses nothing` — entry 5. The
     whole of stage 5a rests on the file being complete, and nothing has ever
     asserted that it is.
-13. `a file whose body is shorter than its header is refused` — entry 6, and the
-    cheapest check on this list.
+13. ✅ `a file whose body is shorter than its header is refused` — entry 6.
+    **Written, red, now passing**, with `a body longer than its header is
+    accepted` beside it to pin the comparison as `<` rather than `!=`.
 14. `the database is not in a journal mode that can lose a committed
     transaction` — entry 12. One `pragma_journal_mode()` read, and it is the
     premise every other durability claim in this document rests on.

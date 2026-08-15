@@ -648,6 +648,33 @@ class BackupService {
         }
       }
 
+      // Every row the header promised is on disk, or none of them are.
+      //
+      // The `counts` header was written from `codec.count()` **before** a
+      // single row was streamed (see [writeBackup]), and until now it was read
+      // only to size a progress bar — the comment in [summarise] says so
+      // outright. So a file whose body is short restored silently, *after*
+      // these tables had already been cleared, and the screen said it worked.
+      // Three ways to be holding one: an export that skipped a row, a hand
+      // edit, and — once the pull applier exists — a merge.
+      //
+      // **`landed < declared`, not `!=`.** The header is counted before the
+      // pages are read, so a set logged while the export was running makes the
+      // body honestly longer than the header. That file is complete and must
+      // not be refused. INVARIANTS.md § 6.
+      for (final codec in _codecs) {
+        final declared = summary.counts[codec.name];
+        if (declared == null) continue;
+        final landed = await codec.count();
+        if (landed < declared) {
+          throw FormatException(
+            'This backup is incomplete. It says it holds $declared '
+            '${_label(codec.name)} and only $landed arrived, so nothing has '
+            'been restored.',
+          );
+        }
+      }
+
       // A pre-v5 file carries no identity slots, so every regime came in on 0 —
       // one colour for the whole shelf, and the uniqueness the mark depends on
       // gone. Deal them out, exactly as the schema migration does. A file that

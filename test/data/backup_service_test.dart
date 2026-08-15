@@ -393,4 +393,91 @@ void main() {
   // there is no lower number to stamp, and what that test was really reaching
   // for — a row that arrives without a column this build reads — is covered
   // properly by 'a file written before a column existed still restores'.
+
+  /// INVARIANTS.md 4 and 6 — a restore replaces the database entirely or
+  /// changes nothing, and it lands every row the file claims to carry.
+  ///
+  /// Both are about the same moment: `restore` empties every table before it
+  /// inserts anything, so from the first `clear()` until the commit the only
+  /// copy of the history is the file being read. A file that turns out to be
+  /// wrong halfway through must take the whole restore back with it, and a
+  /// file that is quietly *short* must not be accepted as complete.
+  group('a restore is all of the file or none of it', () {
+    /// A workout id and the row counts, to compare against after a failure.
+    Future<(String, Map<String, int>)> census() async {
+      final workout = (await db.select(db.workouts).get()).first;
+      return (
+        workout.id,
+        {
+          'workouts': (await db.select(db.workouts).get()).length,
+          'setLogs': (await db.select(db.setLogs).get()).length,
+          'exercises': (await db.select(db.exercises).get()).length,
+          'bodyweight': (await db.select(db.bodyweightLogs).get()).length,
+        },
+      );
+    }
+
+    test('a row violating a CHECK leaves the pre-restore database intact',
+        () async {
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      // `CHECK (cycle_index >= 1)`. A hand-edited export, or — once 5b lands —
+      // a merged one. The row is legal JSON and illegal SQL, which is the only
+      // way to reach the middle of the transaction.
+      final cycles = payload['data']['cycles'] as List;
+      (cycles.first as Map)['cycleIndex'] = 0;
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
+
+    test('a file whose body is shorter than its header is refused', () async {
+      await logASession();
+      await repo.logBodyweight(DateTime(2026, 3, 1), 80);
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      // A leaf table, so dropping a row models a short body without also
+      // breaking a foreign key and failing for the wrong reason. This is
+      // exactly what entry 5's export race produces: the header counted the
+      // rows before the pages were read, and one row never made it out.
+      final rows = payload['data']['bodyweight_logs'] as List;
+      expect(rows, isNotEmpty, reason: 'the fixture must have a row to drop');
+      rows.removeLast();
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before);
+      expect(workoutIdAfter, workoutId);
+    });
+
+    test('a body longer than its header is accepted', () async {
+      // The guard must be `restored < declared`, not `!=`. The header is
+      // counted before the pages are read, so a set logged mid-export makes
+      // the body honestly longer — and refusing that would reject good files.
+      await logASession();
+
+      final payload = await backup.buildPayload();
+      final rows = payload['data']['bodyweight_logs'] as List;
+      final declared = rows.length;
+      rows.add({
+        'id': 'extra-row',
+        'dayKey': 20260301,
+        'weightKg': 80.0,
+        'updatedAt': 1,
+        'deviceId': 'other-phone',
+        'dirty': true,
+      });
+
+      await backup.restore(jsonEncode(payload));
+
+      expect((await db.select(db.bodyweightLogs).get()).length, declared + 1);
+    });
+  });
 }
