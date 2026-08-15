@@ -137,7 +137,7 @@ class ExerciseTrend extends ConsumerWidget {
         ? null
         : dateFromDayKey(all.first.dayKey);
     final (from, to) = window.xBoundsSince(earliest);
-    final by = resolveGranularity(chosen, to.difference(from).inDays);
+    final by = resolveGranularity(chosen, daysBetween(from, to));
 
     // **The same shape whatever the answer is**, and that is the whole point of
     // this method. Scoring the chart is a walk over every performance ever, so

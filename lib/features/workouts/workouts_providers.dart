@@ -72,9 +72,7 @@ final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
   return db.watchQuery([db.setLogs, db.workoutExercises, db.workouts], () async {
     // `volumeWindowDays - 1`, because the window includes today — the same
     // off-by-one `computeConsistency` documents.
-    final from = dayKeyOf(
-      DateTime.now().subtract(const Duration(days: volumeWindowDays - 1)),
-    );
+    final from = dayKeyOf(daysBefore(DateTime.now(), volumeWindowDays - 1));
     return computeWeeklyVolume(setsByMuscle: await repo.setsByMuscleSince(from));
   });
 });
@@ -127,9 +125,7 @@ final workoutsProvider = StreamProvider<WorkoutsData>((ref) {
       db.cycles,
     ],
     () async {
-      final from = dayKeyOf(
-        DateTime.now().subtract(const Duration(days: heatmapWeeks * 7 + 7)),
-      );
+      final from = dayKeyOf(daysBefore(DateTime.now(), heatmapWeeks * 7 + 7));
       final snapshot = await repo.todaySnapshot(heatmapFromDayKey: from);
       return WorkoutsData(
         snapshot: snapshot,

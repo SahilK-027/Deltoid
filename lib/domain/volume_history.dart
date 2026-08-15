@@ -19,10 +19,18 @@ import 'muscle_volume.dart';
 ///
 /// Monday because `Consistency.thisWeek` already draws its week that way, and
 /// two week rules in one app means the same Sunday session lands in different
-/// weeks on two screens. `weekday` is 1 on Monday, so this subtracts nothing on
+/// weeks on two screens. `weekday` is 1 on Monday, so this goes back nothing on
 /// a Monday and six days on a Sunday.
-DateTime weekStartOf(DateTime date) => DateTime(date.year, date.month, date.day)
-    .subtract(Duration(days: date.weekday - 1));
+///
+/// **The result is a map key**, which is what makes the calendar-named form
+/// load-bearing rather than tidy. [computeVolumeHistory] builds `indexOfWeek`
+/// by walking Mondays as dates and then looks this up in it; `bucketize` does
+/// the same through `bucketStartOf`. Both drop a row whose key is absent, with
+/// `if (i == null) continue;` and no complaint. Going back a `Duration` instead
+/// returns 23:00 or 01:00 of a neighbouring day whenever a clock change falls
+/// inside the week, so the lookup misses and a week of training silently
+/// vanishes from the chart.
+DateTime weekStartOf(DateTime date) => daysBefore(date, date.weekday - 1);
 
 /// One week of one series.
 class VolumeWeek {
@@ -36,7 +44,7 @@ class VolumeWeek {
   final int sets;
 
   /// The last day the week covers, for a readout that names a span.
-  DateTime get end => start.add(const Duration(days: 6));
+  DateTime get end => daysBefore(start, -6);
 }
 
 /// One bar: a stretch of weeks folded into the rate they averaged.

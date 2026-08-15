@@ -88,13 +88,13 @@ class TrendWindow {
     }
     if (isAll) {
       final first = earliest == null
-          ? today.subtract(const Duration(days: 365))
+          ? daysBefore(today, 365)
           : DateTime(earliest.year, earliest.month, earliest.day);
       // Never inverted and never a single day: "All" on a log with one entry in
       // it is still a chart, and a span of zero has no width to divide.
-      return first.isBefore(today) ? (first, today) : (today.subtract(const Duration(days: 6)), today);
+      return first.isBefore(today) ? (first, today) : (daysBefore(today, 6), today);
     }
-    return (today.subtract(Duration(days: range!.days)), today);
+    return (daysBefore(today, range!.days), today);
   }
 
   /// The window as day-key bounds, so a query can ask for it rather than a
@@ -102,7 +102,7 @@ class TrendWindow {
   int get fromDayKey => switch (this) {
         _ when isAll => 0,
         _ when year != null => year! * 10000,
-        _ => dayKeyOf(DateTime.now().subtract(Duration(days: range!.days))),
+        _ => dayKeyOf(daysBefore(DateTime.now(), range!.days)),
       };
 
   int get toDayKey => year != null ? year! * 10000 + 1231 : 99999999;
@@ -261,7 +261,7 @@ class TrendRangeBar extends StatelessWidget {
   List<Granularity> get _offered {
     final (from, to) = window.xBoundsSince(earliest);
     final fits = granularitiesFor(
-      to.difference(from).inDays,
+      daysBetween(from, to),
       ceiling: granularityCeiling,
     );
     final out = [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/trend_chart.dart';
 import '../../../domain/chart_buckets.dart';
@@ -263,7 +264,7 @@ class _Months extends StatelessWidget {
     // Named by how much time is on screen, not by how it is folded — the same
     // rule and the same function the line charts use. A fortnight of monthly
     // bars is still a fortnight.
-    final span = bars.last.end.difference(bars.first.start).inDays.toDouble();
+    final span = daysBetween(bars.first.start, bars.last.end).toDouble();
     final format = DateFormat(axisDateFormat(span));
 
     // At most seven, and never more than there are bars: four bars get four

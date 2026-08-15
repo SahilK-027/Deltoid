@@ -523,7 +523,7 @@ class _TrendCard extends ConsumerWidget {
         ? null
         : dateFromDayKey(points.first.dayKey);
     final (from, to) = window.xBoundsSince(earliest);
-    final by = resolveGranularity(granularity, to.difference(from).inDays);
+    final by = resolveGranularity(granularity, daysBetween(from, to));
 
     // Plotted in display units, which is what the axis and the tooltip read in.
     // The mean of a week of weigh-ins is a weigh-in; the sum of them is not a

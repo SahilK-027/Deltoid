@@ -351,9 +351,10 @@ class _MonthGrid extends StatelessWidget {
                 child: Center(
                   child: Text(
                     // Any known Monday, walked forward — the narrow name is the
-                    // formatter's, not ours.
-                    DateFormat('EEEEE')
-                        .format(DateTime(2024, 1, 1).add(Duration(days: i))),
+                    // formatter's, not ours. Named rather than added to, like
+                    // every other date in the app: this one could not have gone
+                    // wrong, and leaving it would make the rule look optional.
+                    DateFormat('EEEEE').format(DateTime(2024, 1, 1 + i)),
                     style: context.t.bodySmall?.copyWith(color: c.textTertiary),
                   ),
                 ),

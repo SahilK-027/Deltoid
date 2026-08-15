@@ -60,3 +60,37 @@ int dayKeyOf(DateTime date) =>
 
 DateTime dateFromDayKey(int key) =>
     DateTime(key ~/ 10000, (key ~/ 100) % 100, key % 100);
+
+/// The calendar date [days] before [date], at local midnight.
+///
+/// **Named, not subtracted.** `date.subtract(Duration(days: n))` is `n * 86400`
+/// seconds of absolute time, and a day that contains a clock change is 23 or 25
+/// hours long — so the result lands on 23:00 or 01:00 of a neighbouring day
+/// rather than on midnight. Dart normalises an out-of-range day component, so
+/// `DateTime(2026, 3, -4)` is 24 February and this needs no month arithmetic of
+/// its own.
+///
+/// [days] may be negative, which walks forward.
+DateTime daysBefore(DateTime date, int days) =>
+    DateTime(date.year, date.month, date.day - days);
+
+/// Whole calendar days from [from] to [to], counting dates rather than hours.
+///
+/// UTC on both sides, which is the pattern the two heatmaps already use
+/// (`heatmap.dart:89-99`, `year_heatmap.dart:55-67`). Only y/m/d is read off
+/// each side, so the zone never escapes the expression — and taking the
+/// difference of two *local* midnights instead would truncate 13 d 23 h to 13
+/// across a spring-forward, which is how "yesterday" reads as "today" twice a
+/// year.
+int daysBetween(DateTime from, DateTime to) =>
+    DateTime.utc(to.year, to.month, to.day)
+        .difference(DateTime.utc(from.year, from.month, from.day))
+        .inDays;
+
+/// [daysBetween] for two `yyyyMMdd` keys.
+///
+/// A `dayKey` is not a day count — `toKey - fromKey` is 76 across a month end
+/// and 8 870 across a New Year — so a span between keys has to go through the
+/// calendar, never through subtraction.
+int daysBetweenKeys(int fromKey, int toKey) =>
+    daysBetween(dateFromDayKey(fromKey), dateFromDayKey(toKey));

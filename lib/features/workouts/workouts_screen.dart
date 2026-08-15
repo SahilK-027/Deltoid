@@ -279,7 +279,11 @@ class _BackfillSheet extends ConsumerStatefulWidget {
 }
 
 class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
-  DateTime _date = DateTime.now().subtract(const Duration(days: 1));
+  /// **This one becomes a row.** Every other date on this screen moves a label;
+  /// accepting the sheet writes this into `startedAt` and `dayKey`, so a day
+  /// that contains a clock change must not shift it. [daysBefore] names the
+  /// calendar date rather than going back 86 400 seconds.
+  DateTime _date = daysBefore(DateTime.now(), 1);
 
   /// Every day ever logged, so the calendar can ring them.
   ///
@@ -367,12 +371,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   }
 
   String get _label {
-    final now = DateTime.now();
-    final days = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).difference(DateTime(_date.year, _date.month, _date.day)).inDays;
+    final days = daysBetween(_date, DateTime.now());
     final stamp = DateFormat('EEE d MMM').format(_date);
     return switch (days) {
       0 => 'Today  ·  $stamp',
@@ -726,14 +725,8 @@ class _RestGap extends StatelessWidget {
 
   /// Whole calendar days, not elapsed hours: a Monday evening session followed
   /// by a Tuesday morning one is "yesterday", not "0 days ago".
-  static int _daysSince(int dayKey) {
-    final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).difference(dateFromDayKey(dayKey)).inDays;
-  }
+  static int _daysSince(int dayKey) =>
+      daysBetweenKeys(dayKey, dayKeyOf(DateTime.now()));
 }
 
 /// First launch. The app ships with no programme at all, so this is the one

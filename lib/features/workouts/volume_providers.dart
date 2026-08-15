@@ -98,8 +98,7 @@ final volumeYearsProvider = FutureProvider<List<int>>((ref) async {
 ({int from, int to}) _spanOf(TrendWindow window, int? firstLogged) {
   final todayKey = dayKeyOf(DateTime.now());
   final from = window.isAll
-      ? (firstLogged ??
-          dayKeyOf(DateTime.now().subtract(const Duration(days: 365))))
+      ? (firstLogged ?? dayKeyOf(daysBefore(DateTime.now(), 365)))
       : window.fromDayKey;
   return (
     from: from,

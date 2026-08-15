@@ -79,23 +79,20 @@ Consistency computeConsistency({
   final first = completedDayKeys.reduce((a, b) => a < b ? a : b);
   // Inclusive of both ends: logging your first session today is one day of
   // history, not zero.
-  final historyDays = dateFromDayKey(todayKey)
-          .difference(dateFromDayKey(first))
-          .inDays +
-      1;
+  final historyDays = daysBetweenKeys(first, todayKey) + 1;
 
   final windowDays = historyDays.clamp(1, consistencyWindowDays);
   // `windowDays - 1`, because the window includes today. Off by one here is how
   // a 4-week divisor ended up describing 29 days of sessions.
   final cutoff = dayKeyOf(
-    dateFromDayKey(todayKey).subtract(Duration(days: windowDays - 1)),
+    daysBefore(dateFromDayKey(todayKey), windowDays - 1),
   );
   final sessions = completedDayKeys.where((k) => k >= cutoff).length;
 
   // Monday of the week containing today. `weekday` is 1 for Monday, so today
   // minus (weekday - 1) days lands on it, and on a Monday subtracts nothing.
   final startOfWeek = dayKeyOf(
-    dateFromDayKey(todayKey).subtract(Duration(days: today.weekday - 1)),
+    daysBefore(dateFromDayKey(todayKey), today.weekday - 1),
   );
 
   return Consistency(

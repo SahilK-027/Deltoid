@@ -31,7 +31,9 @@ and `plates.dart` are almost all tested with hand-computed literals, which is
 unusual and is why this document is short at the top and long at the bottom.
 
 **Three things are actually wrong**, and one of them is wrong by up to two
-kilograms on every bodyweight lift ever charted — § 1, now closed.
+kilograms on every bodyweight lift ever charted — § 1, now closed. § 2 is closed
+too, and it turned out to be worse than written: every timezone with a clock
+change miscounts `historyDays`, not only the handful named in the entry.
 
 **One structural gap runs through everything:** no test anywhere asserts a
 hand-computed `best1RM`, `topSetLoad` or `volume` coming out of the *repository*.
@@ -158,6 +160,74 @@ code today.
 ---
 
 # 2. A `Duration` is subtracted from a calendar date in nineteen places
+
+> **CLOSED.** Every site on the list below is now on `daysBefore` /
+> `daysBetween` / `daysBetweenKeys` in [ids.dart](lib/core/ids.dart), beside
+> `dayKeyOf` and `dateFromDayKey` where the rest of the calendar rules already
+> live. The two heatmaps are untouched: they were already correct.
+>
+> **Two corrections to the entry.**
+>
+> 1. **"The EU, the UK, the US and Australia are safe" is true of `weekStartOf`
+>    and false of everything else.** The Sunday-transition argument is sound —
+>    the transition falls after that Sunday's own midnight, so it is never inside
+>    the span walked back over, and the probe confirms `weekStartOf` and the
+>    volume chart are clean in `America/New_York`, `Europe/London`,
+>    `Pacific/Chatham` and `Australia/Lord_Howe`. But `historyDays` is
+>    `.difference().inDays` between two *fixed* midnights either side of the
+>    transition, and that truncates in **every** DST zone on earth. 143 of the
+>    4 018 days probed were wrong in each of them — the thirteen days following
+>    each spring-forward in the eleven years scanned. The entry rated this "the
+>    smaller half"; it is the universal half.
+> 2. **`Australia/Lord_Howe` shifts by thirty minutes**, and `Pacific/Chatham`
+>    sits at a `:45` offset. Nothing in the entry or in the code assumed a whole
+>    hour, but nothing had tested it either.
+>
+> **How it was made red**, since this is the one bug on the list that cannot be
+> reached from a test on this machine: Dart resolves the local zone from `TZ`
+> once, when the VM starts, and this Mac is `Asia/Kolkata`, which has no clock
+> change. So the checks live in [dst_probe.dart](test/tools/dst_probe.dart), a
+> plain Dart program run as a **child process** under six zones by
+> [dst_calendar_test.dart](test/domain/dst_calendar_test.dart), which reads its
+> findings off stdout. It sweeps every day from 2020 to 2030 in each zone. Before
+> the fix:
+>
+> | Zone | Failing days | Which checks |
+> | --- | --- | --- |
+> | `Asia/Gaza` | 207 | week start, Monday, `historyDays`, dropped rows |
+> | `America/Santiago` | 165 | week start, `historyDays`, dropped rows |
+> | `Pacific/Chatham` | 143 | `historyDays` |
+> | `Australia/Lord_Howe` | 143 | `historyDays` |
+> | `America/New_York` | 143 | `historyDays` |
+> | `Europe/London` | 143 | `historyDays` |
+> | `UTC` | **0** | — the control |
+>
+> After: zero everywhere. `Europe/London` was measured but is not in the
+> committed list — it fails and passes identically to `America/New_York`, and
+> each zone costs a process.
+>
+> **A trap, for RULES § 2.** `Platform.resolvedExecutable` inside `flutter test`
+> is **`flutter_tester`**, the engine binary — not `dart`. It accepts
+> `run <file>`, boots a whole Flutter engine for it, and then hangs. One process
+> per zone, none of them ever exiting, the suite apparently just "slow". The
+> test resolves `dart` off the path instead. The test also refuses to pass a DST zone that reported
+> a single offset all year, because a zone the host has no tzdata for silently
+> resolves to UTC and would turn the whole file green having tested nothing.
+>
+> **One assertion in the first draft of the probe was wrong**, and it is worth
+> recording because it looks like a bug and is not. `daysBefore(d, n).hour == 0`
+> fails in `Asia/Gaza` and `America/Santiago` — those zones move the clock **at
+> midnight**, so the transition day has no 00:00 at all and `DateTime(y, m, d)`
+> on it is 01:00. No fix can produce a midnight that does not exist. The real
+> invariant is that the result is *canonically named* — equal to
+> `DateTime(result.year, result.month, result.day)` — which is exactly what makes
+> it match the key `computeVolumeHistory` walks to. That is what the probe
+> asserts, and it was still red 22 times in Gaza and 11 in Santiago before the
+> fix.
+>
+> `calendar.dart:356` was swept up with the rest: it builds seven weekday names
+> from 1 January 2024 and could never have been wrong, but leaving one
+> `add(Duration(days: i))` in `lib/` would leave the rule looking optional.
 
 **Rank 2.** Off by one day, twice a year, for a week — and in one case it drops a
 whole week of sets from the chart rather than shifting it.
