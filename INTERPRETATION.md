@@ -616,6 +616,60 @@ This is one test and it covers more surface than any other on the list.
 
 # 7. The heatmap and its consistency rate have no tests at all
 
+> **CLOSED**, and the entry named the wrong field.
+>
+> **`isDeload` was never the risk.** `buildHeatmap` OR-s the flag across a day
+> and `loggedDays` takes `max(is_deload)` over the same rows cast to an
+> integer — those are the same fold, and they agree. So does the count, and so
+> does the rate.
+>
+> **`workoutId` was the disagreement, and one side of it was not even
+> deterministic.** `buildHeatmap` kept `existing?.workoutId ?? w.id` — the first
+> row of the day it happened to see — and the query behind it orders on `dayKey`
+> alone, so on a two-session day it kept whichever workout SQLite handed over
+> first. `loggedDays` takes `max(id)` and says in its own comment that it has to
+> be *some* deterministic one; nothing said so on the Dart side. Same day, same
+> tap, two screens, two sessions opened. Red first, both ways round:
+>
+> ```
+> a two-session day opens the same workout on both grids
+>   Expected: 'w-3'   Actual: 'w-2'
+> both heatmap paths agree on the same history
+>   Expected: 'w-2'   Actual: 'w-3'      20260713 workout to open
+> ```
+>
+> Neither choice is more right than the other, so `buildHeatmap` now takes the
+> larger id too. The three folding tests beside it were green on arrival, which
+> is what an untested-but-correct pure fold should do.
+>
+> **The entry's test cannot be written as it asks.** *"Assert `days` and
+> `consistency` are equal field by field"* over the app's two real inputs is
+> false by design: Today's grid is fetched over `heatmapWeeks * 7 + 7` days and
+> the all-time grid over everything, so `days` spans differ and so does
+> `historyDays`. The cross-check is only meaningful over *one* history handed to
+> both, which is how it is written.
+>
+> **`DateTime.now()` inline is why this file had no tests**, and one seam fixes
+> it: both builders take an optional `today`. Nothing in `lib/` passes it.
+>
+> **A first draft of the fixture asserted the window arithmetic without testing
+> it**, and that is the most useful thing here. `historyDays 45`, `windowDays
+> 28`, `sessions 4`, `perWeek 1.0` were all hand-computed and all correct — and
+> perturbing `windowDays - 1` to `windowDays` in `consistency.dart` left the
+> test **green**, because the cutoff moved into the empty stretch between 1 June
+> and 13 July and no session crossed it. The fixture now puts a session on 17
+> June and another on 18 June, one either side of the cutoff, and an off-by-one
+> in either direction moves the count:
+>
+> ```
+> windowDays        Expected: <4>   Actual: <5>
+> windowDays - 2    Expected: <4>   Actual: <3>
+> ```
+>
+> A hand-computed literal over a fixture that cannot feel the bug is still a
+> test that proves nothing. Stage 3's rule is about the *value*; this is the
+> other half of it.
+
 **Rank 7.** An absence, like § 6, and a narrower one — but it is the only file in
 this audit with **zero** test coverage of any kind.
 
