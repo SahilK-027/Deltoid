@@ -190,8 +190,24 @@ firing with the screen off have only been built, not felt.
       that live in comments become conflict rules that live in comments, and a
       regression you cannot see on screen is merged by a project with no CI.
       Stage 1 is done: `hooks/pre-push` runs the gate and refuses a failing
-      push, and the four lints are on with the tree clean under them. Stage 2,
-      the two audits, is next.
+      push, and the four lints are on with the tree clean under them. Stages 2
+      and 3 are done: both audits ran, every entry they raised is closed or
+      recorded, and [INVARIANTS.md](INVARIANTS.md) and
+      [INTERPRETATION.md](INTERPRETATION.md) are back to their prompts, ready to
+      be run again once sync exists. Two things the round owes and did not
+      deliver:
+      - [ ] **A LogScreen widget test proving `_advance` calls the tick guard.**
+            `missingBeforeDone` is pinned; the wiring from the log screen into it
+            is not, because the repo has no LogScreen test harness. The rule it
+            protects: a set cannot be completed with a count and no load, on
+            either of the two paths that complete one.
+      - [ ] **Gather the five structural assertions into `test/integrity/`.**
+            They all exist and all pass — four tombstone counts and the live-cycle
+            count in `write_integrity_test.dart`'s `expectNoOrphans`, the unique
+            positions and single-open-row rules as partial indexes, `day_key`
+            against `started_at` as a CHECK. What does not exist is **one shared
+            oracle callable after any mutation**, which is what the fuzz harness
+            of [HARDENING § 3b](HARDENING.md#3b--the-fuzz-harness) runs against.
 - [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
       document to read before writing any of it. Scope-approved and bounded by
       [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to

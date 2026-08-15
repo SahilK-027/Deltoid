@@ -1,1161 +1,135 @@
 # Deltoid — are the numbers right
 
-Every derived number this app puts on a screen, the rule it should implement,
-where it is implemented, and whether anything asserts it against a value worked
-out by hand. Produced by
-[HARDENING.md § 2b](HARDENING.md#2b-interpretationmd-are-the-numbers-right).
+**Empty.** The round that produced this file ran to completion: eight ranked
+entries closed, a ninth section of verified-and-recorded results retired with
+them, and the UNVERIFIED table emptied — all seven of its tests now carry a
+hand-computed literal. The closed text was deleted rather than kept. Read it
+back with `git log -- INTERPRETATION.md` and `git show <commit>:INTERPRETATION.md`.
 
-**Analysis only.** No code changed to produce this.
+What stays here is what the file *is*, and the prompt that fills it again.
+
+---
+
+## What an interpretation is, in this project
+
+A **derived** number — anything the app computes rather than stores. An e1RM, a
+volume total, a sets-per-week rate, an interpolated bodyweight, a bucket mean, a
+rest target, a plate breakdown, a "3 days ago".
 
 [INVARIANTS.md](INVARIANTS.md) asks whether the row you wrote is the row you
-read. This asks whether the number on the screen is the right number. They share
-no findings.
+read. **This file asks whether the number on the screen is the right number.**
+Storage can be perfect and the arithmetic still wrong: every set correctly on
+disk, and the chart above them drawn against a bodyweight interpolated on a
+date key instead of a day count.
 
-Ranked by **how wrong the number can be × how long it takes to notice**. A
-number that is 2 % wrong forever ranks above one that is 100 % wrong for a
-frame.
+The two share no findings by construction. A wrong *stored* value is an
+invariant; a wrong *computed* value is an interpretation.
 
-## How to read an entry
+## The three test statuses, which are the whole point of the file
 
-- **UNVERIFIED** — a test exists and proves only self-consistency: the expected
-  value is computed by calling the function under test, or by re-implementing
-  its formula. Those prove the code agrees with itself.
 - **HAND** — a literal worked out by a person appears in the test.
-- **NONE** — no test asserts the value.
+- **UNVERIFIED** — a test exists and proves only self-consistency: the expected
+  value is produced by calling the function under test, or by re-implementing
+  its formula in the test. **This is the category the file exists to find.** It
+  reads as coverage, counts as coverage, and proves the code agrees with itself.
+  One bug on both sides of an `expect` satisfies it perfectly.
+- **NONE** — nothing asserts the value.
 
-## The short version
+Every entry states: the rule the number should implement, in words; where it is
+implemented, with `file:line`; the inputs that would expose it being wrong; and
+which of the three statuses it currently has.
 
-The pure domain layer is in good shape: `metrics.dart`, `prefill.dart`,
-`chart_buckets.dart`, `volume_history.dart`, `consistency.dart`, `units.dart`
-and `plates.dart` are almost all tested with hand-computed literals, which is
-unusual and is why this document is short at the top and long at the bottom.
+**Ranked by how wrong the number can be × how long it takes to notice.** A
+number 2 % wrong forever outranks one 100 % wrong for a frame — the first is
+never questioned and the second is seen immediately.
 
-**Three things are actually wrong**, and one of them is wrong by up to two
-kilograms on every bodyweight lift ever charted — § 1, now closed. § 2 is closed
-too, and it turned out to be worse than written: every timezone with a clock
-change miscounts `historyDays`, not only the handful named in the entry.
+## How an entry closes
 
-**One structural gap runs through everything:** no test anywhere asserts a
-hand-computed `best1RM`, `topSetLoad` or `volume` coming out of the *repository*.
-`metrics_test.dart` checks the formulas; the repository tests check that a number
-is `isNotNull` or that two repository methods agree. The wiring between them —
-which load mode, which measure mode, which bodyweight, which sets — is
-unverified end to end.
+**When the check it names passes**, with a banner recording how, the red output,
+and **what the entry got wrong about itself**. In the round just finished, five
+of eight entries were wrong about their own evidence, field or shape — one had
+run its grep against the wrong string, one named `isDeload` as the risk when the
+non-deterministic field was `workoutId`, one asked for a cross-check that is
+false by design across the app's two real inputs, and one found its code correct
+and its comments wrong. Recording that is worth more than the fix.
 
-**The untested code is the code nobody thinks of as arithmetic.**
-`heatmap_data.dart` has no test file at all (§ 7), `restTargetFor` — a three-tier
-fallback that decides the number on the rest timer — has nothing either (§ 8),
-and `plateLoadFor`, the wrapper between the keypad and the best-covered function
-in the app, has none (§ 9). All three sit at the edge between a proven
-calculation and a screen, which is where this document keeps finding the holes.
+## The rules the fixing round runs under
 
-**§§ 8 and 9's tails are now closed**, and both corrected the entry that named
-them: § 8's grep was wrong and the untested tier was the middle one, and
-§ 9's `plateLoadFor` was correct while the two comments describing it were not.
+The same four as [INVARIANTS.md](INVARIANTS.md) — red first, hand-computed
+values, one item per commit — and one that belongs to this file in particular:
+
+**A hand-computed literal over a fixture that cannot feel the bug is still a
+test that proves nothing.** The consistency fixture had four correct hand
+literals and stayed green when the window arithmetic was perturbed, because the
+cutoff moved through an empty stretch of calendar. Put a data point either side
+of every boundary the arithmetic names, then perturb the code and watch the
+number move. Stage 3's rule is about the value; this is the other half of it.
 
 ---
 
-# 1. `bodyweightOnOrdered` interpolates on `yyyyMMdd`, not on days
+## The prompt that regenerates this file
 
-> **CLOSED.** `metrics.dart` now interpolates on a day count from `_daysBetween`,
-> a private helper that converts both keys with `DateTime.utc` and takes
-> `.inDays`. **UTC on both sides deliberately** — a `dayKey` names a calendar day
-> and carries no time, so counting through *local* midnights would make the day
-> containing a clock change 23 or 25 hours long and truncate to the wrong count.
-> That is § 2's bug, and taking it on while fixing § 1 would have been a poor
-> trade. It is the pattern both heatmaps already use.
->
-> Red first, and the three worked values in the table below came back **exactly**
-> as predicted:
->
-> ```
-> interpolates in days, not in date keys
->   Expected: within <0.0001> of <70.9677>   Actual: <70.3>
-> interpolates across a year boundary in days
->   Expected: within <0.0001> of <72.0328>   Actual: <73.98656215005599>
-> interpolates across a month end in days
->   Expected: within <0.0001> of <70.5714>   Actual: <70.96052631578948>
-> ```
->
-> The binary search was left alone: `dayKey` is monotonic, so searching on it is
-> correct. Only the ratio was wrong.
->
-> **Two of the UNVERIFIED list are struck with it.** `interpolates between
-> entries` asserted `> 70 && < 72` and passed under the bug; it is now the first
-> test above. `interpolates the same whatever order the entries arrive in` had
-> the same function on both sides of the `expect` — it keeps the shuffle loop,
-> which is a real assertion about the sort, and now carries two hand literals
-> beside it so it also pins a value. It was red on those.
-
-**Rank 1.** Up to ~2 kg wrong, on every bodyweight and BW+ number the app has
-ever shown, silently, forever.
-
-**The rule it should implement.** Bodyweight on a day with no weigh-in is the
-straight line between the weigh-in before it and the weigh-in after it, in
-**days**.
-
-**Where.** `lib/domain/metrics.dart:253-280`. The interpolation is:
-
-```dart
-final t = (dayKey - a.dayKey) / (b.dayKey - a.dayKey);   // metrics.dart:278
-return a.weightKg + (b.weightKg - a.weightKg) * t;       // metrics.dart:279
-```
-
-`dayKey` is `year * 10000 + month * 100 + day` (`core/ids.dart:58-59`). **It is
-not a day count.** The gap from the 28th to the 4th of the next month is 7 days
-and 76 dayKey units. The gap from 31 December to 1 January is 1 day and 8 870
-dayKey units. The binary search above it (`:264-273`) is correct — `dayKey` is
-monotonic — but the ratio is not.
-
-Everywhere else in the codebase this is done properly: `bucketize` converts with
-`dateFromDayKey` before doing arithmetic (`chart_buckets.dart:239`), and so does
-`computeVolumeHistory` (`volume_history.dart:277`). This one function does the
-arithmetic on the key.
-
-**Inputs that expose it.**
-
-| Series | Query day | Correct | What the code returns | Error |
-| --- | --- | --- | --- | --- |
-| 1 Jan 2026 = 70.0, 1 Feb 2026 = 72.0 | 16 Jan 2026 | 15/31 → **70.968** | 15/100 → **70.300** | **0.67 kg** |
-| 1 Dec 2025 = 70.0, 31 Jan 2026 = 74.0 | 1 Jan 2026 | 31/61 → **72.033** | 8900/8930 → **73.987** | **1.95 kg** |
-| 28 Jan = 70.0, 4 Feb = 71.0 | 1 Feb | 4/7 → **70.571** | 73/76 → **70.961** | 0.39 kg |
-
-The error is zero on a weigh-in day and worst across a month or year boundary,
-which is to say it is worst exactly where a monthly weigh-in habit puts it.
-
-**What it reaches.** `effectiveLoad` for `LoadMode.bodyweight` and
-`bodyweightPlus` (`metrics.dart:25-28`), and therefore:
-
-- `scorePerformance` → `topSetLoad`, `best1RM`, `volume` (`metrics.dart:141-146`)
-- the progress chart (`training_repository.dart:1917-1923`)
-- every history card (`training_repository.dart:1704-1718`)
-- the session total (`session_summary_screen.dart:268-269`)
-
-A pull-up log is scored against a bodyweight that is up to two kilograms wrong,
-so the e1RM is wrong by the same proportion — and the *shape* of the curve
-acquires a sawtooth at every month boundary that looks like real fluctuation.
-
-**Time to notice: never.** The number is plausible. Nothing on screen shows the
-interpolated bodyweight itself.
-
-**Test status: UNVERIFIED.** `test/domain/metrics_test.dart:338-398` has seven
-tests of `bodyweightOn` and **not one asserts an interpolated value**:
-
-- `:344` `interpolates between entries` — asserts only `> 70` and `< 72`. Both
-  the correct answer and the wrong one pass.
-- `:387` `interpolates the same whatever order the entries arrive in` — the
-  expectation is `bodyweightOn(day, ordered)`. **The same function on both
-  sides.** This is the archetype the stage-3 rule exists for.
-- `:351`, `:368`, `:377` test the clamps and the exact-hit cases, which are
-  correct and correctly asserted.
-
-**The check that closes it.**
-`test/domain/metrics_test.dart` → `interpolates in days, not in date keys`:
+Run it when new derived numbers appear, or when the inputs behind existing ones
+change. **Sync is such a change**: a merged row can carry a value combination
+the write path can no longer produce — a working set with a count and no load,
+say — and the arithmetic downstream will draw it.
 
 ```
-// 1 Jan = 70.0, 1 Feb = 72.0. 16 Jan is 15 of the 31 days between them.
-// 70 + 2 * (15 / 31) = 70.967741935…
-expect(bodyweightOn(20260116, log), closeTo(70.9677, 1e-4));
+Audit the correctness of every derived number this app displays. Not storage
+integrity — arithmetic. ANALYSE ONLY; the deliverable is INTERPRETATION.md and
+nothing else.
+
+For each derived value state: the rule it should implement (in words), where it
+is implemented (file:line), the inputs that would expose it being wrong, and
+whether a test asserts the value against a HAND-COMPUTED expectation.
+
+Cover at minimum:
+  - resolvePrefill: session-scoped progression. The app's reason to exist.
+  - effectiveLoad across all four LoadModes, including addedWeight and a null
+    bodyweight.
+  - scorePerformance: top set, e1RM (Epley, reps capped at 12), volume, and
+    which SetTypes count. Holds separately: a hold's seconds live in reps, its
+    top set is the longest rather than the heaviest, and it has no e1RM and no
+    volume.
+  - bodyweightOnOrdered: interpolation, and behaviour outside the series.
+  - bucketize: mean vs sum, empty buckets, rows on a boundary day.
+  - foldWeeks: sets-per-week across granularities.
+  - countsAsVolume and the workout_exercises.muscle snapshot fallback.
+  - cycle advance and deload scheduling.
+  - dayKey <-> DateTime, week starts, and every calculation crossing a DST
+    boundary or a leap day.
+  - the heatmap folds, and the consistency rate under them.
+  - backup round-trip: does every field survive exactly.
+  - every number that reaches a screen through the REPOSITORY rather than
+    through a pure function: the formulas being proved is not the wiring being
+    proved. Which loadMode was read, whether measureMode arrived, which
+    bodyweight series was used, whether a raw statement's columns still line
+    up.
+
+Flag every test whose expected value is computed by calling the same function
+under test, or by re-implementing its formula in the test. Those prove the code
+is self-consistent, not that it is right. List them as UNVERIFIED — they are the
+quiet majority of "covered" behaviour in most projects and there will be some
+here, including in tests written recently.
+
+Rank by: how wrong the displayed number could be, and how long it would take a
+user to notice.
+
+End with the UNVERIFIED list gathered in one place, as a table, so it can be
+worked through and struck off.
 ```
 
-plus the year-boundary row of the table above. Both are red against the current
-code today.
-
----
-
-# 2. A `Duration` is subtracted from a calendar date in nineteen places
-
-> **CLOSED.** Every site on the list below is now on `daysBefore` /
-> `daysBetween` / `daysBetweenKeys` in [ids.dart](lib/core/ids.dart), beside
-> `dayKeyOf` and `dateFromDayKey` where the rest of the calendar rules already
-> live. The two heatmaps are untouched: they were already correct.
->
-> **Two corrections to the entry.**
->
-> 1. **"The EU, the UK, the US and Australia are safe" is true of `weekStartOf`
->    and false of everything else.** The Sunday-transition argument is sound —
->    the transition falls after that Sunday's own midnight, so it is never inside
->    the span walked back over, and the probe confirms `weekStartOf` and the
->    volume chart are clean in `America/New_York`, `Europe/London`,
->    `Pacific/Chatham` and `Australia/Lord_Howe`. But `historyDays` is
->    `.difference().inDays` between two *fixed* midnights either side of the
->    transition, and that truncates in **every** DST zone on earth. 143 of the
->    4 018 days probed were wrong in each of them — the thirteen days following
->    each spring-forward in the eleven years scanned. The entry rated this "the
->    smaller half"; it is the universal half.
-> 2. **`Australia/Lord_Howe` shifts by thirty minutes**, and `Pacific/Chatham`
->    sits at a `:45` offset. Nothing in the entry or in the code assumed a whole
->    hour, but nothing had tested it either.
->
-> **How it was made red**, since this is the one bug on the list that cannot be
-> reached from a test on this machine: Dart resolves the local zone from `TZ`
-> once, when the VM starts, and this Mac is `Asia/Kolkata`, which has no clock
-> change. So the checks live in [dst_probe.dart](test/tools/dst_probe.dart), a
-> plain Dart program run as a **child process** under six zones by
-> [dst_calendar_test.dart](test/domain/dst_calendar_test.dart), which reads its
-> findings off stdout. It sweeps every day from 2020 to 2030 in each zone. Before
-> the fix:
->
-> | Zone | Failing days | Which checks |
-> | --- | --- | --- |
-> | `Asia/Gaza` | 207 | week start, Monday, `historyDays`, dropped rows |
-> | `America/Santiago` | 165 | week start, `historyDays`, dropped rows |
-> | `Pacific/Chatham` | 143 | `historyDays` |
-> | `Australia/Lord_Howe` | 143 | `historyDays` |
-> | `America/New_York` | 143 | `historyDays` |
-> | `Europe/London` | 143 | `historyDays` |
-> | `UTC` | **0** | — the control |
->
-> After: zero everywhere. `Europe/London` was measured but is not in the
-> committed list — it fails and passes identically to `America/New_York`, and
-> each zone costs a process.
->
-> **A trap, for RULES § 2.** `Platform.resolvedExecutable` inside `flutter test`
-> is **`flutter_tester`**, the engine binary — not `dart`. It accepts
-> `run <file>`, boots a whole Flutter engine for it, and then hangs. One process
-> per zone, none of them ever exiting, the suite apparently just "slow". The
-> test resolves `dart` off the path instead. The test also refuses to pass a DST zone that reported
-> a single offset all year, because a zone the host has no tzdata for silently
-> resolves to UTC and would turn the whole file green having tested nothing.
->
-> **One assertion in the first draft of the probe was wrong**, and it is worth
-> recording because it looks like a bug and is not. `daysBefore(d, n).hour == 0`
-> fails in `Asia/Gaza` and `America/Santiago` — those zones move the clock **at
-> midnight**, so the transition day has no 00:00 at all and `DateTime(y, m, d)`
-> on it is 01:00. No fix can produce a midnight that does not exist. The real
-> invariant is that the result is *canonically named* — equal to
-> `DateTime(result.year, result.month, result.day)` — which is exactly what makes
-> it match the key `computeVolumeHistory` walks to. That is what the probe
-> asserts, and it was still red 22 times in Gaza and 11 in Santiago before the
-> fix.
->
-> `calendar.dart:356` was swept up with the rest: it builds seven weekday names
-> from 1 January 2024 and could never have been wrong, but leaving one
-> `add(Duration(days: i))` in `lib/` would leave the rule looking optional.
-
-**Rank 2.** Off by one day, twice a year, for a week — and in one case it drops a
-whole week of sets from the chart rather than shifting it.
-
-**The rule.** [chart_buckets.dart:20-23](lib/domain/chart_buckets.dart) states it
-for the whole app: *"Buckets are walked as calendar dates, never as day
-arithmetic. Adding seven days to a local `DateTime` crosses a daylight-saving
-change correctly; adding `7 * 86400` seconds does not."*
-
-`Duration(days: n)` **is** the `n * 86400` form, and `.difference(...).inDays` is
-its mirror — a truncating division of an absolute span. **Nineteen sites in
-`lib/`, across nine files, use one or the other on a calendar date.** Grouped by
-what they reach:
-
-**Reaches a stored key** — the serious one:
-
-| Site | Code | Consequence |
-| --- | --- | --- |
-| `volume_history.dart:24-25` | `DateTime(y,m,d).subtract(Duration(days: date.weekday - 1))` | a week key that is not midnight, so a map lookup misses and the row is dropped |
-
-**Reaches a displayed number:**
-
-| Site | Code | Consequence |
-| --- | --- | --- |
-| `consistency.dart:91` | `.subtract(Duration(days: windowDays - 1))` | cutoff one day early; one extra session in the numerator |
-| `consistency.dart:98` | `.subtract(Duration(days: today.weekday - 1))` | `thisWeek` starts a day early |
-| `consistency.dart:82-85` | `.difference(...).inDays + 1` | `historyDays` one short; flips `perWeek` to null at the fortnight boundary |
-| `workouts_providers.dart:76` | `dayKeyOf(DateTime.now().subtract(const Duration(days: volumeWindowDays - 1)))` | **the rolling 7-day volume window** — Today's muscle bars count 8 days |
-| `workouts_screen.dart:371-375` | `DateTime(y,m,d).difference(DateTime(y,m,d)).inDays` | the date strip's "N days ago" reads one short; "Yesterday" becomes "Today" |
-| `workouts_screen.dart:731-735` | same, on a `dayKey` | same |
-| `volume_providers.dart:102` | `dayKeyOf(DateTime.now().subtract(const Duration(days: 365)))` | the `All` span's fallback start |
-| `trend_chart.dart:91`, `:95`, `:97`, `:105` | `today.subtract(Duration(days: range.days))` | a chart range one day short at its left edge |
-| `workouts_providers.dart:131` | `dayKeyOf(DateTime.now().subtract(Duration(days: heatmapWeeks * 7 + 7)))` | the heatmap's fetch window, one day short at its left edge |
-| `workouts_screen.dart:282` | `DateTime _date = DateTime.now().subtract(const Duration(days: 1))` | **the backfill sheet's default date** — see below |
-| `exercise_trend.dart:140`, `bodyweight_screen.dart:526`, `trend_chart.dart:264` | `to.difference(from).inDays` → `resolveGranularity` / `granularitiesFor` | a span one day short picks the wrong granularity at a threshold |
-
-**Label only:**
-
-| Site | Code | Consequence |
-| --- | --- | --- |
-| `volume_history.dart:39` | `start.add(const Duration(days: 6))` | `VolumeWeek.end`, never a key |
-| `volume_chart.dart:266` | `bars.last.end.difference(bars.first.start).inDays` | axis span, layout |
-
-**The two heatmaps are correct and are named here so their silence is not read
-as an omission.** Both do the arithmetic in UTC precisely to avoid this:
-`heatmap.dart:93-99` (`DateTime.utc(now.year, now.month, now.day)`, with the
-reason at `:89-92`) and `year_heatmap.dart:63-67` (`DateTime.utc(widget.year, 1,
-1)`, reason at `:55-56`). `dayKeyOf` reads only y/m/d, so the zone never
-escapes. **This is the pattern the other nine sites should have copied.**
-
-The `workouts_providers` / `volume_providers` / `trend_chart` cutoffs are the
-narrowest of the reachable set: they subtract from `DateTime.now()`, which
-carries an hour, so the day only shifts when the wall clock is within an hour of
-midnight *and* a transition falls inside the span. Narrow is not zero, and the
-first of them is the number on the Today screen.
-
-**The backfill default is the one that writes a row.** Every other site on this
-list moves a number on a screen; `workouts_screen.dart:282` seeds the date the
-backfill sheet opens on, and that date becomes `startedAt` and `dayKey` on a real
-workout if the user accepts it. Its label is computed by `_label` at `:371-375`
-— `.inDays` between two local midnights — so on a day when the default is wrong
-the label is wrong in the same direction and reads "Yesterday" for a date that is
-not yesterday. **The check cannot be the label**, because the label shares the
-bug. The fix is the calendar-named form — `DateTime(now.year, now.month,
-now.day - 1)`, which Dart normalises across a month end — or the UTC pair both
-heatmaps use. **Not** `dayKeyOf(...) - 1`: a `dayKey` is not a day count, which
-is the whole of § 1.
-
-**`weekStartOf` is the serious one.** Its result is used as a **map key**:
-
-- `computeVolumeHistory` builds `indexOfWeek` by *walking* Mondays with
-  `DateTime(w.year, w.month, w.day + 7)` (`volume_history.dart:257`) — always
-  local midnight — and then looks up
-  `indexOfWeek[weekStartOf(dateFromDayKey(row.dayKey))]` (`:277`).
-- If `weekStartOf` returns 23:00 of the previous day instead of midnight, the
-  lookup misses and the row is **silently dropped**: `if (i == null) continue;`
-  (`:278`).
-- `bucketize` has the same shape — `index[bucketStartOf(...)]` at
-  `chart_buckets.dart:239`, `if (i == null) continue;` at `:240`, with
-  `bucketStartOf` delegating weekly to `weekStartOf` (`:91`).
-
-**PROVED that the shape is wrong. SUSPECT that it is reachable in most
-timezones.** In every jurisdiction whose transition falls on a Sunday at
-01:00–03:00 local — the EU, the UK, the US, Australia — the transition instant
-always lies *outside* the within-week backward span, because `weekStartOf` starts
-from Sunday-midnight, which precedes the transition. So the bug does not fire
-there. It fires where midnight itself does not exist on the transition day
-(Chile, Cuba, Iran, Lebanon, Brazil historically), where the transition is
-mid-week, or on a permanent offset change pushed by a `tzdata` update.
-
-**Time to notice.** A missing week on the volume chart is visible if you go
-looking; nobody goes looking.
-
-**Test status: NONE** for the crossing. `volume_history_test.dart:26-32` tests
-`weekStartOf` on ordinary days, and `chart_buckets_test.dart:33-42` tests
-`nextBucket` across February, a 31st and a leap year — but only the *forward*,
-calendar-named path, which is the one that is already correct.
-
-**The check that closes it.**
-`test/domain/volume_history_test.dart` → `a week start is midnight across a
-clock change`, over a fixed list of transition dates, asserting
-`weekStartOf(d).hour == 0` and that `computeVolumeHistory` loses no rows in a
-span containing one. The fix is one line —
-`DateTime(date.year, date.month, date.day - (date.weekday - 1))` — and it is the
-form the rest of the file already uses.
-
-For the "days ago" pair, `test/features/` → `a workout logged yesterday reads as
-yesterday across a clock change`: the fix is `.difference(...).inDays` on a **UTC**
-pair — `DateTime.utc(y, m, d)` either side — not on two local midnights, and not
-subtraction of one `dayKey` from another, which is § 1's bug wearing a different
-hat. For `workouts_providers.dart:76` and `:131`, the fix is to build the cutoff
-by naming the calendar date — `DateTime(now.year, now.month, now.day - 6)` —
-rather than subtracting an absolute span from an instant.
-
-**`consistency.dart` is the smaller half.** `historyDays` across a spring-forward
-is 14 where it should be 15 (`.inDays` truncates 13 d 23 h to 13), which flips
-`perWeek` from a number to `null` at exactly the two-week boundary
-(`consistency.dart:106-108`), and shifts `windowDays` — the divisor — by one.
-The cutoff at `:91` lands on the previous day, adding one session to the
-numerator. Test status **NONE**; `consistency_test.dart:29-49` pins the window
-arithmetic with hand-computed literals but never crosses a transition.
-
----
-
-# 3. A working set with no load is a performance worth zero volume
-
-> **CLOSED at the source rather than on the chart.**
->
-> The entry asked whether a loadless performance should produce a chart point.
-> The better answer was that the row should not exist. A set can be ticked two
-> ways — tapping the box, and typing reps then pressing Next — and only the box
-> refused an empty one. The rule was a private method on the log screen, so the
-> second path never asked it.
->
-> Both paths now call `missingBeforeDone` (`lib/features/log/set_completion.dart`),
-> a function over plain values with eleven cases covering the four load modes,
-> holds, and the ghost. Blank stays distinct from zero for `bodyweightPlus`: an
-> unweighted set of a movement you sometimes load is a different fact from a
-> belt you forgot to record, and only one should score as bodyweight alone.
->
-> **Still worth the downstream guard**, at STALE rather than as a bug: the
-> write path can no longer make such a row, but a restore or — after 5b — a
-> merge can still deliver one, and the chart would draw the zero.
->
-> Not red-first at the UI layer: there is no LogScreen test harness in the
-> repo, so the rule is pinned and the wiring is not. Owed.
-
-**Rank 3.** One chart point reading `0 kg` on a day you trained.
-
-**The rule.** A performance with nothing scoreable in it should not produce a
-point.
-
-**Where.** `scorePerformance` counts a set toward `workingSets` on set type
-alone — `if (!s.type.countsForProgress) continue; … count++`
-(`metrics.dart:139-148`) — before it knows whether the set has a load or a count.
-So `score.isEmpty` (`metrics.dart:114`) is false for a done working set with
-`weight == null`, and `exerciseProgress` keeps the point
-(`training_repository.dart:1924`) with `topSetLoad == null`, `best1RM == null`
-and `volume == 0`.
-
-**Inputs that expose it.** A `LoadMode.total` exercise performed for the first
-time, where the reps are typed and the weight is not. Reachable: the tick path
-only *adopts* a weight from the ghost (`log_screen.dart:983`), and on a first-ever
-performance there is no ghost to adopt from. `_advance` requires `reps > 0` and
-nothing more (`log_screen.dart:980`).
-
-**Time to notice.** Immediately, if the volume series is on screen — a bar at
-zero on a day you trained. Otherwise never.
-
-**Test status: NONE.** `training_repository_test.dart:1686` (`a set taken back is
-not on the chart, and an emptied day is not either`) covers `isDone = false`, not
-`weight = null`.
-
-**The check that closes it.**
-`test/domain/metrics_test.dart` → `a set with a count and no load scores nothing`:
-assert `scorePerformance(...).isEmpty` for
-`[ScoredSet(type: working, reps: 8)]` under `LoadMode.total`. Red today —
-it currently reports `workingSets: 1, volume: 0`.
-
-**Note this is a judgement call, not obviously a bug.** `totalReps` of 8 is a
-true fact about the day. The question is whether a point with no load belongs on
-a load chart. Decide it before writing the test.
-
----
-
-# 4. Two definitions of "the top set"
-
-> **CLOSED, and the entry was wrong about the shape of it.**
->
-> This was filed as *two implementations of one rule*. It is not. It is **one
-> name over two different questions**, and the answer was never to merge them:
->
-> - the summary row asks *what was the heaviest thing you did?* — a record of
->   the session, so back-offs belong in it
-> - the chart asks *what counts as progress?* — so back-offs must stay out, or
->   a deliberately light week reads as a gain
->
-> Merging the pools would have broken one of the two. Widening
-> `scorePerformance` would put back-off and drop noise on the e1RM line;
-> narrowing `heaviestLogged` would blank the summary row on a light day.
->
-> **What actually shipped:**
->
-> 1. **The ranker is now shared.** Both rank by `effectiveLoad` rather than the
->    figure typed in the box. That was the one real defect — disagreement 3 —
->    and it was **red first**:
->
->    ```
->    a set with no load does not outrank one that has a load
->      Expected: <0>   Actual: <1>
->    ```
->
->    A `total` set carrying only `addedWeight` sorted as though the belt were
->    on the bar, while the chart scored it as having no load at all.
-> 2. **The pools stay different**, and each now says why in its own doc.
-> 3. **`topSetIndex` is renamed `heaviestLogged`.** The name was the bug: it
->    read as a second opinion on the chart's question and got filed as a defect
->    twice. Two names, two questions, and nothing left that looks like a
->    contradiction.
->
-> Disagreements 1 and 2 are therefore **not defects and are not "fixed"** —
-> they are the two functions correctly answering different questions, and that
-> is now written down where a reader will find it.
->
-> Worth recording: **deload was never part of this.** `exercise_trend.dart`
-> already excludes deload weeks from the plotted line (`:300`), the axis scale
-> (`:226`), the all-time best (`:395`) and the stall badge (`:389`), with the
-> reason stated there — *"a light week is periodisation, not a drop in
-> strength"*.
-
-**Rank 4.** A card names a top set on a day the chart has no point for.
-
-**The rule.** One definition, per [RULES.md § 4](RULES.md#4-code), which records
-that these two functions disagreed once already about every hold ever logged.
-
-**Where.**
-
-- `scorePerformance` ranks by `effectiveLoad` over **working and amrap only**
-  (`metrics.dart:139`, `:161-164`).
-- `topSetIndex` ranks by raw `weight ?? addedWeight` over **everything except
-  warm-ups** (`set_format.dart:117`, `:120-122`).
-
-**They agree on the ordering** for every load mode — `perSide` doubles
-monotonically, `bodyweightPlus` orders by `addedWeight` either way, `bodyweight`
-ties everything and both keep the first. **PROVED.** That is the part
-[RULES.md § 4](RULES.md#4-code) was worried about and it is fine.
-
-**They disagree on the pool, in three ways.**
-
-1. `backoff`, `drop` and `restPause` are eligible top sets for `topSetIndex` and
-   are not performances for `scorePerformance`. On a day whose only non-warm-up
-   sets are back-offs — a deliberately light session — the summary's `_top`
-   (`session_summary_screen.dart:602-603`, and the workout detail screen, which
-   its comment says ranks the same way) names a top set while `exerciseProgress`
-   returns no point at all.
-
-2. **The all-warm-up fallback.** `topSetIndex` widens its pool to *every* set
-   when nothing survives the warm-up filter — `final pool = counted.isEmpty ?
-   [for (var i = 0; i < sets.length; i++) i] : counted` (`set_format.dart:119`),
-   documented at `:105`. So a session where only warm-ups were ticked names a
-   warm-up as the top set. `scorePerformance` returns `isEmpty` for the same
-   list. Deliberate on its own terms — the doc says *"unless warm-ups are all
-   there is"* — and still a second definition.
-
-3. **`addedWeight` is ranked by one and ignored by the other.** `topSetIndex`
-   ranks `sets[i].weight ?? sets[i].addedWeight` (`set_format.dart:121-122`),
-   while `effectiveLoad` reads `addedWeight` only under `bodyweightPlus`
-   (`metrics.dart:20-28`) — under `total` and `perSide` it returns `weight` and
-   `weight * 2`, both null when `weight` is null. So a `total` set with
-   `addedWeight` set and `weight` null is rankable by `topSetIndex` and scores
-   `null` load. That is § 3's exact input, reached from the other side.
-
-**Time to notice.** Never; the two are on different screens.
-
-**Test status: NONE** for any of the three. `metrics_test.dart:162` and
-`set_format_test.dart` each test their own function.
-
-**The check that closes it.**
-`test/domain/set_format_test.dart` → `the top set of a day is the same set the
-score picked`, over a table of set lists covering each `SetType` and each
-`LoadMode` — and including an all-warm-up list and a `total` set carrying only
-`addedWeight` — asserting `topSetIndex` selects the set whose `effectiveLoad`
-equals `scorePerformance(...).topSetLoad`, or that both agree there is no top
-set. Then either widen `scorePerformance`'s pool or narrow `topSetIndex`'s —
-deliberately, in one place.
-
----
-
-# 5. The unit preference does not survive a restore
-
-> **CLOSED.** Same finding as [INVARIANTS § 17](INVARIANTS.md), fixed once —
-> **the full banner is there**, including the two things about the fix that were
-> not obvious from either entry: a whole-table `clear()` would have destroyed
-> the install's `device_id` for the rest of the launch, and the keyset cursor
-> did not generalise to a table with no `id`.
->
-> Red first, on the number this document cares about: `WeightUnit.kg` where the
-> restored history should have read `WeightUnit.lb`.
->
-> **The entry's own claim was right in full** — the severity, the mechanism and
-> the fallback at `units.dart:53-56` all held up. Nothing to correct here.
-
-**Rank 5.** Every weight on every screen changes by a factor of 2.2, once.
-
-`app_settings` is not in `_codecs` (`backup_service.dart:124-261`), so after a
-restore onto a fresh install `weightUnit()` (`training_repository.dart:2148-2153`)
-reads nothing and `WeightUnitX.parse(null)` returns `kg`
-(`units.dart:53-56`).
-
-Storage is kilograms throughout, so **no stored number is wrong** — but a pounds
-user restoring onto a new phone sees their entire history in kilograms with
-nothing said, and the deload rounding in `applyDeload`
-(`prefill.dart:234` → `roundLoadIn`, `units.dart:63-67`) will snap the next
-suggestion to a half-kilo rather than a pound.
-
-**Time to notice: immediately**, which is the only reason this is not higher.
-
-**Test status: NONE.** Also recorded as [INVARIANTS.md](INVARIANTS.md) § 17.
-
-**The check that closes it.** `backup_service_test.dart` → `the unit preference
-survives a restore`.
-
----
-
-# 6. Nothing asserts a hand-computed score through the repository
-
-> **CLOSED.** `training_repository_test.dart` → `a charted point is the number
-> worked out by hand`. `bodyweightPlus` and the hold, through **both** readers:
-> `exerciseProgress`' pair of raw statements and `exerciseHistoryPage`' drift
-> query. Bodyweight 80 on the day trained, one chin of 6 with 10kg hung off it
-> → 90 effective, Epley `90 × (1 + 6/30) = 108.0`, volume `90 × 6 = 540`. A
-> plank of 45s then 62s → top set 62 (the *longer*, not the heavier), load 80,
-> no e1RM, volume 0.
->
-> **Green on arrival, which is what an absence-of-coverage entry should do —
-> the wiring was right, nothing said so.** Four perturbations, each one a
-> mistake that compiles:
->
-> ```
-> the chart stops looking up bodyweight
->   Expected: within <1e-9> of <90>   Actual: <10.0>
-> measureMode does not reach scorePerformance
->   Expected: <62>                    Actual: <45>
-> the raw statement's weight and added_weight aliases swap
->   Expected: within <1e-9> of <90>   Actual: <80.0>
-> the history feed stops looking up bodyweight
->   Expected: within <1e-9> of <90>   Actual: <10.0>
-> ```
->
-> The second is the one worth keeping. With `measure` lost, the hold is scored
-> as reps, both sets carry the same 80, `load > topLoad` is never true, and the
-> top set becomes **whichever set arrived first** — 45 seconds reported as the
-> best plank of the day, with no null, no zero and nothing on screen to say the
-> number is wrong. The third is the failure mode the raw SQL's own doc warns
-> about, made to happen.
->
-> **The entry's sketch spends its example on the mode that was already
-> pinned.** `45 × (1 + 8/30) = 57.0` is correct arithmetic for a `perSide`
-> movement — and `perSide` is exactly what `a chart point knows its session and
-> whether the week was light` had already pinned when the UNVERIFIED list was
-> converted. Writing the sketch as given would have closed nothing. The two
-> modes that were genuinely unasserted are the two written here.
->
-> **Bodyweight is logged on the day trained, deliberately.** Scoring off an
-> interpolated bodyweight would put § 1's `yyyyMMdd` arithmetic inside this
-> test and make a failure mean either thing.
-
-**Rank 6, and the widest gap in the document.** Not a bug — an absence.
-
-`metrics_test.dart` verifies the formulas properly:
-
-| Value | Where | Test | Status |
-| --- | --- | --- | --- |
-| `effectiveLoad`, all four modes | `metrics.dart:13-30` | `metrics_test.dart:6-42` | **HAND** — 22.5 → 45, 73 → 73, bw 72 → 72, bw+10 → 82, bw+ with null bodyweight → 10 |
-| `estimated1RM` Epley | `metrics.dart:37-41` | `metrics_test.dart:114` | **HAND** — `100 × (1 + 6/30) = 120` |
-| the rep cap at 12 | `metrics.dart:39` | `metrics_test.dart:117-121`, `:292-294` | **HAND** — `50 × 1.4 = 70` and `45 × 1.4 = 63`, converted with the UNVERIFIED list |
-| `scorePerformance` set-type filter | `metrics.dart:139` | `metrics_test.dart:132-147` | **HAND** — 1 working set, top 100, volume 600 |
-| `sessionVolume` | `metrics.dart:199-218` | `metrics_test.dart:44-110` | **HAND** — 72 × 14, 450, 410, 700, 0 |
-| a hold has no e1RM and no volume | `metrics.dart:150`, `:165` | `metrics_test.dart:185-246` | **HAND** — topReps 62, totalReps 157, volume 0, session total 300 |
-| `beatsPrevious` | `metrics.dart:53-65` | `metrics_test.dart:284-336` | **HAND**, all five branches |
-| `stalledSessions` | `metrics.dart:287-300` | `metrics_test.dart:400-417` | **HAND** |
-
-**What no test does** is assert any of those numbers coming out of
-`exerciseProgress` (`training_repository.dart:1845`) or `exerciseHistoryPage`
-(`:1623`). The repository tests assert shape only:
-
-- ~~`training_repository_test.dart:1682` — `expect(points.last.best1RM,
-  isNotNull)`~~ — **converted with the UNVERIFIED list**, and it is the first
-  hand-computed score to come out of the repository: 30 in the box on a
-  `perSide` movement is 60 on the body, Epley `60 × (1 + 8/30) = 76.0`, volume
-  `60 × 8 = 480`. One point of one exercise in one load mode — this entry is
-  still open for the other two modes and for `exerciseHistoryPage`
-- `:1616`, `:1640`, `:1686`, `:1698` — counts, ordering, presence
-- `:2437-2441` (`daily counts carry the day, and agree with the rolling
-  window`) — `expect(row.sets, rolling[logged.muscle])`, **two repository methods
-  compared against each other**. The neighbouring `expect(row.sets, logged.sets)`
-  is against the fixture, which rescues it; the second line proves only that the
-  raw SQL at `:881-903` and the drift query at `:775-788` agree, which is worth
-  something and is not correctness.
-
-So: the *formulas* are proved, the *wiring* is not. Which `loadMode` was read,
-whether `measureMode` reached `scorePerformance`, whether the bodyweight series
-was the right one, whether the raw SQL column order at
-`training_repository.dart:1879-1889` still lines up — none of that is asserted
-against a number.
-
-**The check that closes it.**
-`test/data/training_repository_test.dart` → `a charted point is the number worked
-out by hand`. One dumbbell exercise (`perSide`), one bodyweight-plus exercise,
-one hold. Log known sets, then:
-
-```
-// Incline DB press, perSide: 22.5 × 2 = 45 kg effective, 8 reps.
-// Epley: 45 × (1 + 8/30) = 57.0
-expect(point.topSetLoad, 45);
-expect(point.best1RM, closeTo(57.0, 1e-9));
-expect(point.volume, 360);   // 45 × 8
-```
-
-This is one test and it covers more surface than any other on the list.
-
----
-
-# 7. The heatmap and its consistency rate have no tests at all
-
-> **CLOSED**, and the entry named the wrong field.
->
-> **`isDeload` was never the risk.** `buildHeatmap` OR-s the flag across a day
-> and `loggedDays` takes `max(is_deload)` over the same rows cast to an
-> integer — those are the same fold, and they agree. So does the count, and so
-> does the rate.
->
-> **`workoutId` was the disagreement, and one side of it was not even
-> deterministic.** `buildHeatmap` kept `existing?.workoutId ?? w.id` — the first
-> row of the day it happened to see — and the query behind it orders on `dayKey`
-> alone, so on a two-session day it kept whichever workout SQLite handed over
-> first. `loggedDays` takes `max(id)` and says in its own comment that it has to
-> be *some* deterministic one; nothing said so on the Dart side. Same day, same
-> tap, two screens, two sessions opened. Red first, both ways round:
->
-> ```
-> a two-session day opens the same workout on both grids
->   Expected: 'w-3'   Actual: 'w-2'
-> both heatmap paths agree on the same history
->   Expected: 'w-2'   Actual: 'w-3'      20260713 workout to open
-> ```
->
-> Neither choice is more right than the other, so `buildHeatmap` now takes the
-> larger id too. The three folding tests beside it were green on arrival, which
-> is what an untested-but-correct pure fold should do.
->
-> **The entry's test cannot be written as it asks.** *"Assert `days` and
-> `consistency` are equal field by field"* over the app's two real inputs is
-> false by design: Today's grid is fetched over `heatmapWeeks * 7 + 7` days and
-> the all-time grid over everything, so `days` spans differ and so does
-> `historyDays`. The cross-check is only meaningful over *one* history handed to
-> both, which is how it is written.
->
-> **`DateTime.now()` inline is why this file had no tests**, and one seam fixes
-> it: both builders take an optional `today`. Nothing in `lib/` passes it.
->
-> **A first draft of the fixture asserted the window arithmetic without testing
-> it**, and that is the most useful thing here. `historyDays 45`, `windowDays
-> 28`, `sessions 4`, `perWeek 1.0` were all hand-computed and all correct — and
-> perturbing `windowDays - 1` to `windowDays` in `consistency.dart` left the
-> test **green**, because the cutoff moved into the empty stretch between 1 June
-> and 13 July and no session crossed it. The fixture now puts a session on 17
-> June and another on 18 June, one either side of the cutoff, and an off-by-one
-> in either direction moves the count:
->
-> ```
-> windowDays        Expected: <4>   Actual: <5>
-> windowDays - 2    Expected: <4>   Actual: <3>
-> ```
->
-> A hand-computed literal over a fixture that cannot feel the bug is still a
-> test that proves nothing. Stage 3's rule is about the *value*; this is the
-> other half of it.
-
-**Rank 7.** An absence, like § 6, and a narrower one — but it is the only file in
-this audit with **zero** test coverage of any kind.
-
-[lib/features/workouts/heatmap_data.dart](lib/features/workouts/heatmap_data.dart)
-is pure folding logic with no test file. `grep -rn buildHeatmap test/` returns
-nothing.
-
-**What it computes.** Two functions that produce the same displayed values from
-different sources:
-
-- `buildHeatmap(List<Workout>)` (`:39-57`) folds raw workout rows into
-  `Map<int, HeatDay>` — counting workouts per day, OR-ing `isDeload`, keeping
-  the first `workoutId` — then hands `completed.map((w) => w.dayKey)` to
-  `computeConsistency`. Used by `workoutsProvider`
-  (`workouts_providers.dart:136`), which draws the Today screen's grid.
-- `buildHeatmapFromDays(List<LoggedDay>)` (`:65-83`) takes rows SQL has
-  **already** folded by day, and re-expands them: `for (var i = 0; i <
-  d.workouts; i++) d.dayKey` (`:75-77`), because `computeConsistency` wants one
-  key per session rather than per day. Used by `fullHeatmapProvider`
-  (`workouts_providers.dart:53`), which draws the all-time view.
-
-**The rule they should implement.** The same day's training produces the same
-`Consistency` and the same `HeatDay` whichever path it arrives by. The
-re-expansion at `:75-77` exists solely to make the second path agree with the
-first, and nothing checks that it does.
-
-**Inputs that would expose a break.** A day with two workouts, one of them a
-deload: `buildHeatmap` OR-s `isDeload` across them, `buildHeatmapFromDays` reads
-whatever `LoggedDay.isDeload` was aggregated as in SQL. If those two disagree,
-one day is drawn as an easy week on Today and a normal one on the all-time view,
-and the consistency rate underneath differs between two screens showing the same
-history.
-
-**Time to notice.** Never — the two grids are on different screens and cover
-different spans, so a reader has no side-by-side moment.
-
-**Test status: NONE.** Both functions, every field.
-
-**The check that closes it.**
-`test/features/heatmap_data_test.dart` → `both heatmap paths agree on the same
-history`: build a fixture of workouts, run `buildHeatmap` over the rows and
-`buildHeatmapFromDays` over the same history folded by day, and assert `days` and
-`consistency` are equal field by field — plus hand-computed literals for a
-two-workout day and a mixed deload day, so the test is not merely the two
-implementations agreeing with each other. **This one needs both halves**: the
-cross-check alone is exactly the UNVERIFIED shape this document exists to flag.
-
----
-
-# 8. Nothing tests the number the rest timer opens on
-
-> **CLOSED, and the entry was wrong about its own evidence.**
->
-> **"`grep -rn restTarget test/` returns nothing" is false.**
-> `training_repository_test.dart:1171` — `rest is recorded, and its target is
-> remembered per exercise` — calls `restTargetFor` three times and asserts
-> tier 1 (180) and tier 3 (120) with literals. The grep in the entry was run
-> against the wrong string. What was genuinely untested was **tier 2**, the
-> fallback to the last rest actually taken, which is the tier that makes the
-> timer remember anything across sessions at all.
->
-> Four tests added in `training_repository_test.dart`. Three were **green on
-> arrival** and are characterisation:
->
-> - `rest comes from the slot, then the last set, then 120` — 120, then 150
->   (the newer of two rested sets, so `completed_at` ordering is pinned rather
->   than row order), then 150 again through `sessionId: null`, then 180 when a
->   slot target outranks it.
-> - `Push 2 does not open on Push 1's rest target` — incline press is in both
->   push days on purpose, and tier 1 is scoped by session. [RULES § 1](RULES.md#1-the-one-rule)
->   in a smaller place, and it holds.
->
-> **The fourth case was red, and so was a fifth the entry did not name**:
->
-> ```
-> a tombstoned slot's sets are not the rest fallback     Expected: <120>  Actual: <240>
-> a tombstoned workout's sets are not the rest fallback  Expected: <120>  Actual: <240>
-> ```
->
-> The entry asked for the slot case. The workout case is the identical shape
-> one level up — the query did not join `workouts` at all — and was found by
-> asking whether the fix was the whole of it. Both are now filtered, in the one
-> `where`.
->
-> **This closes [INVARIANTS § 31](INVARIANTS.md)'s single exception**, which
-> was catalogued as a recorded result rather than a hole because it is
-> COSMETIC on its own. It was still the only read in the app that could see an
-> orphan, and it stopped being cheap to leave the moment a test existed that
-> could state it.
-
-**Rank 8.** A timer counting to the wrong target, on every set of a session.
-
-**The rule.** The session slot's rest, if it has one; otherwise the last rest
-actually taken on that movement; otherwise two minutes. Three tiers, in that
-order, stated at `training_repository.dart:2155-2159`.
-
-**Where.** `restTargetFor` (`training_repository.dart:2160-2190`). The slot
-lookup filters `session_exercises.deleted_at` (`:2165-2170`); the fallback takes
-the newest `set_logs.rest_seconds` for the exercise, ordered by `completed_at`
-(`:2175-2187`); the floor is `?? 120` (`:2189`).
-
-**Inputs that would expose it being wrong.** The same movement in two sessions
-with different slot targets — pick the wrong tier and Push 2 opens on Push 1's
-rest, which is [RULES.md § 1](RULES.md#1-the-one-rule)'s failure in a smaller
-place. An exercise added mid-session has no slot at all — `setRestTarget` returns
-false for exactly that case (`:2192-2199`) — so it must reach the second tier and
-not the floor.
-
-**One thing the second tier did not filter — now fixed.** It joined
-`workout_exercises` and constrained only `set_logs.deleted_at` (`:2181`) — not
-the slot's tombstone, not the workout's. So it would read a rest value off a set
-orphaned by `removeExerciseFromWorkout`. Those orphans are
-[INVARIANTS.md](INVARIANTS.md) § 1, and this was the one read path that saw them;
-recorded there as § 31. It now joins `workouts` and filters all three tombstones.
-
-**Time to notice.** Minutes — the timer is on screen and counting down in front
-of you. That is the only reason this sits at rank 8 rather than higher.
-
-~~**Test status: NONE.** `grep -rn restTarget test/` returns nothing.~~ **Wrong,
-and corrected on close — see the banner.** Three call sites existed and pinned
-tiers 1 and 3; tier 2 was the untested one.
-`training_repository_test.dart:1204` writes a `restSeconds` and reads it back
-through the workout, which asserts the column, not the resolution — that part
-was right.
-
-**The check that closes it.**
-`test/data/training_repository_test.dart` → `rest comes from the slot, then the
-last set, then 120` — three cases, three literals, plus a fourth asserting a
-tombstoned slot's sets are not the fallback. **Exists**, with a fifth for the
-tombstoned workout beside it. Cheap, and it is the only thing that
-would notice the three tiers being reordered.
-
----
-
-# 9. Everything below here is verified, and is recorded so it is not re-audited
-
-## `resolvePrefill` — the app's reason to exist
-
-**Rule.** Session first, then a deload of the same session, then another session
-labelled `otherSession` ([RULES.md § 1](RULES.md#1-the-one-rule)).
-
-**Where.** `lib/domain/prefill.dart:143-209`. Three ordered passes at `:154-184`;
-`scale = targetIsDeload && !pick.isDeload` at `:192` is the never-deload-a-deload
-rule.
-
-**Test status: HAND**, and thorough. `test/domain/prefill_test.dart:27-101` covers
-all four sources with asserted weights (22.5, 20, 18); `:104-147` covers the
-deload transform and the no-double-scaling rule; `:152-229` covers `applyDeload`
-warm-up preservation, set trimming, the `math.max(1, …)` floor
-(`prefill.dart:230`), partials carried unscaled (`:244`), continuations dropped
-(`:227`), added weight scaled and bodyweight not (`prefill_test.dart:211`), and
-half-kilo rounding (`:222`, `74.4 → 74.5`).
-
-End to end through the database: `training_repository_test.dart:165` (`a
-completed workout becomes next week's prefill for the same session`) and `:197`
-(`Push 2 does not inherit Push 1 numbers for the same exercise`) — the one rule,
-asserted with literals.
-
-**Inputs that would expose a break.** Two performances of one movement on one
-day: covered at `:980` and `:585`, resolved by the `(startedAt, slotId)` sort at
-`training_repository.dart:1333-1337`. A movement fanned across many days pushing
-the same-session performance out of the window: covered at `:1016` (`the
-same-session lookup has no horizon`), which is what the second query at
-`training_repository.dart:1307-1312` exists for.
-
-**Nothing to add.**
-
-## `bucketize`
-
-**Rule.** Mean for a measurement, sum for a count; an empty bucket is `null`, not
-zero; rows outside the span are dropped; boundary days are inside.
-(`chart_buckets.dart:1-25`, `:214-265`.)
-
-**Test status: HAND.** `chart_buckets_test.dart:57` (mean 72 over 3),
-`:74` (sum 36), `:90` (a null bucket keeps its place), `:107` (a row outside is
-dropped, `count == 1`), `:124` (six empty weeks with named start dates),
-`:139` (a reversed span is no buckets), `:44` (a February bucket ends on the
-29th in a leap year), `:151` (order in is irrelevant).
-
-Boundary days: the filter is `row.dayKey < fromKey || row.dayKey > toKey`
-(`:238`) — inclusive both ends, and `:107`'s fixture sits one day outside.
-**Verified.**
-
-## `foldWeeks` and sets-per-week
-
-**Rule.** The value is sets **per week** at every granularity, never sets in the
-bucket (`volume_history.dart:42-50`); untrained weeks divide
-(`:66-68`, `:152-158`); daily is treated as weekly (`:93`).
-
-**Test status: HAND.** `volume_history_test.dart:266` (weekly is the identity),
-`:275` (`30 sets over 5 weeks → 6.0`, with the total and the week count asserted
-separately), `:293` (a week belongs to its Monday's bucket — 7 and 3),
-`:306` (peak follows the fold), `:155` (`averagePerWeek == 2.0` divides by all
-three weeks), `:228` (`20.0` across regions).
-
-`:188` (`expect(steady.averagePerWeek, lumpy.averagePerWeek)`) was **UNVERIFIED**
-as a value; the test's real assertions (`weeksTrained` 3 vs 1) were hand
-literals, so the point being made was already proved. **Converted anyway** —
-`12 / 3 = 4.0` on both sides — because "these two agree" is satisfied just as
-well by one bug in both.
-
-## `computeVolumeHistory`
-
-`volume_history.dart:239-304`. Weeks walked as calendar dates (`:257`); span
-widened to whole weeks (`:244-245`); `other` counted nowhere
-(`:275-276`); days outside the span dropped (`:272`).
-
-**Test status: HAND** — `volume_history_test.dart:35` (a Sunday and the Monday
-after are different weeks, 4 and 6), `:51`, `:61` (`[10, 0, 0]`), `:85` (legs 9 =
-quads 6 + hams 2 + glutes 0 + calves 1), `:125` (`other` counted nowhere, total
-3), `:141`, `:242` (a year folds to 52–54 weeks).
-
-## `countsAsVolume` and the muscle snapshot fallback
-
-**Rule.** Working, amrap and backoff count; warm-ups, drops and rest-pause do not
-(`muscle_volume.dart:85-88`) — deliberately **not** `countsForProgress`
-(`enums.dart:169`). The muscle is the snapshot on the logged row, falling back to
-the catalog only when the row predates the column
-(`training_repository.dart:818-819`, and the same `COALESCE` written out in raw
-SQL at `:886`, grouped on the expression at `:900`).
-
-**Test status: HAND**, and this one is well covered:
-`training_repository_test.dart:2251`, `:2265` (an unticked set is not volume),
-`:2276` (warm-ups and drop legs out, backoff in), `:2301`, `:2319` (sets count
-mid-session), `:2334` (a skipped slot contributes nothing), `:2352` (the muscle
-is snapshotted), `:2369` (**refiling an exercise does not rewrite March** — the
-rule from [RULES.md § 2](RULES.md#2-data)), `:2397` (a pre-column row falls back
-to the catalog).
-
-The SQL list of volume set types is generated from `countsAsVolume` rather than
-written out (`training_repository.dart:919-922`), so the raw statement cannot
-drift. **Good.**
-
-## Cycle advance and deload scheduling
-
-**Rule.** `_cyclesSinceDeload(beforeIndex:)` is exclusive
-([RULES.md § 2](RULES.md#2-data)); a deload never chains
-(`cycle_engine.dart:70`); the counter resets when a deload begins (`:128`).
-
-**Where.** `cycle_engine.dart:68-83`, `:122-130`;
-`training_repository.dart:332-348` for the fold over completed cycles.
-
-**Test status: HAND.** `cycle_engine_test.dart:73` (fires at 5, not 4), `:80`
-(no chaining), `:94` (the countdown), `:112-130` (`planNextCycle`), and `:133`
-(`a full run reaches deload exactly every N cycles` → `[7, 14, 21]`, which is the
-property test that catches an off-by-one). Through the database:
-`training_repository_test.dart:284`, `:316`, `:347`, `:385`.
-
-~~**One thing nothing covers.**~~ **CLOSED, and the worry is not reachable —
-the entry did not say why, and the why is the interesting part.**
-
-`_cyclesSinceDeload` counts only cycles with `completed_at IS NOT NULL`
-(`training_repository.dart:336`), and `_reopenCycleIfIncomplete` (`:3293-3302`)
-tombstones the cycles after the one it reopens. The entry supposed a deload
-cycle dropped that way would stop resetting the counter and the next deload
-would land late.
-
-**Two tests, both green on arrival**, in `training_repository_test.dart`:
-
-- `a deload cycle dropped by a delete does not push the next one late` — drives
-  the sequence the entry describes and asserts the deload cycle really was
-  tombstoned before checking the count, so the test is about something.
-- `a deload closed early is not dropped once training follows it` — the near
-  miss. `advanceCycle` closes a cycle with nothing logged in it, so a deload
-  **can** carry `completed_at` while having no completed sessions: both filters
-  are satisfied at once, which is what the entry needed.
-
-What stops it is neither filter on its own but the guard over the whole tail
-(`:3345-3347`): **every** later cycle must be empty or nothing is dropped. So a
-deload with real training after it is never touched, and a deload with nothing
-after it takes the rest of the tail with it — leaving no surviving cycle on the
-far side of the gap for the counter to be wrong about. It can only ever remove a
-contiguous, untrained tail, never a deload from the middle of a counted run.
-
-**Recorded rather than fixed**, per
-[HARDENING § 3](HARDENING.md#stage-3--build-the-net) rule 1. The pair is kept
-because the composition is not obvious from either function alone, and
-`_reopenCycleIfIncomplete` is where a sync pull applier will want to reach.
-
-## `dayKey ↔ DateTime`, week starts, DST and leap days
-
-- `dayKeyOf` / `dateFromDayKey` — `core/ids.dart:58-62`. Lossless round trip for
-  any real date. **Test status: NONE directly**, used throughout every other
-  test.
-- Leap days and month ends: `nextBucket` names the next date rather than adding a
-  `Duration` (`chart_buckets.dart:97-104`), and a bucket's `end` is the day before
-  the next one opens (`:253-256`) — the only definition that survives February.
-  **HAND** at `chart_buckets_test.dart:33`, `:44` (29 Feb 2024).
-- Week start is Monday everywhere, from one function
-  (`volume_history.dart:24`, re-exported into `chart_buckets.dart:29`), so the
-  same Sunday session cannot land in two different weeks on two screens.
-  **HAND** at `volume_history_test.dart:26` and `chart_buckets_test.dart:12`.
-- **DST: see § 2.** The forward-walking calendar paths and both heatmaps (which
-  work in UTC) are correct; the nine `Duration`-subtracting and
-  `.inDays`-truncating sites are the exception.
-
-## Weights, units and formatting
-
-`units.dart`. Storage is kg, conversion at the edge (`:36-44`); display snapped
-to the unit's granularity (`:48-51`); bodyweight to a tenth rather than to a
-plate (`:103-115`); a signed delta computed from what is **shown**
-(`:87-92`, the rule from [RULES.md § 4](RULES.md#4-code)).
-
-**Test status: HAND**, comprehensively — `units_test.dart:8-132`: 225 lb ↔
-102.058 kg, 100 kg → 220 lb, 74.4 → 74.5, `roundLoadIn` in both units, a deload
-in pounds landing on 180 lb (`:52`), `+1` / `−0.5` / `null` for the deltas,
-`76.4` surviving as `76.4` in bodyweight and rounding to `76.5` as a load
-(`:103-108` — the two precisions asserted side by side, which is the test that
-would catch them being merged).
-
-## Set formatting
-
-`set_format.dart:23-90`. **Test status: HAND** at
-`test/domain/set_format_test.dart`. `formatCount` partials-as-suffix
-(`enums.dart:76-80`) asserted at `metrics_test.dart:257-264`, including that a
-hold never shows a partial.
-
-## Consistency
-
-`consistency.dart:64-110`. **Test status: HAND** —
-`consistency_test.dart:19-126`: `perWeek` null under a fortnight, `1.5` over 14
-days, the 28-day window (`0.25`), `2.0` over a long history, days-trained vs
-sessions (`:86`), a fresh Monday at zero (`:93`). **Except the DST crossing —
-see § 2.**
-
-## Plate maths
-
-**Rule.** `solvePlateLoad` breaks a total into bar plus plates, greedy from the
-heaviest down — optimal for this set because every plate divides or halves the
-next (`plates.dart:63-65`) — and reports what the rack cannot make as
-`remainderKg` rather than rounding it away (`:37-43`). Null, not an empty load,
-for a target at or under the bar (`:71`).
-
-**Where.** `lib/domain/plates.dart:66-96`. The arithmetic runs in **integer half
-kilos of total load** (`:80`), not in doubles and not per side, with the two
-failures that forced it written down at `:73-79`: floating point leaving
-`2.4999999999999996kg` unloadable on a bar that loads exactly, and a per-side
-figure rounding `21.25` to `21.5` and inventing a kilo that is not on the bar.
-
-**Test status: HAND**, every assertion. `test/domain/plates_test.dart`:
-`:8-14` (100 on a 20 bar → one 25 and one 15 a side, `perSideKg` 40,
-`loadedKg` 100, remainder 0), `:17-20` (140 → two 25s and a 10, stacking rather
-than reaching for lighter plates), `:24-28` (a bare bar), `:32-33` and `:37`
-(null under the bar and with no bar), `:43-47` (**62.5 on a 20 bar → a 20 a side
-and 2.5 short**, which is the keypad's every-other-press case), `:55-59` (29 on
-the 9kg EZ → a 10 a side, remainder exactly 0, which is the test that catches the
-double-subtraction bug the comment describes), `:63-67` and `:71-77` (the bar
-weights, and that only `none` is weightless).
-
-**This is the best-covered function in the app**, which is right: it is the one
-number read at arm's length with a bar in your hands. **Nothing to add to
-`solvePlateLoad`.**
-
-**One gap, and it is at the edge rather than in the maths.** `plateLoadFor`
-(`lib/features/log/widgets/plate_view.dart:51-60`) is the wrapper the keypad
-actually calls, and **nothing tests it**: `grep -rn plateLoadFor test/` returns
-nothing. It decides four things — no bar, unparseable buffer, a non-kg display
-unit, and the `unit.toKg` conversion — and the third is load-bearing, because
-drawing a kilo breakdown for a pounds user would put a diagram on screen that no
-gym can load. The guard is there (`:56`) and the reasoning is written down
-(`:44-50`); it is simply unasserted.
-
-> **CLOSED.** `test/features/plate_view_test.dart`, four tests. The three null
-> branches and the `unit.toKg` pass-through were green on arrival, which is
-> what an untested-but-correct wrapper should do.
->
-> **One assertion was red, and the code was right — the comments were wrong.**
->
-> ```
-> no plate diagram in pounds, and none without a bar
->   Expected: null
->     Actual: <Instance of 'PlateLoad'>
-> ```
->
-> That is `plateLoadFor(buffer: '20', barKg: 20)` — the bar weight exactly.
-> Both doc comments on this path said null for a weight *"at or under the
-> bar"*: `plates.dart:58` and `plate_view.dart:47`, the second copied from the
-> first. The boundary in the code is `totalKg < barKg` (`plates.dart:70`) and
-> `plates_test.dart:23` — `an empty bar loads nothing` — has always asserted a
-> bare bar at exactly the bar, deliberately.
->
-> **The comment is what produced the wrong expectation**, which is
-> [DEBT § 7](DEBT.md)'s category exactly: prose stating a fact about the code
-> beneath it, rotting silently, with nothing pointing back at it. Both comments
-> corrected, and `the bar weight exactly draws a bare bar, not nothing` now
-> holds the boundary from the wrapper's side so it cannot be written that way
-> again.
-
-**The check that closes it.** `test/features/` → `no plate diagram in pounds,
-and none without a bar` — four cases against `plateLoadFor`, each expecting
-null, plus one kg case expecting the same `PlateLoad` `solvePlateLoad` returns.
-Cheap, and it pins the one branch that turns a correct function into a wrong
-picture. **Exists** — with the kg case written as hand literals (100 on a 20
-bar → a 25 and a 15 a side) rather than against `solvePlateLoad`, which would
-have been `expect(f(x), f(x))`.
-
-## Backup round trip
-
-**Test status: HAND** where it counts. `backup_service_test.dart:94` (restoring
-into an empty database reproduces it exactly), `:125` (enum and list columns
-survive), `:157` (a file written before a column existed), `:182` (a null muscle
-snapshot stays null rather than becoming `other`), `:206` (bar kind), `:235` (the
-streamed file is byte-identical to `buildPayload`), `:293` (restore from bytes),
-`:357` (history is still queryable afterwards).
-
-**Two gaps in the round trip itself**, both carried over to
-[INVARIANTS.md](INVARIANTS.md) §§ 17–18: the unit preference (§ 5 above) and the
-absence of a test that every column of every codec has a default.
-
-**And a third thing worth knowing while reading the above**: every test in that
-list round-trips through `buildPayload` over a database nothing is writing. The
-export the *app* runs pages by offset over a live one and can skip a row
-entirely, and the `counts` header it writes is never checked against what a
-restore lands — [INVARIANTS.md](INVARIANTS.md) §§ 5–6. Those are storage
-findings rather than arithmetic ones, so they are catalogued there; they are
-named here because "the backup round trip is well tested" is true of the codecs
-and not of the file the phone actually produces.
-
----
-
-# The UNVERIFIED list, in one place
-
-Stage 3 replaces each of these with a hand-computed literal.
-
-| Test | Why |
-| --- | --- |
-| ~~`metrics_test.dart:387` `interpolates the same whatever order the entries arrive in`~~ | **Done with § 1.** The shuffle loop stays — it is a real assertion about the sort — with two hand literals beside it that pin a value |
-| ~~`metrics_test.dart:344` `interpolates between entries`~~ | **Done with § 1**, replaced by `interpolates in days, not in date keys` and two boundary cases |
-| ~~`metrics_test.dart:117` `caps reps so high-rep sets cannot masquerade as strength`~~ | **Done.** `50 × 1.4 = 70` at 12 reps and at 20, with `50 × (1 + 20/30) = 83.333…` named in the comment as the number the cap refuses |
-| ~~`metrics_test.dart:292` (inside `the rep cap in e1RM does not hide a 12 to 13 improvement`)~~ | **Done.** `45 × 1.4 = 63`, written on both sides |
-| ~~`volume_history_test.dart:188` `weeks trained is what the average cannot say`~~ | **Done.** `12 / 3 = 4.0`, on both sides rather than one read off the other |
-| ~~`training_repository_test.dart:2441` `daily counts carry the day, and agree with the rolling window`~~ | **Done.** The cross-check is kept and a literal added: Push 1 opens on a chest movement with three template sets, so both sides are `3` |
-| ~~`training_repository_test.dart:1682` `a chart point knows its session and whether the week was light`~~ | **Done**, and it is the first hand-computed score through the repository — see § 6 |
-
-**The table is empty.** All seven are converted.
-
-Six of the seven were in the two functions this document ranks first and sixth,
-which was not a coincidence: **the numbers nobody hand-computed are the numbers
-nobody checked.** Two were done with § 1, and both were red — which is the point
-the table was making. **The remaining five were all green on arrival**, so the
-formulas were right and only the assertions were hollow; each was perturbed once
-to show it now bites, e.g.
-
-```
-a chart point knows its session and whether the week was light
-  Expected: a numeric value within <1e-9> of <75>
-    Actual: <76.0>
-```
+## What the last round learned about where the holes are
+
+Two patterns, both worth checking first next time.
+
+- **The untested code is the code nobody thinks of as arithmetic.** The pure
+  domain layer was almost entirely HAND already. Every hole was at an *edge*:
+  a fold with no test file, a three-tier fallback deciding a timer, a wrapper
+  between a keypad and the best-covered function in the app. Between a proven
+  calculation and a screen is where this audit keeps finding things.
+- **The numbers nobody hand-computed are the numbers nobody checked.** Six of
+  the seven UNVERIFIED tests sat in the two functions the audit ranked first and
+  sixth. That was not a coincidence, and it is the cheapest heuristic in the
+  file: find the self-referential assertions and you have found the audit's
+  ranking before doing the ranking.
