@@ -1965,7 +1965,15 @@ void main() {
     expect(points.first.isDeload, isFalse);
     expect(points.last.isDeload, isTrue);
     expect(points.last.topSetReps, 8);
-    expect(points.last.best1RM, isNotNull);
+    // Incline DB Press is `perSide`, so 30 in the box is 60 on the body.
+    // Epley: 60 * (1 + 8/30) = 60 * 1.2666… = 76.0. `isNotNull` was the whole
+    // assertion here, which proved a point existed and nothing about what was
+    // on it — the load mode, the reps and the formula all reach this number
+    // and none of them were pinned.
+    expect(points.last.topSetLoad, 60);
+    expect(points.last.best1RM, closeTo(76, 1e-9));
+    // One set of 8 at an effective 60: 480.
+    expect(points.last.volume, closeTo(480, 1e-9));
   });
 
   test('a set taken back is not on the chart, and an emptied day is not either',
@@ -2726,9 +2734,16 @@ void main() {
 
       expect(row.dayKey, today);
       expect(row.sets, logged.sets);
+      // Push 1 opens on Incline DB Press, a chest movement with three
+      // template sets, and `tickFirstExercise` ticks all three. Written out
+      // because the two lines below compare the raw SQL against the drift
+      // query, and two implementations of one mistake agree perfectly.
+      expect(logged.muscle, MuscleGroup.chest);
+      expect(row.sets, 3);
       // Same filters, same definition of a hard set — the two screens cannot
       // disagree about the same week.
       final rolling = await repo.setsByMuscleSince(today);
+      expect(rolling[MuscleGroup.chest], 3);
       expect(row.sets, rolling[logged.muscle]);
     });
 

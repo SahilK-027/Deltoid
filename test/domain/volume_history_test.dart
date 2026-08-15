@@ -185,7 +185,12 @@ void main() {
         to: DateTime(2026, 8, 16),
       ).byRegion[MuscleRegion.chest]!;
 
-      expect(steady.averagePerWeek, lumpy.averagePerWeek);
+      // 12 sets over the 3 weeks of the span: 12 / 3 = 4.0 either way. Both
+      // sides carry the literal rather than one being read off the other,
+      // because "these two agree" is the claim and a shared bug would satisfy
+      // it just as well.
+      expect(steady.averagePerWeek, 4.0);
+      expect(lumpy.averagePerWeek, 4.0);
       expect(steady.weeksTrained, 3);
       expect(lumpy.weeksTrained, 1);
     });

@@ -115,9 +115,12 @@ void main() {
     });
 
     test('caps reps so high-rep sets cannot masquerade as strength', () {
-      final at12 = estimated1RM(load: 50, reps: 12);
-      final at20 = estimated1RM(load: 50, reps: 20);
-      expect(at20, at12);
+      // Epley at the cap: 50 * (1 + 12/30) = 50 * 1.4 = 70.
+      expect(estimated1RM(load: 50, reps: 12), closeTo(70, 1e-9));
+      // 20 reps is scored as 12, so it lands on the same 70 rather than on
+      // 50 * (1 + 20/30) = 83.333…, which is the number the cap exists to
+      // refuse.
+      expect(estimated1RM(load: 50, reps: 20), closeTo(70, 1e-9));
     });
 
     test('rejects incomplete or nonsensical sets', () {
@@ -290,8 +293,10 @@ void main() {
     });
 
     test('the rep cap in e1RM does not hide a 12 to 13 improvement', () {
-      // estimated1RM caps at 12, so both sides score identically there.
-      expect(estimated1RM(load: 45, reps: 13), estimated1RM(load: 45, reps: 12));
+      // estimated1RM caps at 12, so both sides score identically there:
+      // 45 * (1 + 12/30) = 45 * 1.4 = 63, at 12 reps and at 13.
+      expect(estimated1RM(load: 45, reps: 12), closeTo(63, 1e-9));
+      expect(estimated1RM(load: 45, reps: 13), closeTo(63, 1e-9));
       expect(
         beatsPrevious(load: 45, reps: 13, previousLoad: 45, previousReps: 12),
         isTrue,

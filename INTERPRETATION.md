@@ -554,7 +554,7 @@ survives a restore`.
 | --- | --- | --- | --- |
 | `effectiveLoad`, all four modes | `metrics.dart:13-30` | `metrics_test.dart:6-42` | **HAND** — 22.5 → 45, 73 → 73, bw 72 → 72, bw+10 → 82, bw+ with null bodyweight → 10 |
 | `estimated1RM` Epley | `metrics.dart:37-41` | `metrics_test.dart:114` | **HAND** — `100 × (1 + 6/30) = 120` |
-| the rep cap at 12 | `metrics.dart:39` | `metrics_test.dart:117-121`, `:292-294` | **UNVERIFIED** — `expect(at20, at12)`, both sides computed. The literal (`50 × 1.4 = 70`) is never written down |
+| the rep cap at 12 | `metrics.dart:39` | `metrics_test.dart:117-121`, `:292-294` | **HAND** — `50 × 1.4 = 70` and `45 × 1.4 = 63`, converted with the UNVERIFIED list |
 | `scorePerformance` set-type filter | `metrics.dart:139` | `metrics_test.dart:132-147` | **HAND** — 1 working set, top 100, volume 600 |
 | `sessionVolume` | `metrics.dart:199-218` | `metrics_test.dart:44-110` | **HAND** — 72 × 14, 450, 410, 700, 0 |
 | a hold has no e1RM and no volume | `metrics.dart:150`, `:165` | `metrics_test.dart:185-246` | **HAND** — topReps 62, totalReps 157, volume 0, session total 300 |
@@ -565,7 +565,12 @@ survives a restore`.
 `exerciseProgress` (`training_repository.dart:1845`) or `exerciseHistoryPage`
 (`:1623`). The repository tests assert shape only:
 
-- `training_repository_test.dart:1682` — `expect(points.last.best1RM, isNotNull)`
+- ~~`training_repository_test.dart:1682` — `expect(points.last.best1RM,
+  isNotNull)`~~ — **converted with the UNVERIFIED list**, and it is the first
+  hand-computed score to come out of the repository: 30 in the box on a
+  `perSide` movement is 60 on the body, Epley `60 × (1 + 8/30) = 76.0`, volume
+  `60 × 8 = 480`. One point of one exercise in one load mode — this entry is
+  still open for the other two modes and for `exerciseHistoryPage`
 - `:1616`, `:1640`, `:1686`, `:1698` — counts, ordering, presence
 - `:2437-2441` (`daily counts carry the day, and agree with the rolling
   window`) — `expect(row.sets, rolling[logged.muscle])`, **two repository methods
@@ -794,9 +799,11 @@ separately), `:293` (a week belongs to its Monday's bucket — 7 and 3),
 `:306` (peak follows the fold), `:155` (`averagePerWeek == 2.0` divides by all
 three weeks), `:228` (`20.0` across regions).
 
-`:188` (`expect(steady.averagePerWeek, lumpy.averagePerWeek)`) is **UNVERIFIED**
-as a value, but the test's real assertions (`weeksTrained` 3 vs 1) are hand
-literals, so the point being made is proved. Low priority.
+`:188` (`expect(steady.averagePerWeek, lumpy.averagePerWeek)`) was **UNVERIFIED**
+as a value; the test's real assertions (`weeksTrained` 3 vs 1) were hand
+literals, so the point being made was already proved. **Converted anyway** —
+`12 / 3 = 4.0` on both sides — because "these two agree" is satisfied just as
+well by one bug in both.
 
 ## `computeVolumeHistory`
 
@@ -1025,13 +1032,23 @@ Stage 3 replaces each of these with a hand-computed literal.
 | --- | --- |
 | ~~`metrics_test.dart:387` `interpolates the same whatever order the entries arrive in`~~ | **Done with § 1.** The shuffle loop stays — it is a real assertion about the sort — with two hand literals beside it that pin a value |
 | ~~`metrics_test.dart:344` `interpolates between entries`~~ | **Done with § 1**, replaced by `interpolates in days, not in date keys` and two boundary cases |
-| `metrics_test.dart:117` `caps reps so high-rep sets cannot masquerade as strength` | `expect(at20, at12)`, both computed. Write `50 × (1 + 12/30) = 70` |
-| `metrics_test.dart:292` (inside `the rep cap in e1RM does not hide a 12 to 13 improvement`) | `expect(estimated1RM(45,13), estimated1RM(45,12))`, both computed. `45 × 1.4 = 63` |
-| `volume_history_test.dart:188` `weeks trained is what the average cannot say` | `expect(steady.averagePerWeek, lumpy.averagePerWeek)`. The rest of the test is hand-computed; this line is not |
-| `training_repository_test.dart:2441` `daily counts carry the day, and agree with the rolling window` | `expect(row.sets, rolling[logged.muscle])` compares two repository methods. Keep it — it is a real cross-check of the raw SQL against the drift query — and add a literal beside it |
-| `training_repository_test.dart:1682` `a chart point knows its session and whether the week was light` | `expect(points.last.best1RM, isNotNull)`. § 6 |
+| ~~`metrics_test.dart:117` `caps reps so high-rep sets cannot masquerade as strength`~~ | **Done.** `50 × 1.4 = 70` at 12 reps and at 20, with `50 × (1 + 20/30) = 83.333…` named in the comment as the number the cap refuses |
+| ~~`metrics_test.dart:292` (inside `the rep cap in e1RM does not hide a 12 to 13 improvement`)~~ | **Done.** `45 × 1.4 = 63`, written on both sides |
+| ~~`volume_history_test.dart:188` `weeks trained is what the average cannot say`~~ | **Done.** `12 / 3 = 4.0`, on both sides rather than one read off the other |
+| ~~`training_repository_test.dart:2441` `daily counts carry the day, and agree with the rolling window`~~ | **Done.** The cross-check is kept and a literal added: Push 1 opens on a chest movement with three template sets, so both sides are `3` |
+| ~~`training_repository_test.dart:1682` `a chart point knows its session and whether the week was light`~~ | **Done**, and it is the first hand-computed score through the repository — see § 6 |
 
-Six of the seven are in the two functions this document ranks first and sixth,
-which is not a coincidence: **the numbers nobody hand-computed are the numbers
-nobody checked.** Two are now done, both from § 1 — and both were red, which is
-the point the table was making.
+**The table is empty.** All seven are converted.
+
+Six of the seven were in the two functions this document ranks first and sixth,
+which was not a coincidence: **the numbers nobody hand-computed are the numbers
+nobody checked.** Two were done with § 1, and both were red — which is the point
+the table was making. **The remaining five were all green on arrival**, so the
+formulas were right and only the assertions were hollow; each was perturbed once
+to show it now bites, e.g.
+
+```
+a chart point knows its session and whether the week was light
+  Expected: a numeric value within <1e-9> of <75>
+    Actual: <76.0>
+```
