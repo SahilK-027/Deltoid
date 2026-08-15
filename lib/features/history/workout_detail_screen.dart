@@ -493,7 +493,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
   /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
   /// are excluded — a 20 kg warm-up is not what the day was about.
   static String _topLoad(List<SetLog> done, Exercise exercise, WeightUnit unit) {
-    final i = topSetIndex(
+    final i = heaviestLogged(
       sets: [
         for (final s in done)
           (
@@ -504,6 +504,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
           ),
       ],
       measureMode: exercise.measureMode,
+      loadMode: exercise.loadMode,
     );
     if (i == null) return '—';
     final set = done[i];

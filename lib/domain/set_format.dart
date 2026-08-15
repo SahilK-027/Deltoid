@@ -14,6 +14,7 @@
 library;
 
 import 'enums.dart';
+import 'metrics.dart';
 import 'units.dart';
 
 /// One set's load, spelled out: `82.5 kg`, `82.5 kg × 2` for a pair of
@@ -97,19 +98,40 @@ String loadBlurb(LoadMode mode) => switch (mode) {
       LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
     };
 
-/// Which set an exercise's day comes down to, as an index into [sets].
+/// The heaviest thing you actually did, as an index into [sets].
 ///
-/// The heaviest, or the **longest** when the movement is measured on a clock: a
-/// plank's load rarely moves, so sorting five identical zeros by weight picks
-/// an arbitrary one of them. Warm-ups are excluded — a 20 kg warm-up is not
-/// what the day was about — unless warm-ups are all there is.
+/// The **longest** when the movement is measured on a clock: a plank's load
+/// rarely moves, so sorting five identical zeros by weight picks an arbitrary
+/// one of them. Warm-ups are excluded — a 20 kg warm-up is not what the day was
+/// about — unless warm-ups are all there is.
+///
+/// **Not the same question as `scorePerformance`, and deliberately so.** This
+/// one describes the session: it is the number on a summary row, and on a
+/// deliberately light day it should say what you lifted rather than nothing at
+/// all, so back-offs, drops and rest-pause legs are all eligible.
+/// `scorePerformance` asks what counts as *progress*, and answers over working
+/// and AMRAP only, because a chart that counted back-offs would let a light
+/// week look like a gain. Two questions, two pools, and merging them would
+/// break one of the two. What they must share is the *ranking*, below.
+///
+/// It was called `topSetIndex`, which read as a second opinion on the same
+/// question and got filed as a bug twice. The name is the fix.
+///
+/// **Ranked by what was lifted, not by what was typed.** [effectiveLoad] with
+/// no bodyweight: a dumbbell entered as 22.5 is 45 kg, and — the case that was
+/// wrong — a `total` set carrying only `addedWeight` has no load at all, where
+/// the old `weight ?? addedWeight` read the belt figure as though it were on
+/// the bar. Bodyweight is left null on purpose: under `bodyweight` everything
+/// ties either way, and under `bodyweightPlus` ordering by added weight is the
+/// same ordering, so a series nobody has weighed still sorts correctly.
 ///
 /// Returns null only for an empty list. Ranking by index rather than returning
 /// a set keeps this free of the row type: the caller already holds the list.
-int? topSetIndex({
+int? heaviestLogged({
   required List<({SetType setType, double? weight, double? addedWeight, int? reps})>
       sets,
   required MeasureMode measureMode,
+  required LoadMode loadMode,
 }) {
   if (sets.isEmpty) return null;
   final counted = <int>[
@@ -117,9 +139,16 @@ int? topSetIndex({
       if (sets[i].setType != SetType.warmup) i,
   ];
   final pool = counted.isEmpty ? [for (var i = 0; i < sets.length; i++) i] : counted;
+  // A set with no load at all sorts below one that has any, rather than being
+  // read as zero and tying with a bar that genuinely weighs nothing.
   double rank(int i) => measureMode.isHold
       ? (sets[i].reps ?? 0).toDouble()
-      : ((sets[i].weight ?? sets[i].addedWeight) ?? 0);
+      : (effectiveLoad(
+            mode: loadMode,
+            weight: sets[i].weight,
+            addedWeight: sets[i].addedWeight,
+          ) ??
+          -1);
   var best = pool.first;
   for (final i in pool) {
     if (rank(i) > rank(best)) best = i;

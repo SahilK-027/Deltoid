@@ -597,10 +597,15 @@ class _ExerciseEntryRow extends ConsumerWidget {
         .setWorkoutExerciseNotes(entry.workoutExercise.id, text);
   }
 
-  /// The heaviest working set, or the longest for a hold — the same figure the
-  /// workout detail screen prints, because both now rank it the same way.
+  /// The heaviest set logged, or the longest for a hold — the same figure the
+  /// workout detail screen prints, because both call [heaviestLogged].
+  ///
+  /// **Not the chart's number.** This row describes the session, so a
+  /// deliberately light day says what you lifted; `exerciseProgress` scores
+  /// working and AMRAP only, so the same day draws no point. Two questions —
+  /// see [heaviestLogged].
   static String _top(List<SetLog> done, Exercise exercise, WeightUnit unit) {
-    final i = topSetIndex(
+    final i = heaviestLogged(
       sets: [
         for (final s in done)
           (
@@ -611,6 +616,7 @@ class _ExerciseEntryRow extends ConsumerWidget {
           ),
       ],
       measureMode: exercise.measureMode,
+      loadMode: exercise.loadMode,
     );
     if (i == null) return '—';
     final set = done[i];

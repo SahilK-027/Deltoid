@@ -3,7 +3,7 @@ import 'package:deltoid/domain/set_format.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The set that [topSetIndex] ranks, without a database row in sight.
+/// The set that [heaviestLogged] ranks, without a database row in sight.
 ({SetType setType, double? weight, double? addedWeight, int? reps}) s({
   SetType type = SetType.working,
   double? weight,
@@ -177,14 +177,14 @@ void main() {
     });
   });
 
-  group('topSetIndex', () {
+  group('heaviestLogged', () {
     test('picks the heaviest, not the last', () {
       final sets = [
         s(weight: 60, reps: 8),
         s(weight: 80, reps: 5),
         s(weight: 70, reps: 6),
       ];
-      expect(topSetIndex(sets: sets, measureMode: MeasureMode.reps), 1);
+      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
     });
 
     test('a hold is ranked by its clock, not by the load on it', () {
@@ -197,7 +197,7 @@ void main() {
         s(weight: 0, reps: 90),
         s(weight: 0, reps: 60),
       ];
-      expect(topSetIndex(sets: sets, measureMode: MeasureMode.hold), 1);
+      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.hold, loadMode: LoadMode.bodyweight), 1);
     });
 
     test('warm-ups are not what the day was about', () {
@@ -205,7 +205,7 @@ void main() {
         s(type: SetType.warmup, weight: 100, reps: 5),
         s(weight: 80, reps: 5),
       ];
-      expect(topSetIndex(sets: sets, measureMode: MeasureMode.reps), 1);
+      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
     });
 
     test('unless warm-ups are all there is', () {
@@ -213,16 +213,77 @@ void main() {
         s(type: SetType.warmup, weight: 40, reps: 10),
         s(type: SetType.warmup, weight: 60, reps: 8),
       ];
-      expect(topSetIndex(sets: sets, measureMode: MeasureMode.reps), 1);
+      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
     });
 
     test('added weight ranks a weighted chin above an unweighted one', () {
       final sets = [s(added: 0, reps: 10), s(added: 20, reps: 5)];
-      expect(topSetIndex(sets: sets, measureMode: MeasureMode.reps), 1);
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.bodyweightPlus,
+        ),
+        1,
+      );
+    });
+
+    test('a set with no load does not outrank one that has a load', () {
+      // The third disagreement in INTERPRETATION.md § 4. A `total` exercise has
+      // no belt, so `addedWeight` is not load on it — but the old ranking read
+      // `weight ?? addedWeight`, so the second set here sorted as 100 kg while
+      // the chart scored it as having no weight at all. One set, two answers.
+      //
+      // Ranked by effectiveLoad, set 1 has no load and set 0 has 50 kg.
+      final sets = [
+        s(weight: 50, reps: 5),
+        s(added: 100, reps: 5),
+      ];
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        0,
+      );
+    });
+
+    test('a dumbbell day is ranked on the total, and orders the same', () {
+      // 22.5 a side is 45 kg. Doubling is monotonic so the order never changes
+      // — pinned so that ranking by the typed figure cannot creep back in as
+      // an equivalent simplification.
+      final sets = [s(weight: 20, reps: 8), s(weight: 22.5, reps: 6)];
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.perSide,
+        ),
+        1,
+      );
+    });
+
+    test('a back-off day still names what was lifted', () {
+      // The card describes the session; the chart decides what counts as
+      // progress. On a deliberately light day the chart correctly draws
+      // nothing and this correctly says 60 kg. Two questions, two answers.
+      final sets = [
+        s(type: SetType.warmup, weight: 40, reps: 10),
+        s(type: SetType.backoff, weight: 60, reps: 8),
+      ];
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        1,
+      );
     });
 
     test('nothing logged has no top set', () {
-      expect(topSetIndex(sets: [], measureMode: MeasureMode.reps), isNull);
+      expect(heaviestLogged(sets: [], measureMode: MeasureMode.reps, loadMode: LoadMode.total), isNull);
     });
   });
 }

@@ -254,6 +254,27 @@ arithmetic with hand-computed literals but never crosses a transition.
 
 # 3. A working set with no load is a performance worth zero volume
 
+> **CLOSED at the source rather than on the chart.**
+>
+> The entry asked whether a loadless performance should produce a chart point.
+> The better answer was that the row should not exist. A set can be ticked two
+> ways — tapping the box, and typing reps then pressing Next — and only the box
+> refused an empty one. The rule was a private method on the log screen, so the
+> second path never asked it.
+>
+> Both paths now call `missingBeforeDone` (`lib/features/log/set_completion.dart`),
+> a function over plain values with eleven cases covering the four load modes,
+> holds, and the ghost. Blank stays distinct from zero for `bodyweightPlus`: an
+> unweighted set of a movement you sometimes load is a different fact from a
+> belt you forgot to record, and only one should score as bodyweight alone.
+>
+> **Still worth the downstream guard**, at STALE rather than as a bug: the
+> write path can no longer make such a row, but a restore or — after 5b — a
+> merge can still deliver one, and the chart would draw the zero.
+>
+> Not red-first at the UI layer: there is no LogScreen test harness in the
+> repo, so the rule is pinned and the wiring is not. Owed.
+
 **Rank 3.** One chart point reading `0 kg` on a day you trained.
 
 **The rule.** A performance with nothing scoreable in it should not produce a
@@ -293,6 +314,49 @@ a load chart. Decide it before writing the test.
 ---
 
 # 4. Two definitions of "the top set"
+
+> **CLOSED, and the entry was wrong about the shape of it.**
+>
+> This was filed as *two implementations of one rule*. It is not. It is **one
+> name over two different questions**, and the answer was never to merge them:
+>
+> - the summary row asks *what was the heaviest thing you did?* — a record of
+>   the session, so back-offs belong in it
+> - the chart asks *what counts as progress?* — so back-offs must stay out, or
+>   a deliberately light week reads as a gain
+>
+> Merging the pools would have broken one of the two. Widening
+> `scorePerformance` would put back-off and drop noise on the e1RM line;
+> narrowing `heaviestLogged` would blank the summary row on a light day.
+>
+> **What actually shipped:**
+>
+> 1. **The ranker is now shared.** Both rank by `effectiveLoad` rather than the
+>    figure typed in the box. That was the one real defect — disagreement 3 —
+>    and it was **red first**:
+>
+>    ```
+>    a set with no load does not outrank one that has a load
+>      Expected: <0>   Actual: <1>
+>    ```
+>
+>    A `total` set carrying only `addedWeight` sorted as though the belt were
+>    on the bar, while the chart scored it as having no load at all.
+> 2. **The pools stay different**, and each now says why in its own doc.
+> 3. **`topSetIndex` is renamed `heaviestLogged`.** The name was the bug: it
+>    read as a second opinion on the chart's question and got filed as a defect
+>    twice. Two names, two questions, and nothing left that looks like a
+>    contradiction.
+>
+> Disagreements 1 and 2 are therefore **not defects and are not "fixed"** —
+> they are the two functions correctly answering different questions, and that
+> is now written down where a reader will find it.
+>
+> Worth recording: **deload was never part of this.** `exercise_trend.dart`
+> already excludes deload weeks from the plotted line (`:300`), the axis scale
+> (`:226`), the all-time best (`:395`) and the stall badge (`:389`), with the
+> reason stated there — *"a light week is periodisation, not a drop in
+> strength"*.
 
 **Rank 4.** A card names a top set on a day the chart has no point for.
 
