@@ -70,6 +70,32 @@ void main() {
     return we;
   }
 
+  /// A second slot under the same workout as [we].
+  ///
+  /// Not a second [aWorkoutExercise]: that opens a workout, and only one may be
+  /// open at a time. A drop group crossing slots is the interesting shape, and
+  /// it needs two slots on one day rather than two days.
+  Future<String> aSiblingSlot(String we) async {
+    final row = await (db.select(db.workoutExercises)
+          ..where((t) => t.id.equals(we)))
+        .getSingle();
+    final exercise = newId();
+    await db.into(db.exercises).insert(ExercisesCompanion.insert(
+          id: Value(exercise),
+          name: 'Row',
+          muscle: MuscleGroup.back,
+          equipment: Equipment.barbell,
+          loadMode: LoadMode.total,
+        ));
+    final sibling = newId();
+    await db.into(db.workoutExercises).insert(WorkoutExercisesCompanion.insert(
+        id: Value(sibling),
+        workoutId: row.workoutId,
+        exerciseId: exercise,
+        orderIndex: 1));
+    return sibling;
+  }
+
   Future<String> aSet(String we, int index, {String? parent}) async {
     final id = newId();
     await db.into(db.setLogs).insert(SetLogsCompanion.insert(
@@ -94,6 +120,41 @@ void main() {
     final head = await aSet(we, 0);
     await aSet(we, 1, parent: head);
     expect(await db.setLogs.count().getSingle(), 2);
+  });
+
+  test('a drop leg cannot name a head in another exercise', () async {
+    // The column was a real reference, so the head had to exist — but nothing
+    // said *where*. A leg under Bench could name a head under Row, or a head in
+    // last March's workout, and SQLite took it. `addDropLeg` and `setSetType`
+    // always pass a head from the same slot; a restore does not go through
+    // either. INVARIANTS.md § 14.
+    final bench = await aWorkoutExercise(await aRegime());
+    final row = await aSiblingSlot(bench);
+    final head = await aSet(bench, 0);
+
+    await expectLater(
+      aSet(row, 0, parent: head),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test('a drop leg cannot name a head in another workout', () async {
+    // The same rule reaching further: the slot id is unique across the whole
+    // table, so a head in a workout from any other day fails on the same
+    // comparison. This is the shape a merge produces rather than a hand edit.
+    final regime = await aRegime();
+    final march = await aWorkoutExercise(regime);
+    final head = await aSet(march, 0);
+    // The first workout steps aside — only one may be open at a time.
+    await db.update(db.workouts).write(
+          WorkoutsCompanion(deletedAt: Value(nowMs())),
+        );
+    final july = await aWorkoutExercise(regime);
+
+    await expectLater(
+      aSet(july, 0, parent: head),
+      throwsA(isA<SqliteException>()),
+    );
   });
 
   test('one live bodyweight row per day', () async {

@@ -607,5 +607,30 @@ void main() {
       expect(after, before, reason: 'the clear was not rolled back');
       expect(workoutIdAfter, workoutId);
     });
+
+    test('a file with a drop leg pointing into another exercise is refused',
+        () async {
+      // `parent_set_id` was a reference to `set_logs (id)` and nothing more, so
+      // the head had to exist but could sit under any slot in the file. The app
+      // cannot write one — `addDropLeg` walks one slot's list — and this is the
+      // route INVARIANTS § 14 names for it.
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      final sets = (payload['data']['set_logs'] as List).cast<Map>();
+      final head = sets.first;
+      final elsewhere = sets.firstWhere(
+        (s) => s['workoutExerciseId'] != head['workoutExerciseId'],
+        orElse: () => throw StateError('the fixture must span two slots'),
+      );
+      elsewhere['parentSetId'] = head['id'];
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
   });
 }

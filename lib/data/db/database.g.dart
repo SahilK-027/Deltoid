@@ -5708,6 +5708,12 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   /// A real reference, like every other relationship here. It was a bare text
   /// column, so the database would accept a head id that names no set at all —
   /// the one place the schema took the app's word for it.
+  ///
+  /// The head must also sit in the *same slot*, which this reference does not
+  /// say and the composite foreign key in [customConstraints] does. That one
+  /// subsumes this: a `(parent_set_id, workout_exercise_id)` pair that matches
+  /// a row necessarily matches its id. Kept because it is where a reader looks
+  /// to learn the column points at a set.
   final String? parentSetId;
   final int? restSeconds;
   final int? completedAt;
@@ -6994,6 +7000,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_set_logs_position_live',
     'CREATE UNIQUE INDEX idx_set_logs_position_live ON set_logs (workout_exercise_id, set_index) WHERE deleted_at IS NULL',
   );
+  late final Index idxSetLogsSlotIdentity = Index(
+    'idx_set_logs_slot_identity',
+    'CREATE UNIQUE INDEX idx_set_logs_slot_identity ON set_logs (id, workout_exercise_id)',
+  );
   late final Index idxBodyweightDay = Index(
     'idx_bodyweight_day',
     'CREATE INDEX idx_bodyweight_day ON bodyweight_logs (day_key)',
@@ -7037,6 +7047,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxWorkoutExercisesPositionLive,
     idxSetLogsParent,
     idxSetLogsPositionLive,
+    idxSetLogsSlotIdentity,
     idxBodyweightDay,
     idxBodyweightDayLive,
   ];

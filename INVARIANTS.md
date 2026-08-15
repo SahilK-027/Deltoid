@@ -24,8 +24,10 @@ training data?* Anything that cannot belongs in [DEBT.md](DEBT.md).
 
 ## The short version
 
-The schema is in unusually good shape. **Eleven unique indexes (nine when this
-was written — entry 11 added the tenth, entry 20 the eleventh), fifty-one CHECK
+The schema is in unusually good shape. **Eleven unique indexes that are rules
+(nine when this was written — entry 11 added the tenth, entry 20 the eleventh;
+entry 14 added a twelfth that is a foreign key's parent key and enforces
+nothing on its own), fifty-one CHECK
 constraints and thirty-one transactions already hold most of what matters** —
 counted at `grep -c 'CREATE UNIQUE INDEX' lib/data/db/tables.dart`, `grep -o
 'CHECK (' lib/data/db/tables.dart | wc -l`, and `grep -rn 'db.transaction('
@@ -935,6 +937,42 @@ predicate (`:1857-1858`), and `exerciseHistoryPage` the same again (`:1648-1651`
 
 ## 14. `set_logs.parent_set_id` names a real set in the same exercise
 
+> **CLOSED, and not the way this entry proposed.** A **composite foreign key**,
+> `FOREIGN KEY (parent_set_id, workout_exercise_id) REFERENCES set_logs (id,
+> workout_exercise_id)` (`tables.dart:557`), backed by the unique index the
+> parent key requires (`idx_set_logs_slot_identity`, `:452`). Three checks, all
+> red first: `schema_constraints_test.dart` → `a drop leg cannot name a head in
+> another exercise` and `a drop leg cannot name a head in another workout`, plus
+> `backup_service_test.dart` → `a file with a drop leg pointing into another
+> exercise is refused`.
+>
+> **The remedy this entry asked for was the wrong one.** It named "a trigger or
+> an application-level assert". A trigger fires per row, and the restore inserts
+> a leg before its head on purpose — `backup_service.dart:646` turns
+> `PRAGMA defer_foreign_keys = ON` precisely so parentage is judged at commit
+> rather than mid-chunk. A trigger would have refused good files while catching
+> bad ones; the foreign key inherits that deferral for free and needs no code.
+> An application-level assert would have missed the only route the entry names,
+> since a restore does not go through the application.
+>
+> Carrying `workout_exercise_id` into the key is what makes the pair the thing
+> that must match, so *the same slot* is enforced by the same mechanism that
+> already refused a head that does not exist. It subsumes the plain reference on
+> the column, which is kept for readability.
+>
+> **Cost, recorded so it is not mistaken for a rule later.**
+> `idx_set_logs_slot_identity` adds no uniqueness — `id` is already the primary
+> key — and no query reads it. SQLite will not accept a composite foreign key
+> whose parent columns lack a unique index, and that index cannot be partial:
+> a parent key has to cover the whole table, tombstones included. It is a
+> twelfth unique index that enforces nothing.
+>
+> **Both of this entry's judgements hold.** The SUSPECT consequence is
+> confirmed, not corrected: `addDropLeg` reads one slot's sets
+> (`training_repository.dart:2536-2543`) and returns `''` when
+> `head < 0` (`:2544`), so a cross-slot head was never found and the failure was
+> a leg drawn with no head. **Severity STALE** stands.
+
 **Enforced — half.** The column is a real reference (`tables.dart:467-468`), so
 the id must exist, and `CHECK (parent_set_id IS NULL OR parent_set_id <> id)`
 (`:489`) refuses self-parenting. Tested at `schema_constraints_test.dart:72`,
@@ -951,9 +989,11 @@ walk (`addDropLeg`'s `while` at `:2538`) is scoped to one slot's `sets` list, so
 a cross-slot head would simply never be found — a leg drawn with no head, not
 wrong arithmetic.
 
-**The check that closes it.** A trigger or an application-level assert;
-`schema_constraints_test.dart` → `a drop leg cannot name a head in another
-exercise`. **Does not exist.**
+**The check that closes it.** ~~A trigger or an application-level assert;~~
+**neither — a composite foreign key, see the banner for why both of those
+would have been wrong.** `schema_constraints_test.dart` → `a drop leg cannot
+name a head in another exercise`. ~~**Does not exist.**~~ **Exists, with two
+more beside it.**
 
 **Severity: STALE.**
 

@@ -455,6 +455,17 @@ class WorkoutExercises extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_set_logs_position_live '
   'ON set_logs (workout_exercise_id, set_index) WHERE deleted_at IS NULL',
 )
+/// Not a rule — the parent key the drop-group foreign key needs.
+///
+/// `id` is already the primary key, so this adds no uniqueness anything did not
+/// already have. SQLite will only accept a composite foreign key whose parent
+/// columns carry a unique index of their own, and `(id, workout_exercise_id)`
+/// is what [SetLogs.parentSetId]'s pair points at. Unpartial and unqueried, and
+/// deliberately so: see [SetLogs.customConstraints].
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_set_logs_slot_identity '
+  'ON set_logs (id, workout_exercise_id)',
+)
 class SetLogs extends Table with SyncColumns {
   TextColumn get workoutExerciseId => text().references(WorkoutExercises, #id)();
   IntColumn get setIndex => integer().check(setIndex.isBiggerOrEqualValue(0))();
@@ -499,6 +510,12 @@ class SetLogs extends Table with SyncColumns {
   /// A real reference, like every other relationship here. It was a bare text
   /// column, so the database would accept a head id that names no set at all —
   /// the one place the schema took the app's word for it.
+  ///
+  /// The head must also sit in the *same slot*, which this reference does not
+  /// say and the composite foreign key in [customConstraints] does. That one
+  /// subsumes this: a `(parent_set_id, workout_exercise_id)` pair that matches
+  /// a row necessarily matches its id. Kept because it is where a reader looks
+  /// to learn the column points at a set.
   TextColumn get parentSetId =>
       text().nullable().references(SetLogs, #id)();
 
@@ -512,6 +529,22 @@ class SetLogs extends Table with SyncColumns {
   /// accept a row pointing at its own id, and the drop group that describes has
   /// no head to draw and no end to walk to.
   ///
+  /// Nor can a leg name a head under a **different slot**. That is the
+  /// composite foreign key, and it has to be one: a CHECK sees one row and this
+  /// rule compares two. Carrying `workout_exercise_id` into the key makes the
+  /// pair the thing that must match, so a head under another exercise — or in
+  /// another workout, since ids are unique table-wide — is refused by the same
+  /// mechanism that already refused a head that does not exist. `addDropLeg`
+  /// (`training_repository.dart:2513`) and `setSetType` (`:2581`) only ever
+  /// pass a head from the same slot; a restore and a merge do not come through
+  /// either, and the walk that draws a group is scoped to one slot's list, so a
+  /// cross-slot head draws a leg with no head at all. INVARIANTS.md § 14.
+  ///
+  /// SQLite requires the referenced columns to carry a unique index, which
+  /// `idx_set_logs_slot_identity` above exists for and nothing else reads. It
+  /// cannot be partial: a foreign key's parent key has to cover the whole
+  /// table, tombstones included, or the index does not qualify at all.
+  ///
   /// The upper bounds are the other half of the checks above. `weight >= 0`
   /// refuses the assisted-lift minus sign that made a negative load scoreable;
   /// these refuse the misplaced decimal on the other side, where a set of
@@ -522,6 +555,8 @@ class SetLogs extends Table with SyncColumns {
   List<String> get customConstraints => [
         _liveOrTombstoned,
         'CHECK (parent_set_id IS NULL OR parent_set_id <> id)',
+        'FOREIGN KEY (parent_set_id, workout_exercise_id) '
+            'REFERENCES set_logs (id, workout_exercise_id)',
         'CHECK (weight IS NULL OR weight <= 2000)',
         'CHECK (added_weight IS NULL OR added_weight <= 2000)',
         'CHECK (reps IS NULL OR reps <= 86400)',
