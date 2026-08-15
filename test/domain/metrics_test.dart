@@ -341,11 +341,38 @@ void main() {
       (dayKey: 20260201, weightKg: 72.0),
     ];
 
-    test('interpolates between entries', () {
-      // Roughly halfway through January.
-      final w = bodyweightOn(20260116, log)!;
-      expect(w, greaterThan(70));
-      expect(w, lessThan(72));
+    test('interpolates in days, not in date keys', () {
+      // 1 Jan = 70.0, 1 Feb = 72.0. 16 Jan is 15 of the 31 days between them.
+      // 70 + 2 * (15 / 31) = 70.967741935…
+      //
+      // A dayKey is not a day count. Interpolating on the key reads the gap as
+      // 100 units and 16 Jan as 15 of them, which lands on 70.3 — the whole of
+      // the error, and it is worst across a month or a year boundary, which is
+      // exactly where a monthly weigh-in habit puts it.
+      expect(bodyweightOn(20260116, log), closeTo(70.9677, 1e-4));
+    });
+
+    test('interpolates across a year boundary in days', () {
+      // 1 Dec 2025 = 70.0, 31 Jan 2026 = 74.0, asked for 1 Jan 2026.
+      // 61 days apart, 1 Jan is day 31. 70 + 4 * (31 / 61) = 72.032786885…
+      //
+      // On the keys the gap reads as 8 930 and 1 Jan as 8 900 of them — 73.99,
+      // nearly two kilograms out, because the key jumps a year in one day.
+      final acrossNewYear = [
+        (dayKey: 20251201, weightKg: 70.0),
+        (dayKey: 20260131, weightKg: 74.0),
+      ];
+      expect(bodyweightOn(20260101, acrossNewYear), closeTo(72.0328, 1e-4));
+    });
+
+    test('interpolates across a month end in days', () {
+      // 28 Jan = 70.0, 4 Feb = 71.0, asked for 1 Feb: 4 of 7 days.
+      // 70 + 1 * (4 / 7) = 70.571428571…
+      final acrossMonthEnd = [
+        (dayKey: 20260128, weightKg: 70.0),
+        (dayKey: 20260204, weightKg: 71.0),
+      ];
+      expect(bodyweightOn(20260201, acrossMonthEnd), closeTo(70.5714, 1e-4));
     });
 
     test('clamps outside the logged range instead of extrapolating', () {
@@ -394,6 +421,13 @@ void main() {
       for (final day in [20260115, 20260220, 20260301, 20251101]) {
         expect(bodyweightOn(day, shuffled), bodyweightOn(day, ordered));
       }
+
+      // Both sides of the loop above are the same function, so it proves the
+      // sort and nothing about the value. The literals are what pin that:
+      //   15 Jan — 14 of the 31 days from 1 Jan to 1 Feb: 70 + 2 * 14/31
+      //   20 Feb — 19 of the 28 days from 1 Feb to 1 Mar: 72 + 8 * 19/28
+      expect(bodyweightOn(20260115, shuffled), closeTo(70.9032, 1e-4));
+      expect(bodyweightOn(20260220, shuffled), closeTo(77.4286, 1e-4));
     });
   });
 

@@ -275,8 +275,29 @@ double? bodyweightOnOrdered(
   final a = ordered[lo];
   final b = ordered[lo + 1];
   if (b.dayKey == a.dayKey) return b.weightKg;
-  final t = (dayKey - a.dayKey) / (b.dayKey - a.dayKey);
+
+  // In days, not in keys. The search above is right to work on `dayKey` — it is
+  // monotonic — but the *ratio* cannot be: `year * 10000 + month * 100 + day`
+  // counts 76 units from 28 January to 4 February, and 8 870 from one New Year's
+  // Eve to the next morning. Weighing in once a month puts every interpolated
+  // day across exactly the boundaries where the key is furthest from a date.
+  final span = _daysBetween(a.dayKey, b.dayKey);
+  if (span == 0) return b.weightKg;
+  final t = _daysBetween(a.dayKey, dayKey) / span;
   return a.weightKg + (b.weightKg - a.weightKg) * t;
+}
+
+/// Whole days from one `yyyyMMdd` to another.
+///
+/// UTC on both sides, which is the pattern the heatmaps already use
+/// (`heatmap.dart`, `year_heatmap.dart`): a `dayKey` names a calendar day and
+/// carries no time, so counting it through local midnights would make a day
+/// that contains a clock change 23 or 25 hours long and truncate to the wrong
+/// count. Nothing here ever leaves the function, so the zone cannot escape.
+int _daysBetween(int fromDayKey, int toDayKey) {
+  DateTime utcOf(int key) =>
+      DateTime.utc(key ~/ 10000, (key ~/ 100) % 100, key % 100);
+  return utcOf(toDayKey).difference(utcOf(fromDayKey)).inDays;
 }
 
 /// How many consecutive recent performances failed to beat the best e1RM that

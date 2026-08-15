@@ -31,7 +31,7 @@ and `plates.dart` are almost all tested with hand-computed literals, which is
 unusual and is why this document is short at the top and long at the bottom.
 
 **Three things are actually wrong**, and one of them is wrong by up to two
-kilograms on every bodyweight lift ever charted.
+kilograms on every bodyweight lift ever charted — § 1, now closed.
 
 **One structural gap runs through everything:** no test anywhere asserts a
 hand-computed `best1RM`, `topSetLoad` or `volume` coming out of the *repository*.
@@ -50,6 +50,36 @@ calculation and a screen, which is where this document keeps finding the holes.
 ---
 
 # 1. `bodyweightOnOrdered` interpolates on `yyyyMMdd`, not on days
+
+> **CLOSED.** `metrics.dart` now interpolates on a day count from `_daysBetween`,
+> a private helper that converts both keys with `DateTime.utc` and takes
+> `.inDays`. **UTC on both sides deliberately** — a `dayKey` names a calendar day
+> and carries no time, so counting through *local* midnights would make the day
+> containing a clock change 23 or 25 hours long and truncate to the wrong count.
+> That is § 2's bug, and taking it on while fixing § 1 would have been a poor
+> trade. It is the pattern both heatmaps already use.
+>
+> Red first, and the three worked values in the table below came back **exactly**
+> as predicted:
+>
+> ```
+> interpolates in days, not in date keys
+>   Expected: within <0.0001> of <70.9677>   Actual: <70.3>
+> interpolates across a year boundary in days
+>   Expected: within <0.0001> of <72.0328>   Actual: <73.98656215005599>
+> interpolates across a month end in days
+>   Expected: within <0.0001> of <70.5714>   Actual: <70.96052631578948>
+> ```
+>
+> The binary search was left alone: `dayKey` is monotonic, so searching on it is
+> correct. Only the ratio was wrong.
+>
+> **Two of the UNVERIFIED list are struck with it.** `interpolates between
+> entries` asserted `> 70 && < 72` and passed under the bug; it is now the first
+> test above. `interpolates the same whatever order the entries arrive in` had
+> the same function on both sides of the `expect` — it keeps the shuffle loop,
+> which is a real assertion about the sort, and now carries two hand literals
+> beside it so it also pins a value. It was red on those.
 
 **Rank 1.** Up to ~2 kg wrong, on every bodyweight and BW+ number the app has
 ever shown, silently, forever.
@@ -824,8 +854,8 @@ Stage 3 replaces each of these with a hand-computed literal.
 
 | Test | Why |
 | --- | --- |
-| `metrics_test.dart:387` `interpolates the same whatever order the entries arrive in` | `expect(bodyweightOn(d, shuffled), bodyweightOn(d, ordered))` — the same function on both sides. The only test that touches the § 1 bug, and it cannot see it |
-| `metrics_test.dart:344` `interpolates between entries` | asserts a range, not a value. Passes under the bug |
+| ~~`metrics_test.dart:387` `interpolates the same whatever order the entries arrive in`~~ | **Done with § 1.** The shuffle loop stays — it is a real assertion about the sort — with two hand literals beside it that pin a value |
+| ~~`metrics_test.dart:344` `interpolates between entries`~~ | **Done with § 1**, replaced by `interpolates in days, not in date keys` and two boundary cases |
 | `metrics_test.dart:117` `caps reps so high-rep sets cannot masquerade as strength` | `expect(at20, at12)`, both computed. Write `50 × (1 + 12/30) = 70` |
 | `metrics_test.dart:292` (inside `the rep cap in e1RM does not hide a 12 to 13 improvement`) | `expect(estimated1RM(45,13), estimated1RM(45,12))`, both computed. `45 × 1.4 = 63` |
 | `volume_history_test.dart:188` `weeks trained is what the average cannot say` | `expect(steady.averagePerWeek, lumpy.averagePerWeek)`. The rest of the test is hand-computed; this line is not |
@@ -834,4 +864,5 @@ Stage 3 replaces each of these with a hand-computed literal.
 
 Six of the seven are in the two functions this document ranks first and sixth,
 which is not a coincidence: **the numbers nobody hand-computed are the numbers
-nobody checked.**
+nobody checked.** Two are now done, both from § 1 — and both were red, which is
+the point the table was making.
