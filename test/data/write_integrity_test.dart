@@ -110,6 +110,39 @@ void main() {
       expectDistinct([for (final s in live) s.orderIndex]);
     });
 
+    test('undoing a removed slot after another was added still finds a free '
+        'position', () async {
+      // The undo action is the only revival that kept the row's old position.
+      // It only collides when the tombstone held the *highest* index, because
+      // that is the one the append behind it then takes: remove the last slot
+      // and the next append lands exactly where the buried row is pointing.
+      final session = await sessionNamed('Push 1');
+      final slots = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(session.id))
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      await regimes.removeSessionExercise(slots.last.id);
+
+      final spare = await (db.select(db.exercises)
+            ..where((t) => t.id.isNotIn([for (final s in slots) s.exerciseId]))
+            ..limit(1))
+          .getSingle();
+      await regimes.addExerciseToSession(session.id, spare.id);
+
+      await regimes.restoreSessionExercise(slots.last.id);
+
+      final live = await (db.select(db.sessionExercises)
+            ..where(
+                (t) => t.sessionId.equals(session.id) & t.deletedAt.isNull()))
+          .get();
+      expect(
+        live.map((s) => s.id),
+        contains(slots.last.id),
+        reason: 'the undo did not put the slot back',
+      );
+      expectDistinct([for (final s in live) s.orderIndex]);
+    });
+
     test("keeping today's added movement, after one was removed before it",
         () async {
       final session = await sessionNamed('Push 1');

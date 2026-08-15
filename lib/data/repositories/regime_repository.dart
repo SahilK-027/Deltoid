@@ -553,15 +553,36 @@ class RegimeRepository {
   /// Undo for [removeSessionExercise]. The row was only tombstoned, so putting
   /// a slot back is clearing the stamp rather than rebuilding it — which also
   /// keeps its set target and rep range.
+  ///
+  /// It comes back at the end, not where it was. The position it held is free
+  /// ground the moment it is tombstoned — `idx_session_exercises_position_live`
+  /// is scoped `WHERE deleted_at IS NULL` — so an append behind it is entitled
+  /// to take it, and one that appends past the highest live index takes exactly
+  /// that one when the removed slot was the last. Carrying the old position
+  /// back made the undo throw on the index rather than restore anything; see
+  /// [TrainingRepository.applySessionChanges], which revives the same way.
   Future<void> restoreSessionExercise(String id) async {
-    await (db.update(db.sessionExercises)..where((t) => t.id.equals(id))).write(
-      SessionExercisesCompanion(
-        deletedAt: const Value(null),
-        deviceId: Value(currentDeviceId),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
+    await db.transaction(() async {
+      final row = await (db.select(db.sessionExercises)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      if (row == null) return;
+      final live = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(row.sessionId) & t.deletedAt.isNull()))
+          .get();
+
+      await (db.update(db.sessionExercises)..where((t) => t.id.equals(id)))
+          .write(
+        SessionExercisesCompanion(
+          deletedAt: const Value(null),
+          orderIndex: Value(nextPosition(live.map((s) => s.orderIndex))),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
   }
 
   Future<void> updateSessionExercise(

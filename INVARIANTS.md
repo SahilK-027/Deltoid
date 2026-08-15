@@ -32,8 +32,8 @@ lib/`, of which 28 are in the two repositories, 2 in `seeder.dart` and 1 in
 `backup_service.dart`. The places where a rule is only prose are mostly narrow.
 The catalogue below is 31 entries; **eight are CORRUPTION**, four of those were
 the same shape — a parent tombstoned without its children, entry 1, now
-**closed** — and two more were the export and restore paths, both now closed
-too.
+**closed** — and three more were the export, the restore and the undo's
+position, all now closed too.
 
 The audit checked the six writers HARDENING named. `ensureOpenCycle`,
 `_healDuplicateOpenCycles`, `logBodyweight` and `completeWorkout` each open their
@@ -50,10 +50,10 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries, **five closed**. Four were one bug in four places — that is entry
+Eight entries, **six closed**. Four were one bug in four places — that is entry
 1, closed; entry 2 is closed with it. Entries 4 and 6 are the restore, also
-closed, and entry 5 is the export, closed. Entry 3 belongs to § 3b; entries 7
-and 8 are positions and are what is left.
+closed, and entry 5 is the export, closed. Entry 7 is the undo's position, now
+closed too. Entry 3 belongs to § 3b; entry 8 is what is left.
 
 ---
 
@@ -553,6 +553,43 @@ lines of comparison, and the format already carries the number they need.
 ---
 
 ## 7. `set_logs.deleted_at` is only ever set forward
+
+> **CLOSED.** `test/data/write_integrity_test.dart` →
+> `undoing a removed slot after another was added still finds a free position`,
+> in the existing `a position is never reused` group. Red first, and the throw
+> was the one predicted rather than a near neighbour:
+>
+> ```
+> SqliteException(2067): while executing statement, UNIQUE constraint failed:
+>   session_exercises.session_id, session_exercises.order_index
+>   at regime_repository.dart:557 RegimeRepository.restoreSessionExercise
+> ```
+>
+> **The collision is narrower than the entry says.** It needs the tombstone to
+> hold the *highest* live position, not merely any position: `nextPosition`
+> appends past the highest live index, so a slot removed from the middle frees
+> an index the next append does not go anywhere near. Remove the **last** slot
+> and the append lands exactly on the buried row. The test removes `slots.last`
+> for that reason; written against `slots[1]` it passes without the fix.
+>
+> **Fixed** at `regime_repository.dart:556` by reviving at
+> `nextPosition(live)` inside a transaction, which is what
+> `applySessionChanges` (`training_repository.dart:1063`) already did for the
+> same revival reached the other way. The slot comes back at the end rather
+> than where it was; its set target, rep range and notes still come back with
+> it, which is the whole reason the undo revives a tombstone instead of
+> inserting a fresh row. The position was never recoverable — it is free ground
+> the moment the row is tombstoned, because the index is scoped
+> `WHERE deleted_at IS NULL`, and by the time the undo runs another row is
+> legitimately standing on it.
+>
+> The **first half** of the invariant — a tombstone never moved backwards past
+> the row's birth — needed nothing: `_liveOrTombstoned` (`tables.dart:42`)
+> already refuses `deleted_at <= 0` on every syncable table.
+>
+> `restoreSessionExercise` and `applySessionChanges` are the only two revivals
+> in `lib/` (grep: `deletedAt: const Value(null)`), so nothing else carries this
+> shape.
 
 **Invariant.** A tombstone is never moved backwards past the row's birth, and a
 tombstoned row is never silently revived onto a slot another row holds.
@@ -1120,7 +1157,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fourteen, of which **five are done**. Every one is executable, and every one must
+Fourteen, of which **six are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1149,8 +1186,9 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 7. ✅ `a backdated session is not swept the moment it is created` — entry 2,
    with `a session genuinely left open is still swept` beside it as the guard.
    **Written, both red, now passing.**
-8. `undoing a removed slot after another was added still finds a free position` —
-   entry 7.
+8. ✅ `undoing a removed slot after another was added still finds a free
+   position` — entry 7. **Written, red on the unique index, now passing.** The
+   removed slot must be the **last** one for the collision to exist at all.
 9. `a logged workout is byte-identical after every programme edit` — snapshot up
    the `workout_exercises` and `set_logs` rows of a completed workout, run every
    mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
