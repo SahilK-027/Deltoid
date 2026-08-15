@@ -2065,6 +2065,9 @@ class TrainingRepository {
               // Explicit rather than the column default, so a backdated
               // session sorts into history where it belongs.
               startedAt: Value(now.millisecondsSinceEpoch),
+              // All three from the one `DateTime`, which is what makes them
+              // agree — see `Workouts.tzOffsetMinutes`.
+              tzOffsetMinutes: tzOffsetOf(now),
               isDeload: Value(cycle?.isDeload ?? false),
               status: const Value(WorkoutStatus.inProgress),
             ),
@@ -3248,6 +3251,12 @@ class TrainingRepository {
         WorkoutsCompanion(
           dayKey: Value(dayKeyOf(moved)),
           startedAt: Value(moved.millisecondsSinceEpoch),
+          // Restamped rather than left alone. The row may have been written
+          // under another offset — another zone, or the other side of a clock
+          // change — and moving two of the three columns while the third keeps
+          // an offset that no longer explains them is exactly the disagreement
+          // `Workouts.tzOffsetMinutes` exists to refuse.
+          tzOffsetMinutes: Value(tzOffsetOf(moved)),
           endedAt: workout.endedAt == null
               ? const Value.absent()
               : Value(workout.endedAt! + shift),

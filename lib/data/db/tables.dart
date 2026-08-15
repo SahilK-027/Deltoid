@@ -360,6 +360,25 @@ class Workouts extends Table with SyncColumns {
   /// Local calendar day (`yyyyMMdd`) for heatmap and history grouping.
   IntColumn get dayKey => integer()();
   IntColumn get startedAt => integer().clientDefault(nowMs)();
+
+  /// Minutes east of UTC where this session was logged, at the instant it was
+  /// logged.
+  ///
+  /// The only reason it exists is to let the CHECK below compare the two
+  /// columns above. `started_at` is an absolute instant and `day_key` is a local
+  /// calendar day, and no expression can get from one to the other without
+  /// knowing the zone. SQLite can be told the zone — `'localtime'` — but a CHECK
+  /// must be deterministic, and `'localtime'` reads the *machine's* zone at
+  /// evaluation time, so a row written in Delhi would be re-judged in London and
+  /// the constraint would start refusing rows it had already accepted. Written
+  /// down per row instead, the arithmetic is a closed function of the row.
+  ///
+  /// Historically correct rather than current: `DateTime.timeZoneOffset` answers
+  /// for the instant it is asked about, so a session logged the hour before a
+  /// clock change keeps the offset it was actually logged under.
+  ///
+  /// Nothing reads it. It is not a display value and no query filters on it.
+  IntColumn get tzOffsetMinutes => integer()();
   IntColumn get endedAt => integer().nullable()();
   BoolColumn get isDeload => boolean().withDefault(const Constant(false))();
   TextColumn get status =>
@@ -373,14 +392,29 @@ class Workouts extends Table with SyncColumns {
   /// session on two different days at once: ringed on Tuesday in the grid, filed
   /// under Monday in the feed, and reachable from neither reliably.
   ///
-  /// The range is a real one rather than a sanity bound. `dateFromDayKey` does
-  /// arithmetic on this, so `0` is a `DateTime` in year zero and the calendar
-  /// silently scrolls to it.
+  /// They agree here now, through [tzOffsetMinutes]. The arithmetic is in
+  /// seconds rather than milliseconds so the only division is by `started_at`,
+  /// which the CHECK above holds positive — SQLite truncates toward zero, which
+  /// is a floor for a positive value and a ceiling for a negative one, and a
+  /// ceiling here would put the last second of a day on the next one.
+  ///
+  /// The offset range is the real one: nowhere on earth runs west of UTC-12:00
+  /// or east of UTC+14:00. It is not decoration. Without it a hand-edited file
+  /// could name any offset it liked and talk this constraint into accepting a
+  /// row that does claim two days.
+  ///
+  /// The day range is a real one too, rather than a sanity bound.
+  /// `dateFromDayKey` does arithmetic on this, so `0` is a `DateTime` in year
+  /// zero and the calendar silently scrolls to it.
   @override
   List<String> get customConstraints => [
         _liveOrTombstoned,
         'CHECK (day_key BETWEEN 19000101 AND 21001231)',
         'CHECK (started_at > 0)',
+        'CHECK (tz_offset_minutes BETWEEN -720 AND 840)',
+        'CHECK (day_key = CAST(strftime('
+            "'%Y%m%d', started_at / 1000 + tz_offset_minutes * 60, 'unixepoch'"
+            ') AS INTEGER))',
         'CHECK (ended_at IS NULL OR ended_at >= started_at)',
         'CHECK (notes IS NULL OR length(notes) <= 4000)',
         "CHECK (status IN ('planned', 'inProgress', 'completed', 'abandoned'))",

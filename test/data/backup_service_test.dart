@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
@@ -632,5 +633,105 @@ void main() {
       expect(after, before, reason: 'the clear was not rolled back');
       expect(workoutIdAfter, workoutId);
     });
+
+    test('a file with a workout on two days at once is refused', () async {
+      // The route INVARIANTS § 9 names. `day_key` is what the heatmap and the
+      // calendar ring; `started_at` is what History pages by. A row where they
+      // disagree is drawn on one day and filed under another.
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      final workouts = (payload['data']['workouts'] as List).cast<Map>();
+      final day = workouts.first['dayKey'] as int;
+      workouts.first['dayKey'] = day - 1;
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
+
+    test('a file written before the zone offset existed still restores',
+        () async {
+      // Backup files outlive reinstalls — that is what they are for — so a file
+      // written before `tz_offset_minutes` has no key for it, and the column is
+      // required. [impliedTzOffset] supplies the one the file's own two date
+      // columns imply, and the pair survives the round trip unchanged.
+      await logASession();
+
+      final payload = await backup.buildPayload();
+      final workouts = (payload['data']['workouts'] as List).cast<Map>();
+      final was = {
+        for (final w in workouts) w['id'] as String: w['dayKey'] as int,
+      };
+      for (final w in workouts) {
+        w.remove('tzOffsetMinutes');
+      }
+
+      await backup.restore(jsonEncode(payload));
+
+      final restored = await db.select(db.workouts).get();
+      expect(restored, hasLength(was.length));
+      for (final w in restored) {
+        expect(w.dayKey, was[w.id], reason: 'the day the file named');
+      }
+    });
+
+    test('a pre-offset file keeps the day it names, not this zone', () async {
+      // A file written west of here and restored on this phone: `started_at` is
+      // an absolute instant and survives, but the day *this* zone derives from
+      // it is the following one. The file's day wins — it is the day the user
+      // saw — and the offset is fitted to it. Unlike the refusal above there is
+      // no offset in the file for the day key to contradict.
+      //
+      // 02:30 UTC on the 15th is still the 14th anywhere at or west of
+      // UTC-02:31, so the least move that lands it back on the 14th is
+      // -02:31 = **-151 minutes**, which puts it at 23:59 on the 14th. That is
+      // a hand-computed golden and it does not depend on the zone this test
+      // runs in: the nudge is measured from wherever the machine sits and
+      // stops at the same minute either way.
+      await logASession();
+
+      final payload = await backup.buildPayload();
+      final workouts = (payload['data']['workouts'] as List).cast<Map>();
+      expect(workouts, hasLength(1), reason: 'one session, one instant');
+      workouts.first
+        ..remove('tzOffsetMinutes')
+        ..['startedAt'] = DateTime.utc(2026, 3, 15, 2, 30).millisecondsSinceEpoch
+        ..['dayKey'] = 20260314;
+
+      await backup.restore(jsonEncode(payload));
+
+      final restored = await db.select(db.workouts).getSingle();
+      expect(restored.dayKey, 20260314);
+      expect(restored.tzOffsetMinutes, -151);
+    });
+
+    test('a pre-offset file no offset can rescue is refused', () async {
+      // Three days is further than any zone reaches, so no value inside
+      // ±(12, 14) hours reconciles the pair and the file is refused whole. It
+      // was already claiming two days; the column only made that visible.
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      for (final w in (payload['data']['workouts'] as List).cast<Map>()) {
+        w.remove('tzOffsetMinutes');
+        w['dayKey'] = _dayBefore(w['dayKey'] as int, 3);
+      }
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
   });
 }
+
+/// [days] before [key], as a day key — calendar arithmetic, so it holds at a
+/// month boundary where subtracting from the integer does not.
+int _dayBefore(int key, int days) =>
+    dayKeyOf(daysBefore(dateFromDayKey(key), days));

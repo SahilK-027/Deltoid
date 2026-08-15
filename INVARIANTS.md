@@ -27,7 +27,7 @@ training data?* Anything that cannot belongs in [DEBT.md](DEBT.md).
 The schema is in unusually good shape. **Eleven unique indexes that are rules
 (nine when this was written — entry 11 added the tenth, entry 20 the eleventh;
 entry 14 added a twelfth that is a foreign key's parent key and enforces
-nothing on its own), fifty-one CHECK
+nothing on its own), fifty-three CHECK
 constraints and thirty-one transactions already hold most of what matters** —
 counted at `grep -c 'CREATE UNIQUE INDEX' lib/data/db/tables.dart`, `grep -o
 'CHECK (' lib/data/db/tables.dart | wc -l`, and `grep -rn 'db.transaction('
@@ -725,6 +725,67 @@ Data on disk is right; a screen or a derived number can read it wrong.
 
 ## 9. `day_key` and `started_at` name the same day
 
+> **CLOSED.** `workouts.tz_offset_minutes` (`tables.dart`), a CHECK that uses
+> it, and eleven tests: seven in `schema_constraints_test.dart` →
+> `a workout names one day`, three in `backup_service_test.dart`, one in
+> `training_repository_test.dart` →
+> `moving a day logged in another zone restamps its offset`. **Red first** —
+> the column was added without the CHECK and the four refusal tests failed
+> with `Actual: emitted 1`, the accept tests passing already; the repository
+> test was re-run with the `setWorkoutDate` write deleted and failed on the
+> CHECK by name.
+>
+> **The entry was wrong that this needed a design decision it could not make.**
+> It was right that `'localtime'` is unsafe, and right about *why* — but it
+> read that as "SQLite cannot express this" and stopped. SQLite can. The
+> problem is not that the comparison is inexpressible, it is that it is
+> **underdetermined**: an absolute instant and a local calendar day do not
+> determine each other without a zone, and the zone was nowhere in the row.
+> Put it in the row and the arithmetic closes over the row, which is exactly
+> what a CHECK requires. `'localtime'` would have read the *machine's* zone at
+> evaluation time, so a row written in Delhi would be re-judged in London and
+> the constraint would start refusing rows it had already accepted.
+>
+> **One check was not enough, the same way it was not enough in entry 20.** The
+> entry named a single refusal test. A constraint that refuses *everything*
+> passes that, so the accept side is asserted too — and it is the interesting
+> side here, because the point of the design is that one instant legitimately
+> belongs to either of two days and only the offset says which. `2026-03-15
+> 02:30Z` is filed under the 14th in New York and the 15th in Delhi; both are
+> accepted, and each is refused under the other's day. The entry also named a
+> restored file as the route in and then put its only check in the schema
+> test, which says nothing about whether a restore meets it — so the restore
+> refusal is asserted directly.
+>
+> **A required column the old files do not carry, which is new.** Every codec
+> default so far has been a constant — `barKind: none`, `partialReps: null`.
+> This one cannot be: a row without an offset cannot be inserted at all, and no
+> fixed value reconciles an arbitrary pair of date columns. `impliedTzOffset`
+> derives it from the row instead, preferring this phone's offset at that
+> instant — which for a file written on this phone is not a guess but the very
+> offset that produced the day key — and nudging by the fewest whole minutes
+> when a zone move means it no longer reconciles. **The file's day wins over
+> the day this phone would derive**, because the file's day is the one the user
+> saw. A pair no real offset can reconcile falls outside the ±(12, 14) hour
+> bound and the file is refused whole; that row was already claiming two days.
+>
+> **Severity was right and reachability was right: no live bug.** The entry's
+> PROVED is about the *writes*, and they did all hold it — `startWorkout` and
+> `setWorkoutDate` each derive everything from one `DateTime`, and they still
+> do. Nothing in the app has ever written a row that claims two days. This
+> shuts the two doors the entry names and no others: a hand-edited or truncated
+> file, and a merged row once sync lands.
+>
+> Worth recording anyway: **the impossible state was already sitting in the
+> test suite.** Five fixtures built workouts with `dayKey: 20260101` and the
+> column default `startedAt = nowMs()` — August 2026 — a seven-month
+> disagreement, harmless because nothing read both, and precisely the row this
+> entry says must not exist. They now take all three columns from one
+> `DateTime`.
+>
+> ~~**Enforced today: nothing enforces this.**~~ The claim below was true when
+> it was written. Corrected in place:
+
 **Invariant.** `dayKeyOf(DateTime.fromMillisecondsSinceEpoch(started_at)) == day_key`.
 
 **Enforced today: nothing enforces this.** The CHECKs at
@@ -747,12 +808,21 @@ them together (`:3191-3192`).
 (`_olderThan`, `:1422-1425`). The row is ringed on Tuesday and filed under
 Monday.
 
-**The check that closes it.** `test/data/schema_constraints_test.dart` →
-`a workout cannot claim two different days` — insert a row with mismatched
+~~**The check that closes it.**~~ `test/data/schema_constraints_test.dart` →
+~~`a workout cannot claim two different days` — insert a row with mismatched
 columns and expect a refusal. Needs a schema CHECK; SQLite can express it
 (`CAST(strftime('%Y%m%d', started_at/1000, 'unixepoch', 'localtime') AS INTEGER)`
 is *not* safe — it is UTC-relative and the column is local-day). **Does not exist,
-and needs a design decision before it can.**
+and needs a design decision before it can.**~~
+
+`a workout names one day`, seven tests, plus three on the restore and one on
+`setWorkoutDate`. The CHECK is
+`day_key = CAST(strftime('%Y%m%d', started_at / 1000 + tz_offset_minutes * 60,
+'unixepoch') AS INTEGER)`, bounded by
+`tz_offset_minutes BETWEEN -720 AND 840`. Seconds rather than milliseconds so
+the only division is by `started_at`, which the CHECK beside it holds positive:
+SQLite truncates toward zero, a floor for a positive value and a ceiling for a
+negative one, and a ceiling would move the last second of a day onto the next.
 
 ---
 

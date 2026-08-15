@@ -58,6 +58,14 @@ void resetStampsForTesting() => _lastStamp = 0;
 int dayKeyOf(DateTime date) =>
     date.year * 10000 + date.month * 100 + date.day;
 
+/// Minutes east of UTC that [date] carries — its zone at *its own* instant, not
+/// the phone's zone now.
+///
+/// The counterpart to [dayKeyOf]: written beside it on every workout so the
+/// database can check that the day key and the timestamp name the same day. See
+/// `Workouts.tzOffsetMinutes`.
+int tzOffsetOf(DateTime date) => date.timeZoneOffset.inMinutes;
+
 DateTime dateFromDayKey(int key) =>
     DateTime(key ~/ 10000, (key ~/ 100) % 100, key % 100);
 

@@ -49,10 +49,21 @@ void main() {
     return id;
   }
 
+  /// The day every workout these tests build is logged on.
+  ///
+  /// All three date columns come from it, because since the day-key CHECK any
+  /// other combination is refused and the refusal has nothing to do with what
+  /// most of these tests are about.
+  final logged = DateTime(2026, 1, 1, 9);
+
   Future<String> aWorkoutExercise(String regimeId) async {
     final workout = newId();
     await db.into(db.workouts).insert(WorkoutsCompanion.insert(
-        id: Value(workout), regimeId: regimeId, dayKey: 20260101));
+        id: Value(workout),
+        regimeId: regimeId,
+        dayKey: dayKeyOf(logged),
+        startedAt: Value(logged.millisecondsSinceEpoch),
+        tzOffsetMinutes: tzOffsetOf(logged)));
     final exercise = newId();
     await db.into(db.exercises).insert(ExercisesCompanion.insert(
           id: Value(exercise),
@@ -462,7 +473,11 @@ void main() {
     test('a workout status nobody has heard of is refused', () async {
       final regime = await aRegime();
       await db.into(db.workouts).insert(WorkoutsCompanion.insert(
-          id: Value(newId()), regimeId: regime, dayKey: 20260101));
+          id: Value(newId()),
+          regimeId: regime,
+          dayKey: dayKeyOf(logged),
+          startedAt: Value(logged.millisecondsSinceEpoch),
+          tzOffsetMinutes: tzOffsetOf(logged)));
       await expectLater(
         db.customStatement("UPDATE workouts SET status = 'paused'"),
         throwsA(isA<SqliteException>()),
@@ -501,7 +516,9 @@ void main() {
         await db.into(db.workouts).insert(WorkoutsCompanion.insert(
               id: Value(id),
               regimeId: regime,
-              dayKey: 20260101,
+              dayKey: dayKeyOf(logged),
+              startedAt: Value(logged.millisecondsSinceEpoch),
+              tzOffsetMinutes: tzOffsetOf(logged),
               status: Value(status),
             ));
         await (db.update(db.workouts)..where((t) => t.id.equals(id)))
@@ -538,7 +555,9 @@ void main() {
         await db.into(db.workouts).insert(WorkoutsCompanion.insert(
               id: Value(workout),
               regimeId: regime,
-              dayKey: 20260101,
+              dayKey: dayKeyOf(logged),
+              startedAt: Value(logged.millisecondsSinceEpoch),
+              tzOffsetMinutes: tzOffsetOf(logged),
               // Finished, because only one session may be open at a time.
               status: const Value(WorkoutStatus.completed),
             ));
@@ -567,7 +586,9 @@ void main() {
       await db.into(db.workouts).insert(WorkoutsCompanion.insert(
             id: Value(id),
             regimeId: regime,
-            dayKey: 20260101,
+            dayKey: dayKeyOf(logged),
+            startedAt: Value(logged.millisecondsSinceEpoch),
+            tzOffsetMinutes: tzOffsetOf(logged),
             status: Value(status),
           ));
       return id;
@@ -614,6 +635,90 @@ void main() {
     });
   });
 
+  group('a workout names one day', () {
+    /// One instant, written three ways. UTC so the machine running the test has
+    /// no say in it: `2026-03-15 02:30Z` is `2026-03-14 21:30` five hours west
+    /// and `2026-03-15 08:00` five and a half hours east, so the *same*
+    /// `started_at` legitimately belongs to either calendar day and only the
+    /// offset says which.
+    final instant = DateTime.utc(2026, 3, 15, 2, 30).millisecondsSinceEpoch;
+
+    // Made once per test rather than inside the helper, so the helper stays a
+    // plain call `expectLater` can be handed.
+    late String regimeId;
+    setUp(() async => regimeId = await aRegime());
+
+    Future<void> logged({
+      required int dayKey,
+      required int offsetMinutes,
+      int? startedAt,
+    }) =>
+        db.into(db.workouts).insert(WorkoutsCompanion.insert(
+              id: Value(newId()),
+              regimeId: regimeId,
+              dayKey: dayKey,
+              startedAt: Value(startedAt ?? instant),
+              tzOffsetMinutes: offsetMinutes,
+            ));
+
+    test('the day west of the line is that instant in New York', () async {
+      await logged(dayKey: 20260314, offsetMinutes: -300);
+      expect(await db.workouts.count().getSingle(), 1);
+    });
+
+    test('the day east of it is the same instant in Delhi', () async {
+      await logged(dayKey: 20260315, offsetMinutes: 330);
+      expect(await db.workouts.count().getSingle(), 1);
+    });
+
+    test('New York cannot file that instant under the 15th', () async {
+      await expectLater(
+        logged(dayKey: 20260315, offsetMinutes: -300),
+        throwsA(isA<SqliteException>()),
+        reason: 'the heatmap rings it on one day and history files it under '
+            'another, and it is reachable from neither reliably',
+      );
+    });
+
+    test('Delhi cannot file that instant under the 14th', () async {
+      await expectLater(
+        logged(dayKey: 20260314, offsetMinutes: 330),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('the last minute of the local day still belongs to it', () async {
+      // 04:59Z is 23:59 in New York on the 14th; one minute later is midnight.
+      await logged(
+        dayKey: 20260314,
+        offsetMinutes: -300,
+        startedAt: DateTime.utc(2026, 3, 15, 4, 59).millisecondsSinceEpoch,
+      );
+      expect(await db.workouts.count().getSingle(), 1);
+    });
+
+    test('the first minute of the next one does not', () async {
+      await expectLater(
+        logged(
+          dayKey: 20260314,
+          offsetMinutes: -300,
+          startedAt: DateTime.utc(2026, 3, 15, 5).millisecondsSinceEpoch,
+        ),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('an offset no place on earth keeps is refused', () async {
+      // Nothing runs further east than +14:00, and an out-of-range offset is
+      // the shape a hand-edited file takes when it tries to talk the CHECK
+      // into accepting a mismatched pair.
+      await expectLater(
+        logged(dayKey: 20260315, offsetMinutes: 900),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+  });
+
   group('a position is unique among live rows', () {
     Future<String> aSession(String regime, int order, {String name = 'Push'}) async {
       final id = newId();
@@ -650,7 +755,11 @@ void main() {
       final regime = await aRegime();
       final workout = newId();
       await db.into(db.workouts).insert(WorkoutsCompanion.insert(
-          id: Value(workout), regimeId: regime, dayKey: 20260101));
+          id: Value(workout),
+          regimeId: regime,
+          dayKey: dayKeyOf(logged),
+          startedAt: Value(logged.millisecondsSinceEpoch),
+          tzOffsetMinutes: tzOffsetOf(logged)));
       final exercise = newId();
       await db.into(db.exercises).insert(ExercisesCompanion.insert(
             id: Value(exercise),
@@ -769,7 +878,10 @@ void main() {
     test('a day that is not a day is refused', () async {
       await expectLater(
         db.into(db.workouts).insert(WorkoutsCompanion.insert(
-            id: Value(newId()), regimeId: await aRegime(), dayKey: 0)),
+            id: Value(newId()),
+            regimeId: await aRegime(),
+            dayKey: 0,
+            tzOffsetMinutes: tzOffsetOf(logged))),
         throwsA(isA<SqliteException>()),
         reason: 'dateFromDayKey does arithmetic on this — 0 is year zero, and '
             'the calendar scrolls silently to it',
@@ -781,8 +893,11 @@ void main() {
         db.into(db.workouts).insert(WorkoutsCompanion.insert(
               id: Value(newId()),
               regimeId: await aRegime(),
-              dayKey: 20260101,
+              // Two seconds into 1970 at UTC, so the only thing wrong with
+              // this row is the one thing under test.
+              dayKey: 19700101,
               startedAt: const Value(2000),
+              tzOffsetMinutes: 0,
               endedAt: const Value(1000),
             )),
         throwsA(isA<SqliteException>()),

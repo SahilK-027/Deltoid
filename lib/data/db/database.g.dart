@@ -3805,6 +3805,17 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
     requiredDuringInsert: false,
     clientDefault: nowMs,
   );
+  static const VerificationMeta _tzOffsetMinutesMeta = const VerificationMeta(
+    'tzOffsetMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> tzOffsetMinutes = GeneratedColumn<int>(
+    'tz_offset_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _endedAtMeta = const VerificationMeta(
     'endedAt',
   );
@@ -3862,6 +3873,7 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
     cycleId,
     dayKey,
     startedAt,
+    tzOffsetMinutes,
     endedAt,
     isDeload,
     status,
@@ -3940,6 +3952,17 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
         startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
       );
     }
+    if (data.containsKey('tz_offset_minutes')) {
+      context.handle(
+        _tzOffsetMinutesMeta,
+        tzOffsetMinutes.isAcceptableOrUnknown(
+          data['tz_offset_minutes']!,
+          _tzOffsetMinutesMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_tzOffsetMinutesMeta);
+    }
     if (data.containsKey('ended_at')) {
       context.handle(
         _endedAtMeta,
@@ -4007,6 +4030,10 @@ class $WorkoutsTable extends Workouts with TableInfo<$WorkoutsTable, Workout> {
         DriftSqlType.int,
         data['${effectivePrefix}started_at'],
       )!,
+      tzOffsetMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tz_offset_minutes'],
+      )!,
       endedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}ended_at'],
@@ -4050,6 +4077,25 @@ class Workout extends DataClass implements Insertable<Workout> {
   /// Local calendar day (`yyyyMMdd`) for heatmap and history grouping.
   final int dayKey;
   final int startedAt;
+
+  /// Minutes east of UTC where this session was logged, at the instant it was
+  /// logged.
+  ///
+  /// The only reason it exists is to let the CHECK below compare the two
+  /// columns above. `started_at` is an absolute instant and `day_key` is a local
+  /// calendar day, and no expression can get from one to the other without
+  /// knowing the zone. SQLite can be told the zone — `'localtime'` — but a CHECK
+  /// must be deterministic, and `'localtime'` reads the *machine's* zone at
+  /// evaluation time, so a row written in Delhi would be re-judged in London and
+  /// the constraint would start refusing rows it had already accepted. Written
+  /// down per row instead, the arithmetic is a closed function of the row.
+  ///
+  /// Historically correct rather than current: `DateTime.timeZoneOffset` answers
+  /// for the instant it is asked about, so a session logged the hour before a
+  /// clock change keeps the offset it was actually logged under.
+  ///
+  /// Nothing reads it. It is not a display value and no query filters on it.
+  final int tzOffsetMinutes;
   final int? endedAt;
   final bool isDeload;
   final WorkoutStatus status;
@@ -4065,6 +4111,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     this.cycleId,
     required this.dayKey,
     required this.startedAt,
+    required this.tzOffsetMinutes,
     this.endedAt,
     required this.isDeload,
     required this.status,
@@ -4089,6 +4136,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     }
     map['day_key'] = Variable<int>(dayKey);
     map['started_at'] = Variable<int>(startedAt);
+    map['tz_offset_minutes'] = Variable<int>(tzOffsetMinutes);
     if (!nullToAbsent || endedAt != null) {
       map['ended_at'] = Variable<int>(endedAt);
     }
@@ -4122,6 +4170,7 @@ class Workout extends DataClass implements Insertable<Workout> {
           : Value(cycleId),
       dayKey: Value(dayKey),
       startedAt: Value(startedAt),
+      tzOffsetMinutes: Value(tzOffsetMinutes),
       endedAt: endedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(endedAt),
@@ -4149,6 +4198,7 @@ class Workout extends DataClass implements Insertable<Workout> {
       cycleId: serializer.fromJson<String?>(json['cycleId']),
       dayKey: serializer.fromJson<int>(json['dayKey']),
       startedAt: serializer.fromJson<int>(json['startedAt']),
+      tzOffsetMinutes: serializer.fromJson<int>(json['tzOffsetMinutes']),
       endedAt: serializer.fromJson<int?>(json['endedAt']),
       isDeload: serializer.fromJson<bool>(json['isDeload']),
       status: $WorkoutsTable.$converterstatus.fromJson(
@@ -4171,6 +4221,7 @@ class Workout extends DataClass implements Insertable<Workout> {
       'cycleId': serializer.toJson<String?>(cycleId),
       'dayKey': serializer.toJson<int>(dayKey),
       'startedAt': serializer.toJson<int>(startedAt),
+      'tzOffsetMinutes': serializer.toJson<int>(tzOffsetMinutes),
       'endedAt': serializer.toJson<int?>(endedAt),
       'isDeload': serializer.toJson<bool>(isDeload),
       'status': serializer.toJson<String>(
@@ -4191,6 +4242,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     Value<String?> cycleId = const Value.absent(),
     int? dayKey,
     int? startedAt,
+    int? tzOffsetMinutes,
     Value<int?> endedAt = const Value.absent(),
     bool? isDeload,
     WorkoutStatus? status,
@@ -4206,6 +4258,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     cycleId: cycleId.present ? cycleId.value : this.cycleId,
     dayKey: dayKey ?? this.dayKey,
     startedAt: startedAt ?? this.startedAt,
+    tzOffsetMinutes: tzOffsetMinutes ?? this.tzOffsetMinutes,
     endedAt: endedAt.present ? endedAt.value : this.endedAt,
     isDeload: isDeload ?? this.isDeload,
     status: status ?? this.status,
@@ -4223,6 +4276,9 @@ class Workout extends DataClass implements Insertable<Workout> {
       cycleId: data.cycleId.present ? data.cycleId.value : this.cycleId,
       dayKey: data.dayKey.present ? data.dayKey.value : this.dayKey,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      tzOffsetMinutes: data.tzOffsetMinutes.present
+          ? data.tzOffsetMinutes.value
+          : this.tzOffsetMinutes,
       endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
       isDeload: data.isDeload.present ? data.isDeload.value : this.isDeload,
       status: data.status.present ? data.status.value : this.status,
@@ -4243,6 +4299,7 @@ class Workout extends DataClass implements Insertable<Workout> {
           ..write('cycleId: $cycleId, ')
           ..write('dayKey: $dayKey, ')
           ..write('startedAt: $startedAt, ')
+          ..write('tzOffsetMinutes: $tzOffsetMinutes, ')
           ..write('endedAt: $endedAt, ')
           ..write('isDeload: $isDeload, ')
           ..write('status: $status, ')
@@ -4263,6 +4320,7 @@ class Workout extends DataClass implements Insertable<Workout> {
     cycleId,
     dayKey,
     startedAt,
+    tzOffsetMinutes,
     endedAt,
     isDeload,
     status,
@@ -4282,6 +4340,7 @@ class Workout extends DataClass implements Insertable<Workout> {
           other.cycleId == this.cycleId &&
           other.dayKey == this.dayKey &&
           other.startedAt == this.startedAt &&
+          other.tzOffsetMinutes == this.tzOffsetMinutes &&
           other.endedAt == this.endedAt &&
           other.isDeload == this.isDeload &&
           other.status == this.status &&
@@ -4299,6 +4358,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
   final Value<String?> cycleId;
   final Value<int> dayKey;
   final Value<int> startedAt;
+  final Value<int> tzOffsetMinutes;
   final Value<int?> endedAt;
   final Value<bool> isDeload;
   final Value<WorkoutStatus> status;
@@ -4315,6 +4375,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
     this.cycleId = const Value.absent(),
     this.dayKey = const Value.absent(),
     this.startedAt = const Value.absent(),
+    this.tzOffsetMinutes = const Value.absent(),
     this.endedAt = const Value.absent(),
     this.isDeload = const Value.absent(),
     this.status = const Value.absent(),
@@ -4332,13 +4393,15 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
     this.cycleId = const Value.absent(),
     required int dayKey,
     this.startedAt = const Value.absent(),
+    required int tzOffsetMinutes,
     this.endedAt = const Value.absent(),
     this.isDeload = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : regimeId = Value(regimeId),
-       dayKey = Value(dayKey);
+       dayKey = Value(dayKey),
+       tzOffsetMinutes = Value(tzOffsetMinutes);
   static Insertable<Workout> custom({
     Expression<String>? id,
     Expression<int>? updatedAt,
@@ -4350,6 +4413,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
     Expression<String>? cycleId,
     Expression<int>? dayKey,
     Expression<int>? startedAt,
+    Expression<int>? tzOffsetMinutes,
     Expression<int>? endedAt,
     Expression<bool>? isDeload,
     Expression<String>? status,
@@ -4367,6 +4431,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
       if (cycleId != null) 'cycle_id': cycleId,
       if (dayKey != null) 'day_key': dayKey,
       if (startedAt != null) 'started_at': startedAt,
+      if (tzOffsetMinutes != null) 'tz_offset_minutes': tzOffsetMinutes,
       if (endedAt != null) 'ended_at': endedAt,
       if (isDeload != null) 'is_deload': isDeload,
       if (status != null) 'status': status,
@@ -4386,6 +4451,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
     Value<String?>? cycleId,
     Value<int>? dayKey,
     Value<int>? startedAt,
+    Value<int>? tzOffsetMinutes,
     Value<int?>? endedAt,
     Value<bool>? isDeload,
     Value<WorkoutStatus>? status,
@@ -4403,6 +4469,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
       cycleId: cycleId ?? this.cycleId,
       dayKey: dayKey ?? this.dayKey,
       startedAt: startedAt ?? this.startedAt,
+      tzOffsetMinutes: tzOffsetMinutes ?? this.tzOffsetMinutes,
       endedAt: endedAt ?? this.endedAt,
       isDeload: isDeload ?? this.isDeload,
       status: status ?? this.status,
@@ -4444,6 +4511,9 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
     if (startedAt.present) {
       map['started_at'] = Variable<int>(startedAt.value);
     }
+    if (tzOffsetMinutes.present) {
+      map['tz_offset_minutes'] = Variable<int>(tzOffsetMinutes.value);
+    }
     if (endedAt.present) {
       map['ended_at'] = Variable<int>(endedAt.value);
     }
@@ -4477,6 +4547,7 @@ class WorkoutsCompanion extends UpdateCompanion<Workout> {
           ..write('cycleId: $cycleId, ')
           ..write('dayKey: $dayKey, ')
           ..write('startedAt: $startedAt, ')
+          ..write('tzOffsetMinutes: $tzOffsetMinutes, ')
           ..write('endedAt: $endedAt, ')
           ..write('isDeload: $isDeload, ')
           ..write('status: $status, ')
@@ -10021,6 +10092,7 @@ typedef $$WorkoutsTableCreateCompanionBuilder =
       Value<String?> cycleId,
       required int dayKey,
       Value<int> startedAt,
+      required int tzOffsetMinutes,
       Value<int?> endedAt,
       Value<bool> isDeload,
       Value<WorkoutStatus> status,
@@ -10039,6 +10111,7 @@ typedef $$WorkoutsTableUpdateCompanionBuilder =
       Value<String?> cycleId,
       Value<int> dayKey,
       Value<int> startedAt,
+      Value<int> tzOffsetMinutes,
       Value<int?> endedAt,
       Value<bool> isDeload,
       Value<WorkoutStatus> status,
@@ -10163,6 +10236,11 @@ class $$WorkoutsTableFilterComposer
 
   ColumnFilters<int> get startedAt => $composableBuilder(
     column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tzOffsetMinutes => $composableBuilder(
+    column: $table.tzOffsetMinutes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10326,6 +10404,11 @@ class $$WorkoutsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get tzOffsetMinutes => $composableBuilder(
+    column: $table.tzOffsetMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get endedAt => $composableBuilder(
     column: $table.endedAt,
     builder: (column) => ColumnOrderings(column),
@@ -10445,6 +10528,11 @@ class $$WorkoutsTableAnnotationComposer
 
   GeneratedColumn<int> get startedAt =>
       $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get tzOffsetMinutes => $composableBuilder(
+    column: $table.tzOffsetMinutes,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get endedAt =>
       $composableBuilder(column: $table.endedAt, builder: (column) => column);
@@ -10596,6 +10684,7 @@ class $$WorkoutsTableTableManager
                 Value<String?> cycleId = const Value.absent(),
                 Value<int> dayKey = const Value.absent(),
                 Value<int> startedAt = const Value.absent(),
+                Value<int> tzOffsetMinutes = const Value.absent(),
                 Value<int?> endedAt = const Value.absent(),
                 Value<bool> isDeload = const Value.absent(),
                 Value<WorkoutStatus> status = const Value.absent(),
@@ -10612,6 +10701,7 @@ class $$WorkoutsTableTableManager
                 cycleId: cycleId,
                 dayKey: dayKey,
                 startedAt: startedAt,
+                tzOffsetMinutes: tzOffsetMinutes,
                 endedAt: endedAt,
                 isDeload: isDeload,
                 status: status,
@@ -10630,6 +10720,7 @@ class $$WorkoutsTableTableManager
                 Value<String?> cycleId = const Value.absent(),
                 required int dayKey,
                 Value<int> startedAt = const Value.absent(),
+                required int tzOffsetMinutes,
                 Value<int?> endedAt = const Value.absent(),
                 Value<bool> isDeload = const Value.absent(),
                 Value<WorkoutStatus> status = const Value.absent(),
@@ -10646,6 +10737,7 @@ class $$WorkoutsTableTableManager
                 cycleId: cycleId,
                 dayKey: dayKey,
                 startedAt: startedAt,
+                tzOffsetMinutes: tzOffsetMinutes,
                 endedAt: endedAt,
                 isDeload: isDeload,
                 status: status,

@@ -645,6 +645,44 @@ void main() {
     );
   });
 
+  test('moving a day logged in another zone restamps its offset', () async {
+    // The move has to carry the offset with it, and a test running in one
+    // fixed zone cannot see that: the old offset and the new one are the same
+    // number, so leaving it alone looks identical to rewriting it.
+    //
+    // So the row is put in another zone first. 02:30 UTC on the 15th at -151
+    // minutes is 23:59 on the 14th — the same trio the restore fits to a
+    // pre-offset file, and self-consistent, so the database accepts it. Move it
+    // and the offset must become this machine's, whatever that is; left at
+    // -151 it no longer explains the two columns beside it and the CHECK
+    // refuses the update outright.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(id);
+
+    await (db.update(db.workouts)..where((t) => t.id.equals(id))).write(
+      WorkoutsCompanion(
+        dayKey: const Value(20260314),
+        startedAt:
+            Value(DateTime.utc(2026, 3, 15, 2, 30).millisecondsSinceEpoch),
+        tzOffsetMinutes: const Value(-151),
+        endedAt: const Value.absent(),
+      ),
+    );
+
+    final to = DateTime(2026, 3, 20);
+    await repo.setWorkoutDate(id, to);
+
+    final after = (await repo.workoutDetail(id))!.workout;
+    expect(after.dayKey, dayKeyOf(to));
+    expect(
+      after.tzOffsetMinutes,
+      tzOffsetOf(DateTime.fromMillisecondsSinceEpoch(after.startedAt)),
+      reason: 'the offset must explain the two columns it was written beside',
+    );
+  });
+
   test('moving a logged day moves it into the cycle that covers the new date',
       () async {
     final regime = await activeRegime();
@@ -1577,6 +1615,7 @@ void main() {
               sessionId: Value(sessions[i % sessions.length].id),
               dayKey: dayKeyOf(date),
               startedAt: Value(date.millisecondsSinceEpoch),
+              tzOffsetMinutes: tzOffsetOf(date),
               endedAt: Value(date
                   .add(const Duration(minutes: 61))
                   .millisecondsSinceEpoch),
@@ -1755,6 +1794,7 @@ void main() {
             sessionId: Value(push1.id),
             dayKey: twice.workout.dayKey,
             startedAt: Value(twice.workout.startedAt + 1),
+            tzOffsetMinutes: twice.workout.tzOffsetMinutes,
             status: const Value(WorkoutStatus.completed),
             isDeload: const Value(true),
           ),

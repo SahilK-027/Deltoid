@@ -111,6 +111,42 @@ class _TableCodec<T extends Insertable<dynamic>> {
   final Future<void> Function() clear;
 }
 
+/// The zone offset a workout written before `tz_offset_minutes` existed implies.
+///
+/// The column arrived alongside the CHECK that ties `day_key` to `started_at`,
+/// so a row without one cannot be inserted at all — and since nothing reads the
+/// offset for its own sake, *any* value that reconciles the two columns the file
+/// already carries is a correct one.
+///
+/// This phone's offset at that instant is the honest first guess, and for the
+/// case that actually happens — a file written on this phone, in this zone —
+/// it is not a guess at all but the very offset that produced the day key.
+/// Restored after a move across zones it will not reconcile, and refusing the
+/// whole file over a column the file predates would be the wrong answer, so it
+/// is nudged by the fewest whole minutes that put the instant back on the day
+/// the file names.
+///
+/// A row the two columns of which no real offset can reconcile lands outside
+/// the ±(12, 14) hours the CHECK allows and the restore refuses the file. That
+/// is the right answer too: such a row was already claiming two days.
+int impliedTzOffset(int startedAt, int dayKey) {
+  const minute = Duration.millisecondsPerMinute;
+  const day = Duration.millisecondsPerDay;
+
+  final device =
+      DateTime.fromMillisecondsSinceEpoch(startedAt).timeZoneOffset.inMinutes;
+  // Wall clock as an instant: the day key read as if it were UTC, which is the
+  // same arithmetic the CHECK does.
+  final dayStart =
+      DateTime.utc(dayKey ~/ 10000, (dayKey ~/ 100) % 100, dayKey % 100)
+          .millisecondsSinceEpoch;
+  final local = startedAt + device * minute;
+
+  if (local >= dayStart && local < dayStart + day) return device;
+  if (local < dayStart) return device + ((dayStart - local) / minute).ceil();
+  return device - ((local - dayStart - day) / minute).floor() - 1;
+}
+
 /// Whole-database export and restore.
 ///
 /// Deliberately separate from cloud sync: sync propagates whatever state the
@@ -198,7 +234,13 @@ class BackupService {
       page: (limit, after) => _pageOf(db.workouts, limit, after),
       count: () => _countOf(db.workouts),
       table: db.workouts,
-      parse: Workout.fromJson,
+      // A file written before the zone offset existed has no key for it, and
+      // the row cannot land without one — see [impliedTzOffset].
+      parse: (row) => Workout.fromJson({
+        'tzOffsetMinutes':
+            impliedTzOffset(row['startedAt'] as int, row['dayKey'] as int),
+        ...row,
+      }),
       clear: () => db.delete(db.workouts).go(),
     ),
     _TableCodec(
