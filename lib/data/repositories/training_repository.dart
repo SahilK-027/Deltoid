@@ -1135,7 +1135,7 @@ class TrainingRepository {
         // `idx_session_exercises_position_live` refuses it mid-transaction.
         await renumber(
           [for (final slot in wanted) slot.id],
-          from: nextPosition(live.map((s) => s.orderIndex)),
+          scope: {for (final s in live) s.id: s.orderIndex},
           write: (id, orderIndex) async {
             await (db.update(db.sessionExercises)..where((t) => t.id.equals(id)))
                 .write(
@@ -2660,7 +2660,7 @@ class TrainingRepository {
 
       await renumber(
         orderedIds,
-        from: nextPosition(scope.map((e) => e.orderIndex)),
+        scope: {for (final e in scope) e.id: e.orderIndex},
         write: (id, orderIndex) async {
           await (db.update(db.workoutExercises)..where((t) => t.id.equals(id)))
               .write(

@@ -502,7 +502,7 @@ class RegimeRepository {
 
       await renumber(
         orderedIds,
-        from: nextPosition(scope.map((s) => s.orderIndex)),
+        scope: {for (final s in scope) s.id: s.orderIndex},
         write: (id, orderIndex) async {
           await (db.update(db.sessions)..where((t) => t.id.equals(id))).write(
             SessionsCompanion(
@@ -628,7 +628,7 @@ class RegimeRepository {
 
       await renumber(
         orderedIds,
-        from: nextPosition(scope.map((s) => s.orderIndex)),
+        scope: {for (final s in scope) s.id: s.orderIndex},
         write: (id, orderIndex) async {
           await (db.update(db.sessionExercises)..where((t) => t.id.equals(id)))
               .write(

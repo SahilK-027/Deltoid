@@ -13,20 +13,40 @@
 /// mid-transaction, and the reorder rolls back — for a permutation that is
 /// perfectly legal once it has finished.
 ///
-/// So it goes in two passes through a range nothing is standing in. [from] is
-/// one past the highest live position in the scope, so the first pass lands
-/// every row somewhere free, and the second brings them down to `0..n-1` over
-/// ground the first pass has just vacated. Twice the writes, inside one
-/// transaction, for a list the length of a training day.
+/// So it goes in two passes through a range nothing is standing in. The scratch
+/// range starts one past the highest live position in the scope, so the first
+/// pass lands every row somewhere free, and the second brings them down to
+/// `0..n-1` over ground the first pass has just vacated. Twice the writes,
+/// inside one transaction, for a list the length of a training day.
 ///
-/// [from] must be computed inside the same transaction as the writes, over
-/// *every* live row in the scope rather than only the ones being moved — a row
-/// the caller left out of [orderedIds] is still occupying its position.
+/// [scope] is every live row under the parent — id to current position — read
+/// inside the same transaction as the writes. It is not a convenience: both
+/// passes depend on it. The first needs the highest position in the *whole*
+/// scope to clear, and the second writes `0..n-1`, which belongs to the caller
+/// only if [orderedIds] is the whole scope. A partial list is not a permutation,
+/// so one that does not name exactly [scope] is refused here rather than
+/// several writes later.
+///
+/// Both halves of that used to be the caller's problem, stated in prose. Handing
+/// a short list to the old signature failed one of two ways: on the unique index
+/// with a message about nothing the caller did wrong, or — when the omitted row
+/// sat above everything the second pass wrote — not at all, reporting success
+/// for a scope it only partly knew about.
 Future<void> renumber(
   List<String> orderedIds, {
-  required int from,
+  required Map<String, int> scope,
   required Future<void> Function(String id, int orderIndex) write,
 }) async {
+  if (orderedIds.length != scope.length ||
+      !orderedIds.toSet().containsAll(scope.keys)) {
+    throw StateError(
+      'renumber was handed ${orderedIds.length} of ${scope.length} live rows; '
+      'a reorder must name every row in its scope. '
+      'Missing: ${scope.keys.where((id) => !orderedIds.contains(id)).toList()}',
+    );
+  }
+
+  final from = nextPosition(scope.values);
   for (var i = 0; i < orderedIds.length; i++) {
     await write(orderedIds[i], from + i);
   }

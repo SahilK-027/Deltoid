@@ -33,7 +33,8 @@ lib/`, of which 28 are in the two repositories, 2 in `seeder.dart` and 1 in
 The catalogue below is 31 entries; **eight are CORRUPTION**, four of those were
 the same shape — a parent tombstoned without its children, entry 1, now
 **closed** — and three more were the export, the restore and the undo's
-position, all now closed too.
+position, all now closed too. Entry 8, the reorder's scope, is closed as well,
+and demoted: it can only refuse, never corrupt.
 
 The audit checked the six writers HARDENING named. `ensureOpenCycle`,
 `_healDuplicateOpenCycles`, `logBodyweight` and `completeWorkout` each open their
@@ -50,10 +51,11 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries, **six closed**. Four were one bug in four places — that is entry
-1, closed; entry 2 is closed with it. Entries 4 and 6 are the restore, also
-closed, and entry 5 is the export, closed. Entry 7 is the undo's position, now
-closed too. Entry 3 belongs to § 3b; entry 8 is what is left.
+Eight entries, **seven closed**. Four were one bug in four places — that is
+entry 1, closed; entry 2 is closed with it. Entries 4 and 6 are the restore,
+also closed, and entry 5 is the export, closed. Entry 7 is the undo's position
+and entry 8 the reorder's scope, both closed. **Entry 3 is what is left, and it
+belongs to § 3b's crash injection** — nothing here blocks Stage 5 any more.
 
 ---
 
@@ -631,6 +633,48 @@ happen"; arguably STALE. Ranked here because the fix is the same
 
 ## 8. `renumber` must be handed every live row in its scope
 
+> **CLOSED.** `renumber` no longer takes the caller's word, or the caller's
+> `from`. It takes `scope` — a `{id: orderIndex}` of every live row under the
+> parent, read in the same transaction — computes `from` itself, and throws a
+> `StateError` naming the missing ids when `orderedIds` is not exactly that set.
+> All four callers already read the full scope to compute `from`, so each was a
+> one-line change (`regime_repository.dart:505`, `:631`,
+> `training_repository.dart:1138`, `:2663`).
+>
+> Red first, both halves, verbatim:
+>
+> ```
+> a reorder that omits a live row is refused rather than colliding
+>   Expected: throws <Instance of 'StateError'>
+>    Which: threw SqliteException(2067): UNIQUE constraint failed:
+>      session_exercises.session_id, session_exercises.order_index
+>
+> a reorder that omits the last live row is refused too
+>   Expected: throws <Instance of 'StateError'>
+>     Actual: <Instance of 'Future<void>'>
+> ```
+>
+> **The entry's severity was wrong, and its shape was half-right.** It says the
+> second pass "writes `0..n-1` over positions a row it never saw still holds" and
+> rates that CORRUPTION. It cannot corrupt: the partial index is checked per
+> statement, so the collision is a refusal and a rollback, never two rows on one
+> position. The real cost was a raw `SqliteException(2067)` surfacing from inside
+> a sync applier with a message about a constraint the caller never touched.
+>
+> The half the entry missed is the quiet one. A collision only happens when an
+> omitted row sits **below** `orderedIds.length`. Omit the row holding the
+> **highest** position and the second pass writes underneath it, nothing collides,
+> and the reorder returns success — having renumbered a scope it only partly knew
+> about. That is the second test, and it is the one that was silent.
+>
+> Both live in `test/data/write_integrity_test.dart` → `a reorder lands whole`.
+> A `StateError` and not an `assert`: the entry asked for an assert, but asserts
+> are stripped in release and the one caller that can reach this is the sync pull
+> applier, which will run there.
+>
+> Also corrected: `tables.dart:178` pointed at `regime_repository.dart` for
+> `renumber`, which has lived in `db/renumber.dart` since it was extracted.
+
 **Invariant.** `renumber(orderedIds, from: …)` may only be called when
 `orderedIds` is the complete set of live rows under the parent — otherwise its
 second pass writes `0..n-1` over positions a row it never saw still holds.
@@ -661,7 +705,10 @@ directly.
 `assert` in `renumber` comparing `orderedIds.length` against the scope size,
 which is the cheap mechanism [DEBT.md § 1](DEBT.md) asks for.
 
-**Severity: CORRUPTION** if reached; unreachable today.
+~~**Severity: CORRUPTION** if reached; unreachable today.~~ **Corrected on
+close: it cannot corrupt.** The partial index is checked per statement, so the
+worst it could do was refuse loudly or, in the case the entry missed, succeed
+quietly on a scope it had only part of. See the banner above.
 
 ---
 
@@ -1157,7 +1204,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fourteen, of which **six are done**. Every one is executable, and every one must
+Fifteen, of which **seven are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1176,7 +1223,7 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 4. `day_key agrees with started_at on every workout`.
 5. `every live workout names a live cycle` — entry 23's count, zero.
 
-**Four write-path tests:**
+**Five write-path tests:**
 
 6. ✅ `a tombstoned parent leaves nothing live beneath it`, over
    `removeExerciseFromWorkout`, `replaceExerciseInWorkout`, `deleteSession`,
@@ -1189,34 +1236,41 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 8. ✅ `undoing a removed slot after another was added still finds a free
    position` — entry 7. **Written, red on the unique index, now passing.** The
    removed slot must be the **last** one for the collision to exist at all.
-9. `a logged workout is byte-identical after every programme edit` — snapshot up
-   the `workout_exercises` and `set_logs` rows of a completed workout, run every
-   mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
-   held by inspection; this is what keeps it held.
+9. ✅ `a reorder that omits a live row is refused rather than colliding`, with
+   `a reorder that omits the last live row is refused too` beside it — entry 8.
+   **Written, both red, now passing.** The pair is the point: the first threw a
+   raw `SqliteException(2067)`, the second threw nothing at all.
+10. `a logged workout is byte-identical after every programme edit` — snapshot up
+    the `workout_exercises` and `set_logs` rows of a completed workout, run every
+    mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
+    held by inspection; this is what keeps it held.
 
 **Five backup and durability tests:**
 
-10. `every column of every codec has a default or is in every file` — entry 18,
+11. `every column of every codec has a default or is in every file` — entry 18,
     the one that makes [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3
     mechanical.
-11. ✅ `a restore that throws leaves the database exactly as it was` — entry 4.
+12. ✅ `a restore that throws leaves the database exactly as it was` — entry 4.
     **Written, and green on arrival** — the entry said it would be. Kept as a
     characterisation test for the pull applier.
-12. `an export taken while rows are being written loses nothing` — entry 5. The
-    whole of stage 5a rests on the file being complete, and nothing has ever
-    asserted that it is.
-13. ✅ `a file whose body is shorter than its header is refused` — entry 6.
+13. ✅ `an export taken while rows are being written loses nothing` — entry 5,
+    landed as `a row arriving behind the cursor is not written twice` and
+    `a row leaving behind the cursor does not take a neighbour`. **Written, red,
+    now passing.**
+14. ✅ `a file whose body is shorter than its header is refused` — entry 6.
     **Written, red, now passing**, with `a body longer than its header is
     accepted` beside it to pin the comparison as `<` rather than `!=`.
-14. `the database is not in a journal mode that can lose a committed
+15. `the database is not in a journal mode that can lose a committed
     transaction` — entry 12. One `pragma_journal_mode()` read, and it is the
     premise every other durability claim in this document rests on.
 
 **Not on the list, deliberately:** the keystroke window (entry 3) is crash
 injection, not a unit test, and belongs wholly to § 3b — the widget test that
 looks like it would cover it is green on the first run, which entry 3 explains.
-Entries 8, 14 and 15's second-writer cases belong to 5b and cannot be red until
-there is a pull applier to make them fail. Entry 22 (a restore is not checked by
+Entries 14 and 15's second-writer cases belong to 5b and cannot be red until
+there is a pull applier to make them fail. **Entry 8 was on that list and should
+not have been** — it was red today, against the callers that already exist, and
+is now item 9. Entry 22 (a restore is not checked by
 the launch repairs) is a one-line wiring fix rather than a check, and lands with
 whichever of these touches `restore` first. Entries 29, 30 and 31 are recorded
 results rather than holes, and close nothing.

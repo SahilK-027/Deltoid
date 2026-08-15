@@ -394,6 +394,48 @@ void main() {
       expectDistinct([for (final e in after) e.workoutExercise.orderIndex]);
     });
 
+    test('a reorder that omits a live row is refused rather than colliding',
+        () async {
+      // A partial list is not a permutation. The second pass brings the rows it
+      // was handed down to 0..n-1, and a row it never saw is still standing in
+      // that range — so today this dies on the unique index, several writes into
+      // a transaction, with a message about nothing the caller did wrong.
+      final session = await sessionNamed('Push 1');
+      final live = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(session.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      expect(live.length, greaterThan(2), reason: 'need a row to drop');
+
+      final missingMiddle = [
+        for (final s in live)
+          if (s.id != live[1].id) s.id,
+      ];
+      await expectLater(
+        regimes.reorderSessionExercises(missingMiddle),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('a reorder that omits the last live row is refused too', () async {
+      // The half that fails quietly. The omitted row holds the highest position,
+      // which is above everything the second pass writes, so nothing collides
+      // and the reorder reports success — having renumbered a scope it only
+      // partly knew about.
+      final session = await sessionNamed('Push 1');
+      final live = await (db.select(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(session.id) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+      expect(live.length, greaterThan(2), reason: 'need a row to drop');
+
+      await expectLater(
+        regimes.reorderSessionExercises(
+            [for (final s in live.take(live.length - 1)) s.id]),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('an empty list is not a reorder', () async {
       await repo.reorderWorkoutExercises([]);
       await regimes.reorderSessions([]);

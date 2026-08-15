@@ -175,7 +175,7 @@ class Regimes extends Table with SyncColumns {
 ///
 /// A reorder therefore cannot renumber in place: writing position 0 onto the
 /// row currently at 1 collides with the row still sitting at 0. See
-/// `renumber` in `regime_repository.dart` for the two-pass that avoids it.
+/// `renumber` in `db/renumber.dart` for the two-pass that avoids it.
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_sessions_position_live '
   'ON sessions (regime_id, order_index) WHERE deleted_at IS NULL',
