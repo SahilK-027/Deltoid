@@ -24,6 +24,7 @@ import '../../domain/prefill.dart';
 import '../../domain/units.dart';
 import 'log_providers.dart';
 import 'session_summary_screen.dart';
+import 'set_completion.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
 import 'widgets/hold_pad.dart';
@@ -979,7 +980,16 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
       if (reps > 0) {
         // The count is settled — typed, timed, or taken from the ghost a few
-        // lines up and already flushed. Only the load may still be blank.
+        // lines up and already flushed. **The load may still be blank**, and
+        // until now this path ticked anyway: on a movement you have never done
+        // there is no ghost to adopt from, so a first-ever set went down with
+        // reps and no weight. Same refusal the box has always made.
+        //
+        // `repsOverride` because the row is a build behind the buffer: the
+        // count was written a moment ago and the watched query has not come
+        // back with it, so asking the row would report reps missing when they
+        // are not.
+        if (_refuseIncomplete(from.setId, repsOverride: reps)) return;
         _adoptGhost(from.setId, skipCount: true);
         // Rest was already being measured; it was simply thrown away. Absent
         // rather than null when there is none to record: re-ticking a set an
@@ -1044,18 +1054,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
       _adoptGhost(set.id);
 
       // A set with nothing in it — and nothing coming from last time either —
-      // cannot be ticked. It used to be allowed, and it wrote a completed set
-      // with a null load and null reps: invisible to the progress chart,
-      // useless as next week's prefill, and indistinguishable later from a set
-      // that genuinely happened. Send the thumb to the empty field instead of
-      // arguing about it.
-      final empty = _firstEmptyField(set.id);
-      if (empty != null) {
-        HapticFeedback.selectionClick();
-        final located = _locate(_detail!, set.id);
-        if (located != null) _focus(located.$2, empty);
-        return;
-      }
+      // cannot be ticked. Send the thumb to the empty field instead of arguing
+      // about it. See [missingBeforeDone] for why.
+      if (_refuseIncomplete(set.id)) return;
     }
     // The same write the keypad's "Next" makes. Ticking the box by hand used to
     // record no rest at all, so how long a set rested depended on which of two
@@ -1148,7 +1149,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// fields and opened the keypad. Logging the same numbers as last week, which
   /// is the single most common thing to do on this screen, took two taps on the
   /// same box and looked like the first one had missed.
-  SetField? _firstEmptyField(String setId) {
+  /// The rule itself is [missingBeforeDone]; this only finds the numbers to
+  /// hand it. Both tick paths ask through here — see [_refuseIncomplete].
+  SetField? _firstEmptyField(String setId, {int? repsOverride}) {
     final detail = _detail;
     if (detail == null) return null;
     final located = _locate(detail, setId);
@@ -1156,21 +1159,32 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final (entry, set, position) = located;
     final ghost = _ghostFor(_prefill[entry.exercise.id], entry.sets, position);
 
-    switch (entry.exercise.loadMode) {
-      case LoadMode.bodyweightPlus:
-        if (set.addedWeight == null && ghost?.addedWeight == null) {
-          return SetField.added;
-        }
-      case LoadMode.total:
-      case LoadMode.perSide:
-        if (set.weight == null && ghost?.weight == null) {
-          return SetField.weight;
-        }
-      case LoadMode.bodyweight:
-        break;
-    }
-    if (set.reps == null && ghost?.reps == null) return SetField.reps;
-    return null;
+    return missingBeforeDone(
+      loadMode: entry.exercise.loadMode,
+      weight: set.weight,
+      addedWeight: set.addedWeight,
+      // The keypad's path knows the count from its buffer before the row has
+      // caught up with it — see [_advance].
+      reps: repsOverride ?? set.reps,
+      ghostWeight: ghost?.weight,
+      ghostAddedWeight: ghost?.addedWeight,
+      ghostReps: ghost?.reps,
+    );
+  }
+
+  /// Sends the thumb to what is missing rather than ticking an empty set, and
+  /// says whether it did.
+  ///
+  /// Shared by the box and the keypad so the two cannot drift: the box has
+  /// always refused an empty set, and Next never did, which is how a first-ever
+  /// movement could be logged with reps and no load at all.
+  bool _refuseIncomplete(String setId, {int? repsOverride}) {
+    final empty = _firstEmptyField(setId, repsOverride: repsOverride);
+    if (empty == null) return false;
+    HapticFeedback.selectionClick();
+    final located = _locate(_detail!, setId);
+    if (located != null) _focus(located.$2, empty);
+    return true;
   }
 
   /// Completes a set's blanks from last time's numbers.
