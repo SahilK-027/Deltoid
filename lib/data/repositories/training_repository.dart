@@ -3082,11 +3082,26 @@ class TrainingRepository {
     Duration olderThan = const Duration(hours: 24),
   }) async {
     final cutoff = nowMs() - olderThan.inMilliseconds;
+    // **`updatedAt`, not `startedAt`.** This asks how long ago the row was
+    // written, and `startedAt` is the one column the app deliberately moves
+    // into the past: `startWorkout(at:)` backdates it so a session you forgot
+    // to log sorts into history where it belongs. Keyed on `startedAt`, a
+    // backfill for last Tuesday was **already past this cutoff the instant it
+    // was created**, and this runs before first paint on every launch — so
+    // opening the backfill sheet, getting the log screen and being killed by
+    // Android before you ticked anything lost the whole session with no
+    // message. INVARIANTS.md § 2.
+    //
+    // `updatedAt` is never backdated: it is stamped by `nowMs` on the insert
+    // and re-stamped on every write to this row. Ticking a set writes
+    // `set_logs` rather than `workouts`, so a session trained and left open
+    // overnight still ages here — which is right, because `doneSetCount` below
+    // is what keeps that one.
     final stale = await (db.select(db.workouts)
           ..where((t) =>
               t.status.equalsValue(WorkoutStatus.inProgress) &
               t.deletedAt.isNull() &
-              t.startedAt.isSmallerThanValue(cutoff)))
+              t.updatedAt.isSmallerThanValue(cutoff)))
         .get();
 
     var swept = 0;

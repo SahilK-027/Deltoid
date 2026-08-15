@@ -1812,13 +1812,19 @@ void main() {
   });
 
   group('sweeping sessions left open', () {
-    /// Backdates the workout row itself: `startWorkout(at:)` moves the day key
-    /// but deliberately keeps the current clock time, and the sweep reads the
-    /// clock.
-    Future<void> backdate(String workoutId, Duration by) async {
+    /// Ages the row, which is what the sweep reads — see
+    /// `sweepAbandonedWorkouts`.
+    ///
+    /// **Not `startedAt`.** The comment that used to sit here said
+    /// `startWorkout(at:)` moved only the day key, which is false: it backdates
+    /// `startedAt` too, so keying the sweep on that column deleted every
+    /// backfilled session at the next launch. INVARIANTS.md § 2. Moving
+    /// `updatedAt` is how you make a row old without also claiming the training
+    /// happened at another time.
+    Future<void> age(String workoutId, Duration by) async {
       await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
           .write(WorkoutsCompanion(
-        startedAt: Value(nowMs() - by.inMilliseconds),
+        updatedAt: Value(nowMs() - by.inMilliseconds),
       ));
     }
 
@@ -1827,7 +1833,7 @@ void main() {
         regimeId: (await activeRegime()).id,
         sessionId: (await sessionNamed('Push 1')).id,
       );
-      await backdate(id, const Duration(hours: 30));
+      await age(id, const Duration(hours: 30));
 
       expect(await repo.sweepAbandonedWorkouts(), 1);
 
@@ -1852,7 +1858,7 @@ void main() {
         reps: const Value(8),
         isDone: const Value(true),
       );
-      await backdate(id, const Duration(days: 4));
+      await age(id, const Duration(days: 4));
 
       expect(await repo.sweepAbandonedWorkouts(), 0);
 
@@ -1868,7 +1874,7 @@ void main() {
         regimeId: (await activeRegime()).id,
         sessionId: (await sessionNamed('Push 1')).id,
       );
-      await backdate(id, const Duration(hours: 1));
+      await age(id, const Duration(hours: 1));
 
       expect(await repo.sweepAbandonedWorkouts(), 0);
       expect(

@@ -49,8 +49,8 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries, **one closed**. Four were one bug in four places — that is entry
-1, and it is the closed one; two more are the backup export.
+Eight entries, **two closed**. Four were one bug in four places — that is entry
+1, closed; entry 2 is closed with it. Two more are the backup export.
 
 ---
 
@@ -205,22 +205,47 @@ second writer, which is why it was first.
 
 ## 2. A workout with logged sets is never swept
 
+> **CLOSED.** `write_integrity_test.dart` → `the sweep reads how long ago the row
+> was written`, **red first**:
+>
+> ```
+> a backdated session is not swept the moment it is created  Expected: <0>  Actual: <1>
+> a session genuinely left open is still swept               Expected: <1>  Actual: <0>
+> ```
+>
+> The sweep now keys on `updatedAt` rather than `startedAt`. The second test is
+> the guard that the fix narrowed the sweep instead of disabling it, and the two
+> together pin the column choice rather than the behaviour.
+>
+> Three existing tests in `training_repository_test.dart` aged the row by moving
+> `startedAt`, through a helper whose doc comment asserted that
+> `startWorkout(at:)` moved only the day key. **That comment was the bug's
+> cover** — it is false, and it is why nobody looked. Helper and comment
+> corrected with the fix.
+
 **Invariant.** `sweepAbandonedWorkouts` tombstones a workout only when
 `doneSetCount == 0` **and** it is genuinely stale.
 
 **Enforced today.** The `doneSetCount` half is enforced at
-`training_repository.dart:3081`. The staleness half is
-`t.startedAt.isSmallerThanValue(cutoff)` at `training_repository.dart:3076`,
-where `cutoff = nowMs() - 24h` (`:3071`).
+`training_repository.dart:3081`. The staleness half was
+`t.startedAt.isSmallerThanValue(cutoff)`, where `cutoff = nowMs() - 24h`, and is
+now `t.updatedAt`.
 
-**The hole.** `startWorkout(at:)` writes `startedAt` to the *backdated* moment —
-`training_repository.dart:2015-2018` and `:2067`. So a session you are backfilling
-for three weeks ago is `inProgress` with `startedAt` three weeks in the past, and
-is **already past the sweep cutoff the instant it is created**. `sweepAbandonedWorkouts`
-runs before first paint on every launch (`core/providers.dart:28`).
+**The hole, as it was.** `startWorkout(at:)` writes `startedAt` to the
+*backdated* moment — `training_repository.dart:2015-2018` and `:2067`. So a
+session you are backfilling for three weeks ago was `inProgress` with `startedAt`
+three weeks in the past, and was **already past the sweep cutoff the instant it
+was created**. `sweepAbandonedWorkouts` runs before first paint on every launch
+(`core/providers.dart:28`).
 
-**PROVED** — the two lines are unambiguous; I have not driven the sequence on a
-device.
+`updatedAt` is the column that cannot be backdated: stamped by `nowMs` on the
+insert, re-stamped on every write to the row, and never moved by the backfill
+sheet. Ticking a set writes `set_logs` rather than `workouts`, so a session
+trained and left open overnight still ages — which is correct, because
+`doneSetCount` is what keeps that one.
+
+**PROVED, then demonstrated** — the two lines were unambiguous, and the test
+above drove the sequence and watched it delete the session.
 
 **How a user reaches it.** Open the backfill sheet, pick a date last week, get
 the log screen, leave without ticking anything, and let Android reclaim the
@@ -261,15 +286,15 @@ of entry 1 and still open.
 `test/data/write_integrity_test.dart` →
 `a backdated session is not swept the moment it is created`: start a workout with
 `at: 3 weeks ago`, run `sweepAbandonedWorkouts()`, assert the workout is still
-`inProgress` and not tombstoned. **Does not exist today** —
-`training_repository_test.dart:1814-1880` covers three sweep cases, none of them
-backdated.
+`inProgress` and not tombstoned. **Exists**, plus its guard. What was there
+before covered three sweep cases, none of them backdated — and aged the row
+through the column the bug lived in.
 
-**Only that one.** The companion check the composition above suggested is green
+**Only those two.** The companion check the composition above suggested is green
 against the code as it now stands, so it is not written — see the paragraph
 above for why, and rule 1 for why a green-on-arrival test is worse than none.
 
-**Severity: CORRUPTION.**
+**Severity: CORRUPTION — closed.**
 
 ---
 
@@ -1021,7 +1046,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fourteen, of which **one is done**. Every one is executable, and every one must
+Fourteen, of which **two are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1047,7 +1072,9 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
    `deleteRegime` — entry 1, each asserting only the edges that entry says it
    owes, plus the companion assertions that a deleted regime keeps its workouts
    and its sessions. **Written, red on all four, now passing.**
-7. `a backdated session is not swept the moment it is created` — entry 2.
+7. ✅ `a backdated session is not swept the moment it is created` — entry 2,
+   with `a session genuinely left open is still swept` beside it as the guard.
+   **Written, both red, now passing.**
 8. `undoing a removed slot after another was added still finds a free position` —
    entry 7.
 9. `a logged workout is byte-identical after every programme edit` — snapshot up

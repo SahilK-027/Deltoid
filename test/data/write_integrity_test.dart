@@ -465,6 +465,57 @@ void main() {
     });
   });
 
+  /// INVARIANTS.md § 2.
+  ///
+  /// The sweep exists for a mis-tapped Start: a workout with nothing in it,
+  /// opened long enough ago that you are not coming back. It decided "long
+  /// enough ago" from `startedAt` — the one column the app **deliberately
+  /// moves into the past**, because backfilling last Tuesday's session is a
+  /// thing this log has to let you do. A backfill was therefore already past
+  /// the cutoff the instant it was created, and `sweepAbandonedWorkouts` runs
+  /// before first paint on every launch.
+  group('the sweep reads how long ago the row was written', () {
+    Future<Workout> workoutRow(String id) =>
+        (db.select(db.workouts)..where((t) => t.id.equals(id))).getSingle();
+
+    test('a backdated session is not swept the moment it is created', () async {
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+
+      // The backfill sheet: pick a date three weeks ago, get the log screen,
+      // put the phone down without ticking anything. Android reclaims the
+      // process; the next launch runs the sweep.
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: session.id,
+        at: DateTime.now().subtract(const Duration(days: 21)),
+      );
+
+      expect(await repo.sweepAbandonedWorkouts(), 0,
+          reason: 'a session you are backfilling has not been abandoned — it '
+              'was opened seconds ago');
+
+      final after = await workoutRow(id);
+      expect(after.status, WorkoutStatus.inProgress);
+      expect(after.deletedAt, isNull);
+    });
+
+    test('a session genuinely left open is still swept', () async {
+      // The guard on the test above: the fix must narrow the sweep, not
+      // disable it.
+      final id = await repo.startWorkout(
+        regimeId: (await activeRegime()).id,
+        sessionId: (await sessionNamed('Push 1')).id,
+      );
+      await (db.update(db.workouts)..where((t) => t.id.equals(id))).write(
+        WorkoutsCompanion(updatedAt: Value(nowMs() - const Duration(hours: 30).inMilliseconds)),
+      );
+
+      expect(await repo.sweepAbandonedWorkouts(), 1);
+      expect((await workoutRow(id)).deletedAt, isNotNull);
+    });
+  });
+
   /// INVARIANTS.md § 1.
   ///
   /// **The rule is not "no live row under a tombstoned parent".** It is: a
