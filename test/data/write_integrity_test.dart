@@ -464,4 +464,152 @@ void main() {
       expect(await repo.completeWorkout('no-such-workout'), isFalse);
     });
   });
+
+  /// INVARIANTS.md § 1.
+  ///
+  /// **The rule is not "no live row under a tombstoned parent".** It is: a
+  /// tombstoned row takes the rows that only exist to *describe* it, and never
+  /// the rows that *record what was done*. `session_exercises` describe a
+  /// session; `workouts` record training under it.
+  ///
+  /// So `deleteRegime` owes its cycles and must leave its sessions and its
+  /// workouts exactly where they are — `deleteRegime`'s own doc says history
+  /// stays in History as it was logged, and `loggedSessions` filters
+  /// `sessions.deleted_at`, so cascading there would delete the only way to
+  /// page a retired programme's history. Widening this group to "every foreign
+  /// key" deletes training. The companion assertions below are what stop that.
+  ///
+  /// Invisible on this phone: every read that carries a number joins the parent
+  /// and filters `deleted_at`. These are live rows carrying `dirty`, which is
+  /// what the first sync push sends, and no tombstone will ever follow them.
+  group('a tombstoned parent leaves nothing live beneath it', () {
+    Future<int> countOf(String from) async => (await db
+            .customSelect('SELECT COUNT(*) AS n FROM $from')
+            .getSingle())
+        .read<int>('n');
+
+    /// Live `set_logs` under a tombstoned `workout_exercises`.
+    Future<int> orphanedSets() => countOf(
+          'set_logs s JOIN workout_exercises we ON we.id = s.workout_exercise_id '
+          'WHERE s.deleted_at IS NULL AND we.deleted_at IS NOT NULL',
+        );
+
+    /// Live `workout_exercises` under a tombstoned `workouts`. The one
+    /// `healOrphanedSnapshots` already repairs at launch — asserted here so the
+    /// heal keeps working, not because it is open.
+    Future<int> orphanedSnapshots() => countOf(
+          'workout_exercises we JOIN workouts w ON w.id = we.workout_id '
+          'WHERE we.deleted_at IS NULL AND w.deleted_at IS NOT NULL',
+        );
+
+    /// Live `session_exercises` under a tombstoned `sessions`.
+    Future<int> orphanedSlots() => countOf(
+          'session_exercises se JOIN sessions ss ON ss.id = se.session_id '
+          'WHERE se.deleted_at IS NULL AND ss.deleted_at IS NOT NULL',
+        );
+
+    /// Live `cycles` under a tombstoned `regimes`.
+    Future<int> orphanedCycles() => countOf(
+          'cycles c JOIN regimes r ON r.id = c.regime_id '
+          'WHERE c.deleted_at IS NULL AND r.deleted_at IS NOT NULL',
+        );
+
+    Future<void> expectNoOrphans() async {
+      expect(await orphanedSets(), 0, reason: 'live sets under a dead slot');
+      expect(await orphanedSnapshots(), 0,
+          reason: 'live snapshots under a dead workout');
+      expect(await orphanedSlots(), 0, reason: 'live slots under a dead session');
+      expect(await orphanedCycles(), 0, reason: 'live cycles under a dead regime');
+    }
+
+    test('removing an exercise mid-session takes its sets', () async {
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+      final workoutId =
+          await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+
+      final before = (await repo.workoutDetail(workoutId))!;
+      final slot = before.entries[1].workoutExercise;
+      expect(before.entries[1].sets, isNotEmpty,
+          reason: 'the fixture must have sets to orphan');
+
+      await repo.removeExerciseFromWorkout(slot.id);
+
+      await expectNoOrphans();
+    });
+
+    test('swapping an exercise takes the sets logged into the old one',
+        () async {
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+      final workoutId =
+          await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+
+      final before = (await repo.workoutDetail(workoutId))!;
+      final slot = before.entries[1].workoutExercise;
+      final logged = before.entries[1].sets.first;
+      // Real work, not an empty row: this is the sequence that loses it —
+      // two sets in, then a swap, and the sets stay live under a dead slot.
+      await repo.updateSet(
+        logged.id,
+        weight: const Value(60),
+        reps: const Value(8),
+        isDone: const Value(true),
+      );
+
+      final spare = await (db.select(db.exercises)
+            ..where((t) => t.id.isNotIn(
+                [for (final e in before.entries) e.workoutExercise.exerciseId]))
+            ..limit(1))
+          .getSingle();
+      await repo.replaceExerciseInWorkout(slot.id, spare.id);
+
+      await expectNoOrphans();
+    });
+
+    test('deleting a training day takes its slots', () async {
+      final session = await sessionNamed('Push 1');
+      final slots = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(session.id) & t.deletedAt.isNull()))
+          .get();
+      expect(slots, isNotEmpty, reason: 'the fixture must have slots to orphan');
+
+      await regimes.deleteSession(session.id);
+
+      await expectNoOrphans();
+    });
+
+    test('deleting a programme takes its cycles and nothing else', () async {
+      final regime = await activeRegime();
+      final session = await sessionNamed('Push 1');
+      final workoutId =
+          await repo.startWorkout(regimeId: regime.id, sessionId: session.id);
+      await repo.completeWorkout(workoutId);
+      expect(await repo.ensureOpenCycle(regime.id), isNotNull,
+          reason: 'the fixture must have a cycle to orphan');
+
+      await regimes.deleteRegime(regime.id);
+
+      await expectNoOrphans();
+
+      // The companion half, and the reason this test is not just the four
+      // counts. A fix that cascades past `cycles` deletes the history the
+      // programme was deleted to get away from.
+      final liveWorkouts = await (db.select(db.workouts)
+            ..where((t) =>
+                t.regimeId.equals(regime.id) & t.deletedAt.isNull()))
+          .get();
+      expect(liveWorkouts.map((w) => w.id), contains(workoutId),
+          reason: 'a deleted programme keeps its logged workouts');
+
+      final liveSessions = await (db.select(db.sessions)
+            ..where((t) =>
+                t.regimeId.equals(regime.id) & t.deletedAt.isNull()))
+          .get();
+      expect(liveSessions.map((s) => s.id), contains(session.id),
+          reason: 'a deleted programme keeps its sessions, or History loses '
+              'the only way to page by them');
+    });
+  });
 }

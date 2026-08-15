@@ -201,13 +201,29 @@ class RegimeRepository {
   /// Removes a regime from the programme list without touching training.
   ///
   /// Workouts hold their own snapshots and stay in History exactly as they were
-  /// logged; what disappears is the split, its sessions and its cycle counter.
+  /// logged; what disappears is the split and its cycle counter.
+  ///
+  /// Its **cycles** go with it — a cycle exists only to number this regime's
+  /// weeks. Its **sessions** deliberately do not, even though nothing outside
+  /// this regime reads them: `loggedSessions` filters `sessions.deletedAt`, so
+  /// tombstoning them removes every one from History's session filter and
+  /// takes away the only way to page a retired programme's history. That
+  /// asymmetry is INVARIANTS.md § 1, and it is a stop rather than a tidy-up.
   Future<void> deleteRegime(String regimeId) async {
     await db.transaction(() async {
       final stamp = nowMs();
       await (db.update(db.regimes)..where((t) => t.id.equals(regimeId))).write(
         RegimesCompanion(
           isActive: const Value(false),
+          deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+      await (db.update(db.cycles)..where((t) => t.regimeId.equals(regimeId)))
+          .write(
+        CyclesCompanion(
           deletedAt: Value(stamp),
           deviceId: Value(currentDeviceId),
           updatedAt: Value(stamp),
@@ -439,15 +455,34 @@ class RegimeRepository {
 
   /// Soft delete — past workouts keep pointing at the session, so history
   /// survives a programme change.
+  ///
+  /// Its **slots** go with it, because a `session_exercises` row exists only to
+  /// describe the session; its **workouts** do not, because they record what
+  /// was done. That distinction is the whole of INVARIANTS.md § 1, and widening
+  /// it here would delete training rather than a template.
   Future<void> deleteSession(String sessionId) async {
-    await (db.update(db.sessions)..where((t) => t.id.equals(sessionId))).write(
-      SessionsCompanion(
-        deletedAt: Value(nowMs()),
-        deviceId: Value(currentDeviceId),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
+    final stamp = nowMs();
+    await db.transaction(() async {
+      await (db.update(db.sessionExercises)
+            ..where((t) => t.sessionId.equals(sessionId)))
+          .write(
+        SessionExercisesCompanion(
+          deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+      await (db.update(db.sessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        SessionsCompanion(
+          deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+    });
   }
 
   /// Two passes through free ground — see [renumber]. A single pass writes a

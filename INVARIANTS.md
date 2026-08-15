@@ -16,6 +16,11 @@ training data?* Anything that cannot belongs in [DEBT.md](DEBT.md).
 - **Severity**: `CORRUPTION` (data wrong or lost) / `STALE` (data right, shown
   wrong) / `COSMETIC`.
 - Every claim carries `file:line` or says `unverified`.
+- **CLOSED** — the check named by the entry exists, was red first, and is now
+  passing. A closed entry keeps its number and stays where it is rather than
+  moving tier: the numbers are referenced from thirty other entries and from
+  [HARDENING.md § 3](HARDENING.md#stage-3--build-the-net), and a renumber per
+  close would break them all. The tier headings count what is still open.
 
 ## The short version
 
@@ -25,9 +30,9 @@ counted at `grep -c 'CREATE UNIQUE INDEX' lib/data/db/tables.dart`, `grep -o
 'CHECK (' lib/data/db/tables.dart | wc -l`, and `grep -rn 'db.transaction('
 lib/`, of which 28 are in the two repositories, 2 in `seeder.dart` and 1 in
 `backup_service.dart`. The places where a rule is only prose are mostly narrow.
-The catalogue below is 31 entries; **eight are CORRUPTION**, four of those are
-the same shape — a parent tombstoned without its children — and two more are the
-export path, which pages over a live database.
+The catalogue below is 31 entries; **eight are CORRUPTION**, four of those were
+the same shape — a parent tombstoned without its children, entry 1, now
+**closed** — and two more are the export path, which pages over a live database.
 
 The audit checked the six writers HARDENING named. `ensureOpenCycle`,
 `_healDuplicateOpenCycles`, `logBodyweight` and `completeWorkout` each open their
@@ -44,11 +49,30 @@ every hard delete in the app is one of the restore's nine `clear()` closures
 
 # Tier 1 — CORRUPTION
 
-Eight entries. Four are one bug in four places; two more are the backup export.
+Eight entries, **one closed**. Four were one bug in four places — that is entry
+1, and it is the closed one; two more are the backup export.
 
 ---
 
 ## 1. A tombstoned parent tombstones every live row beneath it
+
+> **CLOSED.** `write_integrity_test.dart` → `a tombstoned parent leaves nothing
+> live beneath it`, four tests, **red first** against the code as it stood:
+>
+> ```
+> removing an exercise mid-session takes its sets     Expected: <0>  Actual: <3>
+> swapping an exercise takes the sets logged into…    Expected: <0>  Actual: <3>
+> deleting a training day takes its slots             Expected: <0>  Actual: <6>
+> deleting a programme takes its cycles and nothing…  Expected: <0>  Actual: <1>
+> ```
+>
+> Fixed in `removeExerciseFromWorkout`, `replaceExerciseInWorkout`,
+> `deleteSession` and `deleteRegime`; the four counts and both companion
+> assertions now pass, and the full suite is green at 561.
+>
+> **The entry stays here in full.** Its exception list is not a record of a bug
+> that was fixed, it is the rule the fix had to stop at, and the § 3b harness
+> needs both halves.
 
 **Invariant.** For every `set_logs` row with `deleted_at IS NULL`, its
 `workout_exercises` parent has `deleted_at IS NULL`. Likewise
@@ -103,18 +127,23 @@ that record what was done.** `session_exercises` describe a session;
 `workouts` record training under it. That distinction is the whole content of
 this entry, and stage 3 must implement it rather than the general form.
 
-**Enforced today — partially.**
+**Enforced today — everywhere, since the close.** The four `no` rows are what
+this entry was:
 
 | Path | Takes its children? | Evidence |
 | --- | --- | --- |
-| `deleteWorkout` | yes | `training_repository.dart:3245` calls `_tombstoneChildren` |
-| `abandonWorkout` | yes | `training_repository.dart:3100` |
-| `healOrphanedSnapshots` | yes, at launch | `training_repository.dart:531`, wired at `core/providers.dart:37` |
-| `completeWorkout` (unticked sets) | yes | `training_repository.dart:2953` |
-| **`removeExerciseFromWorkout`** | **no** | `training_repository.dart:2904` writes `workout_exercises` and nothing else |
-| **`replaceExerciseInWorkout`** | **no** | `training_repository.dart:2867-2877` tombstones the old slot; its `set_logs` are never touched |
-| **`deleteSession`** | **no** | `regime_repository.dart:442` writes `sessions` only; its `session_exercises` stay live |
-| **`deleteRegime`** | **no** | `regime_repository.dart:205` writes `regimes` only; its `cycles` stay live. Its `sessions` staying live is **correct** — see the exceptions above |
+| `deleteWorkout` | yes | calls `_tombstoneChildren` |
+| `abandonWorkout` | yes | same |
+| `healOrphanedSnapshots` | yes, at launch | wired at `core/providers.dart:37` |
+| `completeWorkout` (unticked sets) | yes | one transaction with the status write |
+| `removeExerciseFromWorkout` | **yes, now** | was a lone `workout_exercises` write; now a transaction around `_tombstoneSetsOf` and the slot |
+| `replaceExerciseInWorkout` | **yes, now** | tombstones the displaced slot's `set_logs` inside the transaction it already had |
+| `deleteSession` | **yes, now** | was a lone `sessions` write; now a transaction taking its `session_exercises` |
+| `deleteRegime` | **yes, now** | takes its `cycles`. Its `sessions` and `workouts` staying live is **correct** and is asserted — see the exceptions above |
+
+The shared write is `_tombstoneSetsOf`, which is deliberately **not** a
+transaction of its own: it is half of a cascade and each caller owes the other
+half. That is entry 29.
 
 `healOrphanedSnapshots` does **not** close these. Its predicate is
 `workout_exercises.deleted_at IS NULL AND workouts.deleted_at IS NOT NULL`
@@ -163,12 +192,14 @@ forever, because no tombstone will ever arrive to clear it. This is the failure
 paths, asserting the four SQL counts above are zero after each — **plus a
 companion assertion that the exception edges are still live**: after
 `deleteRegime`, its `workouts` and its `sessions` must both still be
-`deleted_at IS NULL`, or the fix has cascaded past its boundary. **Does not
-exist today** — `write_integrity_test.dart:56-145` covers positions, not
-orphans; `training_repository_test.dart:1737` (`discarding a session takes its
-sets and snapshots with it`) covers `abandonWorkout` only.
+`deleted_at IS NULL`, or the fix has cascaded past its boundary. **Exists**, and
+was red on all four paths before any `lib/` code moved. What was there before
+covered neither: `write_integrity_test.dart:56-145` covers positions, not
+orphans, and `training_repository_test.dart:1737` (`discarding a session takes
+its sets and snapshots with it`) covers `abandonWorkout` only.
 
-**Severity: CORRUPTION.** Latent locally, certain once there is a second writer.
+**Severity: CORRUPTION — closed.** Latent locally, certain once there is a
+second writer, which is why it was first.
 
 ---
 
@@ -201,29 +232,30 @@ process — returning from the background does not re-run it. That narrows the
 window to "the app was killed or restarted before you came back to the
 backfill", which on Android is routine rather than rare.
 
-**What is lost — and the obvious bound does not hold.** The reading that makes
-this survivable is "a workout with zero ticked sets, so snapshots and empty set
-rows, not logged work". That is only true while entry 1 is closed.
-`doneSetCount` (`training_repository.dart:3008-3021`) filters
-`workout_exercises.deleted_at IS NULL`, and entry 1 leaves ticked `set_logs`
-alive under a tombstoned slot. So:
+**What is lost.** Bounded to a workout with zero ticked sets — so the exercise
+snapshots and the empty set rows, not logged work. It is on this tier because
+the *mechanism* is a launch-time delete keyed on a column the app deliberately
+backdates, and the bound depends on `doneSetCount` continuing to be checked
+first.
 
-1. Backfill a session for last week. Log two sets into exercise A.
-2. Swap A for B (`replaceExerciseInWorkout`). A's slot is tombstoned; its two
-   ticked sets stay live beneath it.
-3. Log nothing into B and leave. Android reclaims the process.
-4. Next launch: `doneSetCount` reads **0** — it cannot see A's sets through the
-   tombstoned parent — so the sweep calls `abandonWorkout`.
-5. `_tombstoneChildren` (`:3117`) selects `workout_exercises` **without** a
-   `deleted_at` filter, so it reaches A's orphans and tombstones them properly.
+**A composition with entry 1 that dissolved when entry 1 closed, recorded
+because the reasoning is worth keeping.** `doneSetCount`
+(`training_repository.dart:3008-3021`) filters
+`workout_exercises.deleted_at IS NULL`. While entry 1 was open, a swap left two
+ticked sets live under a tombstoned slot, `doneSetCount` could not see them
+through the dead parent, read **0**, and the sweep took a session the user had
+actually trained.
 
-Two real sets, gone, on a launch, with no message. **PROVED** by reading
-`doneSetCount`'s predicate against `replaceExerciseInWorkout`'s write; the
-sequence is not driven. It is the reason entries 1 and 2 must be read together
-rather than fixed in either order.
-
-It is on this tier on its own terms too, because the *mechanism* is a
-launch-time delete keyed on a column the app deliberately backdates.
+Entry 1's fix removes it, and **not** by changing `doneSetCount`: a swap now
+tombstones the displaced slot's sets explicitly, so they are discarded by the
+user's own action at the moment they stop being visible, and a workout with
+nothing else in it is genuinely empty when the sweep looks. Disk agrees with the
+screen, which it did not before. The check that would have caught this — `a
+swapped-out exercise still counts as work done` — is **green the moment it is
+written** now, which by
+[HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1 means it is not
+worth writing. What remains is the backdating hole above, which is independent
+of entry 1 and still open.
 
 **The check that closes it.**
 `test/data/write_integrity_test.dart` →
@@ -233,10 +265,9 @@ launch-time delete keyed on a column the app deliberately backdates.
 `training_repository_test.dart:1814-1880` covers three sweep cases, none of them
 backdated.
 
-**A second one, for the composition above**: `a swapped-out exercise still counts
-as work done` — log two sets, swap the exercise, run the sweep, assert the
-workout survives. It is red for as long as either entry is open, which is what
-makes it the right assertion to write.
+**Only that one.** The companion check the composition above suggested is green
+against the code as it now stands, so it is not written — see the paragraph
+above for why, and rule 1 for why a green-on-arrival test is worse than none.
 
 **Severity: CORRUPTION.**
 
@@ -990,7 +1021,8 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fifteen. Every one is executable, and every one must be **red first**
+Fourteen, of which **one is done**. Every one is executable, and every one must
+be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
 **Five structural invariants, asserted as SQL after every mutation.** These are
@@ -1008,36 +1040,33 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 4. `day_key agrees with started_at on every workout`.
 5. `every live workout names a live cycle` — entry 23's count, zero.
 
-**Five write-path tests:**
+**Four write-path tests:**
 
-6. `a tombstoned parent leaves nothing live beneath it`, over
+6. ✅ `a tombstoned parent leaves nothing live beneath it`, over
    `removeExerciseFromWorkout`, `replaceExerciseInWorkout`, `deleteSession`,
    `deleteRegime` — entry 1, each asserting only the edges that entry says it
-   owes.
+   owes, plus the companion assertions that a deleted regime keeps its workouts
+   and its sessions. **Written, red on all four, now passing.**
 7. `a backdated session is not swept the moment it is created` — entry 2.
-8. `a swapped-out exercise still counts as work done` — entries 1 and 2
-   composed: two ticked sets, a swap, a sweep, and the workout survives. It is
-   the one check on this list that is red for two separate reasons, which is why
-   it is worth writing rather than folding into 6 or 7.
-9. `undoing a removed slot after another was added still finds a free position` —
+8. `undoing a removed slot after another was added still finds a free position` —
    entry 7.
-10. `a logged workout is byte-identical after every programme edit` — snapshot up
-    the `workout_exercises` and `set_logs` rows of a completed workout, run every
-    mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
-    held by inspection; this is what keeps it held.
+9. `a logged workout is byte-identical after every programme edit` — snapshot up
+   the `workout_exercises` and `set_logs` rows of a completed workout, run every
+   mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
+   held by inspection; this is what keeps it held.
 
 **Five backup and durability tests:**
 
-11. `every column of every codec has a default or is in every file` — entry 18,
+10. `every column of every codec has a default or is in every file` — entry 18,
     the one that makes [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3
     mechanical.
-12. `a restore that throws leaves the database exactly as it was` — entry 4.
-13. `an export taken while rows are being written loses nothing` — entry 5. The
+11. `a restore that throws leaves the database exactly as it was` — entry 4.
+12. `an export taken while rows are being written loses nothing` — entry 5. The
     whole of stage 5a rests on the file being complete, and nothing has ever
     asserted that it is.
-14. `a file whose body is shorter than its header is refused` — entry 6, and the
+13. `a file whose body is shorter than its header is refused` — entry 6, and the
     cheapest check on this list.
-15. `the database is not in a journal mode that can lose a committed
+14. `the database is not in a journal mode that can lose a committed
     transaction` — entry 12. One `pragma_journal_mode()` read, and it is the
     premise every other durability claim in this document rests on.
 

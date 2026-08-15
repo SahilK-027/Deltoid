@@ -2864,14 +2864,21 @@ class TrainingRepository {
     final muscle = (await _musclesOf([newExerciseId]))[newExerciseId];
 
     final id = newId();
+    final stamp = nowMs();
     await db.transaction(() async {
+      // The displaced slot's sets go with it. Two sets logged into a movement
+      // you then swapped away are not the new movement's, and leaving them live
+      // under a tombstoned slot is what INVARIANTS.md § 1 is about — the sets
+      // stay `dirty` and unreachable, and `doneSetCount` stops seeing them,
+      // which is what lets the launch sweep call the whole session empty.
+      await _tombstoneSetsOf([workoutExerciseId], stamp);
       await (db.update(db.workoutExercises)
             ..where((t) => t.id.equals(workoutExerciseId)))
           .write(
         WorkoutExercisesCompanion(
-          deletedAt: Value(nowMs()),
+          deletedAt: Value(stamp),
           deviceId: Value(currentDeviceId),
-          updatedAt: Value(nowMs()),
+          updatedAt: Value(stamp),
           dirty: const Value(true),
         ),
       );
@@ -2901,16 +2908,22 @@ class TrainingRepository {
     return id;
   }
 
+  /// The slot goes and its sets go with it — see [_tombstoneSetsOf].
   Future<void> removeExerciseFromWorkout(String workoutExerciseId) async {
-    await (db.update(db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId)))
-        .write(
-      WorkoutExercisesCompanion(
-        deletedAt: Value(nowMs()),
-        deviceId: Value(currentDeviceId),
-        updatedAt: Value(nowMs()),
-        dirty: const Value(true),
-      ),
-    );
+    final stamp = nowMs();
+    await db.transaction(() async {
+      await _tombstoneSetsOf([workoutExerciseId], stamp);
+      await (db.update(db.workoutExercises)
+            ..where((t) => t.id.equals(workoutExerciseId)))
+          .write(
+        WorkoutExercisesCompanion(
+          deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+    });
   }
 
   /// Finishes a workout and closes its cycle if that was the last session owed.
@@ -3110,10 +3123,37 @@ class TrainingRepository {
     });
   }
 
+  /// Tombstones every set under [workoutExerciseIds], live or not.
+  ///
+  /// The one write a slot's disappearance owes, wherever the slot goes: leaving
+  /// its `set_logs` alive under a deleted parent is invisible on this phone —
+  /// every read that carries a number joins the slot and filters `deletedAt` —
+  /// but they are live rows with `dirty` set, so the first push hands another
+  /// device sets belonging to a slot that does not exist, and no tombstone ever
+  /// follows to clear them. See INVARIANTS.md § 1.
+  ///
+  /// **Not a transaction of its own**, so every caller owes one: this is half
+  /// of a cascade and the other half is the parent's own write.
+  Future<void> _tombstoneSetsOf(List<String> workoutExerciseIds, int stamp) =>
+      (db.update(db.setLogs)
+            ..where((t) => t.workoutExerciseId.isIn(workoutExerciseIds)))
+          .write(
+        SetLogsCompanion(
+          deletedAt: Value(stamp),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(stamp),
+          dirty: const Value(true),
+        ),
+      );
+
   /// Tombstones a workout's exercise snapshots and every set under them.
   ///
   /// Shared by [deleteWorkout] and [abandonWorkout] because "the workout is
   /// gone" has to mean the same thing however it went.
+  ///
+  /// No `deletedAt` filter on the slots it collects, deliberately: a slot that
+  /// was already swapped away may still be carrying live sets, and those are
+  /// the workout's too.
   Future<void> _tombstoneChildren(String workoutId, int stamp) async {
     final weIds = [
       for (final we in await (db.select(db.workoutExercises)
@@ -3123,16 +3163,7 @@ class TrainingRepository {
     ];
     if (weIds.isEmpty) return;
 
-    await (db.update(db.setLogs)
-          ..where((t) => t.workoutExerciseId.isIn(weIds)))
-        .write(
-      SetLogsCompanion(
-        deletedAt: Value(stamp),
-        deviceId: Value(currentDeviceId),
-        updatedAt: Value(stamp),
-        dirty: const Value(true),
-      ),
-    );
+    await _tombstoneSetsOf(weIds, stamp);
     await (db.update(db.workoutExercises)
           ..where((t) => t.workoutId.equals(workoutId)))
         .write(
