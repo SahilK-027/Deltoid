@@ -1263,6 +1263,37 @@ its default.
 
 ## 19. `WorkoutExercise` and `SetLog` are snapshots
 
+> **CLOSED**, and the entry's severity was right: nothing was wrong, and that is
+> the point. `test/data/snapshot_guard_test.dart` → `a logged workout is
+> byte-identical after every programme edit`. Log a session, freeze both tables
+> as JSON, run every writer on the programme side — `updateExercise` on the
+> movement the workout logged, all four `session_exercises` mutators,
+> `applySessionChanges`, both session writers, `updateRegime`,
+> `setActiveRegime`, and `deleteRegime` on the programme the history came from —
+> then assert the frozen rows come back identical.
+>
+> **Green on arrival, which is what an invariant held by inspection should do.**
+> So the evidence is two perturbations, each a mistake someone would plausibly
+> make:
+>
+> ```
+> updateExercise also touches its snapshots' updated_at
+>   Which: at location [18]['updatedAt'] is <1786807960637> instead of <1786807960567>
+>
+> a programme write reaches set_logs
+>   Which: at location [0]['reps'] is <99> instead of <8>
+> ```
+>
+> **The first is why the assertion is byte-identical rather than value-equal.**
+> Nothing on any screen would change: no weight, no rep count, no muscle. But a
+> snapshot rewritten with the same numbers is a row a sync push would send, and
+> the rule has stopped holding whether or not anyone can see it. A test written
+> as "the numbers are still the same" would have passed.
+>
+> `deleteRegime` is run last and deliberately: a deleted programme keeps its
+> workouts (§ 1's exception list), so the snapshots must still be there
+> afterwards — and unchanged.
+
 **Invariant.** No write triggered by a programme edit may touch a
 `workout_exercises` or `set_logs` row.
 
@@ -1613,7 +1644,7 @@ exceptions left**: no read path outside the backup codecs drops
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fifteen, of which **eight are done**. Every one is executable, and every one must
+Fifteen, of which **ten are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1649,16 +1680,22 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
    `a reorder that omits the last live row is refused too` beside it — entry 8.
    **Written, both red, now passing.** The pair is the point: the first threw a
    raw `SqliteException(2067)`, the second threw nothing at all.
-10. `a logged workout is byte-identical after every programme edit` — snapshot up
-    the `workout_exercises` and `set_logs` rows of a completed workout, run every
-    mutator in `RegimeRepository`, assert nothing moved. Entry 19 is currently
-    held by inspection; this is what keeps it held.
+10. ✅ `a logged workout is byte-identical after every programme edit` — snapshot
+    up the `workout_exercises` and `set_logs` rows of a completed workout, run
+    every mutator in `RegimeRepository`, assert nothing moved. Entry 19 was held
+    by inspection; this is what keeps it held. **Written, green on arrival** —
+    the invariant was already true — with two perturbations recorded in entry
+    19's banner, one of which changes no value at all and is caught only because
+    the comparison is byte-identical.
 
 **Five backup and durability tests:**
 
-11. `every column of every codec has a default or is in every file` — entry 18,
-    the one that makes [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3
-    mechanical.
+11. ✅ `every column of every codec has a default or is in every file` — entry
+    18, the one that makes [RULES.md § 3](RULES.md#3-schema-and-migrations) step
+    3 mechanical. **Written, red first**, and *not* in the shape this list asked
+    for: there is no default map to look a column up in, and every column is in
+    a freshly written payload by construction, so the check is behavioural —
+    delete a key, hand the row to that codec's own `parse`. See entry 18.
 12. ✅ `a restore that throws leaves the database exactly as it was` — entry 4.
     **Written, and green on arrival** — the entry said it would be. Kept as a
     characterisation test for the pull applier.
