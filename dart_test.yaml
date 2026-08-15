@@ -1,0 +1,5 @@
+# The default `flutter test` concurrency is cpu/2, which leaves half this
+# machine's 8 cores idle. 8 is measured: 68s -> 46s on an unloaded machine.
+# 12 oversubscribes and thrashes back to 71s, so this is the ceiling, not a
+# knob to keep turning up.
+concurrency: 8

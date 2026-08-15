@@ -97,6 +97,14 @@ includes deload weeks. Restore the file through Settings → Backup.
 dart run tool/seed_years.dart --years 5 --out seed.json
 ```
 
+Its tests live beside it in `tool/test/`, deliberately outside `test/`, so that
+`flutter test` never pays for them — the generator is a debugging tool, not part
+of the app. Run them when you change it:
+
+```bash
+flutter test tool/test/
+```
+
 ### Environment notes (this Mac)
 
 - **Android is the only target that can be built here.** Xcode is not
@@ -200,8 +208,9 @@ lib/
     settings/                   settings, bodyweight log, backup
     shell/                      the four-tab scaffold
 
-test/                           domain · data · features · tool
+test/                           domain · data · features · core
 tool/seed_years.dart            generates years of plausible history
+tool/test/                      its tests, outside test/ so they never run by default
 assets/audio/rest_done.mp3      the end-of-rest tone
 ```
 

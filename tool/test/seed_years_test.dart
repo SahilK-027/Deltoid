@@ -8,7 +8,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../tool/seed_years.dart' show buildSeedPayload;
+import '../seed_years.dart' show buildSeedPayload;
 
 /// The seed generator writes a backup file, and a backup file the importer
 /// rejects is a generator nobody finds out is broken until they are standing in
