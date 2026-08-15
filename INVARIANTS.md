@@ -802,6 +802,38 @@ only writer is a transaction, but a pull applier would be a second one.
 
 ## 12. Interrupted `completeWorkout` leaves nothing half-finished
 
+> **CLOSED — and the check was green the moment it was written, which is what
+> the entry asked for.** This entry never claimed a bug: it claimed the mode was
+> *argued rather than read*. `schema_constraints_test.dart` →
+> `the database is not in a journal mode that can lose a committed transaction`
+> now reads it.
+>
+> **The mode is `delete`**, which is what
+> [SYNC.md § 16](SYNC.md#16-still-to-decide) said from memory. Recorded as a
+> measured value rather than a recollection:
+>
+> ```
+> Expected: ('memory' or 'off')
+>   Actual: 'delete'
+> ```
+>
+> — the inverted expectation, run once to prove the assertion has teeth before
+> it was written the right way round. `delete` keeps a rollback journal beside
+> the file, so an interrupted `completeWorkout` is undone on the next open, and
+> the premise this entry and § 3b's crash injection both rest on is now held by
+> the suite.
+>
+> **The check cannot be pointed at the shared test database, and the test says
+> so with a second assertion.** An in-memory sqlite is always `journal_mode =
+> memory` — one of the two modes being refused — so a version of this check
+> written against `db` would fail while looking like it proved something. The
+> file-backed reader is the point of it.
+>
+> Nothing in `lib/` sets the pragma; this is the packaged sqlite3's default,
+> reached through `NativeDatabase(File(...))` under the same `beforeOpen` the
+> app runs. The day anything sets `journal_mode`, this test is the one that
+> notices.
+
 **Invariant.** A workout is `completed` with its empty sets tombstoned and its
 cycle settled, or it is untouched.
 
@@ -816,7 +848,9 @@ settlements into its own transaction (`:3187-3210`).
 **Answer to HARDENING's question — "does an interrupted `completeWorkout` leave a
 half-finished workout?" — no, given the journal mode below.**
 
-**`journal_mode` is UNVERIFIED, and it is load-bearing for this entry.**
+**`journal_mode` was UNVERIFIED, and it is load-bearing for this entry.** It is
+now read by the test named below; the paragraph is kept because it is the
+argument for why reading it mattered.
 [SYNC.md § 16](SYNC.md#16-still-to-decide) says `delete`, and nothing in `lib/`
 sets it: `_open()` is a bare
 `driftDatabase(name: 'deltoid', native: DriftNativeOptions())`
@@ -829,7 +863,8 @@ code, which by this document's own rules makes it unverified rather than true.
 `the database is not in a journal mode that can lose a committed transaction` —
 `SELECT * FROM pragma_journal_mode()` and assert it. One line, and it turns the
 premise of this entry and of § 3b's crash injection into something the suite
-holds rather than something SYNC.md remembers.
+holds rather than something SYNC.md remembers. **Exists**, over a file rather
+than over the in-memory test database — see the banner.
 
 **Recovery after an unclean shutdown is also correct**: `openWorkout`
 (`:1945`) returns the newest live `inProgress` row, and the single-open index
@@ -1204,7 +1239,7 @@ all ([INTERPRETATION.md](INTERPRETATION.md) § 8).
 
 # The smallest set of checks that would justify trusting this with real data
 
-Fifteen, of which **seven are done**. Every one is executable, and every one must
+Fifteen, of which **eight are done**. Every one is executable, and every one must
 be **red first**
 ([HARDENING.md § 3](HARDENING.md#stage-3--build-the-net) rule 1).
 
@@ -1260,9 +1295,12 @@ the oracle the fuzz harness of § 3b runs against, and they close entries 1, 9,
 14. ✅ `a file whose body is shorter than its header is refused` — entry 6.
     **Written, red, now passing**, with `a body longer than its header is
     accepted` beside it to pin the comparison as `<` rather than `!=`.
-15. `the database is not in a journal mode that can lose a committed
+15. ✅ `the database is not in a journal mode that can lose a committed
     transaction` — entry 12. One `pragma_journal_mode()` read, and it is the
     premise every other durability claim in this document rests on.
+    **Written, green on arrival, and the value is `delete`** — the entry
+    predicted the green, because what was missing was a reading rather than a
+    fix.
 
 **Not on the list, deliberately:** the keystroke window (entry 3) is crash
 injection, not a unit test, and belongs wholly to § 3b — the widget test that

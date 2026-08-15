@@ -202,6 +202,41 @@ void main() {
     expect(row.data.values.first, 5000);
   });
 
+  test('the database is not in a journal mode that can lose a committed '
+      'transaction', () async {
+    // Read off a file, never off `db`: an in-memory database is always
+    // `memory`, which is precisely one of the two modes this refuses. The
+    // premise being checked is about the file the phone keeps, and the only
+    // honest place to read it is a file.
+    final file =
+        File('${Directory.systemTemp.path}/deltoid_journal_${newId()}.sqlite');
+    addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+    final onDisk = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(onDisk.close);
+
+    final row = await onDisk
+        .customSelect('SELECT * FROM pragma_journal_mode()')
+        .getSingle();
+    final mode = (row.data.values.first as String).toLowerCase();
+
+    // `memory` keeps the rollback journal in RAM and `off` writes none at all:
+    // under either, a power cut mid-transaction leaves a half-applied
+    // transaction on disk with nothing to undo it. The other four each keep a
+    // journal the next open can recover from, which is what every durability
+    // claim in INVARIANTS.md rests on.
+    expect(mode, anyOf('delete', 'truncate', 'persist', 'wal'),
+        reason: 'nothing in lib/ sets journal_mode, so this is whatever the '
+            'packaged sqlite3 defaults to — read it rather than assume it');
+
+    // And the reason the check cannot be pointed at the shared test database.
+    final inMemory =
+        await db.customSelect('SELECT * FROM pragma_journal_mode()').getSingle();
+    expect((inMemory.data.values.first as String).toLowerCase(), 'memory',
+        reason: 'if this ever stops being true, the test above could be '
+            'written against `db` and still look like it proved something');
+  });
+
   test('a negative load is refused', () async {
     final we = await aWorkoutExercise(await aRegime());
     await expectLater(
