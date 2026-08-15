@@ -1119,6 +1119,42 @@ Spot-verified across `training_repository.dart` (`:1191`, `:1253`, `:2409`,
 
 ## 17. `app_settings` is not in the backup
 
+> **CLOSED**, together with [INTERPRETATION § 5](INTERPRETATION.md) — one
+> finding filed twice, one fix, one commit.
+>
+> `app_settings` is now a codec, but **a whitelist rather than a table**:
+> `backedUpSettingKeys` is `{'units'}` and the whitelist lives in the *query*,
+> so a key this build has never heard of never reaches a file at all. The entry
+> was right that the table mixes two unlike things and that only `units` should
+> travel. `theme_mode` is out with `device_id` — `providers.dart:108-109`
+> already says which theme suits a phone is a property of the phone.
+>
+> **Red first, and it was exactly the bug as written:**
+>
+> ```
+> the unit preference survives a restore, and the device identity does not
+>   Expected: WeightUnit:<WeightUnit.lb>
+>     Actual: WeightUnit:<WeightUnit.kg>
+> ```
+>
+> **Three things the entry did not say, and the first is the one that would
+> have been got wrong.**
+>
+> 1. **`clear()` cannot be `delete(appSettings)`.** Every other codec clears its
+>    whole table, and copying that here would take `device_id` with it — minted
+>    at `beforeOpen` (`database.dart:95-108`), which ran at launch, long before
+>    the restore. The row would not come back until the *next* launch, so every
+>    row written in between would carry a stale identity or none. The clear is
+>    scoped to the whitelist, and the test asserts the fresh install's id is
+>    unchanged by the restore rather than merely absent from the file.
+> 2. **`_cursorOf` did not generalise.** It read `row['id']`, and
+>    `app_settings` is keyed by `key` — there is no `id` column. The cursor is
+>    now a field on the codec, defaulting to the old behaviour.
+> 3. **The file is not the only way in.** A hand-edited or merged file can carry
+>    `device_id` however careful the export is, so the whitelist is applied on
+>    the restore side too (`_TableCodec.keep`), before the count check, not at
+>    parse.
+
 **PROVED.** `_codecs` (`backup_service.dart:124-261`) covers nine tables;
 `appSettings` is absent, matching
 [SYNC.md § 4](SYNC.md#4-what-the-server-holds)'s rule for sync.

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:deltoid/core/ids.dart';
+import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
@@ -9,6 +10,7 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
+import 'package:deltoid/domain/units.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -468,6 +470,37 @@ void main() {
     expect(past, hasLength(1));
     expect(past.first.sessionName, 'Push 1');
     expect(past.first.sets.first.weight, 22.5);
+  });
+
+  test('the unit preference survives a restore, and the device identity does '
+      'not', () async {
+    await setWeightUnit(db, WeightUnit.lb);
+    await logASession();
+    final json = jsonEncode(await backup.buildPayload());
+
+    // A brand new phone: it has minted its own device id at open, and that id
+    // is a property of the install rather than of the history.
+    final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(fresh.close);
+    final freshDeviceId = (await (fresh.select(fresh.appSettings)
+              ..where((t) => t.key.equals(deviceIdKey)))
+            .getSingle())
+        .value;
+    final oldDeviceId = (await (db.select(db.appSettings)
+              ..where((t) => t.key.equals(deviceIdKey)))
+            .getSingle())
+        .value;
+    expect(freshDeviceId, isNot(oldDeviceId));
+
+    await BackupService(fresh).restore(json);
+
+    // A pounds user's history redraws in pounds.
+    expect(await TrainingRepository(fresh).weightUnit(), WeightUnit.lb);
+    // And the phone is still itself.
+    final after = await (fresh.select(fresh.appSettings)
+          ..where((t) => t.key.equals(deviceIdKey)))
+        .getSingle();
+    expect(after.value, freshDeviceId);
   });
 
   test('a backup from a newer schema is refused rather than half-applied',

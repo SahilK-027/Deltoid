@@ -80,6 +80,8 @@ class _TableCodec<T extends Insertable<dynamic>> {
     required this.table,
     required this.parse,
     required this.clear,
+    this.cursor = _idOf,
+    this.keep,
   });
 
   final String name;
@@ -105,11 +107,39 @@ class _TableCodec<T extends Insertable<dynamic>> {
   /// backups abandoned halfway.
   final TableInfo<Table, dynamic> table;
 
+  /// The value a keyset page resumes after. Every syncable table takes its `id`
+  /// from `SyncColumns`, so [_idOf] serves all of them; `app_settings` is keyed
+  /// by its `key` instead and says so.
+  final String Function(Map<String, dynamic> row) cursor;
+
+  /// Which rows of a *file* this codec will write, or null for all of them.
+  ///
+  /// The pager already refuses to export anything else, so this only ever bites
+  /// on a file that was not written by this build — a hand edit, or a merge.
+  /// Restoring `device_id` out of one would give two installs the same identity.
+  final bool Function(Map<String, dynamic> row)? keep;
+
   /// JSON row → something `Batch.insertAll` can write.
   final T Function(Map<String, dynamic> row) parse;
 
   final Future<void> Function() clear;
 }
+
+String _idOf(Map<String, dynamic> row) => row['id']! as String;
+
+/// The `app_settings` keys a backup carries, and the only ones it restores.
+///
+/// A whitelist rather than the table, because the table mixes two unlike
+/// things. `units` is a preference of the *user* — storage is kilograms
+/// whatever it says, so a pounds user restoring onto a new phone found their
+/// whole history redrawn in kilos with nothing said. `device_id` is a property
+/// of the *install*, minted at open (`database.dart`) and never to be copied:
+/// two phones sharing one would make `deviceId` name a history rather than a
+/// writer, which is what [SYNC.md](SYNC.md) leans on to resolve a conflict.
+/// `last_pull_at` and `user_id` are this install's bookkeeping with the server,
+/// and `theme_mode` is deliberately out too — which theme suits a phone is a
+/// property of the phone.
+const backedUpSettingKeys = {'units'};
 
 /// The zone offset a workout written before `tz_offset_minutes` existed implies.
 ///
@@ -176,6 +206,25 @@ class BackupService {
   /// Parents before children, so a restore never inserts a row whose foreign
   /// key has not been written yet.
   late final List<_TableCodec> _codecs = [
+    // Points at nothing and nothing points at it, so it may sit anywhere; first
+    // because it is the smallest and a restore that fails on it should fail
+    // before it has written a decade of sets.
+    _TableCodec(
+      name: 'app_settings',
+      page: _pageOfSettings,
+      count: _countOfSettings,
+      cursor: (row) => row['key']! as String,
+      table: db.appSettings,
+      keep: (row) => backedUpSettingKeys.contains(row['key']),
+      parse: AppSetting.fromJson,
+      // Only the keys this file carries. Clearing the table would take
+      // `device_id` with it, and the restore runs long after `beforeOpen` has
+      // minted one — so the phone would finish the restore with no identity at
+      // all until its next launch.
+      clear: () => (db.delete(db.appSettings)
+            ..where((t) => t.key.isIn(backedUpSettingKeys)))
+          .go(),
+    ),
     _TableCodec(
       name: 'exercises',
       page: (limit, after) => _pageOf(db.exercises, limit, after),
@@ -322,12 +371,31 @@ class BackupService {
     return (await q.get()).map((row) => row.toJson()).toList();
   }
 
-  /// The id to resume a keyset page after: the last one written.
+  /// One page of the settings a backup carries, ordered by key.
   ///
-  /// Every syncable table takes its `id` from `SyncColumns`, so this key is
-  /// always there — and [_pageOf] has already required the column to build the
-  /// query that produced this row.
-  String _cursorOf(Map<String, dynamic> row) => row['id']! as String;
+  /// Its own pager because `app_settings` has no `id` — the key is the primary
+  /// key — and because the whitelist belongs in the query rather than after it:
+  /// a key this build has never heard of must not reach the file at all.
+  Future<List<Map<String, dynamic>>> _pageOfSettings(
+    int limit,
+    String? after,
+  ) async {
+    final q = db.select(db.appSettings)
+      ..where((t) => t.key.isIn(backedUpSettingKeys))
+      ..orderBy([(t) => OrderingTerm(expression: t.key)])
+      ..limit(limit);
+    if (after != null) q.where((t) => t.key.isBiggerThanValue(after));
+    return (await q.get()).map((row) => row.toJson()).toList();
+  }
+
+  /// How many of them there are — the same whitelist, so the header the file
+  /// carries and the count a restore checks it against describe one set of rows.
+  Future<int> _countOfSettings() async {
+    final rows = await (db.select(db.appSettings)
+          ..where((t) => t.key.isIn(backedUpSettingKeys)))
+        .get();
+    return rows.length;
+  }
 
   /// How many rows a table holds, asked of SQLite rather than of Dart.
   Future<int> _countOf(TableInfo<Table, dynamic> table) async {
@@ -356,7 +424,7 @@ class BackupService {
         final page = await codec.page(pageSize, after);
         rows.addAll(page);
         if (page.length < pageSize) break;
-        after = _cursorOf(page.last);
+        after = codec.cursor(page.last);
         if (betweenPages != null) await betweenPages!();
       }
       data[codec.name] = rows;
@@ -446,7 +514,7 @@ class BackupService {
             ));
           }
           if (page.length < pageSize) break;
-          after = _cursorOf(page.last);
+          after = codec.cursor(page.last);
           if (betweenPages != null) await betweenPages!();
         }
         sink.write(']');
@@ -698,8 +766,18 @@ class BackupService {
         await codec.clear();
       }
       for (final codec in _codecs) {
-        final rows = data[codec.name];
+        var rows = data[codec.name];
         if (rows is! List || rows.isEmpty) continue;
+        // A file this build did not write may carry rows this codec refuses —
+        // see [_TableCodec.keep]. Dropped here rather than at parse, so the
+        // count check below sees what actually landed.
+        final keep = codec.keep;
+        if (keep != null) {
+          rows = rows
+              .where((row) => row is Map && keep(Map<String, dynamic>.from(row)))
+              .toList();
+          if (rows.isEmpty) continue;
+        }
 
         // In chunks, not one statement per row: a year of training is ~40k
         // rows and a decade is ten times that. Chunked rather than one giant

@@ -522,6 +522,18 @@ deliberately, in one place.
 
 # 5. The unit preference does not survive a restore
 
+> **CLOSED.** Same finding as [INVARIANTS § 17](INVARIANTS.md), fixed once —
+> **the full banner is there**, including the two things about the fix that were
+> not obvious from either entry: a whole-table `clear()` would have destroyed
+> the install's `device_id` for the rest of the launch, and the keyset cursor
+> did not generalise to a table with no `id`.
+>
+> Red first, on the number this document cares about: `WeightUnit.kg` where the
+> restored history should have read `WeightUnit.lb`.
+>
+> **The entry's own claim was right in full** — the severity, the mechanism and
+> the fallback at `units.dart:53-56` all held up. Nothing to correct here.
+
 **Rank 5.** Every weight on every screen changes by a factor of 2.2, once.
 
 `app_settings` is not in `_codecs` (`backup_service.dart:124-261`), so after a
