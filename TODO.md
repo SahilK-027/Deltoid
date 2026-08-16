@@ -89,18 +89,8 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 ## Left
 
 - [ ] **Migration ladder** — `schemaVersion` is 1 with no `onUpgrade`. Prerequisite of sync, not a consequence. [RULES § 3](RULES.md#3-schema-and-migrations).
-- [ ] **Cloud backup** — designed in full in [SYNC.md](SYNC.md); read it before writing any of it. Correct on any number of devices, live on none. Local schema does not change.
-  - [ ] Supabase project: nine tables, `user_id`, RLS with `using` and `with check`.
-  - [ ] A `SyncClient` seam with a fake behind it.
-  - [ ] Push: drain `dirty`, parents first, idempotent upserts.
-  - [ ] Pull: `last_pull_at` cursor, LWW applier, tombstones as tombstones.
-  - [ ] Collision resolution for the nine unique indexes — re-slot, never delete.
-  - [ ] Defer `ensureStarterCatalog` until the welcome screen is answered.
-  - [ ] A test per row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does).
-  - [ ] Adoption: the three shapes at sign-in, with an export before anything is dropped.
-  - [ ] Google sign-in, session persisted.
-  - [ ] The welcome screen — the app's one illustrated page.
-  - [ ] Settings: connect, state, last run, two sign-out doors.
-  - [ ] Scheduling: debounce, resume, connectivity, idle backstop. Needs `connectivity_plus`.
-  - [ ] Catalog deduplication on `starterKey`, references repointed.
-  - [ ] `journal_mode` still open: `delete` today, WAL trades durability.
+- [ ] **Cloud backup, push-only** — one writer, so no merge and no conflict rules. Auth, a push loop over `dirty`, restore into an empty database, Settings.
+- [ ] **Cloud backup, the second writer** — pull, last-write-wins, collisions on the nine unique indexes, adoption at sign-in. Every row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does) as a test.
+
+Both halves are designed in full in [SYNC.md](SYNC.md); read it before writing any
+of it. Needs `connectivity_plus`, and `journal_mode` is still open ([SYNC § 16](SYNC.md#16-still-to-decide)).
