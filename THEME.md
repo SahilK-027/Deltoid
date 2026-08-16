@@ -135,6 +135,28 @@ Two rules stop those colliding:
   session, `deload` for a light week. That is what a feed of trained days is
   scanned for, and a programme hue in the same slot hides it.
 
+### Contrast, and the four places it is under AA
+
+Measured, not eyeballed — `test/core/light_theme_test.dart` computes every pair
+and fails on drift. `textPrimary` clears 4.5:1 on every ground in both ramps,
+`textSecondary` clears it on the page, the card and a control, and the accent
+pair clears it both ways round.
+
+Four pairs sit below, all of them a grey on a raised fill, all of them label
+text that never carries a fact on its own:
+
+| Pair | Dark | Light |
+| --- | --- | --- |
+| `textSecondary` on `surfaceHighest` | 4.04 | 4.84 |
+| `textTertiary` on `surfaceSunken` | 3.81 | 2.74 |
+| `textTertiary` on `surfaceHigh` | 2.78 | 2.87 |
+| `textTertiary` on `surfaceHighest` | 2.23 | 2.55 |
+
+They are accepted rather than unnoticed, and pinned at those numbers so the ramp
+cannot slide further without the suite saying so. A hue on a card is a mark
+rather than a sentence and is held to 1.4:1; yellow on white, at 1.44, is the
+tightest in the app.
+
 ### A filled mark's glyph is its own hue, taken down
 
 Not white, not black. `#FF8660` carries `#9E2600`; `#5DBA86` carries `#275C3E`.

@@ -27,8 +27,11 @@ because every weakness below is one that a sync layer *multiplies*:
   a migration to write. Everything that should be deleted should be deleted
   first.
 
-The order to work in: **§1** first, then **§6**. §7 and §9 are ongoing rather than
-blocking. §8 is closed: the three field call sites and the two-piece gap are named
+The order to work in: **§1** first, then **§6**. §7 is ongoing rather than blocking. §9 is closed: the light ramp is measured pair by pair in
+`test/core/light_theme_test.dart`, with the four pairs that sit under AA written
+into THEME → Contrast and pinned at the numbers they hold, and the chart's zoom
+is held to not resizing on any frame of a range switch
+(`test/features/chart_transition_test.dart`). §8 is closed: the three field call sites and the two-piece gap are named
 exceptions in THEME now, and `test/core/documented_exceptions_test.dart` fails
 a comment that cites THEME or RULES, claims an exception, and does not say
 which section grants it. §4 is closed — the volume providers are `autoDispose` and
@@ -128,15 +131,3 @@ than a copy. Prefer *"bounded by the range control — see the assert below"* ov
 **Done when**: nothing, really. This is a habit rather than a task. It is here so
 that the next person who finds a stale comment treats it as a category rather
 than an accident.
-
----
-
-## 9. Smaller things, unranked
-
-- **No test asserts the light theme.** THEME defines a full light ramp and every
-  widget test builds `Brightness.dark`. Contrast bugs in light mode are currently
-  invisible to CI that does not exist (§2).
-- **Chart transitions are unverified.** The zoom animation is implemented and
-  nothing tests it, because testing "it looked smooth" needs a golden or a frame
-  timeline. At minimum a test could assert the frame's size never changes during
-  a range switch, which is the part that would be *visibly* wrong.
