@@ -206,9 +206,15 @@ firing with the screen off have only been built, not felt.
       against a model too dumb to share its mistakes, checking that oracle and
       every value the model tracks after each operation, shrinking a failure to
       its shortest sequence. It has run 1,350,000 generated operations —
-      744,358 of them applied — with no violation of either. **Stage 4, the
-      rest of DEBT.md, is what is left**, and § 3's query rewrites are the
-      reason the harness was built before them.
+      744,358 of them applied — with no violation of either. Stage 4 is done as
+      far as a keyboard can take it: §§ 1, 3, 4, 5, 7, 8 and 9 of DEBT.md are
+      closed, each by a check rather than by a fix — the queries that grow with
+      the log are raw and covered by a parity test against the drift path they
+      replaced, the volume screen stops querying when you leave it, no painter
+      clamps to a bound it computed, the exceptions to THEME are in THEME, and
+      the light ramp is measured pair by pair. **What is left of stage 4 is
+      § 6**, which is the entry below this one about the device, and cannot be
+      closed by writing anything.
 - [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
       document to read before writing any of it. Scope-approved and bounded by
       [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to
