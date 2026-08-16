@@ -119,7 +119,10 @@ DateTime? firstLoggedDay(WidgetRef ref) {
 }
 
 /// Which movements produced a region's sets, over the selected span.
-final regionExercisesProvider = StreamProvider.family<
+///
+/// `autoDispose`, for [volumeHistoryProvider]'s reason and asserted by the same
+/// test.
+final regionExercisesProvider = StreamProvider.autoDispose.family<
     List<({String exerciseId, String name, int sets})>, MuscleRegion>(
   (ref, region) {
     final db = ref.watch(databaseProvider);
@@ -146,7 +149,16 @@ final regionExercisesProvider = StreamProvider.family<
 /// Watches the same three tables Workouts' bars do, so a set ticked mid-session
 /// moves this week's bar while you are standing in the session — the screens
 /// agree because they read the same rows through the same filters.
-final volumeHistoryProvider = StreamProvider<VolumeHistory>((ref) {
+///
+/// **`autoDispose`, and that is the point.** `set_logs` is the hot table during
+/// a session — one write per set ticked — and this query folds the whole
+/// selected span, which on `All` is the whole log. Kept alive, opening this
+/// screen once meant every set you ticked for the rest of the app's life
+/// re-queried and re-folded that history on the UI isolate, for a screen you
+/// were not looking at. `exerciseProgressProvider` had the same bug; this is
+/// the same fix, and `volume_provider_lifetime_test.dart` is why it cannot come
+/// back (DEBT § 4).
+final volumeHistoryProvider = StreamProvider.autoDispose<VolumeHistory>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);
   final window = ref.watch(volumeWindowProvider);

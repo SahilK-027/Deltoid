@@ -22,17 +22,14 @@ because every weakness below is one that a sync layer *multiplies*:
   three times — then sync's will too, and sync's failures are silent and
   permanent rather than a slow screen. A conflict rule that is only a paragraph
   is a data-loss bug waiting for the second device.
-- **§4, unbounded queries on hot tables.** Sync adds a *second* writer to
-  every syncable table. Today `volumeHistoryProvider` recomputes thirty years on
-  every set you tick; after sync it recomputes on every set another device ticks,
-  arriving in batches, on the UI isolate.
 - **§6, twelve features never used in a gym.** Sync is the point after which
   deleting a feature stops being free — there will be rows of it on a server and
   a migration to write. Everything that should be deleted should be deleted
   first.
 
-The order to work in: **§1** first, then **§4**, then **§6**. §7, §8 and §9 are ongoing rather
-than blocking. §5 is closed — the rule is in RULES § Interface and enforced by
+The order to work in: **§1** first, then **§6**. §7, §8 and §9 are ongoing rather
+than blocking. §4 is closed — the volume providers are `autoDispose` and
+`test/features/volume_provider_lifetime_test.dart` says so. §5 is closed — the rule is in RULES § Interface and enforced by
 `test/core/clamp_bounds_test.dart`. §3, the row-mapping conversions, is closed — the queries whose
 row count grows with the log are raw and covered by
 `test/data/query_conversion_test.dart`, and the ones that stay in drift say in
@@ -81,41 +78,6 @@ mechanism. Roughly in order of value:
 **Done when**: every comment in `lib/` containing the words *bounded*, *never*,
 *must not* or *always* either has an assert/test beside it or has been rewritten
 to stop making a promise nothing keeps.
-
----
-
-## 4. `volumeHistoryProvider` recomputes on every set you tick
-
-The live instance of §1 and §3 together, and worth its own entry because it is
-still true.
-
-```dart
-final volumeHistoryProvider = StreamProvider<VolumeHistory>((ref) { … })
-```
-
-Three facts that are individually fine and jointly bad:
-
-1. It watches `db.setLogs` — **the hot table during a session**, written once per
-   set ticked.
-2. It is **not** `autoDispose`, so once the volume screen has been opened it stays
-   subscribed for the rest of the app's life.
-3. Since `All` was added it is unbounded: 19 478 rows and ~150ms on thirty years.
-
-So: open the volume screen on `All` once, go and train, and every set you tick
-re-queries and re-folds thirty years of history on the UI isolate, for a screen
-you are not looking at.
-
-`exerciseProgressProvider` had exactly this bug and its doc comment now explains
-the fix at length — *"`autoDispose`, and that is the point"*. The lesson was
-learned in one file and not carried to the other.
-
-**What to do.** Either make it `autoDispose` (matching the exercise chart), or
-give it the narrow stream treatment `history_providers.dart` uses —
-`historyShapeChanges()` rather than every `set_logs` write. Probably both.
-
-**Done when**: ticking a set with the volume screen backgrounded runs no volume
-query. A test can assert this the way
-`a set ticked in a live session cannot change the feed` already does.
 
 ---
 
