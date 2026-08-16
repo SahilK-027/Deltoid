@@ -56,6 +56,35 @@ void main() {
     expect(autoGranularityFor(3, Granularity.monthly), Granularity.monthly);
   });
 
+  testWidgets('a box under a pixel tall paints rather than throwing',
+      (tester) async {
+    // The other half of the same bug, and the one DEBT § 5 names: the bar
+    // height was `clamp(1.0, size.height)`, whose lower bound is a constant and
+    // whose upper bound is the layout. A tile shorter than the minimum ink
+    // inverts the pair and `clamp` throws — on every repaint, from inside
+    // `paint`, which is not a frame you can navigate away from.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 138,
+              height: 0.5,
+              child: WeeklyBars(
+                bars: foldWeeks(weeksOf(8), Granularity.weekly),
+                hue: const Color(0xFF00E5FF),
+                height: 0.5,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a single bar in a wide box is still drawn', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

@@ -385,7 +385,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     });
 
     if (detail.entries.isEmpty) return;
-    final page = _page.clamp(0, detail.entries.length - 1);
+    final page = math.max(0, math.min(detail.entries.length - 1, _page));
     final entry = detail.entries[page];
     final saved = await ref
         .read(trainingRepositoryProvider)
@@ -513,7 +513,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
             if (detail.entries.isNotEmpty)
               ExerciseRail(
                 entries: detail.entries,
-                current: _page.clamp(0, detail.entries.length - 1),
+                current:
+                    math.max(0, math.min(detail.entries.length - 1, _page)),
                 onSelect: _goToPage,
                 onAdd: () => _addExercise(detail),
                 onReorder: (ids) {
@@ -1241,7 +1242,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // throws rather than returning anything. Adding the first exercise to an
     // empty session went straight through here.
     if (detail == null || detail.entries.isEmpty) return;
-    final target = index.clamp(0, detail.entries.length - 1);
+    final target = math.max(0, math.min(detail.entries.length - 1, index));
     if (!_pages.hasClients) {
       setState(() => _page = target);
       return;
@@ -1297,7 +1298,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Follow the exercise that was in front of you, wherever it landed.
         final was = current.isEmpty
             ? null
-            : current[_page.clamp(0, current.length - 1)];
+            : current[math.max(0, math.min(current.length - 1, _page))];
         setState(() => _pendingOrder = ids);
         repo.reorderWorkoutExercises(ids);
         final landed = was == null ? -1 : ids.indexOf(was);
@@ -2276,7 +2277,8 @@ class _IndexCell extends StatelessWidget {
     // reached half a chip above the `D` and ended in a rounded shoulder with
     // nothing under it — the same at the foot, around the `+`. Inset by the
     // gap between the two and the cap circumscribes the circle exactly.
-    final inset = ((height - SetRow.indexColumn) / 2).clamp(0.0, height / 2);
+    final inset =
+        math.max(0.0, math.min(height / 2, (height - SetRow.indexColumn) / 2));
 
     return SizedBox(
       width: SetRow.indexColumn,

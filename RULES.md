@@ -333,6 +333,14 @@ rather than looks:
 - **Loading and empty are different states.** A screen with more than one query
   either tells them apart or is rebuilt around a single query. Collapsing them
   renders "nothing here" at data that is merely late.
+- **A painter never clamps to a bound it computed.** `clamp(lower, upper)`
+  throws when `lower > upper`, and a bound computed from a layout that got
+  small or a list that got long inverts exactly that way — inside `paint`, on
+  every repaint, which is not a frame you can navigate away from. One instance
+  killed the volume screen. Write `max(a, min(b, c))`, which cannot throw and
+  says what it means, and keep `clamp` for a pair of literals. Enforced by
+  `test/core/clamp_bounds_test.dart`, which reads `lib/` and fails on a
+  `.clamp(` whose bounds are arithmetic rather than constants.
 - **A widget laid out in a row of siblings may not contain a `LayoutBuilder`.**
   It cannot report an intrinsic dimension, so any parent that asks for one —
   `IntrinsicHeight`, a `Row` sizing itself to its tallest child — throws at

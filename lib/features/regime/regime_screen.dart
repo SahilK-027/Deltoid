@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -105,7 +106,7 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
 
     // A day deleted out from under the strip must not leave the body pointing
     // past the end of it.
-    final day = sessions.isEmpty ? 0 : _day.clamp(0, sessions.length - 1);
+    final day = math.max(0, math.min(sessions.length - 1, _day));
 
     return Scaffold(
       // Pushed, so it wears the bar rather than a masthead (THEME → Components). The

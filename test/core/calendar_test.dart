@@ -54,6 +54,25 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
+  testWidgets('an inverted range opens on a grid rather than throwing',
+      (tester) async {
+    // DEBT § 5: `first` and `last` are the picker's own computed bounds, and a
+    // caller that gets them the wrong way round — a history whose newest
+    // workout predates the window it is being offered — used to hand
+    // `_CalendarCard` a range it cannot page inside. The picker owns the
+    // ordering rather than trusting it.
+    await open(
+      tester,
+      initial: DateTime(2026, 3, 14),
+      first: DateTime(2026, 8, 2),
+      last: DateTime(2026, 1, 1),
+    );
+
+    expect(tester.takeException(), isNull);
+    // Opened on the range's own end rather than on a month outside it.
+    expect(find.text('August 2026'), findsOneWidget);
+  });
+
   testWidgets('picking a day pops it back at midnight', (tester) async {
     DateTime? result;
     await tester.pumpWidget(

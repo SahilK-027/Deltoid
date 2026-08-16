@@ -26,17 +26,14 @@ because every weakness below is one that a sync layer *multiplies*:
   every syncable table. Today `volumeHistoryProvider` recomputes thirty years on
   every set you tick; after sync it recomputes on every set another device ticks,
   arriving in batches, on the UI isolate.
-- **§5, painters that crash on their own geometry.** A pull that lands more rows
-  than the local log has ever held is exactly the input that made the last one
-  throw.
 - **§6, twelve features never used in a gym.** Sync is the point after which
   deleting a feature stops being free — there will be rows of it on a server and
   a migration to write. Everything that should be deleted should be deleted
   first.
 
-The order to work in: **§1 and §5** first (they are the same habit — make the
-rule mechanical), then **§4**, then **§6**. §7, §8 and §9 are ongoing rather
-than blocking. §3, the row-mapping conversions, is closed — the queries whose
+The order to work in: **§1** first, then **§4**, then **§6**. §7, §8 and §9 are ongoing rather
+than blocking. §5 is closed — the rule is in RULES § Interface and enforced by
+`test/core/clamp_bounds_test.dart`. §3, the row-mapping conversions, is closed — the queries whose
 row count grows with the log are raw and covered by
 `test/data/query_conversion_test.dart`, and the ones that stay in drift say in
 a comment why their row count does not grow.
@@ -119,32 +116,6 @@ give it the narrow stream treatment `history_providers.dart` uses —
 **Done when**: ticking a set with the volume screen backgrounded runs no volume
 query. A test can assert this the way
 `a set ticked in a live session cannot change the feed` already does.
-
----
-
-## 5. Painters compute their own bounds and do not defend them
-
-`clamp(lower, upper)` throws when `lower > upper`. That is not a rare edge — it is
-what happens whenever a bound is computed from a layout that got small or a list
-that got long. One instance killed the volume screen. The same pattern is still
-present:
-
-- `volume_history_bars.dart:276` — `(…).clamp(1.0, size.height)` throws if the
-  widget is ever laid out under one logical pixel tall. Not currently reachable
-  because both call sites pass a fixed height, which is exactly what was true of
-  the one that did crash.
-- `calendar.dart:49` — `initial.clamp(firstDay, lastDay)` throws if a caller ever
-  passes a range whose end precedes its start.
-
-**What to do.** Two options, in order of preference. Stop computing bounds that
-can invert — `max(a, min(b, c))` cannot throw and says what it means. Or assert
-the ordering at the top of `paint`, which turns a production crash into a debug
-failure at the moment the bad input is produced.
-
-Worth a rule in RULES.md: *a painter never clamps to a bound it computed.*
-
-**Done when**: no `.clamp(` in `lib/` has a non-constant lower bound, or each one
-that does is preceded by an assert.
 
 ---
 

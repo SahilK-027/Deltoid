@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -284,7 +285,7 @@ class _Months extends StatelessWidget {
     // as *nearly* even, which is worse than either even or obviously not.
     final indices = [
       for (var k = 0; k < count; k++)
-        (((k + 0.5) * n / count) - 0.5).round().clamp(0, n - 1),
+        math.max(0, math.min(n - 1, (((k + 0.5) * n / count) - 0.5).round())),
     ];
 
     List<({int index, double at, String label})> pickedWith(DateFormat f) {

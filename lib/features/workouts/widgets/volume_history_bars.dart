@@ -124,7 +124,8 @@ class _WeeklyBarsState extends State<WeeklyBars>
     final weeks = widget.bars;
     final width = context.size?.width ?? 0;
     if (weeks.isEmpty || width <= 0) return;
-    final i = (dx / width * weeks.length).floor().clamp(0, weeks.length - 1);
+    final i = math.max(
+        0, math.min(weeks.length - 1, (dx / width * weeks.length).floor()));
     if (i == _touched) return;
     setState(() => _touched = i);
     widget.onSelected?.call(weeks[i]);
@@ -272,8 +273,15 @@ class _BarsPainter extends CustomPainter {
       // At least a point of ink for a week that was trained: rounded down, one
       // set against a peak of forty is nothing at all, and a week you trained
       // must never draw as a week you skipped.
+      //
+      // `min(max(…))` rather than `clamp(1.0, size.height)`, and for the reason
+      // the bar width above is written the same way (RULES § Drawing): a
+      // painter never clamps to a bound it computed. A box under a point tall
+      // inverts that pair and `clamp` throws — inside `paint`, on every
+      // repaint. Written this way the minimum ink simply yields to a box that
+      // has less than a point to give.
       final filled =
-          (size.height * sets / scale).clamp(1.0, size.height);
+          math.min(size.height, math.max(1.0, size.height * sets / scale));
       final colour = touched == null || touched == i
           ? hue
           // Untouched bars step back rather than the touched one lighting up,
