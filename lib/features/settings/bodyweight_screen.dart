@@ -88,20 +88,32 @@ final bodyweightSummaryProvider = StreamProvider<BodyweightSummary>((ref) {
 
 /// The entries the chart is drawing, oldest first — the window, not the log.
 ///
-/// The chart never showed more than a year, and the widest window on daily
-/// weighing is 366 points. Filtering the other 17 884 in Dart on every rebuild
-/// was work to throw away.
+/// Filtering the log in Dart on every rebuild was work to throw away, so the
+/// window is the query's. **The window is not always small**: this used to say
+/// the chart never showed more than a year, which stopped being true the day
+/// `All` was added and now asks for `day_key >= 0` — every weigh-in ever, the
+/// same regression `setsByMuscleDaily` had (DEBT § 3). So it reads the two
+/// columns the chart plots positionally off a `QueryRow` rather than hydrating
+/// a whole `BodyweightLog` per point, which is drift's most expensive path and
+/// pays for columns nothing here reads.
 final bodyweightRangeProvider = StreamProvider.autoDispose
-    .family<List<BodyweightLog>, TrendWindow>((ref, window) {
+    .family<List<({int dayKey, double weightKg})>, TrendWindow>((ref, window) {
   final db = ref.watch(databaseProvider);
-  return db.watchQuery([db.bodyweightLogs], () {
-    return (db.select(db.bodyweightLogs)
-          ..where((t) =>
-              t.deletedAt.isNull() &
-              t.dayKey.isBiggerOrEqualValue(window.fromDayKey) &
-              t.dayKey.isSmallerOrEqualValue(window.toDayKey))
-          ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
-        .get();
+  return db.watchQuery([db.bodyweightLogs], () async {
+    final rows = await db.customSelect(
+      'SELECT day_key AS day_key, weight_kg AS weight_kg '
+      'FROM bodyweight_logs WHERE deleted_at IS NULL '
+      'AND day_key BETWEEN ?1 AND ?2 ORDER BY day_key',
+      variables: [
+        Variable.withInt(window.fromDayKey),
+        Variable.withInt(window.toDayKey),
+      ],
+      readsFrom: {db.bodyweightLogs},
+    ).get();
+    return [
+      for (final r in rows)
+        (dayKey: r.read<int>('day_key'), weightKg: r.read<double>('weight_kg')),
+    ];
   });
 });
 
@@ -501,7 +513,8 @@ class _TrendCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Oldest first, which is the direction a chart reads — and the query
-    // already returns only the window, so this is at most a year of days.
+    // returns the window rather than the log, though on `All` those are the
+    // same thing.
     final points = ref.watch(bodyweightRangeProvider(window)).valueOrNull;
     if (points == null) {
       return const AppCard(

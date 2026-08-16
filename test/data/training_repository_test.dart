@@ -15,6 +15,15 @@ import 'package:flutter_test/flutter_test.dart';
 /// does: starter catalog, then a template.
 final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
 
+/// What Today actually asks for: a fixed recent window, not the whole log.
+///
+/// These tests used to pass `0` and mean "everything", which is the shape
+/// `todaySnapshot` now asserts against — an open-ended key there is every
+/// workout ever written, hydrated as whole rows, on every rebuild of the first
+/// screen (DEBT § 3). Nothing here logs further back than a few days, so the
+/// window makes no difference to what comes out.
+int get heatmapWindowKey => dayKeyOf(daysBefore(DateTime.now(), 98));
+
 void main() {
   late AppDatabase db;
   late TrainingRepository repo;
@@ -2270,7 +2279,7 @@ void main() {
 
       expect(await repo.sweepAbandonedWorkouts(), 1);
 
-      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final today = await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
       expect(today.openWorkout, isNull,
           reason: 'a mis-tapped Start blocks every other session behind '
               '"finish the one you are in" until it goes');
@@ -2295,7 +2304,7 @@ void main() {
 
       expect(await repo.sweepAbandonedWorkouts(), 0);
 
-      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final today = await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
       expect(today.openWorkout?.id, id,
           reason: 'trained it and forgot to press Finish is the common case; '
               'deleting a real day to save a tap is not a trade the app makes');
@@ -2311,7 +2320,7 @@ void main() {
 
       expect(await repo.sweepAbandonedWorkouts(), 0);
       expect(
-        (await repo.todaySnapshot(heatmapFromDayKey: 0)).openWorkout?.id,
+        (await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey)).openWorkout?.id,
         id,
       );
     });
@@ -2326,7 +2335,7 @@ void main() {
         sessionId: (await sessionNamed('Pull 1')).id,
       );
 
-      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final today = await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
 
       expect(today.regime?.name, ppl.name);
       expect(today.sessions.map((s) => s.name), contains('Push 1'));
@@ -2351,7 +2360,7 @@ void main() {
         isDone: const Value(true),
       );
 
-      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final today = await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
 
       expect(today.openWorkoutDoneSets, 1);
       expect(today.openWorkoutTotalSets,
@@ -2368,7 +2377,7 @@ void main() {
         () async {
       final bare =
           await RegimeRepository(db).addSession((await activeRegime()).id, 'Bare');
-      final today = await repo.todaySnapshot(heatmapFromDayKey: 0);
+      final today = await repo.todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
       final names = today.exerciseNamesBySession;
 
       // Every session is a key; a session with no slots maps to an empty list,
@@ -2384,7 +2393,7 @@ void main() {
       await ensureStarterCatalog(fresh);
 
       final today = await TrainingRepository(fresh)
-          .todaySnapshot(heatmapFromDayKey: 0);
+          .todaySnapshot(heatmapFromDayKey: heatmapWindowKey);
 
       expect(today.regime, isNull);
       expect(today.status, isNull);

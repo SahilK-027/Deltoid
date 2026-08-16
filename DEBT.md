@@ -22,7 +22,7 @@ because every weakness below is one that a sync layer *multiplies*:
   three times — then sync's will too, and sync's failures are silent and
   permanent rather than a slow screen. A conflict rule that is only a paragraph
   is a data-loss bug waiting for the second device.
-- **§3 and §4, unbounded queries on hot tables.** Sync adds a *second* writer to
+- **§4, unbounded queries on hot tables.** Sync adds a *second* writer to
   every syncable table. Today `volumeHistoryProvider` recomputes thirty years on
   every set you tick; after sync it recomputes on every set another device ticks,
   arriving in batches, on the UI isolate.
@@ -35,8 +35,11 @@ because every weakness below is one that a sync layer *multiplies*:
   first.
 
 The order to work in: **§1 and §5** first (they are the same habit — make the
-rule mechanical), then **§3 and §4**, then **§6**. §7, §8 and §9 are ongoing
-rather than blocking.
+rule mechanical), then **§4**, then **§6**. §7, §8 and §9 are ongoing rather
+than blocking. §3, the row-mapping conversions, is closed — the queries whose
+row count grows with the log are raw and covered by
+`test/data/query_conversion_test.dart`, and the ones that stay in drift say in
+a comment why their row count does not grow.
 
 The gate itself — a pre-push hook and a linter with rules in it — was §2 and is
 done. The numbering below keeps its gap deliberately, because
@@ -81,41 +84,6 @@ mechanism. Roughly in order of value:
 **Done when**: every comment in `lib/` containing the words *bounded*, *never*,
 *must not* or *always* either has an assert/test beside it or has been rewritten
 to stop making a promise nothing keeps.
-
----
-
-## 3. Drift's row mapping is a performance trap, and it is still set
-
-Reading rows through drift's `TypedResult.read` costs about **14µs per row** —
-it resolves the expression to a column name on every call. Measured on this
-project's own data, the same 5 496 rows cost:
-
-| path | cost |
-| --- | --- |
-| `readTable` (whole row objects) | ~120ms |
-| `TypedResult.read` (selected columns) | ~90ms |
-| `QueryRow` read positionally (raw SQL) | **~16ms** |
-
-Two hot paths have been converted — `exerciseProgress` and `setsByMuscleDaily`,
-each about 5× — but **34 other call sites** of `selectOnly` / `readTable` remain
-in `lib/data/repositories/` and `lib/features/`. Most are fine: they read tens of
-rows, and raw SQL would trade compile-time column checking for speed nobody
-needs. The dangerous ones are the queries whose row count grows with the size of
-the log.
-
-**What to do.** Audit by *growth*, not by frequency. For each query in
-`training_repository.dart`, answer: does its row count grow with years of
-training? If yes, it is on this list. Convert only those, and only with a test
-asserting the output is identical to the drift version first — both conversions
-so far were verified that way before the old path was deleted.
-
-Note the trade being made: raw SQL gives up compile-time column names, so a
-renamed column compiles and fails on a device. Both converted queries have a
-test that reads every column back for exactly this reason. Keep that rule.
-
-**Done when**: every unbounded query in the repository is either converted or has
-a comment saying why it does not need to be — with an assert enforcing the bound
-it claims (see §1).
 
 ---
 
@@ -278,14 +246,6 @@ cover them, or write the exception down.
 
 ## 9. Smaller things, unranked
 
-- **`pastPerformances` still builds a `WHERE … IN (…)` with one parameter per
-  performance** (`training_repository.dart:1370`). The chart no longer uses it,
-  but prefill still does, at `limit: 60` — safe today, and the same latent shape
-  as the query that had to be rewritten. It is one `limit: null` away from being
-  a two-thousand-parameter statement again.
-- **`analysis_options.yaml` has no `unawaited_futures`.** In a codebase this full
-  of `Future`-returning repository calls, a dropped `await` is a write that
-  silently does not happen.
 - **No test asserts the light theme.** THEME defines a full light ramp and every
   widget test builds `Brightness.dark`. Contrast bugs in light mode are currently
   invisible to CI that does not exist (§2).

@@ -599,6 +599,17 @@ class TrainingRepository {
   /// [heatmapFromDayKey] bounds the consistency grid; the caller owns how far
   /// back it looks.
   Future<TodaySnapshot> todaySnapshot({required int heatmapFromDayKey}) async {
+    // The heat query below hydrates whole `Workout` rows, which is affordable
+    // only because the window is a fixed thirteen weeks — the exact shape DEBT
+    // § 3 is about, and § 1's answer to it: state the bound where it can fail
+    // rather than in a comment nothing checks. An open-ended key here is every
+    // workout ever written, once per rebuild of Today.
+    assert(
+      heatmapFromDayKey >=
+          dayKeyOf(DateTime.now().subtract(const Duration(days: 400))),
+      "Today's heatmap is a fixed recent window, not the whole log: "
+      '$heatmapFromDayKey is more than a year back',
+    );
     final regimeQuery = db.select(db.regimes)
       ..where((t) => t.isActive.equals(true) & t.deletedAt.isNull())
       ..orderBy([
@@ -716,26 +727,35 @@ class TrainingRepository {
   /// rings on the calendar.
   ///
   /// Aggregated in SQL rather than folded in Dart. The grid needs three facts
-  /// about a day and [allCompleted] was handing over every column of every
+  /// about a day and the query this replaced — a plain select of every
+  /// completed workout, since deleted — was handing over every column of every
   /// workout to get them: fifty years is a few thousand rows, each one
   /// serialised across the database isolate's port and rebuilt as an object on
   /// the UI isolate, to be thrown away the moment the day it belongs to had
   /// been counted. That transfer is the hitch you feel when Consistency opens.
+  ///
+  /// **Raw, and unbounded is why.** Its row count is one per day you have ever
+  /// trained, so it is the shape DEBT § 3 asks about: at four grouped columns
+  /// per row through drift's `TypedResult.read` — 14µs a call — a long history
+  /// spends most of Consistency's open inside the row mapper rather than inside
+  /// SQLite. Read positionally off a `QueryRow` the same rows and the same
+  /// numbers cost a fraction of it; see [exerciseProgress], where the
+  /// measurement was taken. The price is that a renamed column compiles and
+  /// fails on a device, so `query_conversion_test.dart` reads every column this
+  /// names, and holds it against the drift query it replaced.
   Future<List<LoggedDay>> loggedDays() async {
-    final counted = db.workouts.id.count();
-    // Any workout on the day, so a ringed day on the calendar has something to
-    // open. `max` because it has to be *some* deterministic one.
-    final anyId = db.workouts.id.max();
-    // Stored as an integer, so the max is "was any of them a deload".
-    final deload = db.workouts.isDeload.cast<int>().max();
-
-    final rows = await (db.selectOnly(db.workouts)
-          ..addColumns([db.workouts.dayKey, counted, anyId, deload])
-          ..where(db.workouts.status.equalsValue(WorkoutStatus.completed) &
-              db.workouts.deletedAt.isNull())
-          ..groupBy([db.workouts.dayKey])
-          ..orderBy([OrderingTerm(expression: db.workouts.dayKey)]))
-        .get();
+    final rows = await db.customSelect(
+      'SELECT day_key AS day_key, COUNT(id) AS n, '
+      // Any workout on the day, so a ringed day on the calendar has something
+      // to open. `max` because it has to be *some* deterministic one.
+      'MAX(id) AS any_id, '
+      // Stored as an integer, so the max is "was any of them a deload".
+      'MAX(is_deload) AS deload '
+      'FROM workouts '
+      "WHERE status = 'completed' AND deleted_at IS NULL "
+      'GROUP BY day_key ORDER BY day_key',
+      readsFrom: {db.workouts},
+    ).get();
 
     return [
       for (final r in rows)
@@ -745,12 +765,12 @@ class TrainingRepository {
         // landed on a screen saying the session was gone. `max(id)` over a
         // group that produced a row cannot actually be null — the guard is for
         // the shape of the answer, not for a case anyone has seen.
-        if (r.read(anyId) != null)
+        if (r.readNullable<String>('any_id') != null)
           LoggedDay(
-            dayKey: r.read(db.workouts.dayKey)!,
-            workouts: r.read(counted) ?? 0,
-            isDeload: (r.read(deload) ?? 0) != 0,
-            anyWorkoutId: r.read(anyId)!,
+            dayKey: r.read<int>('day_key'),
+            workouts: r.readNullable<int>('n') ?? 0,
+            isDeload: (r.readNullable<int>('deload') ?? 0) != 0,
+            anyWorkoutId: r.read<String>('any_id'),
           ),
     ];
   }
@@ -772,6 +792,11 @@ class TrainingRepository {
   ///   `domain/consistency.dart` already made for the heatmap. The chart is
   ///   where deloads are excluded, because an e1RM off 80% describes the
   ///   programme rather than you.
+  ///
+  /// Left in drift deliberately: the `GROUP BY` is on the muscle, so this
+  /// returns one row per muscle group — twelve, whatever the history behind
+  /// them weighs. Row mapping is only a cost when the row count grows with the
+  /// log, and the count here is a property of the enum.
   Future<Map<MuscleGroup, int>> setsByMuscleSince(int fromDayKey) async {
     final counted = db.setLogs.id.count();
     final muscle = _loggedMuscle;
@@ -934,6 +959,10 @@ class TrainingRepository {
   /// label, and a list showing both would be the rename failing rather than
   /// history being preserved. What a movement *trained* is a fact about the
   /// session; what it is *called* is a fact about now.
+  ///
+  /// Drift, for [setsByMuscleSince]'s reason: grouped by movement, so the row
+  /// count is bounded by the catalog — a couple of hundred at the outside —
+  /// rather than by the number of sets counted into it.
   Future<List<({String exerciseId, String name, int sets})>> setsByExercise({
     required int fromDayKey,
     required int toDayKey,
@@ -969,24 +998,12 @@ class TrainingRepository {
   ///
   /// What the year picker offers is built from this: a year with nothing in it
   /// is a year the picker has no business listing.
+  ///
+  /// One row, by construction: `MIN` over the whole log.
   Future<int?> firstLoggedDayKey() async {
     final oldest = db.workouts.dayKey.min();
     final row = await (_volumeQuery()..addColumns([oldest])).getSingleOrNull();
     return row?.read(oldest);
-  }
-
-  /// Every completed workout, oldest first.
-  ///
-  /// Deliberately separate from [todaySnapshot]: Today only ever needs the last
-  /// thirteen weeks, and loading a decade of rows to render three months of grid
-  /// would be a tax paid on every write to any of six tables.
-  Future<List<Workout>> allCompleted() {
-    return (db.select(db.workouts)
-          ..where((t) =>
-              t.status.equalsValue(WorkoutStatus.completed) &
-              t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
-        .get();
   }
 
   /// The session template as the diff wants it: exercise id and name, in order.
@@ -1338,78 +1355,107 @@ class TrainingRepository {
     return merged;
   }
 
+  /// **Raw, and the gather is why.** This is unbounded at `limit: null` and
+  /// used to hydrate whole `WorkoutExercise`, `Workout` and `Session` rows to
+  /// read eight columns of them, then collect their sets with
+  /// `WHERE workout_exercise_id IN (…)` — one bound parameter per performance,
+  /// which on a long history is a statement thousands of variables wide, built
+  /// and bound on the UI isolate (DEBT § 9). The slot list is now a subquery
+  /// inside the set statement instead: the same predicate text, built once
+  /// below so the two statements cannot drift apart, and four bound parameters
+  /// however long the history gets.
+  ///
+  /// The price is a renamed column that compiles and fails on a device, so
+  /// `query_conversion_test.dart` reads every column named here and holds the
+  /// result against the drift queries this replaced.
   Future<List<PastPerformance>> _performances(
     String exerciseId, {
     required int? limit,
     String? excludeWorkoutId,
     String? sessionId,
   }) async {
-    final q = db.select(db.workoutExercises).join([
-      innerJoin(db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
-      leftOuterJoin(db.sessions, db.sessions.id.equalsExp(db.workouts.sessionId)),
-    ])
-      ..where(db.workoutExercises.exerciseId.equals(exerciseId) &
-          db.workoutExercises.deletedAt.isNull() &
-          db.workouts.deletedAt.isNull() &
-          db.workouts.status.equalsValue(WorkoutStatus.completed))
-      ..orderBy([OrderingTerm(expression: db.workouts.startedAt, mode: OrderingMode.desc)]);
-    if (limit != null) q.limit(limit);
+    // `?2` and `?3` are the optional predicates, passed as null when they do
+    // not apply so the statement text — and so SQLite's compiled-statement
+    // cache entry — is the same one every call.
+    final where = 'we.exercise_id = ?1 AND we.deleted_at IS NULL '
+        "AND wo.deleted_at IS NULL AND wo.status = 'completed' "
+        'AND (?2 IS NULL OR wo.id <> ?2) '
+        'AND (?3 IS NULL OR wo.session_id = ?3) ';
+    // A null limit is the whole history — see [pastPerformances]. SQLite reads
+    // a negative limit as no limit, which keeps the text constant too.
+    const order = 'ORDER BY wo.started_at DESC LIMIT ?4';
+    final variables = [
+      Variable.withString(exerciseId),
+      Variable<String>(excludeWorkoutId),
+      Variable<String>(sessionId),
+      Variable.withInt(limit ?? -1),
+    ];
 
-    if (excludeWorkoutId != null) {
-      q.where(db.workouts.id.equals(excludeWorkoutId).not());
-    }
-    if (sessionId != null) {
-      q.where(db.workouts.sessionId.equals(sessionId));
-    }
-
-    final rows = await q.get();
+    final rows = await db.customSelect(
+      'SELECT we.id AS slot_id, we.skip_reason AS skip_reason, '
+      'wo.id AS workout_id, wo.session_id AS session_id, '
+      'wo.day_key AS day_key, wo.started_at AS started_at, '
+      'wo.is_deload AS is_deload, se.name AS session_name '
+      'FROM workout_exercises we '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'LEFT JOIN sessions se ON se.id = wo.session_id '
+      'WHERE $where$order',
+      variables: variables,
+      readsFrom: {db.workoutExercises, db.workouts, db.sessions},
+    ).get();
     if (rows.isEmpty) return const [];
 
-    final weIds = rows.map((r) => r.readTable(db.workoutExercises).id).toList();
-    final setRows = await (db.select(db.setLogs)
-          ..where((t) => t.workoutExerciseId.isIn(weIds) & t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
-        .get();
+    // The same slots again as a subquery rather than as a list of ids: the
+    // window is expressed once in SQL instead of once per row in parameters.
+    final setRows = await db.customSelect(
+      'SELECT s.workout_exercise_id AS slot_id, s.set_type AS set_type, '
+      's.weight AS weight, s.reps AS reps, s.partial_reps AS partial_reps, '
+      's.added_weight AS added_weight, s.parent_set_id AS parent_set_id, '
+      's.is_done AS is_done '
+      'FROM set_logs s WHERE s.deleted_at IS NULL '
+      'AND s.workout_exercise_id IN ('
+      'SELECT we.id FROM workout_exercises we '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'WHERE $where$order) '
+      'ORDER BY s.set_index',
+      variables: variables,
+      readsFrom: {db.setLogs, db.workoutExercises, db.workouts},
+    ).get();
 
-    final setsByWe = <String, List<SetLog>>{};
+    final setsByWe = <String, List<PastSet>>{};
     for (final s in setRows) {
-      setsByWe.putIfAbsent(s.workoutExerciseId, () => []).add(s);
+      // Ticked sets only, as before: a planned row is not a performance.
+      if (!s.read<bool>('is_done')) continue;
+      setsByWe.putIfAbsent(s.read<String>('slot_id'), () => []).add(PastSet(
+            type: SetType.values.byName(s.read<String>('set_type')),
+            weight: s.readNullable<double>('weight'),
+            reps: s.readNullable<int>('reps'),
+            partialReps: s.readNullable<int>('partial_reps'),
+            addedWeight: s.readNullable<double>('added_weight'),
+            isLeg: s.readNullable<String>('parent_set_id') != null,
+          ));
     }
 
     return [
       for (final r in rows)
         () {
-          final we = r.readTable(db.workoutExercises);
-          final w = r.readTable(db.workouts);
-          final session = r.readTableOrNull(db.sessions);
-          final sets = setsByWe[we.id] ?? const <SetLog>[];
+          final slotId = r.read<String>('slot_id');
           return PastPerformance(
-            workoutId: w.id,
-            slotId: we.id,
-            sessionId: w.sessionId,
-            sessionName: session?.name ?? 'Ad-hoc',
-            dayKey: w.dayKey,
-            startedAt: w.startedAt,
-            isDeload: w.isDeload,
+            workoutId: r.read<String>('workout_id'),
+            slotId: slotId,
+            sessionId: r.readNullable<String>('session_id'),
+            sessionName: r.readNullable<String>('session_name') ?? 'Ad-hoc',
+            dayKey: r.read<int>('day_key'),
+            startedAt: r.read<int>('started_at'),
+            isDeload: r.read<bool>('is_deload'),
             // Sets logged before the exercise was marked skipped did happen:
             // two sets then a bad shoulder is two real sets. They stay
             // eligible here *and* are shown under the skip pill in history, so
             // there is one story rather than two. This used to be decided by
             // accident — nothing read skipReason, and the empty-sets check did
             // the filtering.
-            skipReason: we.skipReason,
-            sets: [
-              for (final s in sets)
-                if (s.isDone)
-                  PastSet(
-                    type: s.setType,
-                    weight: s.weight,
-                    reps: s.reps,
-                    partialReps: s.partialReps,
-                    addedWeight: s.addedWeight,
-                    isLeg: s.parentSetId != null,
-                  ),
-            ],
+            skipReason: SkipReason.values.byName(r.read<String>('skip_reason')),
+            sets: setsByWe[slotId] ?? const <PastSet>[],
           );
         }(),
     ];
@@ -1440,6 +1486,15 @@ class TrainingRepository {
     String? regimeId,
     bool deloadOnly = false,
   }) async {
+    // **Bounded by the page, not by the log** — the answer DEBT § 3 asks every
+    // repository query for. It stays drift rather than raw because its row
+    // count is what the user has scrolled into view; the `IN (…)` gathers below
+    // are one bound parameter per row of *that*. The ceiling is not a product
+    // rule, it is the assert § 1 asks for: a limit this large is a paging bug
+    // upstream, and this is where it becomes visible instead of becoming a
+    // statement thousands of variables wide.
+    assert(limit > 0 && limit <= 5000,
+        'the feed pages by keyset — $limit rows is a paging bug, not a page');
     var predicate = db.workouts.status.equalsValue(WorkoutStatus.completed) &
         db.workouts.deletedAt.isNull();
     // Filters go in the query, never over the loaded page: History pages by
@@ -1524,6 +1579,10 @@ class TrainingRepository {
 
   /// Every exercise with at least one logged performance, most recently trained
   /// first. The index for the per-exercise history views.
+  ///
+  /// Drift rather than raw: grouped by exercise, so this returns one row per
+  /// movement ever trained and the catalog bounds it. Years of training make
+  /// the counts bigger, not the result longer.
   Future<List<ExerciseHistorySummary>> exercisesWithHistory() async {
     final performed = db.workoutExercises.id.count();
     final lastDay = db.workouts.dayKey.max();
@@ -1572,6 +1631,10 @@ class TrainingRepository {
   /// regime's sessions would omit every day you trained under the split you
   /// stopped running, which is precisely the history worth filtering; one built
   /// from all sessions ever created would offer days that return an empty list.
+  ///
+  /// Grouped by session, so the row count is the number of training days you
+  /// have ever run — a handful per regime — rather than the number of workouts
+  /// behind them. Drift is the right cost at that size.
   Future<List<LoggedSession>> loggedSessions() async {
     final logged = db.workouts.id.count();
     final lastDay = db.workouts.dayKey.max();
@@ -1625,6 +1688,10 @@ class TrainingRepository {
     int limit = 20,
     HistoryCursor? olderThan,
   }) async {
+    // Bounded by the page for the reasons [workoutFeed] gives, and asserted for
+    // the same one: the set gather below binds one parameter per row returned.
+    assert(limit > 0 && limit <= 5000,
+        'this list pages by keyset — $limit rows is a paging bug, not a page');
     // A slot with nothing ticked in it and no reason given is not a
     // performance: it is a row that was on the screen. Left in, it drew a card
     // reading "Nothing logged" with a dash where the weight goes — most easily
@@ -1734,12 +1801,24 @@ class TrainingRepository {
   }
 
   /// Bodyweight history, used to score bodyweight and BW+ lifts.
+  ///
+  /// **Raw, and unbounded is why.** One row per day ever weighed, growing for
+  /// as long as the app is used, and it was hydrating whole `BodyweightLog` row
+  /// objects — every column, sync bookkeeping included — to read two of them.
+  /// Whole rows are the most expensive of drift's three read paths (~120ms per
+  /// five thousand rows against ~16ms positional), and this is on the path of
+  /// every bodyweight and BW+ chart. Covered field by field, against the drift
+  /// query it replaced, in `query_conversion_test.dart`.
   Future<List<({int dayKey, double weightKg})>> bodyweightSeries() async {
-    final rows = await (db.select(db.bodyweightLogs)
-          ..where((t) => t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
-        .get();
-    return [for (final r in rows) (dayKey: r.dayKey, weightKg: r.weightKg)];
+    final rows = await db.customSelect(
+      'SELECT day_key AS day_key, weight_kg AS weight_kg '
+      'FROM bodyweight_logs WHERE deleted_at IS NULL ORDER BY day_key',
+      readsFrom: {db.bodyweightLogs},
+    ).get();
+    return [
+      for (final r in rows)
+        (dayKey: r.read<int>('day_key'), weightKg: r.read<double>('weight_kg')),
+    ];
   }
 
   /// A bodyweight entry is an input to every bodyweight and BW+ score, not a
