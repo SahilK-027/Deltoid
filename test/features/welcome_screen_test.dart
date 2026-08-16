@@ -6,6 +6,7 @@ import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/repairs.dart';
 import 'package:deltoid/data/sync/sync_auth.dart';
+import 'package:deltoid/features/welcome/curl_illustration.dart';
 import 'package:deltoid/features/welcome/welcome_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,18 @@ void main() {
 
   Future<int> catalogSize() async =>
       (await db.select(db.exercises).get()).length;
+
+  /// A few frames, rather than `pumpAndSettle`.
+  ///
+  /// The drawing cycles its hue on a repeating timer, so this screen never
+  /// settles by design — `pumpAndSettle` waits for a quiet frame that will not
+  /// come. See `CurlIllustration`, and THEME → the threshold screen for why a
+  /// loop is allowed here.
+  Future<void> beats(WidgetTester tester, [int n = 6]) async {
+    for (var i = 0; i < n; i++) {
+      await tester.pump(const Duration(milliseconds: 120));
+    }
+  }
 
   Future<void> pump(WidgetTester tester, {SyncAuth? auth}) async {
     await tester.pumpWidget(
@@ -90,19 +103,21 @@ void main() {
     testWidgets('asks one question, and offers both answers', (tester) async {
       await pump(tester);
 
-      expect(find.text('Back up to your Google account'), findsOneWidget);
-      expect(find.text('Use without an account'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue on this phone'), findsOneWidget);
       // One screen, never two.
       expect(find.byType(PageView), findsNothing);
-      // The mark, and no second drawn object under it — THEME → Illustration.
+      // The wordmark, and the one drawing the app has — see THEME →
+      // Illustration, which allows exactly one, on this screen.
       expect(find.byType(Image), findsOneWidget);
+      expect(find.byType(CurlIllustration), findsOneWidget);
     });
 
     testWidgets('declining is a real answer and seeds the catalog',
         (tester) async {
       await pump(tester);
-      await tester.tap(find.text('Use without an account'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue on this phone'));
+      await beats(tester);
 
       expect(await welcomeAnswered(db), isTrue);
       expect(await catalogSize(), greaterThan(0),
@@ -114,8 +129,8 @@ void main() {
       final auth = _FakeAuth();
       await pump(tester, auth: auth);
 
-      await tester.tap(find.text('Back up to your Google account'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue with Google'));
+      await beats(tester);
 
       expect(auth.signInCalls, 1);
       expect(await welcomeAnswered(db), isTrue);
@@ -127,21 +142,21 @@ void main() {
       final auth = _FakeAuth(cancel: true);
       await pump(tester, auth: auth);
 
-      await tester.tap(find.text('Back up to your Google account'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue with Google'));
+      await beats(tester);
 
       expect(await welcomeAnswered(db), isFalse,
           reason: 'closing Google\'s sheet answers Google, not this screen');
       expect(await catalogSize(), 0);
       // And the button is live again rather than stuck saying "Signing in".
-      expect(find.text('Back up to your Google account'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('a sign-in that fails says so and asks again', (tester) async {
       final auth = _FakeAuth(fail: 'No signal.');
       await pump(tester, auth: auth);
 
-      await tester.tap(find.text('Back up to your Google account'));
+      await tester.tap(find.text('Continue with Google'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -153,7 +168,7 @@ void main() {
       final auth = _FakeAuth(hold: true);
       await pump(tester, auth: auth);
 
-      await tester.tap(find.text('Back up to your Google account'));
+      await tester.tap(find.text('Continue with Google'));
       await tester.pump();
       // The label has changed, so this taps the disabled button underneath it.
       await tester.tap(find.text('Signing in'));
@@ -162,7 +177,7 @@ void main() {
       expect(auth.signInCalls, 1);
 
       auth.release();
-      await tester.pumpAndSettle();
+      await beats(tester);
     });
   });
 }

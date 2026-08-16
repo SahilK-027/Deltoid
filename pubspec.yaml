@@ -52,6 +52,7 @@ dependencies:
   supabase_flutter: ^2.17.2
   google_sign_in: ^7.2.0
   crypto: ^3.0.7
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -83,6 +84,12 @@ flutter:
     # in design/ and are deliberately not bundled.
     - assets/brand/mark_white.png
     - assets/brand/mark_ink.png
+    # Google's own `G`, from their public branding assets. Used on the one
+    # control that opens Google's own sign-in sheet, which is the use it exists
+    # for. Not part of the app's palette and never mixed with it.
+    - assets/brand/google_g.svg
+    - assets/brand/curl_line.svg
+    - assets/brand/curl_mass.svg
 
   # Inter 4.1 (SIL OFL 1.1, see assets/fonts/OFL.txt). Static instances only —
   # a variable font declared under a `weight:` key renders at its default

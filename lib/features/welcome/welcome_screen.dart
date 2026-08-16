@@ -7,29 +7,27 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/toast.dart';
 import '../../data/sync/sync_auth.dart';
+import 'curl_illustration.dart';
+import 'google_mark.dart';
 
 /// One screen, one question, asked once.
-///
-/// [THEME.md](THEME.md) permits exactly one illustrated page and this is it —
-/// and it stays inside the rule banning an illustrated intro only while all of
-/// this holds: one screen and never two, one question and not about training,
-/// declining given equal standing, seen once, and the outcome named before the
-/// question is put.
 ///
 /// The question is where the history is kept, which is the only thing about the
 /// user this app cannot infer. It is deliberately **not** a wizard step in front
 /// of building a programme: the user is the planner, and nothing here asks
 /// about training.
 ///
-/// Top to bottom: the mark, a display line, a body line, the primary button, an
-/// `OR` rule, the decline action. The only centred display line in the app,
-/// which is what makes this read as a threshold rather than a page.
+/// **A threshold, not a page**, and THEME grants it four things it grants
+/// nowhere else — see THEME → the threshold screen for all four and why. Two
+/// equal buttons rather than one primary and a text link, pill-shaped rather
+/// than `Radii.control`, a wordmark above the fold, and Google's own four
+/// colours on the control that opens Google's own sheet.
 ///
-/// **The mark is the whole of the picture**, at the size a drawing would have
-/// been. It is already a drawn shape in one ink that inverts with the theme, so
-/// a second drawn object under it was one drawing too many on a page whose
-/// whole job is to ask one question — see THEME → Illustration, which now
-/// records that no screen carries one.
+/// Top to bottom: the wordmark, the mark at the size a drawing would have been,
+/// a display line, the two answers, and one paragraph saying what each does.
+/// Nothing is centred on the page as a whole — the wordmark sits at the top,
+/// the answers at the bottom, and the mark takes the space between, which is
+/// what makes it read as a door rather than as a form.
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -37,7 +35,44 @@ class WelcomeScreen extends ConsumerStatefulWidget {
   ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
+    with SingleTickerProviderStateMixin {
+  /// The screen arrives rather than appearing.
+  ///
+  /// THEME's motion rule is that motion *confirms a change and never performs*,
+  /// and an entrance is a performance — see THEME → the threshold screen, which
+  /// grants it here and nowhere else. What it buys is worth the exception: this
+  /// is the first frame of the app anyone ever sees, there is nothing on screen
+  /// to confirm yet, and a page that assembles itself in front of you reads as
+  /// something being made for you rather than a form being presented to you.
+  ///
+  /// One shot, 620ms, never replayed. The mark settles first and the rest
+  /// follows it up the page, each part a beat behind the last.
+  late final AnimationController _entrance = AnimationController(
+    duration: const Duration(milliseconds: 620),
+    vsync: this,
+  )..forward();
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  /// One part's share of the entrance: [order] beats in, over [span] of it.
+  Animation<double> _step(int order) {
+    const beat = 0.11;
+    final start = (order * beat).clamp(0.0, 0.7);
+    return CurvedAnimation(
+      parent: _entrance,
+      curve: Interval(
+        start,
+        (start + 0.5).clamp(0.0, 1.0),
+        curve: Motion.emphasized,
+      ),
+    );
+  }
+
   /// True from the tap until the account is signed in or the sheet is closed.
   ///
   /// The one thing on this screen that waits on a network, and the reason it
@@ -79,88 +114,125 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Widget build(BuildContext context) {
     final c = context.c;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final mark = dark
+        ? 'assets/brand/mark_white.png'
+        : 'assets/brand/mark_ink.png';
 
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            // Generous vertical space, and centred — until the screen is short
-            // enough that centring would crop it, at which point it scrolls.
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.gutter,
-              vertical: Space.xxl,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - Space.xxl * 2,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Image.asset(
-                      // Two inks rather than a tint, because the mark is a
-                      // drawn shape with soft edges: colouring the white one
-                      // through a filter would harden every one of them.
-                      dark
-                          ? 'assets/brand/mark_white.png'
-                          : 'assets/brand/mark_ink.png',
-                      height: 132,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.xxl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Space.lg),
+              // The wordmark: small, centred, and the only place the app says
+              // its own name. Everywhere else the name is the launcher icon and
+              // the header band.
+              _Arrive(
+                step: _step(0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      mark,
+                      height: 18,
                       filterQuality: FilterQuality.high,
                     ),
-                  ),
-                  const SizedBox(height: Space.xxxl),
-                  Text(
-                    'Keep your training',
-                    textAlign: TextAlign.center,
-                    style: context.t.displayLarge,
-                  ),
-                  const SizedBox(height: Space.md),
-                  Text(
-                    // The outcome, not the mechanism. Nobody wants a sync; they
-                    // want the four years of training to survive the phone.
-                    'Sign in and your training survives a lost phone. It is '
-                    'already there on the next one.',
-                    textAlign: TextAlign.center,
-                    style: context.t.bodyMedium,
-                  ),
-                  const SizedBox(height: Space.xxxl),
-                  PrimaryButton(
-                    label: _signingIn
-                        ? 'Signing in'
-                        : 'Back up to your Google account',
-                    // Disabled while the sheet is up, so a second tap cannot
-                    // open a second one behind the first.
-                    onPressed: _signingIn ? null : _signIn,
-                  ),
-                  const SizedBox(height: Space.xl),
-                  _Or(c: c),
-                  const SizedBox(height: Space.xl),
-                  // **Equal standing.** A plain text action at the size the
-                  // primary is labelled at, in the primary ink, dead centre —
-                  // not a grey `Skip` in a corner, not small print. Declining
-                  // is a real answer and Settings offers the same connection
-                  // later, so nothing here needs to argue with it.
-                  Center(
-                    child: Pressable(
-                      onTap: _signingIn ? null : _decline,
-                      scale: 0.96,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: Space.lg,
-                          vertical: Space.md,
-                        ),
-                        child: Text(
-                          'Use without an account',
-                          style: context.t.titleMedium,
-                        ),
+                    const SizedBox(width: Space.sm),
+                    Text('Deltoid', style: context.t.titleMedium),
+                  ],
+                ),
+              ),
+
+              // The drawing takes whatever is left between the wordmark and
+              // the answers, rather than a fixed height: on a short phone it
+              // scales down instead of pushing the buttons off the bottom.
+              const SizedBox(height: Space.xxl),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _step(1),
+                  builder: (context, child) {
+                    final t = _step(1).value.clamp(0.0, 1.0);
+                    return Opacity(
+                      opacity: t,
+                      // Settles down to its size rather than growing into it: a
+                      // shape that ends on 1.0 from above has landed, one that
+                      // arrives from below is still going somewhere.
+                      child: Transform.scale(
+                        scale: 1 + 0.04 * (1 - t),
+                        child: child,
                       ),
+                    );
+                  },
+                  child: const Center(
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: CurlIllustration(),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: Space.xl),
+              _Arrive(
+                step: _step(2),
+                child: Text(
+                  // What the app is, in one line, rather than what this screen
+                  // does. The screen's own question is answered by the two
+                  // buttons under it, and a line asking it as well would be the
+                  // same fact twice (THEME rule 6).
+                  'A training log that keeps every session apart',
+                  textAlign: TextAlign.center,
+                  style: context.t.displaySmall?.copyWith(height: 1.25),
+                ),
+              ),
+              const SizedBox(height: Space.xxl),
+
+              _Arrive(
+                step: _step(3),
+                child: _ThresholdButton(
+                  label: _signingIn ? 'Signing in' : 'Continue with Google',
+                  icon: const GoogleMark(),
+                  // Disabled while Google's sheet is up, so a second tap cannot
+                  // open a second one behind the first.
+                  onTap: _signingIn ? null : _signIn,
+                ),
+              ),
+              const SizedBox(height: Space.md),
+              // **Equal standing**, which on this screen means an equal button
+              // rather than a text link under a louder one. Declining is a real
+              // answer: Settings offers the same connection later, and nothing
+              // ever asks again.
+              _Arrive(
+                step: _step(4),
+                child: _ThresholdButton(
+                  label: 'Continue on this phone',
+                  icon: Icon(
+                    Icons.smartphone_rounded,
+                    size: 19,
+                    color: c.onAccent,
+                  ),
+                  onTap: _signingIn ? null : _decline,
+                ),
+              ),
+              const SizedBox(height: Space.xl),
+              _Arrive(
+                step: _step(5),
+                child: Text(
+                  // Both outcomes, in the order the buttons are in, each in terms
+                  // of what happens to the *training* rather than to the data.
+                  'Signing in copies your training to your Google account, so a '
+                  'lost phone is not a lost history. Either way the app works '
+                  'offline, and you can connect later in Settings.',
+                  textAlign: TextAlign.center,
+                  style: context.t.bodySmall?.copyWith(
+                    color: c.textTertiary,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: Space.lg),
+            ],
           ),
         ),
       ),
@@ -168,33 +240,84 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   }
 }
 
-/// A hairline either side of the word, which is the only place in the app a
-/// rule carries a label. It separates two answers rather than decorating them:
-/// without it the text action reads as a footnote to the button above it.
-class _Or extends StatelessWidget {
-  const _Or({required this.c});
+/// One part of the entrance: it fades up and rises a little into place.
+///
+/// A rise of 10 rather than 24 — the page is arriving, not sliding in from
+/// somewhere. Anything further reads as a transition between two screens.
+class _Arrive extends StatelessWidget {
+  const _Arrive({required this.step, required this.child});
 
-  final DeltoidColors c;
+  final Animation<double> step;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: step,
+    builder: (context, child) => Opacity(
+      opacity: step.value.clamp(0.0, 1.0),
+      child: Transform.translate(
+        offset: Offset(0, 10 * (1 - step.value)),
+        child: child,
+      ),
+    ),
+    child: child,
+  );
+}
+
+/// The threshold screen's answer button: a full-width pill, `accent` fill, glyph
+/// left of a centred label.
+///
+/// Local to this screen on purpose. It is not a [PrimaryButton] with a rounder
+/// corner — it is the shape a *choice between two equals* takes, and the app has
+/// exactly one screen that offers one. Promoting it to the design system would
+/// invite a second screen to use it, and a second screen would have a primary
+/// action and a secondary one, which is what [PrimaryButton] and
+/// [SecondaryButton] already say properly.
+class _ThresholdButton extends StatelessWidget {
+  const _ThresholdButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final Widget icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final line = Expanded(child: Container(height: 1, color: c.border));
-    return Row(
-      children: [
-        line,
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Space.md),
-          child: Text(
-            // The one uppercase label outside a page eyebrow — see
-            // THEME → the welcome screen, which spells this rule `OR`. It is a
-            // separator rather than a heading, and lowercase at 11sp between
-            // two hairlines reads as a word someone forgot to finish.
-            'OR',
-            style: context.t.labelSmall?.copyWith(color: c.textTertiary),
-          ),
+    final c = context.c;
+    final enabled = onTap != null;
+
+    return Pressable(
+      onTap: onTap,
+      scale: 0.975,
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          color: enabled ? c.accent : c.surfaceHigh,
+          borderRadius: BorderRadius.circular(Radii.pill),
         ),
-        line,
-      ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Dimmed rather than removed while a sign-in is in flight: the row
+            // must not change width, or the label shifts as it changes.
+            Opacity(opacity: enabled ? 1 : 0.4, child: icon),
+            const SizedBox(width: Space.md),
+            Flexible(
+              child: Text(
+                label,
+                style: context.t.titleMedium?.copyWith(
+                  color: enabled ? c.onAccent : c.textTertiary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

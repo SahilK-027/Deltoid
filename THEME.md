@@ -500,17 +500,21 @@ uses colour here.
 An illustration inside a working screen is decoration, and decoration is what
 rule 1 spends the whole colour system avoiding.
 
-**No screen carries one today.** The welcome screen was where it would have
-gone, and it leads with the mark instead — which is itself a drawn shape, in
-one ink, inverting with the theme. A second drawn object under it was one
-drawing too many on a page whose whole job is to ask one question. The rules
-below stand for the day a screen genuinely has nothing else to be.
+**Today that is the threshold screen and nowhere else.** A figure curling a
+dumbbell: `curl_line.svg` for the figure and `curl_mass.svg` for the weight,
+two files because one asset cannot hold two colours that both answer to the
+theme.
 
-- **A single continuous stroke**, hand-drawn rather than geometric — a barbell,
-  a figure mid-rep, a plate. Weight 2, round caps and joins. It should look
-  drawn by a person, not by a vector tool.
-- **`textPrimary` on `surface`, nothing else.** No fill, no second weight, no
-  shadow.
+- **Drawn by a person, not by a vector tool.** The line swells and tapers, no
+  curve repeats, and nothing is symmetrical. Four attempts were made to derive
+  one arithmetically — from arcs, from an offset silhouette, from bezier
+  wobble — and they produced, in order, a comb, a mouth, a coil and a pair of
+  spectacles. **A drawing is authored, not computed.** What code may do is
+  colour it, place it and animate it.
+- **Line and mass, in two files.** The figure takes `textPrimary` and inverts
+  with the theme. The weight takes a hue, and the split is what stops the two
+  merging into one silhouette — they are the same value otherwise.
+- **No fill under the line, no second weight, no shadow.**
 - **Monochrome, including the accent.** Most likely rule to be broken: the
   obvious reference — a line drawing with one coloured dot — puts a hue into
   chrome, and here a warm dot is `deload`, so the drawing means something it
@@ -908,10 +912,33 @@ stays inside the rule while all of this holds:
 - **It says what it will do before it asks.** The subtitle names the outcome — a
   history that survives a lost phone — rather than the mechanism.
 
-Top to bottom: the mark, a `display` line, a `body` line, the primary button,
-an `OR` rule, the decline action. Centred, generous vertical
-space, everything inside the gutter. The only screen with a centred `display`
-line, which is what makes it read as a threshold rather than a page.
+Top to bottom: the wordmark, the mark, a `display` line, the two answers, and
+one `body` paragraph saying what each of them does. Not centred as a page — the
+wordmark sits at the top, the answers at the bottom, and the mark takes the
+space between. The only screen with a centred `display` line, which is what
+makes it read as a threshold rather than a page.
+
+### What the threshold screen is allowed, and nothing else is
+
+Four things, all of them because this screen is a **door rather than a page**:
+it holds no data, it is seen once, and it is the only place the app asks the
+user for something rather than showing them what they did. Every one of them
+would be wrong on a screen with a set on it.
+
+| Allowed here | The rule it stands outside | Why |
+| --- | --- | --- |
+| **Two equal buttons**, both `accent` | *One primary action per screen* | There are two answers and neither is the recommendation. A primary with a text link under it is a screen that has already decided, and the decline has to have equal standing |
+| **`Radii.pill`** on those buttons | Buttons wear `Radii.control` | A pill is the shape of a choice; the control radius is the shape of the app. Nothing else on this screen is a control, so there is nothing for them to disagree with |
+| **The wordmark**, mark plus name | The app never says its own name | Once, at the top of the one screen a person can arrive at without knowing what they opened |
+| **A hue on the drawing**, cycling the six identity colours every 3s | *Chrome is monochrome; colour is data* | Nothing on this screen is data for it to be confused with: no regime exists yet, no series, no deload. It cycles rather than picking one because a single hue here would look like a *particular* programme's mark, which is the one meaning the six do carry |
+| **A loop that never settles** | *Motion is still; it confirms a change* | The consequence of the row above — and the reason `pumpAndSettle` cannot be used on this screen in tests. It stops the moment the question is answered, because the screen is gone |
+| **An entrance**: the page arrives in parts, 620ms, once | *Motion confirms a change; it never performs* | There is nothing on screen to confirm yet. It is the first frame of the app anyone sees, and a page that assembles itself reads as something being made for you rather than a form being presented to you. One shot, never replayed |
+| **Google's four colours** on the Google button | *Chrome is monochrome; colour is data* | Not our hue and not our palette: somebody else's identity, on the one control that opens their sheet, and what a user's eye actually looks for. The official asset, never redrawn — an arc a few degrees out reads as a knock-off and no test can tell you it is wrong |
+
+What the four have in common: none of them puts a **meaning-bearing** colour or
+a **second primary** anywhere a number is read. A hue here cannot be confused
+with a deload, a series or a regime, because none of those exists yet — the
+account has not been chosen and the catalog has not been seeded.
 
 Choice cards handle a genuinely branching decision: `surface` fill, radius 16,
 1px `border`, padding 16, icon left, `title`, one `body` line, radio right, and
