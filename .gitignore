@@ -58,3 +58,14 @@ app.*.map.json
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# The live project's URL, publishable key and OAuth client id.
+#
+# None of the three is a secret — all of them ship inside the APK and are
+# extractable from it, which is exactly why RLS rather than a key is what
+# protects the data (SYNC.md § 3). They are kept out of the tree as hygiene: a
+# live project reference in a public repo is an invitation to probe it, and a
+# free project that gets hammered is a sync outage on the phone.
+#
+# `deltoid.env.example.json` is committed and shows the shape.
+deltoid.env.json
