@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
-
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/theme/tokens.dart';
 import 'package:flutter/material.dart';
