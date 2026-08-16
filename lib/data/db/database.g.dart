@@ -6991,6 +6991,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SetLogsTable setLogs = $SetLogsTable(this);
   late final $BodyweightLogsTable bodyweightLogs = $BodyweightLogsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final Index idxExercisesDirty = Index(
+    'idx_exercises_dirty',
+    'CREATE INDEX idx_exercises_dirty ON exercises (dirty) WHERE dirty = 1',
+  );
   late final Index idxRegimesSingleActive = Index(
     'idx_regimes_single_active',
     'CREATE UNIQUE INDEX idx_regimes_single_active ON regimes (is_active) WHERE is_active = 1 AND deleted_at IS NULL',
@@ -6998,6 +7002,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxRegimesIdentityLive = Index(
     'idx_regimes_identity_live',
     'CREATE UNIQUE INDEX idx_regimes_identity_live ON regimes (identity_index) WHERE deleted_at IS NULL',
+  );
+  late final Index idxRegimesDirty = Index(
+    'idx_regimes_dirty',
+    'CREATE INDEX idx_regimes_dirty ON regimes (dirty) WHERE dirty = 1',
   );
   late final Index idxSessionsRegime = Index(
     'idx_sessions_regime',
@@ -7011,6 +7019,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_sessions_name_live',
     'CREATE UNIQUE INDEX idx_sessions_name_live ON sessions (regime_id, lower(trim(name))) WHERE deleted_at IS NULL',
   );
+  late final Index idxSessionsDirty = Index(
+    'idx_sessions_dirty',
+    'CREATE INDEX idx_sessions_dirty ON sessions (dirty) WHERE dirty = 1',
+  );
   late final Index idxSessionExercisesSession = Index(
     'idx_session_exercises_session',
     'CREATE INDEX idx_session_exercises_session ON session_exercises (session_id)',
@@ -7018,6 +7030,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxSessionExercisesPositionLive = Index(
     'idx_session_exercises_position_live',
     'CREATE UNIQUE INDEX idx_session_exercises_position_live ON session_exercises (session_id, order_index) WHERE deleted_at IS NULL',
+  );
+  late final Index idxSessionExercisesDirty = Index(
+    'idx_session_exercises_dirty',
+    'CREATE INDEX idx_session_exercises_dirty ON session_exercises (dirty) WHERE dirty = 1',
   );
   late final Index idxCyclesRegime = Index(
     'idx_cycles_regime',
@@ -7030,6 +7046,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxCyclesRegimeOpenLive = Index(
     'idx_cycles_regime_open_live',
     'CREATE UNIQUE INDEX idx_cycles_regime_open_live ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL',
+  );
+  late final Index idxCyclesDirty = Index(
+    'idx_cycles_dirty',
+    'CREATE INDEX idx_cycles_dirty ON cycles (dirty) WHERE dirty = 1',
   );
   late final Index idxWorkoutsSessionLookup = Index(
     'idx_workouts_session_lookup',
@@ -7051,6 +7071,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_workouts_single_open',
     'CREATE UNIQUE INDEX idx_workouts_single_open ON workouts (status) WHERE status = \'inProgress\' AND deleted_at IS NULL',
   );
+  late final Index idxWorkoutsDirty = Index(
+    'idx_workouts_dirty',
+    'CREATE INDEX idx_workouts_dirty ON workouts (dirty) WHERE dirty = 1',
+  );
   late final Index idxWorkoutExercisesWorkout = Index(
     'idx_workout_exercises_workout',
     'CREATE INDEX idx_workout_exercises_workout ON workout_exercises (workout_id)',
@@ -7062,6 +7086,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxWorkoutExercisesPositionLive = Index(
     'idx_workout_exercises_position_live',
     'CREATE UNIQUE INDEX idx_workout_exercises_position_live ON workout_exercises (workout_id, order_index) WHERE deleted_at IS NULL',
+  );
+  late final Index idxWorkoutExercisesDirty = Index(
+    'idx_workout_exercises_dirty',
+    'CREATE INDEX idx_workout_exercises_dirty ON workout_exercises (dirty) WHERE dirty = 1',
   );
   late final Index idxSetLogsParent = Index(
     'idx_set_logs_parent',
@@ -7075,6 +7103,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_set_logs_slot_identity',
     'CREATE UNIQUE INDEX idx_set_logs_slot_identity ON set_logs (id, workout_exercise_id)',
   );
+  late final Index idxSetLogsDirty = Index(
+    'idx_set_logs_dirty',
+    'CREATE INDEX idx_set_logs_dirty ON set_logs (dirty) WHERE dirty = 1',
+  );
   late final Index idxBodyweightDay = Index(
     'idx_bodyweight_day',
     'CREATE INDEX idx_bodyweight_day ON bodyweight_logs (day_key)',
@@ -7082,6 +7114,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxBodyweightDayLive = Index(
     'idx_bodyweight_day_live',
     'CREATE UNIQUE INDEX idx_bodyweight_day_live ON bodyweight_logs (day_key) WHERE deleted_at IS NULL',
+  );
+  late final Index idxBodyweightLogsDirty = Index(
+    'idx_bodyweight_logs_dirty',
+    'CREATE INDEX idx_bodyweight_logs_dirty ON bodyweight_logs (dirty) WHERE dirty = 1',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -7098,29 +7134,38 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     setLogs,
     bodyweightLogs,
     appSettings,
+    idxExercisesDirty,
     idxRegimesSingleActive,
     idxRegimesIdentityLive,
+    idxRegimesDirty,
     idxSessionsRegime,
     idxSessionsPositionLive,
     idxSessionsNameLive,
+    idxSessionsDirty,
     idxSessionExercisesSession,
     idxSessionExercisesPositionLive,
+    idxSessionExercisesDirty,
     idxCyclesRegime,
     idxCyclesRegimeIndexLive,
     idxCyclesRegimeOpenLive,
+    idxCyclesDirty,
     idxWorkoutsSessionLookup,
     idxWorkoutsDay,
     idxWorkoutsCycle,
     idxWorkoutsStarted,
     idxWorkoutsSingleOpen,
+    idxWorkoutsDirty,
     idxWorkoutExercisesWorkout,
     idxWorkoutExercisesExercise,
     idxWorkoutExercisesPositionLive,
+    idxWorkoutExercisesDirty,
     idxSetLogsParent,
     idxSetLogsPositionLive,
     idxSetLogsSlotIdentity,
+    idxSetLogsDirty,
     idxBodyweightDay,
     idxBodyweightDayLive,
+    idxBodyweightLogsDirty,
   ];
 }
 

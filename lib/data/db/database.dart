@@ -6,6 +6,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
 import 'converters.dart';
+import 'migrations.dart';
 import 'tables.dart';
 
 part 'database.g.dart';
@@ -30,25 +31,25 @@ class AppDatabase extends _$AppDatabase {
   /// In-memory instance for tests.
   AppDatabase.forTesting(super.executor);
 
-  /// One, and it stays one until the app is in someone's hands.
+  /// The ladder is running again, one step per change from here on.
   ///
-  /// This carried a v2..v8 ladder of upgrade steps, each one migrating a
-  /// database shape that only ever existed on a test device. Nothing has been
-  /// released, so nothing out there is at any of those versions: the steps were
-  /// upgrade paths from states no install will ever be in, and every schema
-  /// change since would have had to keep working forever to serve them.
+  /// It carried a v2..v8 ladder once, each step migrating a database shape that
+  /// only ever existed on a test device, and that was thrown away with nothing
+  /// released: those were upgrade paths from states no install would ever be in.
   ///
-  /// The ladder starts again — properly, one step per released change — the
-  /// day a build reaches a phone that is not ours. Until then a schema change
-  /// is an edit to `tables.dart`, a regenerate, and a reinstall.
+  /// It starts over at 2 because sync is what makes a reinstall an unacceptable
+  /// upgrade path — see `migrations.dart`, and
+  /// [RULES.md § 3](RULES.md#3-schema-and-migrations) for the protocol a change
+  /// follows now.
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
         },
+        onUpgrade: (m, from, to) => upgradeSchema(this, m, from, to),
         beforeOpen: (details) async {
           // Tombstones and cascades depend on referential integrity being real.
           await customStatement('PRAGMA foreign_keys = ON');
@@ -61,6 +62,27 @@ class AppDatabase extends _$AppDatabase {
           // and the failure mode of a zero timeout is an immediate
           // SQLITE_BUSY thrown at whichever screen happened to be writing.
           await customStatement('PRAGMA busy_timeout = 5000');
+
+          // A reader and a writer at once, which is what sync makes ordinary.
+          //
+          // Under the `delete` journal the packaged sqlite3 defaults to, a
+          // reader and a writer are serialised completely — so a push draining
+          // `dirty` across a hundred thousand rows and a thumb ticking a set
+          // take turns, and with the timeout above that turn is a screen
+          // waiting on a background job for up to five seconds
+          // ([SYNC.md § 16](SYNC.md#16-still-to-decide)). WAL lets them
+          // overlap: a writer no longer blocks readers, and the durability
+          // given up is a `NORMAL`-synchronous transaction losing its last
+          // commit to a power cut, never a corrupt file.
+          //
+          // Decided in the first phase on purpose, so every later test runs on
+          // the mode the phone runs on. It is a property of the file, so this
+          // sets it once and re-asserts it for free on every launch after.
+          //
+          // Leaves `-wal` and `-shm` files beside the database — safe today
+          // because nothing copies the database file (a backup writes JSON),
+          // and something to revisit the moment anything does.
+          await customStatement('PRAGMA journal_mode = WAL');
 
           // Before anything can write a row that carries it.
           await _ensureDeviceId();

@@ -3,12 +3,11 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../domain/enums.dart';
 import '../db/database.dart';
+import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
 import '../seed/seeder.dart';
 
@@ -68,25 +67,37 @@ class ImportResult {
   final int rowsWritten;
 }
 
-/// One table's dump/restore pair.
+/// One table's dump/restore pair: what [TableSpec] says about the table, plus
+/// the parts that are only a *file's* problem.
 ///
-/// Explicit rather than a generic loop over `TableInfo`, because reconstructing
-/// a row from JSON needs the generated `fromJson` for its data class — the
-/// generic `map()` reads database rows, not serialised ones, and would quietly
-/// mangle enum and converter columns.
-class _TableCodec<T extends Insertable<dynamic>> {
+/// The name, the table and the parser with its defaults come from the shared
+/// registry in `data/db/table_spec.dart`, because the pull applier needs
+/// exactly those three and must not grow a second list of defaults beside this
+/// one — [SYNC.md § 17](SYNC.md#17-the-architecture). Paging, counting,
+/// clearing and the settings whitelist stay here: a server has no pages and
+/// never clears a table.
+class _TableCodec {
   const _TableCodec({
-    required this.name,
+    required this.spec,
     required this.page,
     required this.count,
-    required this.table,
-    required this.parse,
     required this.clear,
     this.cursor = _idOf,
     this.keep,
   });
 
-  final String name;
+  final TableSpec spec;
+
+  String get name => spec.name;
+
+  /// The table itself, so a restore can insert a whole file in batches rather
+  /// than a row at a time. 120k round trips through the platform channel took
+  /// minutes on a phone with the screen frozen, which reads as a crash and got
+  /// backups abandoned halfway.
+  TableInfo<Table, dynamic> get table => spec.table;
+
+  /// JSON row → something `Batch.insertAll` can write. See [TableSpec.parse].
+  Insertable<dynamic> Function(Map<String, dynamic> row) get parse => spec.parse;
 
   /// One window of rows, oldest id first, starting after the id `after`.
   ///
@@ -103,12 +114,6 @@ class _TableCodec<T extends Insertable<dynamic>> {
   /// How many rows there are, for the header the file carries and for progress.
   final Future<int> Function() count;
 
-  /// The table itself, so a restore can insert a whole file in batches rather
-  /// than a row at a time. 120k round trips through the platform channel took
-  /// minutes on a phone with the screen frozen, which reads as a crash and got
-  /// backups abandoned halfway.
-  final TableInfo<Table, dynamic> table;
-
   /// The value a keyset page resumes after. Every syncable table takes its `id`
   /// from `SyncColumns`, so [_idOf] serves all of them; `app_settings` is keyed
   /// by its `key` instead and says so.
@@ -121,21 +126,11 @@ class _TableCodec<T extends Insertable<dynamic>> {
   /// Restoring `device_id` out of one would give two installs the same identity.
   final bool Function(Map<String, dynamic> row)? keep;
 
-  /// JSON row → something `Batch.insertAll` can write.
-  final T Function(Map<String, dynamic> row) parse;
-
   final Future<void> Function() clear;
 }
 
 String _idOf(Map<String, dynamic> row) => row['id']! as String;
 
-/// What a test sees of one codec: enough to ask a table's columns what the
-/// parser does without them. See [BackupService.codecsForTesting].
-typedef BackupCodecView = ({
-  String name,
-  TableInfo<Table, dynamic> table,
-  Insertable<dynamic> Function(Map<String, dynamic> row) parse,
-});
 
 /// The `app_settings` keys a backup carries, and the only ones it restores.
 ///
@@ -151,41 +146,6 @@ typedef BackupCodecView = ({
 /// property of the phone.
 const backedUpSettingKeys = {'units'};
 
-/// The zone offset a workout written before `tz_offset_minutes` existed implies.
-///
-/// The column arrived alongside the CHECK that ties `day_key` to `started_at`,
-/// so a row without one cannot be inserted at all — and since nothing reads the
-/// offset for its own sake, *any* value that reconciles the two columns the file
-/// already carries is a correct one.
-///
-/// This phone's offset at that instant is the honest first guess, and for the
-/// case that actually happens — a file written on this phone, in this zone —
-/// it is not a guess at all but the very offset that produced the day key.
-/// Restored after a move across zones it will not reconcile, and refusing the
-/// whole file over a column the file predates would be the wrong answer, so it
-/// is nudged by the fewest whole minutes that put the instant back on the day
-/// the file names.
-///
-/// A row the two columns of which no real offset can reconcile lands outside
-/// the ±(12, 14) hours the CHECK allows and the restore refuses the file. That
-/// is the right answer too: such a row was already claiming two days.
-int impliedTzOffset(int startedAt, int dayKey) {
-  const minute = Duration.millisecondsPerMinute;
-  const day = Duration.millisecondsPerDay;
-
-  final device =
-      DateTime.fromMillisecondsSinceEpoch(startedAt).timeZoneOffset.inMinutes;
-  // Wall clock as an instant: the day key read as if it were UTC, which is the
-  // same arithmetic the CHECK does.
-  final dayStart =
-      DateTime.utc(dayKey ~/ 10000, (dayKey ~/ 100) % 100, dayKey % 100)
-          .millisecondsSinceEpoch;
-  final local = startedAt + device * minute;
-
-  if (local >= dayStart && local < dayStart + day) return device;
-  if (local < dayStart) return device + ((dayStart - local) / minute).ceil();
-  return device - ((local - dayStart - day) / minute).floor() - 1;
-}
 
 /// Whole-database export and restore.
 ///
@@ -214,139 +174,39 @@ class BackupService {
   final Future<void> Function()? betweenPages;
 
   /// Parents before children, so a restore never inserts a row whose foreign
-  /// key has not been written yet.
+  /// key has not been written yet — which is the order the registry is already
+  /// in, and the same order a push walks.
+  ///
+  /// Built from `tableSpecs` rather than written out again, so a table added to
+  /// the schema cannot be added to sync and forgotten by backup, or the other
+  /// way round. Everything special here is special about *files*.
   late final List<_TableCodec> _codecs = [
-    // Points at nothing and nothing points at it, so it may sit anywhere; first
-    // because it is the smallest and a restore that fails on it should fail
-    // before it has written a decade of sets.
-    _TableCodec(
-      name: 'app_settings',
-      page: _pageOfSettings,
-      count: _countOfSettings,
-      cursor: (row) => row['key']! as String,
-      table: db.appSettings,
-      keep: (row) => backedUpSettingKeys.contains(row['key']),
-      parse: AppSetting.fromJson,
-      // Only the keys this file carries. Clearing the table would take
-      // `device_id` with it, and the restore runs long after `beforeOpen` has
-      // minted one — so the phone would finish the restore with no identity at
-      // all until its next launch.
-      clear: () => (db.delete(db.appSettings)
-            ..where((t) => t.key.isIn(backedUpSettingKeys)))
-          .go(),
-    ),
-    _TableCodec(
-      name: 'exercises',
-      page: (limit, after) => _pageOf(db.exercises, limit, after),
-      count: () => _countOf(db.exercises),
-      // `fromJson` is generated against *today's* columns and reads every one
-      // of them unconditionally, so a file written before a column existed
-      // dies on a null cast — with the user's only copy of their history in
-      // the picker. A default for anything added after v1 keeps old files
-      // restorable; add one here whenever a column is added to this table.
-      table: db.exercises,
-      parse: (row) => Exercise.fromJson({
-        'barKind': BarKind.none.name,
-        'measureMode': MeasureMode.reps.name,
-        ...row,
-      }),
-      clear: () => db.delete(db.exercises).go(),
-    ),
-    _TableCodec(
-      name: 'regimes',
-      page: (limit, after) => _pageOf(db.regimes, limit, after),
-      count: () => _countOf(db.regimes),
-      table: db.regimes,
-      // A file written before v5 has no identity slot in it, and
-      // `Regime.fromJson` casts the missing key straight to int. Everything
-      // lands on 0 here and the slots are dealt out properly once the restore
-      // is written — see the backfill at the end of [restore].
-      parse: (row) => Regime.fromJson({'identityIndex': 0, ...row}),
-      clear: () => db.delete(db.regimes).go(),
-    ),
-    _TableCodec(
-      name: 'sessions',
-      page: (limit, after) => _pageOf(db.sessions, limit, after),
-      count: () => _countOf(db.sessions),
-      table: db.sessions,
-      parse: Session.fromJson,
-      clear: () => db.delete(db.sessions).go(),
-    ),
-    _TableCodec(
-      name: 'session_exercises',
-      page: (limit, after) => _pageOf(db.sessionExercises, limit, after),
-      count: () => _countOf(db.sessionExercises),
-      table: db.sessionExercises,
-      parse: SessionExercise.fromJson,
-      clear: () => db.delete(db.sessionExercises).go(),
-    ),
-    _TableCodec(
-      name: 'cycles',
-      page: (limit, after) => _pageOf(db.cycles, limit, after),
-      count: () => _countOf(db.cycles),
-      table: db.cycles,
-      parse: Cycle.fromJson,
-      clear: () => db.delete(db.cycles).go(),
-    ),
-    _TableCodec(
-      name: 'workouts',
-      page: (limit, after) => _pageOf(db.workouts, limit, after),
-      count: () => _countOf(db.workouts),
-      table: db.workouts,
-      // A file written before the zone offset existed has no key for it, and
-      // the row cannot land without one — see [impliedTzOffset].
-      parse: (row) => Workout.fromJson({
-        'tzOffsetMinutes':
-            impliedTzOffset(row['startedAt'] as int, row['dayKey'] as int),
-        ...row,
-      }),
-      clear: () => db.delete(db.workouts).go(),
-    ),
-    _TableCodec(
-      name: 'workout_exercises',
-      page: (limit, after) => _pageOf(db.workoutExercises, limit, after),
-      count: () => _countOf(db.workoutExercises),
-      table: db.workoutExercises,
-      // A file written before the muscle snapshot existed has no key for it,
-      // and null is the honest value: the row predates the column, so readers
-      // fall back to the catalog rather than being told it was `other`.
-      parse: (row) => WorkoutExercise.fromJson({'muscle': null, ...row}),
-      clear: () => db.delete(db.workoutExercises).go(),
-    ),
-    _TableCodec(
-      name: 'set_logs',
-      page: (limit, after) => _pageOf(db.setLogs, limit, after),
-      count: () => _countOf(db.setLogs),
-      table: db.setLogs,
-      // Partials arrived at v8. Nullable, so a file written before it simply
-      // has no key here and every restored set reads as all-full — which is
-      // what those sets meant when they were logged.
-      parse: (row) => SetLog.fromJson({'partialReps': null, ...row}),
-      clear: () => db.delete(db.setLogs).go(),
-    ),
-    _TableCodec(
-      name: 'bodyweight_logs',
-      page: (limit, after) => _pageOf(db.bodyweightLogs, limit, after),
-      count: () => _countOf(db.bodyweightLogs),
-      table: db.bodyweightLogs,
-      parse: BodyweightLog.fromJson,
-      clear: () => db.delete(db.bodyweightLogs).go(),
-    ),
+    for (final spec in tableSpecs(db))
+      if (spec.name == 'app_settings')
+        _TableCodec(
+          spec: spec,
+          page: _pageOfSettings,
+          count: _countOfSettings,
+          cursor: (row) => row['key']! as String,
+          keep: (row) => backedUpSettingKeys.contains(row['key']),
+          // Only the keys this file carries. Clearing the table would take
+          // `device_id` with it, and the restore runs long after `beforeOpen`
+          // has minted one — so the phone would finish the restore with no
+          // identity at all until its next launch.
+          clear: () => (db.delete(db.appSettings)
+                ..where((t) => t.key.isIn(backedUpSettingKeys)))
+              .go(),
+        )
+      else
+        _TableCodec(
+          spec: spec,
+          page: (limit, after) => _pageOf(spec.table, limit, after),
+          count: () => _countOf(spec.table),
+          clear: () => db.delete(spec.table).go(),
+        ),
   ];
 
-  /// Each codec's table and its JSON → row parser, for the one test that has to
-  /// see all of them at once.
-  ///
-  /// [RULES.md § 3](RULES.md#3-schema-and-migrations) step 3 — *give a new
-  /// column a default here* — is prose, and prose is remembered rather than
-  /// enforced. The check that makes it mechanical has to walk `table.$columns`
-  /// and ask each parser what it does with the column missing, which needs both
-  /// halves of a codec and nothing else in it.
-  @visibleForTesting
-  List<BackupCodecView> get codecsForTesting => [
-        for (final c in _codecs)
-          (name: c.name, table: c.table, parse: c.parse),
-      ];
+
 
   /// One page of [table] as JSON, ordered by id, resuming after [after].
   ///
@@ -381,9 +241,8 @@ class BackupService {
   /// gives the guarantee that matters, which is that no row present for the
   /// whole export is missed. Rows written *during* one may or may not be in the
   /// file; a backup is a moment, and that moment is when it started.
-  Future<List<Map<String, dynamic>>>
-      _pageOf<T extends HasResultSet, D extends DataClass>(
-    ResultSetImplementation<T, D> table,
+  Future<List<Map<String, dynamic>>> _pageOf(
+    TableInfo<Table, dynamic> table,
     int limit,
     String? after,
   ) async {
@@ -392,7 +251,13 @@ class BackupService {
       ..orderBy([(_) => OrderingTerm(expression: id)])
       ..limit(limit);
     if (after != null) q.where((_) => id.isBiggerThanValue(after));
-    return (await q.get()).map((row) => row.toJson()).toList();
+    // `row` is a `DataClass` whose type the registry knows and this loop does
+    // not; `toJson` is the one thing all ten of them have, and reaching it
+    // through `dynamic` is what lets one pager serve every table.
+    return [
+      for (final dynamic row in await q.get())
+        row.toJson() as Map<String, dynamic>,
+    ];
   }
 
   /// One page of the settings a backup carries, ordered by key.

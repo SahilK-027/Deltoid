@@ -43,6 +43,17 @@ const _liveOrTombstoned = 'CHECK (deleted_at IS NULL OR deleted_at > 0)';
 
 /// The exercise catalog. Shared across every regime — swapping PPL for
 /// upper/lower reuses these rows, which is what keeps history comparable.
+/// What this device still owes the server, countable without a scan.
+///
+/// Sync's state is derived rather than remembered ([SYNC.md § 17](SYNC.md#17-the-architecture)),
+/// which means `COUNT(*) WHERE dirty` is asked every time a set is ticked —
+/// across a `set_logs` holding 168k rows at fifty years, that is a full scan per
+/// tick. Partial on `dirty = 1`, so the index is *empty* whenever nothing is
+/// owed and holds only the queue when something is.
+@TableIndex.sql(
+  'CREATE INDEX idx_exercises_dirty '
+  'ON exercises (dirty) WHERE dirty = 1',
+)
 class Exercises extends Table with SyncColumns {
   TextColumn get name => text()();
   TextColumn get muscle => textEnum<MuscleGroup>()();
@@ -132,6 +143,12 @@ class Exercises extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_regimes_identity_live '
   'ON regimes (identity_index) WHERE deleted_at IS NULL',
 )
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_regimes_dirty '
+  'ON regimes (dirty) WHERE dirty = 1',
+)
 class Regimes extends Table with SyncColumns {
   TextColumn get name => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(false))();
@@ -210,6 +227,12 @@ class Regimes extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_sessions_name_live '
   'ON sessions (regime_id, lower(trim(name))) WHERE deleted_at IS NULL',
 )
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_sessions_dirty '
+  'ON sessions (dirty) WHERE dirty = 1',
+)
 class Sessions extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   TextColumn get name => text()();
@@ -230,6 +253,12 @@ class Sessions extends Table with SyncColumns {
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_session_exercises_position_live '
   'ON session_exercises (session_id, order_index) WHERE deleted_at IS NULL',
+)
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_session_exercises_dirty '
+  'ON session_exercises (dirty) WHERE dirty = 1',
 )
 class SessionExercises extends Table with SyncColumns {
   TextColumn get sessionId => text().references(Sessions, #id)();
@@ -304,6 +333,12 @@ class SessionExercises extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_cycles_regime_open_live '
   'ON cycles (regime_id) WHERE completed_at IS NULL AND deleted_at IS NULL',
 )
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_cycles_dirty '
+  'ON cycles (dirty) WHERE dirty = 1',
+)
 class Cycles extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
   IntColumn get cycleIndex => integer()();
@@ -351,6 +386,12 @@ class Cycles extends Table with SyncColumns {
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_workouts_single_open '
   "ON workouts (status) WHERE status = 'inProgress' AND deleted_at IS NULL",
+)
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_workouts_dirty '
+  'ON workouts (dirty) WHERE dirty = 1',
 )
 class Workouts extends Table with SyncColumns {
   TextColumn get regimeId => text().references(Regimes, #id)();
@@ -434,6 +475,12 @@ class Workouts extends Table with SyncColumns {
   'CREATE UNIQUE INDEX idx_workout_exercises_position_live '
   'ON workout_exercises (workout_id, order_index) WHERE deleted_at IS NULL',
 )
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_workout_exercises_dirty '
+  'ON workout_exercises (dirty) WHERE dirty = 1',
+)
 class WorkoutExercises extends Table with SyncColumns {
   TextColumn get workoutId => text().references(Workouts, #id)();
   TextColumn get exerciseId => text().references(Exercises, #id)();
@@ -499,6 +546,12 @@ class WorkoutExercises extends Table with SyncColumns {
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_set_logs_slot_identity '
   'ON set_logs (id, workout_exercise_id)',
+)
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_set_logs_dirty '
+  'ON set_logs (dirty) WHERE dirty = 1',
 )
 class SetLogs extends Table with SyncColumns {
   TextColumn get workoutExerciseId => text().references(WorkoutExercises, #id)();
@@ -625,6 +678,12 @@ class SetLogs extends Table with SyncColumns {
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_bodyweight_day_live '
   'ON bodyweight_logs (day_key) WHERE deleted_at IS NULL',
+)
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_bodyweight_logs_dirty '
+  'ON bodyweight_logs (dirty) WHERE dirty = 1',
 )
 class BodyweightLogs extends Table with SyncColumns {
   IntColumn get dayKey => integer()();

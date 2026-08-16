@@ -107,46 +107,42 @@ Drift code has to be regenerated after any edit to `lib/data/db/tables.dart`:
 dart run build_runner build
 ```
 
-**Nothing is released, so there is no migration ladder.** `schemaVersion` is 1
-and `MigrationStrategy` has an `onCreate` and no `onUpgrade`. Every database
-that exists is one we made and can throw away, so a schema change is:
+**The ladder is running.** `schemaVersion` is 2 and `MigrationStrategy` has an
+`onUpgrade`, in `lib/data/db/migrations.dart`. So a schema change is:
 
 1. the column or `@TableIndex` in `tables.dart`,
 2. `dart run build_runner build`,
-3. **a default in the backup codec** for that table,
-4. reinstall the app on every device, because there is no upgrade path and
-   the old database will not be migrated onto the new shape.
+3. **a default in `lib/data/db/table_spec.dart`** for that table,
+4. **a rung**: `schemaVersion` up one, and a step in `upgradeSchema` guarded by
+   the version it was added at.
 
-This carried a v2..v8 ladder, each step migrating a shape that only ever existed
-on a test device, and every future change would have had to keep all of them
-working forever for installs that will never exist. It went, and it starts again
-— one step per *released* change, `schemaVersion` climbing from 1 — the day a
-build reaches a phone that is not ours. **Once that happens this section is
-wrong and has to be rewritten before the next schema change**, along with the
-rules the ladder needs: every step idempotent (`addColumnIfMissing`, `CREATE
-INDEX IF NOT EXISTS`, never bare `m.addColumn` / `m.createIndex` — a device
-given an earlier build comes back with the structure in place and the stamp
-behind it, and the bare form throws on launch before any screen), and a test
-that runs a full upgrade over a database that already has everything.
+**Every step is idempotent.** `addColumnIfMissing`, `createIndexesIfMissing`,
+never a bare `m.addColumn` or `m.createIndex`: a device given an earlier build
+comes back with the structure already in place and the stamp behind it, and the
+bare form throws on launch before any screen is drawn.
+`test/data/migrations_test.dart` runs a full upgrade over a database that
+already has everything, and compares a database created fresh against one walked
+up the ladder.
 
-**Sync is that day, and it arrives before any second phone does**, because it
-lets two devices running *different builds* exchange rows. That needs two things
-this section has never needed: an upgrade path for the local file, and a wire
-format that survives a row carrying one column more or fewer than the reader
-knows. A pull that drops an unknown column loses data silently; one that refuses
-the row stops the sync. Neither is decided, and neither can be decided after the
-first release. Until then the four steps above hold and the reinstall is the
-upgrade path.
+This carried a v2..v8 ladder once, each step migrating a shape that only ever
+existed on a test device, and that was thrown away with nothing released. It
+started again at 2 because **sync is the day this section named, and it arrives
+before any second phone does** — it lets two devices running *different builds*
+exchange rows, which needs an upgrade path for the local file and a wire format
+that survives a row carrying one column more or fewer than the reader knows.
+Both exist now: the ladder above, and the shared registry step 3 points at.
 
-Step 3 holds with or without a ladder, and is the easy one to miss and the
-expensive one to get wrong. `Exercise.fromJson` is generated against _today's_
-columns and reads every one unconditionally, so a file exported before a column
-existed throws a null cast on restore — with the only copy of a history in the
-file picker. `backup/backup_service.dart` spreads a default map under each
-restored row for this reason, and `test/data/backup_service_test.dart` restores
-a payload with a column stripped out to keep it honest. **Index-only** changes
-skip step 3, since nothing new is stored; so do **constraint-only** ones — but a
-constraint cannot be altered in place (SQLite has no `ALTER … DROP CHECK`), so
+Step 3 is the easy one to miss and the expensive one to get wrong, and it has
+**two** readers now rather than one — a restore and a sync pull — which is why
+the defaults live in one registry rather than beside each of them.
+`Exercise.fromJson` is generated against _today's_ columns and reads every one
+unconditionally, so a file exported before a column existed throws a null cast
+on restore — with the only copy of a history in the file picker. `db/table_spec.dart` spreads a default map under each parsed row for
+this reason, and `test/data/table_spec_test.dart` walks every column of every
+table asking each parser what it does with that column missing.
+
+**Index-only** changes skip step 3, since nothing new is stored; so do
+**constraint-only** ones — but a constraint cannot be altered in place (SQLite has no `ALTER … DROP CHECK`), so
 changing one is a table rebuild, and a step re-mapping a retired value must run
 *before* the rebuild that narrows the column.
 
@@ -154,7 +150,7 @@ A backup also carries the `schemaVersion` it was written against, and import
 refuses anything **newer** than the running build can read rather than clearing
 the tables and failing halfway. Collapsing the version to 1 therefore made every
 previously exported file unrestorable, which was acceptable exactly once, while
-the only data anywhere was test data.
+the only data anywhere was test data. It is not available again.
 
 **Backfill wherever the app already knows the answer.** A new column's default
 is the honest value for a row nobody has been asked about, and the wrong value
@@ -439,6 +435,8 @@ rather than shape. Where the checks live now:
 | An exception to THEME or RULES is written into the document | `test/core/documented_exceptions_test.dart` |
 | The light ramp is legible | `test/core/light_theme_test.dart` |
 | A rewritten query returns what the old one did | `test/data/query_conversion_test.dart` |
+| Every column has a default, or has always been written | `test/data/table_spec_test.dart` — walks every column of every table |
+| Every rung of the ladder can be replayed | `test/data/migrations_test.dart` — a full upgrade over a database that already has everything |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

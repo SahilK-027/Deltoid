@@ -369,8 +369,7 @@ void main() {
     expect(row.data.values.first, 5000);
   });
 
-  test('the database is not in a journal mode that can lose a committed '
-      'transaction', () async {
+  test('the database on disk is in WAL', () async {
     // Read off a file, never off `db`: an in-memory database is always
     // `memory`, which is precisely one of the two modes this refuses. The
     // premise being checked is about the file the phone keeps, and the only
@@ -387,14 +386,19 @@ void main() {
         .getSingle();
     final mode = (row.data.values.first as String).toLowerCase();
 
-    // `memory` keeps the rollback journal in RAM and `off` writes none at all:
-    // under either, a power cut mid-transaction leaves a half-applied
-    // transaction on disk with nothing to undo it. The other four each keep a
-    // journal the next open can recover from, which is what every durability
-    // claim about this database rests on.
-    expect(mode, anyOf('delete', 'truncate', 'persist', 'wal'),
-        reason: 'nothing in lib/ sets journal_mode, so this is whatever the '
-            'packaged sqlite3 defaults to — read it rather than assume it');
+    // This used to accept any of the four recoverable modes and say outright
+    // that nothing in `lib/` set one, so the honest thing was to read whatever
+    // the packaged sqlite3 defaulted to. `database.dart` sets one now, and the
+    // reasoning inverts with it: WAL is a decision — a sync reader and a UI
+    // writer overlap under it and serialise under `delete`
+    // ([SYNC.md § 16](SYNC.md#16-still-to-decide)) — so this names it exactly.
+    //
+    // It is still a durable mode, which is the property the old test was really
+    // holding: WAL keeps a log the next open recovers from, unlike `memory`,
+    // which keeps it in RAM, or `off`, which keeps none at all.
+    expect(mode, 'wal',
+        reason: 'beforeOpen sets it, so a phone that reads anything else never '
+            'ran beforeOpen');
 
     // And the reason the check cannot be pointed at the shared test database.
     final inMemory =

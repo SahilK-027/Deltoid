@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**719 tests, analyzer clean.**
+**727 tests, analyzer clean.**
 
 ---
 
@@ -92,7 +92,7 @@ Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
 [SYNC.md](SYNC.md) before writing any of it — the design is § 1–16, the code is
 § 17–20.
 
-- [ ] **0 · The ground** — migration ladder, the `dirty` indexes, WAL, the shared table registry, the wire proved, `INTERNET` in the release manifest.
+- [x] **0 · The ground** — migration ladder at `schemaVersion` 2 with every rung idempotent, the nine `dirty` indexes, WAL, the shared table registry both readers answer to, the wire proved, `INTERNET` in the release manifest.
 - [ ] **1 · The server** — nine tables, RLS on every one, the `server_updated_at` trigger, `supabase/migrations` in the repo.
 - [ ] **2 · Identity** — Google sign-in, the welcome screen, seeding moved behind it, the account section in Settings.
 - [ ] **3 · Push** — one writer, so no merge and no conflict rules. The `dirty` drain, the triggers, the lifecycle hook.
