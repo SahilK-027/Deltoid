@@ -86,6 +86,36 @@ Build a release APK:
 flutter build apk --release
 ```
 
+### The fuzz harness
+
+`test/integrity/model_fuzz_test.dart` drives the real database with seeded
+random operations and checks every one against a deliberately dumb in-memory
+model and against `test/integrity/invariant_oracle.dart`. A failure prints the
+seed and the shortest operation sequence that still reproduces it.
+
+The committed run is small enough to sit in the suite. Three environment
+variables make it a soak, and `FUZZ_REPORT=1` prints how many operations each
+seed actually applied:
+
+```bash
+FUZZ_REPORT=1 FUZZ_SEEDS=120 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_test.dart
+```
+
+`FUZZ_BACKUP_EVERY=N` runs the backup/restore operation every Nth time it is
+proposed instead of every time. It is the one operation whose cost grows with
+the history behind it — it rewrites every row — so thinning it is what makes a
+run of millions of operations finish in an afternoon:
+
+```bash
+FUZZ_REPORT=1 FUZZ_SEEDS=500 FUZZ_OPS=2000 FUZZ_BACKUP_EVERY=10 flutter test test/integrity/model_fuzz_test.dart
+```
+
+Rerun a single failure exactly as it was printed:
+
+```bash
+FUZZ_SEED=17 FUZZ_SEEDS=1 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_test.dart
+```
+
 ### Filling it with data
 
 `tool/seed_years.dart` writes a backup file holding years of plausible history,
