@@ -244,6 +244,50 @@ class Harness {
     return null;
   }
 
+  /// Leaves at least one live set in the database, creating one if the run has
+  /// not.
+  ///
+  /// The durability test tears a transaction that deletes every set, and a
+  /// random walk can perfectly well arrive at a state with no sets in it —
+  /// every workout completed or deleted, every set tombstoned. The tear then
+  /// destroys nothing and the rollback proves nothing, which is a vacuous test
+  /// rather than a passing one. Two of six shards landed there.
+  Future<void> ensureSomethingToLose() async {
+    bool hasSets() =>
+        workouts.values.any((w) => w.exercises.any((e) => e.sets.isNotEmpty));
+    if (hasSets()) return;
+
+    final regime = await activeRegime();
+    if (regime == null) return;
+    final ss = await sessions(regime.id);
+    if (ss.isEmpty) return;
+
+    var w = openWorkout;
+    if (w == null) {
+      final id =
+          await repo.startWorkout(regimeId: regime.id, sessionId: ss.first.id);
+      if (!workouts.containsKey(id)) await adoptWorkout(id, dayKeyOf(now));
+      w = workouts[id];
+      if (w == null) return;
+    }
+    if (w.exercises.isEmpty) {
+      final all = await catalog();
+      if (all.isEmpty) return;
+      final weId = await repo.addExerciseToWorkout(w.id, all.first.id);
+      await adoptExercise(w, weId);
+    }
+    final e = w.exercises.first;
+    if (e.sets.isEmpty) {
+      final id = await repo.addSet(e.id);
+      final row = await (db.select(db.setLogs)..where((t) => t.id.equals(id)))
+          .getSingle();
+      e.sets.add(MSet(id)
+        ..weight = row.weight
+        ..reps = row.reps
+        ..done = row.isDone);
+    }
+  }
+
   /// Runs [op], or returns false when it does not apply to the current state.
   ///
   /// A skipped operation is not a failure and is not recorded: the generator
@@ -711,20 +755,36 @@ void main() {
           await h.verify('crash-run op $i');
         }
       }
+      await h.ensureSomethingToLose();
+      await h.verify('ensuring there is something to lose');
       final before = h.workouts.keys.toSet();
 
       // The half-written state: several rows land, then the transaction throws.
       // What must reach the file is nothing at all.
+      //
+      // **Both statements have to be ones SQLite accepts.** The first draft
+      // wrote a `day_key` of 19700101, which the CHECK against `started_at`
+      // refuses — so the transaction died on its own poison at statement one,
+      // the delete never ran, and the test proved only that a constraint
+      // works. The tear has to be legal on the way in and destructive once
+      // committed, or there is nothing for the rollback to take back.
       final open = h.openWorkout ?? h.live.firstOrNull;
       if (open != null) {
         await expectLater(
           db.transaction(() async {
             await (db.update(db.workouts)..where((t) => t.id.equals(open.id)))
-                .write(const WorkoutsCompanion(dayKey: Value(19700101)));
+                .write(const WorkoutsCompanion(notes: Value('half-written')));
             await db.delete(db.setLogs).go();
             throw StateError('battery');
           }),
           throwsA(isA<StateError>()),
+        );
+        // The delete really would have been felt: the sets it took are the
+        // ones the model is about to check for.
+        expect(
+          h.workouts.values.any((w) => w.exercises.any((e) => e.sets.isNotEmpty)),
+          isTrue,
+          reason: 'the torn transaction deleted nothing, so it proves nothing',
         );
       }
       await h.verify('a rolled-back transaction');
