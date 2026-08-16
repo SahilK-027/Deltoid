@@ -1,261 +1,162 @@
 # Deltoid
 
-Deltoid is a personal, offline-first training log built with Flutter and SQLite.
-It runs on Android and keeps everything on the device.
+A personal, offline-first training log. Flutter, Riverpod and drift over SQLite,
+Android only, one user.
 
-Offline-first is finished and is the architecture, not a stage: every screen
-reads local disk and nothing waits on a server. **Online sync across your own
-devices is in scope and not yet built** — the schema has carried the columns for
-it from the start (`updatedAt`, `deletedAt`, `deviceId`, `dirty`), and the app
-makes no network call until it lands.
+Everything lives on the device and no screen waits on a server — the app makes
+no network call at all today. Sync across your own devices is designed and in
+scope but not built; the schema has carried its columns from the start
+(`updatedAt`, `deletedAt`, `deviceId`, `dirty`).
 
 **No programme is baked in.** A fresh install ships with an exercise catalog and
-nothing else. You either build your own split or start from one of the two
-templates (PPL 6-day and Upper/Lower) and edit it into shape. A template writes
-ordinary sessions and slots, so nothing about it stays special once it has been
-applied.
+nothing else. Build a split or start from a template (PPL 6-day, Upper/Lower) and
+edit it — a template writes ordinary rows, and nothing about it stays special.
 
-**It is a single-user personal tool rather than a product**, so scope discipline
-is a requirement. [RULES.md § Scope](RULES.md#6-scope) lists what stays out.
+The one idea the app exists for: **progression is scoped to the session, not the
+exercise.** Push 1 and Push 2 keep separate histories of the same movement, so
+what the fields prefill with is what you did on *this* day last time.
 
----
+## Quick start
 
-## The docs
-
-There are four documentation files, and each one has a single job. Nothing
-belongs in two of them.
-
-| File                     | Holds                                                                                                 |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **README.md** (this)     | What it is, how to set it up, how to run it, what the files are, how it is built                      |
-| **[RULES.md](RULES.md)** | Every rule the app is held to — data invariants, migration protocol, code traps, scope                |
-| **[THEME.md](THEME.md)** | The app as it stands: every screen, the design language it is drawn in, and the decisions behind both |
-| **[TODO.md](TODO.md)**   | One list — what is done, what is left                                                                 |
-| [CLAUDE.md](CLAUDE.md)   | Orientation for AI sessions. Points at the four above; holds nothing of its own                       |
-
----
-
-## Setup
-
-You need the Flutter SDK (Dart `^3.11.5`) and a working Android toolchain.
-Point the shell at the Android SDK first:
+Needs the Flutter SDK (Dart `^3.11.5`) and an Android toolchain.
 
 ```bash
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH
-```
-
-Then fetch the packages and generate the database code:
-
-```bash
 flutter pub get
 dart run build_runner build
-```
-
-`build_runner` writes the drift database code in `lib/data/db/database.g.dart`,
-and it has to be run again after **any** edit to `lib/data/db/tables.dart`.
-
-Then install the git hooks — once per clone, because `.git/hooks` is not
-version-controlled:
-
-```bash
 git config core.hooksPath hooks
-```
-
-That points git at [`hooks/`](hooks/), where `pre-push` runs
-`flutter analyze && flutter test` and refuses the push if either fails. The only
-way past it is `git push --no-verify`.
-
-## Running it
-
-Start the app on a connected device or emulator:
-
-```bash
 flutter run
 ```
 
-Check it before calling any change done. Both commands must come back clean:
+`build_runner` generates `lib/data/db/database.g.dart` and must be re-run after
+any edit to `lib/data/db/tables.dart`. `core.hooksPath` is once per clone and
+points git at [`hooks/`](hooks/), whose `pre-push` refuses a push that fails
+analyze or test; `--no-verify` is the only way past it.
 
-```bash
-flutter analyze && flutter test
+## Commands
+
+| | |
+| --- | --- |
+| `flutter run` | run on a connected device or emulator |
+| `flutter analyze && flutter test` | the gate — both must be clean before anything is done |
+| `dart run build_runner build` | regenerate after a schema change |
+| `flutter build apk --release` | release build |
+| `flutter test tool/test/` | tests for the seed generator, which `flutter test` skips |
+
+## Layout
+
+```
+lib/
+  main.dart · app.dart      bootstrap, theme mode, the shell
+
+  domain/                   pure Dart — no Flutter, no database, no I/O
+    prefill.dart              resolvePrefill + applyDeload    ← the core rule
+    cycle_engine.dart         cycle status, deload scheduling
+    metrics.dart              e1RM, effective load, beatsPrevious, stalls
+    muscle_volume.dart        weekly sets folded into six regions
+    volume_history.dart       weeks, spans and rates
+    chart_buckets.dart        the fold every chart draws through
+    consistency.dart          sessions per week, streaks, honest rates
+    session_diff.dart         today's improvisation vs the template
+    plates.dart · units.dart · set_format.dart · enums.dart
+
+  data/
+    db/                     tables.dart (schema), database.dart,
+                            watch.dart (the only safe way to watch a query)
+    repositories/           training_repository  logging, cycles, history,
+                                                 progress, volume
+                            regime_repository    programmes, sessions, catalog
+    seed/                   starter catalog + optional templates
+    backup/                 whole-database JSON export / restore
+
+  core/                     theme tokens, shared providers, the primitives every
+                            screen composes from, ids, failure reporting,
+                            notifications, the end-of-rest alert
+
+  features/                 workouts · log · history · regime · settings · shell
+
+test/                       domain · data · features · core · integrity
+tool/seed_years.dart        generates years of plausible history
 ```
 
-Build a release APK:
+Four layers, dependencies one way only: `features` → `data` → `domain`, with
+`core` available to all three. Repositories return plain records and streams, so
+no widget touches a table. Weights are always stored in kilograms and converted
+at the edge.
 
-```bash
-flutter build apk --release
-```
+Riverpod providers sit over drift streams, so a write re-renders whatever was
+watching that table. That stays true after sync: screens read local disk, and a
+sync is background reconciliation of the same tables.
 
-### The fuzz harness
+The four tabs are **Workouts** (next session, consistency grid, weekly volume),
+**Regime** (programmes, editor, exercise catalog), **History** (session feed,
+per-exercise history and trend) and **Settings** (units, theme, bodyweight,
+backup).
 
-`test/integrity/model_fuzz_test.dart` drives the real database with seeded
-random operations and checks every one against a deliberately dumb in-memory
-model and against `test/integrity/invariant_oracle.dart`. A failure prints the
-seed and the shortest operation sequence that still reproduces it.
+## Testing
 
-The committed run is small enough to sit in the suite. Three environment
-variables make it a soak, and `FUZZ_REPORT=1` prints how many operations each
-seed actually applied:
+719 tests. Beyond the usual unit and widget tests, `test/integrity/` holds two
+pieces worth knowing about:
 
-```bash
-FUZZ_REPORT=1 FUZZ_SEEDS=120 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_test.dart
-```
+- `invariant_oracle.dart` — sixteen structural rules re-derived in SQL, callable
+  after any write, each with a test that has watched it fire.
+- `model_fuzz_test.dart` — seeded random operations against the real database and
+  a deliberately dumb in-memory model, checking the oracle after every one. A
+  failure prints the seed and the shortest sequence that still reproduces it.
 
-`FUZZ_BACKUP_EVERY=N` runs the backup/restore operation every Nth time it is
-proposed instead of every time. It is the one operation whose cost grows with
-the history behind it — it rewrites every row — so thinning it is what makes a
-run of millions of operations finish in an afternoon:
+The committed fuzz run is small enough to live in the suite. Environment
+variables turn it into a soak:
 
 ```bash
 FUZZ_REPORT=1 FUZZ_SEEDS=500 FUZZ_OPS=2000 FUZZ_BACKUP_EVERY=10 flutter test test/integrity/model_fuzz_test.dart
 ```
 
-Rerun a single failure exactly as it was printed:
+`FUZZ_SEEDS` × `FUZZ_OPS` is the size of the run, `FUZZ_REPORT=1` prints how many
+operations each seed applied, and `FUZZ_BACKUP_EVERY=N` thins the one operation
+whose cost grows with the history behind it. Replay a printed failure with
+`FUZZ_SEED=17 FUZZ_SEEDS=1`.
 
-```bash
-FUZZ_SEED=17 FUZZ_SEEDS=1 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_test.dart
-```
-
-### Filling it with data
-
-`tool/seed_years.dart` writes a backup file holding years of plausible history,
-so the app can be tested at a size no fresh install reaches. The history it
-generates progresses over time, keeps each session's numbers separate and
-includes deload weeks. Restore the file through Settings → Backup.
+To test at a size no fresh install reaches, generate a history and restore it
+through Settings → Backup:
 
 ```bash
 dart run tool/seed_years.dart --years 5 --out seed.json
 ```
 
-Its tests live beside it in `tool/test/`, deliberately outside `test/`, so that
-`flutter test` never pays for them — the generator is a debugging tool, not part
-of the app. Run them when you change it:
+## Schema changes
 
-```bash
-flutter test tool/test/
-```
+`schemaVersion` is **1** and there is no `onUpgrade`. While the app is
+unreleased, a schema change is an edit to `tables.dart`, a regenerate, a default
+in the backup codec, and a reinstall. The migration ladder starts the day a build
+reaches a phone that is not yours — see
+[RULES § 3](RULES.md#3-schema-and-migrations) before touching a column.
 
-### Environment notes (this Mac)
+## The docs
 
-- **Android is the only target that can be built here.** Xcode is not
-  installed, only CommandLineTools, so iOS cannot be built or run on this
-  machine. Nothing iOS-specific is known to be broken, but nothing has been
-  verified either.
-- The emulator crashes when it is given a window on macOS 26, so run it
-  headless:
+Each has one job, and nothing belongs in two of them.
 
-  ```bash
-  emulator -avd Pixel_3a_API_31_arm64-v8a -no-window -no-snapshot -gpu swiftshader_indirect
-  ```
+| File | Holds |
+| --- | --- |
+| **README.md** (this) | What it is, how to set it up, how to run it, where things live |
+| **[RULES.md](RULES.md)** | Every rule the app is held to — data invariants, migrations, code traps, scope |
+| **[THEME.md](THEME.md)** | The app screen by screen, and the design language it is drawn in |
+| **[SYNC.md](SYNC.md)** | The sync design: what syncs, how a conflict resolves, what it may never do |
+| **[TODO.md](TODO.md)** | One list — what is done, what is left. Status lives here and nowhere else |
+| [CLAUDE.md](CLAUDE.md) | Orientation for AI sessions; points at the five above and holds nothing of its own |
 
-- Take a screenshot with `adb exec-out screencap -p > out.png`.
-- Inspect the database on the device with the command below. Quote the whole
-  thing, or the shell mangles it:
+It is a single-user personal tool rather than a product, so scope discipline is a
+requirement — [RULES § 6](RULES.md#6-scope) lists what stays out, and the answer
+to "should this be added" is usually no.
 
-  ```bash
-  adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app_flutter/deltoid.sqlite 'select count(*) from workouts'"
-  ```
+## Environment notes
 
-- `file_picker` resolves to version 3.0.4, which is missing a namespace and
-  breaks the Gradle build. The app uses `file_selector` instead, and it should
-  not be swapped back.
-
----
-
-## How it is built
-
-The app is built with Flutter, Riverpod and drift. Everything lives on local
-disk, and there is no network call anywhere in it today. State is a layer of
-Riverpod providers over drift streams, so a write in one place re-renders
-whatever was watching that table.
-
-That stays true after sync lands: local disk is what the screens read, and a
-sync is a background reconciliation of the same tables rather than a thing any
-screen waits on. Reads never learn about the network.
-
-There are four layers, and the dependencies point one way only — `features`
-depends on `data`, which depends on `domain` — while `core` is available to all
-three.
-
-- **`domain/`** holds pure Dart with no Flutter, no database and no I/O. Every
-  rule that does arithmetic lives here and is unit-tested without a database:
-  prefill and deload, cycle timing, estimated 1RM and effective load, weekly
-  volume, consistency, plate maths and unit conversion.
-- **`data/`** holds the drift schema, the two repositories over it, the starter
-  catalog and the whole-database JSON backup. Repositories return plain records
-  and streams, so no widget ever touches a table directly.
-- **`features/`** holds one folder per tab, each with its own screens, providers
-  and widgets.
-- **`core/`** holds the theme tokens, the shared providers, the component
-  primitives every screen composes from, and a few cross-cutting pieces such as
-  id generation, the end-of-rest alert, the per-second ticker and scroll
-  behaviour.
-
-Weights are always stored in kilograms, and the display unit converts them at
-the edge. The schema is at version 7 and the upgrade path is real, so read
-[RULES.md § Schema and migrations](RULES.md#3-schema-and-migrations) before
-touching a column.
-
-### Layout
-
-```
-lib/
-  main.dart · app.dart          bootstrap, theme mode, the shell
-
-  domain/                       pure Dart, heavily unit-tested
-    prefill.dart                  resolvePrefill + applyDeload   ← the core rule
-    cycle_engine.dart             CycleStatus, planNextCycle     ← cycles, deload
-    metrics.dart                  e1RM, effective load, beatsPrevious, stalls
-    muscle_volume.dart            weekly sets folded into six regions
-    consistency.dart              sessions-per-week, streaks, honest rates
-    session_diff.dart             today's improvisation vs the template
-    plates.dart                   what to load on the bar
-    units.dart                    kg / lb, rounding, signed deltas
-    enums.dart                    LoadMode, MeasureMode, SetType, SkipReason, …
-
-  data/
-    db/                         tables.dart (schema), database.dart (migrations),
-                                watch.dart (the only safe way to watch a query)
-    repositories/               training_repository  logging, cycles, history,
-                                                     progress, volume
-                                regime_repository    programmes, sessions, catalog
-    seed/                       starter exercise catalog + optional templates
-    backup/                     whole-DB JSON export / restore, Downloads writer
-
-  core/
-    theme/                      tokens.dart, theme.dart — the language in code
-    widgets/                    primitives.dart (cards, rows, chips, sheets),
-                                trend_chart.dart (the one chart), calendar.dart
-                                (the one day picker), reorder_sheet.dart,
-                                ticking.dart (every per-second rebuild)
-    providers.dart · ids.dart · rest_alert.dart · scroll.dart
-
-  features/
-    today/                      Workouts: next session, heatmap, volume bars
-    log/                        the logging PageView, keypad, hold pad, summary
-    history/                    session feed, per-exercise history, trend chart
-    regime/                     regime library, programme editor, exercise catalog
-    settings/                   settings, bodyweight log, backup
-    shell/                      the four-tab scaffold
-
-test/                           domain · data · features · core
-tool/seed_years.dart            generates years of plausible history
-tool/test/                      its tests, outside test/ so they never run by default
-assets/audio/rest_done.mp3      the end-of-rest tone
-```
-
-### The four tabs
-
-The app has four tabs: Workouts, Regime, History and Settings.
-[THEME.md](THEME.md) describes the system every one of them is drawn with. In
-short:
-
-- **Workouts** is the landing screen. It shows how long it has been since you
-  trained, the one session to start next, the consistency grid and this week's
-  sets per muscle. The code still calls this feature `today`.
-- **Regime** holds the regime library and the programme editor, along with the
-  exercise catalog and the deload configuration.
-- **History** holds the session feed and the per-exercise index. Every row opens
-  what was actually logged, and an exercise opens with its trend chart at the
-  top.
-- **Settings** holds units, theme, the bodyweight log and backup.
+- **Android is the only target buildable here.** Only CommandLineTools is
+  installed, no Xcode. Nothing iOS-specific is known broken; nothing is verified.
+- The emulator crashes with a window on macOS 26, so run it headless:
+  `emulator -avd Pixel_3a_API_31_arm64-v8a -no-window -no-snapshot -gpu swiftshader_indirect`
+- Screenshot: `adb exec-out screencap -p > out.png`
+- Read the on-device database (quote the whole thing or the shell mangles it):
+  `adb shell "run-as com.deltoid.deltoid sqlite3 /data/data/com.deltoid.deltoid/app_flutter/deltoid.sqlite 'select count(*) from workouts'"`
+- `file_picker` resolves to 3.0.4, which is missing a namespace and breaks the
+  Gradle build. The app uses `file_selector`; do not swap it back.
