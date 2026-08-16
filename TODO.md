@@ -1,14 +1,10 @@
 # Deltoid — the list
 
-This is the single list of what the app is made of: everything that is done,
-and everything that is left. Within each group, the newest work is at the
-bottom.
+Status only, one line per item: what is done, what is left. Why anything is
+shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
+[SYNC.md](SYNC.md), and the code carries the detail.
 
-This file carries status and nothing else. Why a feature is shaped the way it is
-belongs in [THEME.md](THEME.md), and the rules it must not break belong in
-[RULES.md](RULES.md).
-
-The app currently has **719 tests** and is analyzer clean.
+**719 tests, analyzer clean.**
 
 ---
 
@@ -16,289 +12,95 @@ The app currently has **719 tests** and is analyzer clean.
 
 ### Core model
 
-- [x] Regimes, sessions, session slots and cycles are built. A cycle advances
-      when the work is done rather than when the calendar turns.
-- [x] Deload fires after a configurable number of cycles and applies fewer sets
-      and a lighter bar. It can be configured per regime and overridden per slot.
-- [x] Prefill is scoped to the session. Last time's numbers sit in the fields as
-      ghost text, borrowed numbers are labelled on the exercise's ⓘ, the ghost is
-      adopted when a set is completed, and beating last time lights the row up.
-- [x] Logging writes snapshots, so a workout keeps its own copy of the day and
-      editing the programme never rewrites history.
-- [x] Up to six regimes live at once with one of them active. Each owns an
-      identity hue, and names are unique among the living ones.
-- [x] The exercise catalog archives rather than deletes. The starter catalog is
-      seeded on first launch, and no regime is ever seeded.
-- [x] Stale sessions are handled: one left open with nothing in it is swept
-      silently, and one with sets in it is kept and offers Finish or Discard.
+- [x] Regimes, sessions, slots and cycles; a cycle advances on work done, not on the calendar.
+- [x] Deload after N cycles, per regime and overridable per slot.
+- [x] Prefill scoped to the session, with ghost text, labelled borrows and adoption on tick.
+- [x] Logging writes snapshots, so editing a programme never rewrites history.
+- [x] Six regimes, one active, each with an identity hue and a unique living name.
+- [x] The exercise catalog archives rather than deletes; starter catalog seeded, no regime ever is.
+- [x] Stale open sessions: empty ones swept, ones with sets kept and offered Finish or Discard.
 
 ### Logging
 
-- [x] The log screen shows one exercise per page and supports typed sets, set
-      types, drop groups, swipe-to-delete, swapping, skipping, moving and adding
-      a movement mid-session, notes at three levels, and recovery from a force
-      stop.
-- [x] The keypad is docked and stepped by the plate increment, and it puts last
-      time's value one tap away.
-- [x] The plate view sits inside the keypad and shows what to load on the bar,
-      for a movement that knows which bar it uses.
-- [x] The rest timer starts itself when a set is ticked, plays its tone on the
-      alarm stream, and holds a wakelock while a session is open. A rest still
-      running when the app goes to the background is handed to the OS as an
-      exact alarm, so it rings on time with the screen off, and an ongoing
-      silent notification carries the session, its set count and a system-drawn
-      countdown.
-- [x] Ticking a set moves the keypad to the next open set — turning the page
-      when that set is on the next exercise — and closes it on the last one, so
-      the finish button is the only thing left on screen.
-- [x] Partial reps are logged apart from full ones. The count cell splits in
-      equal halves only once there is a second number in it — `P` on the pad
-      asks for it and `F` closes it again, a number on the row or in the ghost
-      keeps it. Either box takes focus on its own tap; only the pad's `F`
-      closes the half. Last time's partials show as a ghost and are never
-      adopted. History reads them as `8+3`. They are recorded only: out of volume,
-      out of e1RM and out of `beatsPrevious`.
-- [x] Isometric holds are measured in time through `MeasureMode` on the
-      exercise. A stopwatch replaces the keypad for them, so starting and
-      stopping the clock writes the hold, ticks the set and starts rest, and a
-      hold that was timed elsewhere is typed as a clock instead.
-- [x] The session summary reports volume, sets and time, carries the session
-      note and a recap, and offers to keep today's changes to the programme.
+- [x] One exercise per page: typed sets, set types, drop groups, delete, swap, skip, move, add mid-session, notes at three levels, force-stop recovery.
+- [x] Docked keypad, stepped by the plate increment, last time's value one tap away.
+- [x] Plate view inside the keypad, for a movement that knows its bar.
+- [x] Rest timer with tone, wakelock, an OS exact alarm in the background and an ongoing notification.
+- [x] Ticking advances the keypad to the next open set, across pages, and closes on the last.
+- [x] Partial reps logged apart from full ones, shown as `8+3`, out of volume, e1RM and `beatsPrevious`.
+- [x] Isometric holds through `MeasureMode`, with a stopwatch in place of the keypad.
+- [x] Session summary: volume, sets, time, the session note, a recap and the offer to keep programme changes.
 
 ### Reading it back
 
-- [x] History pages the session feed by keyset, indexes every exercise trained,
-      and opens a workout from that day's own snapshot rows. Filters run in the
-      query rather than over the loaded page.
-- [x] The trend chart plots estimated 1RM or heaviest weight over time with one
-      line per session slot, excludes deload weeks, detects stalls and takes
-      pinch to zoom. A timed hold is plotted in seconds instead.
-- [x] The consistency heatmap shows eighteen weeks on Workouts with the all-time
-      view behind it, drawing a year per `CustomPaint`.
-- [x] Weekly muscle volume shows six region rows under the heatmap, counted in
-      SQL, with arms and legs folding open onto their own muscles.
-- [x] Volume history answers the question the rolling week cannot: a screen of
-      six stat tiles, one bar per week, opened from that card exactly as the
-      all-time heatmap opens from the one above it. Averages divide by every
-      week in the span including the empty ones, each tile scales to its own
-      peak, and scrubbing the bars names the week in the caption. A region opens
-      onto its own muscles, so a year of neglected hamstrings is visible rather
-      than buried in a leg total. `1M / 3M / 1Y` plus the year picker — never
-      "all time", which is a decade squashed into a phone's width.
-- [x] A region opens onto a full-size chart with a y axis and months under the
-      baseline, three figures the average cannot state on its own (total, best
-      week, weeks trained of weeks in the span), and **which movements produced
-      the sets**, with each one's share. That last section is what a region with
-      one muscle has instead of a split: Back cannot ask quads-versus-hamstrings
-      but it can ask why eleven of its sets were pulldowns.
-- [x] `workout_exercises.muscle` snapshots what a movement trained at the moment
-      it was logged, so refiling an exercise in the catalog no longer rewrites
-      every week it ever appeared in. Nullable, and null means "logged before
-      the column existed, ask the catalog" — not `other`.
-- [x] The bodyweight log is one tap from Settings, groups by month with deltas,
-      has its own trend, and is interpolated into every bodyweight lift's score.
-- [x] The trend chart is drawn in the same frame as the list under it. Scoring
-      thirty years of one movement was 130ms of drift row mapping — whole
-      `SetLog` objects gathered by a two-thousand-parameter `IN` — so the
-      chart's two queries read the five columns they use off a `QueryRow`
-      instead: **26ms**, same numbers, asserted equal. The header now draws at a
-      fixed height before its numbers arrive, so the rows no longer jump.
-- [x] An empty chart is a chart: gridlines, the window's own time axis, the
-      whole history's value axis, and no sentence written across it. One session
-      plots its dot. Never-logged is that same page with dashes in it rather
-      than a screen of its own.
-- [x] History's exercise search falls through to the catalog, so a movement you
-      created and have not trained is findable — listed under the matches, and
-      saying it has never been logged rather than not existing.
-- [x] **Every chart is one chart.** `lib/domain/chart_buckets.dart` folds any
-      dated series into daily / weekly / monthly / yearly buckets — measurements
-      averaged, counts summed and stated per week — and every chart in the app
-      draws through it, so fifty years is fifty marks rather than eighteen
-      thousand. `Auto` takes the finest level under a ~60-mark ceiling and is
-      named on the chip. The exercise trend, bodyweight, the volume grid and a
-      region's chart share one control row (`1W 1M 3M 6M 1Y All`, year,
-      averaging), one axis (seven labels, the last one today, counted back from
-      it), and one transition — the frame holds its size while the scale and the
-      marks interpolate. The consistency heatmap and the muscle bar list keep
-      the shared colour and type but not the axis: a calendar and a ranked row
-      list have no time axis to range over.
+- [x] History pages by keyset, indexes every exercise trained, opens a workout from its own snapshots.
+- [x] Trend chart: e1RM or top weight, one line per session slot, deloads excluded, stalls flagged, pinch to zoom, holds in seconds.
+- [x] Consistency heatmap, eighteen weeks on Workouts with the all-time view behind it.
+- [x] Weekly muscle volume, six regions counted in SQL, arms and legs folding open.
+- [x] Volume history screen: six tiles, one bar per week, averages over every week in the span.
+- [x] A region opens onto a full chart plus the movements that produced its sets.
+- [x] `workout_exercises.muscle` snapshots what a movement trained when it was logged.
+- [x] Bodyweight log: monthly groups with deltas, its own trend, interpolated into every bodyweight lift.
+- [x] The trend chart draws in the same frame as the list under it — 130ms to 26ms, same numbers.
+- [x] An empty chart is still a chart: axes, gridlines, no sentence written across it.
+- [x] History's exercise search falls through to the catalog.
+- [x] Every chart folds through `chart_buckets.dart` and shares one control row, one axis and one transition.
 
 ### Around the edges
 
-- [x] Backup exports, restores and auto-exports after a session, saving to
-      Downloads or through the share sheet. The JSON runs on another isolate and
-      reports progress, and the round trip is tested.
-- [x] Settings covers units (kilograms or pounds, display only), the light, dark
-      and system themes drawn as three miniatures of the app, and the adaptive
-      launcher icon.
-- [x] One day picker serves backfill, the bodyweight log and re-dating a
-      workout, and it rings the days that are already logged.
-- [x] Backfill logs a past session, asking for the day first and keeping it on
-      screen while you choose.
+- [x] Backup export, restore and auto-export after a session, on an isolate, round-trip tested.
+- [x] Settings: units, three themes drawn as miniatures, adaptive launcher icon.
+- [x] One day picker for backfill, bodyweight and re-dating, ringing the days already logged.
+- [x] Backfill asks for the day first and keeps it on screen.
 
 ### The rebrand
 
-Every screen was rebuilt on [THEME.md](THEME.md), ordered by how much a screen
-is used and by what shared pieces it forced into existence.
-
-- [x] 0 · Foundation — the tokens, the type roles, the primitives and the nav
-      bar.
-- [x] 1 · Workouts — the header band, the flat hero and one white action.
-- [x] 2 · Log — the set rows, index chips, keypad, rail, sheets and rest timer.
-- [x] 3 · History and workout detail — full-bleed rows, month headings, the
-      session summary and notes at three levels.
-- [x] 4 · Progress folded into History, so the chart now lives at the head of an
-      exercise's own history and the tab is gone.
-- [x] 5 · The Regime cluster — the tab became the library, a regime pushes the
-      editor, and an exercise is one screen wherever you came from.
-- [x] 6 · Settings, the bodyweight log and the all-time heatmap.
-- [x] Feel — ink on rows and the nav bar, animated folds, damped scrolling, and
-      no spinner anywhere there is already content on screen. The four things
-      that actually cost frames were found by reading the code rather than by
-      guessing, and all four are fixed.
-- [ ] **7 · Reconciliation** — the light theme has now been driven on an
-      emulator across Workouts, Regimes, the exercise catalog, History and
-      Settings, all of them **empty**. What that confirmed: the neutral ramp
-      inverts without a tint, the primary action is black, and the six hues
-      appear only as fills — the catalog's muscle chips carry a coloured dot
-      with `textPrimary` text, which is the rule. What it found: History said
-      "nothing logged" twice, once in the eyebrow and once as a `——` that reads
-      as a black rule at 22sp in `#111111`.
-
-      **Still unchecked, and all of it needs a populated log**: chart lines
-      (`seriesPrimary` cyan measures 1.7:1 on a white card — the documented
-      risk, and the one most likely to be wrong), the heatmap ramp, the volume
-      bars, identity marks on a second regime, deload orange, and every screen
-      of the log itself. Motion has not been looked at in either theme.
+- [x] 0 · Foundation — tokens, type roles, primitives, nav bar.
+- [x] 1 · Workouts.
+- [x] 2 · Log.
+- [x] 3 · History and workout detail.
+- [x] 4 · Progress folded into History; the tab is gone.
+- [x] 5 · The Regime cluster.
+- [x] 6 · Settings, bodyweight log, all-time heatmap.
+- [x] Feel — ink, folds, damped scrolling, no spinner over existing content.
+- [ ] 7 · Reconciliation — light theme checked on five **empty** screens only. Unchecked, and all of it needs a populated log: chart lines, heatmap ramp, volume bars, a second regime's identity mark, deload orange, the log itself, and motion in either theme.
 
 ### Hardening
 
-- [x] **Hardening — the road to first real data.** A finished campaign, run in
-      five stages against exit criteria that were checks rather than feelings.
-      It came before sync because every weakness in it is one a sync layer
-      multiplies: invariants that live in comments become conflict rules that
-      live in comments, and a regression you cannot see on screen is merged by
-      a project with no CI.
-
-      **The gate** is `hooks/pre-push`, which refuses a push that fails
-      `flutter analyze && flutter test`, plus four lints — `unawaited_futures`
-      the one that matters, because a dropped await is a write that silently
-      does not happen.
-
-      **Two audits** ran and were worked through: one asking whether the app can
-      lose, silently alter or corrupt logged data, one asking whether the
-      numbers it displays are the right numbers. Every entry they raised is
-      closed or recorded, and the tests they produced are the suite's spine —
-      hand-computed literals rather than `expect(f(x), f(x))`, each one red
-      before the code that made it green.
-
-      **The net** is `test/integrity/`. `invariant_oracle.dart` holds sixteen
-      structural rules re-derived in SQL rather than delegated to the index or
-      CHECK that normally enforces them, because an index only refuses
-      statements it sees and says nothing about a restore, a heal, or a row
-      another device pushed; each rule has a perturbation test that has watched
-      it fire. `model_fuzz_test.dart` walks the database at random against a
-      model too dumb to share its mistakes, checking that oracle and every value
-      the model tracks after each operation and shrinking a failure to its
-      shortest sequence. It has run 1,350,000 generated operations — 744,358 of
-      them applied — with no violation of either, and it survives an unclean
-      shutdown on a real file.
-
-      **The debt** is closed, each entry by a check rather than by a fix: the
-      queries whose row count grows with the log are raw SQL behind a parity
-      test against the drift path they replaced, the volume screen stops
-      querying when you leave it, no painter clamps to a bound it computed, the
-      exceptions to THEME are written into THEME, and both colour ramps are
-      measured pair by pair. Where each load-bearing rule is checked is listed
-      in [RULES § 7](RULES.md#7-working-on-it).
-
-      **What it did not close** is the section above about the device, which no
-      amount of writing can, and sync, which is the entry below.
+- [x] The gate: `hooks/pre-push` runs analyze and test, plus four lints including `unawaited_futures`.
+- [x] Both audits run and worked through — can it corrupt data, and are the numbers right.
+- [x] `test/integrity/invariant_oracle.dart`: sixteen structural rules in SQL, each with a perturbation test.
+- [x] `test/integrity/model_fuzz_test.dart`: 1,350,000 operations, no violation, survives an unclean shutdown.
+- [x] Queries that grow with the log are raw SQL behind a parity test against the drift path.
+- [x] The volume screen stops querying when you leave it.
+- [x] No painter clamps to a bound it computed.
+- [x] Exceptions to THEME are written into THEME, enforced by a test.
+- [x] Both colour ramps measured pair by pair; the four pairs under AA are named in THEME.
+- [x] Where each load-bearing rule is checked: [RULES § 7](RULES.md#7-working-on-it).
 
 ### Not yet driven on the device
 
-Five things are built, analyzer clean and tested, but have not yet been used in
-a gym: the weekly volume bars, the volume history screens, the muscle chips,
-isometric holds and the hold pad. Five more have never been verified on real hardware at all: the rest tone,
-the haptics, the wakelock, audio ducking and the share sheet. Newest and least
-driven: the ongoing session notification and the scheduled rest alarm — the
-notification permission prompt, the countdown on the lock screen and the alarm
-firing with the screen off have only been built, not felt.
+- [ ] Built and tested but never used in a gym: weekly volume bars, volume history screens, muscle chips, isometric holds, hold pad.
+- [ ] Never verified on real hardware at all: rest tone, haptics, wakelock, audio ducking, share sheet.
+- [ ] Newest and least driven: the ongoing session notification and the scheduled rest alarm.
 
 ---
 
 ## Left
 
-- [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
-      document to read before writing any of it. Scope-approved and bounded by
-      [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to
-      take, not collaboration and not a feature.
-
-The shape, decided: **correct on any number of devices, live on
-      none.** Two phones never lose a write, fabricate one, or refuse each
-      other's rows; what they do not do is update each other within seconds. A
-      held socket is what Keep and Notion need for two people in one document,
-      and it would cost a battery budget here to serve a case one person with
-      one phone does not produce — while the correctness it gets confused with
-      is built either way.
-
-      **Identity** is Google through Supabase Auth, which is also what makes the
-      anon key harmless: with RLS keyed to `auth.uid()` the key alone grants
-      nothing. **What syncs** is the nine `SyncColumns` tables and never
-      `app_settings`. **Conflict** is row-level last-write-wins throughout,
-      ordered on a server timestamp rather than a phone's — field-level merge
-      was rejected because a `SetLog` is one physical event, and merging
-      `60 × 8` with `62.5 × 5` field-by-field yields a lift nobody performed.
-      Only **`journal_mode`** is still open: `delete` today, so a sync reader
-      and a writer serialise completely, and WAL trades a little durability.
-
-      **The local schema does not change.** `user_id` is server-side only,
-      attached from the session at push time. Nothing in `tables.dart` moves.
-
-      In build order, each piece landing on its own:
-
-      - [ ] Migration ladder — the prerequisite below, before any of this ships.
-      - [ ] Supabase project: nine tables, `user_id`, RLS with `using` *and*
-            `with check` on every one. Needs the project URL and anon key.
-      - [ ] A `SyncClient` seam with a fake behind it, so push, pull, conflict
-            and adoption are all testable without a network or a credential.
-      - [ ] Push: drain `dirty`, parents first, idempotent upserts, and clear
-            `dirty` only against an unchanged `updatedAt`.
-      - [ ] Pull: `last_pull_at` cursor on `server_updated_at`, LWW applier
-            through the repositories, tombstones as tombstones, a bad row
-            skipped and named rather than stopping the batch.
-      - [ ] Collision resolution for the nine unique indexes — re-slot,
-            re-flag, re-number, never delete. The first four are not edge cases:
-            two devices appending to one parent both compute `max + 1`.
-      - [ ] Defer `ensureStarterCatalog` until the welcome screen is answered,
-            so a fresh phone signing in does not end up with two catalogs and
-            its history split across two ids for one movement.
-      - [ ] A test per row of [SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does),
-            so a later change that breaks one fails a build rather than a
-            history.
-      - [ ] Adoption: the three shapes at sign-in, and for the third a prompt
-            offering keep-account / keep-phone / merge, with counts on both
-            sides and the side not kept exported to a file first.
-      - [ ] Sign-in on Google, session persisted, seen once.
-      - [ ] The welcome screen — the app's one illustrated page, drawn to
-            [THEME.md § Illustration](THEME.md), monochrome, with declining
-            given equal standing.
-      - [ ] Settings: connect, state, last run, and the two sign-out doors.
-      - [ ] Scheduling: debounced after writes, on resume, on connectivity, plus
-            an idle backstop whose interval wants a real phone to choose it.
-            Needs `connectivity_plus` — the design says "on connectivity
-            regained" in three places and nothing in `pubspec.yaml` can detect
-            it.
-      - [ ] Catalog deduplication on `starterKey`, with references repointed.
-            Needed whenever a phone that has trained offline signs into an
-            account that already has a catalog, which is the ordinary
-            offline-first order — not a rare case.
-
-- [ ] **The migration ladder, as a prerequisite of sync rather than a
-      consequence.** `schemaVersion` is 1 with no `onUpgrade`, which holds only
-      while every database is one we can throw away. Sync ends that: two devices
-      can run different builds and exchange rows, so a released schema change
-      needs both an upgrade path for the local file and a wire format that
-      survives a row carrying one column more or fewer than the reader knows.
-      See [RULES.md § 3](RULES.md#3-schema-and-migrations) for the rules the
-      ladder itself has to follow.
+- [ ] **Migration ladder** — `schemaVersion` is 1 with no `onUpgrade`. Prerequisite of sync, not a consequence. [RULES § 3](RULES.md#3-schema-and-migrations).
+- [ ] **Cloud backup** — designed in full in [SYNC.md](SYNC.md); read it before writing any of it. Correct on any number of devices, live on none. Local schema does not change.
+  - [ ] Supabase project: nine tables, `user_id`, RLS with `using` and `with check`.
+  - [ ] A `SyncClient` seam with a fake behind it.
+  - [ ] Push: drain `dirty`, parents first, idempotent upserts.
+  - [ ] Pull: `last_pull_at` cursor, LWW applier, tombstones as tombstones.
+  - [ ] Collision resolution for the nine unique indexes — re-slot, never delete.
+  - [ ] Defer `ensureStarterCatalog` until the welcome screen is answered.
+  - [ ] A test per row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does).
+  - [ ] Adoption: the three shapes at sign-in, with an export before anything is dropped.
+  - [ ] Google sign-in, session persisted.
+  - [ ] The welcome screen — the app's one illustrated page.
+  - [ ] Settings: connect, state, last run, two sign-out doors.
+  - [ ] Scheduling: debounce, resume, connectivity, idle backstop. Needs `connectivity_plus`.
+  - [ ] Catalog deduplication on `starterKey`, references repointed.
+  - [ ] `journal_mode` still open: `delete` today, WAL trades durability.
