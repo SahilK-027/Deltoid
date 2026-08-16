@@ -92,7 +92,7 @@ final bodyweightSummaryProvider = StreamProvider<BodyweightSummary>((ref) {
 /// window is the query's. **The window is not always small**: this used to say
 /// the chart never showed more than a year, which stopped being true the day
 /// `All` was added and now asks for `day_key >= 0` — every weigh-in ever, the
-/// same regression `setsByMuscleDaily` had (DEBT § 3). So it reads the two
+/// same regression `setsByMuscleDaily` had. So it reads the two
 /// columns the chart plots positionally off a `QueryRow` rather than hydrating
 /// a whole `BodyweightLog` per point, which is drift's most expensive path and
 /// pays for columns nothing here reads.

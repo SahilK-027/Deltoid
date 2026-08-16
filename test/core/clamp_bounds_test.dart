@@ -9,9 +9,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// list that got long. `WeeklyBars` documented its geometry carefully and still
 /// shipped `clamp(1.0, slot)`, which was latent until a range widened enough to
 /// reach it and then fatal on every repaint of the volume screen. The comment
-/// was correct, load-bearing, and did nothing (DEBT § 1, § 5).
+/// was correct, load-bearing, and did nothing, which is why the rules that
+/// matter in this codebase are mechanical (RULES § 7).
 ///
-/// So the rule is mechanical instead: **both bounds of a `clamp` must be
+/// The mechanical form of this one: **both bounds of a `clamp` must be
 /// constants.** A bound built out of arithmetic — `n - 1`, `height / 2`,
 /// `size.height * sets / scale` — is one whose ordering nothing checked, and
 /// the fix is always the same shape: `max(a, min(b, c))` cannot invert and

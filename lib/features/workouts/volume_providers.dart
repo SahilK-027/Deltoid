@@ -157,7 +157,7 @@ final regionExercisesProvider = StreamProvider.autoDispose.family<
 /// re-queried and re-folded that history on the UI isolate, for a screen you
 /// were not looking at. `exerciseProgressProvider` had the same bug; this is
 /// the same fix, and `volume_provider_lifetime_test.dart` is why it cannot come
-/// back (DEBT § 4).
+/// back.
 final volumeHistoryProvider = StreamProvider.autoDispose<VolumeHistory>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);

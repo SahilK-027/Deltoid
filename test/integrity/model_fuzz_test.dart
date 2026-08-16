@@ -19,7 +19,7 @@ import 'invariant_oracle.dart';
 /// A seeded random-operation harness, driving the real database against a model
 /// too stupid to be wrong in the same direction.
 ///
-/// [HARDENING.md](../../HARDENING.md) § 3b. `invariant_oracle.dart` judges what
+/// `invariant_oracle.dart` judges what
 /// must be true of *any* database; this file judges what must be true of *this*
 /// one, given the operations that were actually performed. The two are asserted
 /// after every single operation, so a failure names the operation that caused
@@ -726,11 +726,11 @@ void main() {
   //
   // On a real file, because an in-memory sqlite is always
   // `journal_mode = memory` and a durability claim read off one is worth
-  // nothing — INVARIANTS.md carries that trap by name.
+  // nothing.
   //
   // A `kill -9` cannot be staged from inside the test process: `flutter test`
   // runs on `flutter_tester`, and spawning it to run a script boots an engine
-  // and hangs (INVARIANTS.md again). What *can* be staged is the state a kill
+  // and hangs. What *can* be staged is the state a kill
   // leaves on disk — a transaction that never committed, and a connection that
   // was never closed — which is the thing the invariants have to survive.
   group('the database survives an unclean shutdown', () {

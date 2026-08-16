@@ -58,8 +58,8 @@ void main() {
 
   testWidgets('a box under a pixel tall paints rather than throwing',
       (tester) async {
-    // The other half of the same bug, and the one DEBT § 5 names: the bar
-    // height was `clamp(1.0, size.height)`, whose lower bound is a constant and
+    // The other half of the same bug: the bar height was
+    // `clamp(1.0, size.height)`, whose lower bound is a constant and
     // whose upper bound is the layout. A tile shorter than the minimum ink
     // inverts the pair and `clamp` throws — on every repaint, from inside
     // `paint`, which is not a frame you can navigate away from.

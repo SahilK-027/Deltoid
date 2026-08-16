@@ -20,10 +20,9 @@ import 'invariant_oracle.dart';
 /// **The oracle can feel every break.** One test per rule, each building the
 /// state that rule forbids and asserting the oracle names *that* rule. A judge
 /// nobody has watched convict is an assertion that a `COUNT(*)` returned zero,
-/// and a typo in a join makes it return zero forever. These are the perturbation
-/// [HARDENING.md](../../HARDENING.md) § 3 asks for, written down instead of
-/// performed by hand once, because the fuzz harness is about to depend on this
-/// file being right rather than merely quiet.
+/// and a typo in a join makes it return zero forever. The perturbations are
+/// written down instead of performed by hand once, because the fuzz harness
+/// depends on this file being right rather than merely quiet.
 ///
 /// Standing an index down to build a forbidden state is the shape
 /// `test/data/write_integrity_test.dart` already uses, and it is honest about

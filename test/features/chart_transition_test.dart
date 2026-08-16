@@ -5,8 +5,8 @@ import 'package:deltoid/features/workouts/widgets/volume_history_bars.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// DEBT § 9: the zoom between two ranges was implemented and nothing tested it,
-/// because "it looked smooth" needs a golden or a frame timeline.
+/// The zoom between two ranges was implemented and tested by nothing, because
+/// "it looked smooth" needs a golden or a frame timeline.
 ///
 /// What can be tested without either is the part that would be *visibly* wrong:
 /// the chart must not resize while it animates. A bar strip that grows a few

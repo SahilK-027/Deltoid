@@ -11,7 +11,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// DEBT § 4: the volume screen used to keep querying after you left it.
+/// The volume screen used to keep querying after you left it.
 ///
 /// `volumeHistoryProvider` watches `set_logs` — the hot table during a session,
 /// written once per set ticked — and was not `autoDispose`, so opening the

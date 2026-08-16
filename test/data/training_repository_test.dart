@@ -20,7 +20,7 @@ final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
 /// These tests used to pass `0` and mean "everything", which is the shape
 /// `todaySnapshot` now asserts against — an open-ended key there is every
 /// workout ever written, hydrated as whole rows, on every rebuild of the first
-/// screen (DEBT § 3). Nothing here logs further back than a few days, so the
+/// screen. Nothing here logs further back than a few days, so the
 /// window makes no difference to what comes out.
 int get heatmapWindowKey => dayKeyOf(daysBefore(DateTime.now(), 98));
 

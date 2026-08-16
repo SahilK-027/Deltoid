@@ -8,9 +8,9 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The conversions DEBT.md § 3 asks for, held to the rule it sets: an unbounded
-/// query is only rewritten in raw SQL once a test has run the old drift path
-/// and the new one over the same seeded data and found them identical field by
+/// The rule every raw-SQL conversion in this repository is held to: an
+/// unbounded query is only rewritten once a test has run the old drift path and
+/// the new one over the same seeded data and found them identical field by
 /// field. The drift implementations below are the ones that were in
 /// `TrainingRepository` before the rewrite, copied verbatim; they stay here
 /// because a parity test whose reference implementation was deleted proves
@@ -62,7 +62,8 @@ Future<List<({int dayKey, double weightKg})>> bodyweightSeriesViaDrift(
 /// `TrainingRepository._performances` as it was: a drift join hydrating whole
 /// `WorkoutExercise`, `Workout` and `Session` rows, then a second query
 /// gathering set logs with `WHERE workout_exercise_id IN (…)` — one bound
-/// parameter per performance, which is the shape DEBT § 9 names.
+/// parameter per performance — a statement thousands of variables wide on a
+/// long history.
 Future<List<PastPerformance>> performancesViaDrift(
   AppDatabase db,
   String exerciseId, {

@@ -2,7 +2,7 @@ import 'package:deltoid/data/db/converters.dart';
 import 'package:deltoid/data/db/renumber.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// DEBT § 1: two rules that were stated in a doc comment and checked nowhere.
+/// Two rules that were stated in a doc comment and checked nowhere.
 ///
 /// Both are small, and that is the point — a rule small enough to be obvious is
 /// a rule nobody writes a test for, and `nextPosition` is called by every append

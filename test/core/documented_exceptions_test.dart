@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// DEBT § 8: **an exception to a documented rule is a change to the document.**
+/// **An exception to a documented rule is a change to the document.**
 ///
 /// The failure this catches is individually reasonable every time it happens: a
 /// comment states a global rule, notes that this code breaks it, explains why,

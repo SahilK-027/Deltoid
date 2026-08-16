@@ -4,8 +4,9 @@ import 'package:deltoid/core/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// DEBT § 9: THEME defines a full light ramp and every widget test built
-/// `Brightness.dark`, so a contrast bug in light mode was invisible.
+/// THEME defines a full light ramp and every widget test in this suite builds
+/// `Brightness.dark`, so a contrast bug in light mode was invisible until this
+/// existed.
 ///
 /// The check is arithmetic rather than a golden. A screenshot of a light screen
 /// tells you it rendered; the number below tells you whether the grey text on

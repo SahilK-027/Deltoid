@@ -8,7 +8,7 @@ This file carries status and nothing else. Why a feature is shaped the way it is
 belongs in [THEME.md](THEME.md), and the rules it must not break belong in
 [RULES.md](RULES.md).
 
-The app currently has **503 tests** and is analyzer clean.
+The app currently has **719 tests** and is analyzer clean.
 
 ---
 
@@ -171,6 +171,50 @@ is used and by what shared pieces it forced into existence.
       bars, identity marks on a second regime, deload orange, and every screen
       of the log itself. Motion has not been looked at in either theme.
 
+### Hardening
+
+- [x] **Hardening — the road to first real data.** A finished campaign, run in
+      five stages against exit criteria that were checks rather than feelings.
+      It came before sync because every weakness in it is one a sync layer
+      multiplies: invariants that live in comments become conflict rules that
+      live in comments, and a regression you cannot see on screen is merged by
+      a project with no CI.
+
+      **The gate** is `hooks/pre-push`, which refuses a push that fails
+      `flutter analyze && flutter test`, plus four lints — `unawaited_futures`
+      the one that matters, because a dropped await is a write that silently
+      does not happen.
+
+      **Two audits** ran and were worked through: one asking whether the app can
+      lose, silently alter or corrupt logged data, one asking whether the
+      numbers it displays are the right numbers. Every entry they raised is
+      closed or recorded, and the tests they produced are the suite's spine —
+      hand-computed literals rather than `expect(f(x), f(x))`, each one red
+      before the code that made it green.
+
+      **The net** is `test/integrity/`. `invariant_oracle.dart` holds sixteen
+      structural rules re-derived in SQL rather than delegated to the index or
+      CHECK that normally enforces them, because an index only refuses
+      statements it sees and says nothing about a restore, a heal, or a row
+      another device pushed; each rule has a perturbation test that has watched
+      it fire. `model_fuzz_test.dart` walks the database at random against a
+      model too dumb to share its mistakes, checking that oracle and every value
+      the model tracks after each operation and shrinking a failure to its
+      shortest sequence. It has run 1,350,000 generated operations — 744,358 of
+      them applied — with no violation of either, and it survives an unclean
+      shutdown on a real file.
+
+      **The debt** is closed, each entry by a check rather than by a fix: the
+      queries whose row count grows with the log are raw SQL behind a parity
+      test against the drift path they replaced, the volume screen stops
+      querying when you leave it, no painter clamps to a bound it computed, the
+      exceptions to THEME are written into THEME, and both colour ramps are
+      measured pair by pair. Where each load-bearing rule is checked is listed
+      in [RULES § 7](RULES.md#7-working-on-it).
+
+      **What it did not close** is the section above about the device, which no
+      amount of writing can, and sync, which is the entry below.
+
 ### Not yet driven on the device
 
 Five things are built, analyzer clean and tested, but have not yet been used in
@@ -185,36 +229,6 @@ firing with the screen off have only been built, not felt.
 
 ## Left
 
-- [ ] **Work through [HARDENING.md](HARDENING.md).** Five stages between here and real
-      data, then sync. Not a feature, and it comes before the one below. Every weakness in it is one a sync layer multiplies: invariants
-      that live in comments become conflict rules that live in comments, and a
-      regression you cannot see on screen is merged by a project with no CI.
-      Stage 1 is done: `hooks/pre-push` runs the gate and refuses a failing
-      push, and the four lints are on with the tree clean under them. Stages 2
-      and 3a are done: both audits ran, every entry they raised is closed or
-      recorded, and [INVARIANTS.md](INVARIANTS.md) and
-      [INTERPRETATION.md](INTERPRETATION.md) are back to their prompts, ready to
-      be run again once sync exists. The two things 3a owed are paid: the log
-      screen's tick guard is asserted through the widget on both paths that
-      complete a set, and the structural rules are gathered into
-      `test/integrity/invariant_oracle.dart` — sixteen of them, re-derived in SQL
-      rather than delegated to the index or CHECK that normally enforces them,
-      because an index only refuses statements it sees and says nothing about a
-      restore, a heal, or a row another device pushed. Each rule has a
-      perturbation test that has watched it fire. Stage 3b is done too:
-      `test/integrity/model_fuzz_test.dart` walks the database at random
-      against a model too dumb to share its mistakes, checking that oracle and
-      every value the model tracks after each operation, shrinking a failure to
-      its shortest sequence. It has run 1,350,000 generated operations —
-      744,358 of them applied — with no violation of either. Stage 4 is done as
-      far as a keyboard can take it: §§ 1, 3, 4, 5, 7, 8 and 9 of DEBT.md are
-      closed, each by a check rather than by a fix — the queries that grow with
-      the log are raw and covered by a parity test against the drift path they
-      replaced, the volume screen stops querying when you leave it, no painter
-      clamps to a bound it computed, the exceptions to THEME are in THEME, and
-      the light ramp is measured pair by pair. **What is left of stage 4 is
-      § 6**, which is the entry below this one about the device, and cannot be
-      closed by writing anything.
 - [ ] **Cloud backup.** Designed in full — see [SYNC.md](SYNC.md), which is the
       document to read before writing any of it. Scope-approved and bounded by
       [RULES.md § 6](RULES.md#6-scope): a backup you do not have to remember to

@@ -56,7 +56,7 @@ void main() {
 
   testWidgets('an inverted range opens on a grid rather than throwing',
       (tester) async {
-    // DEBT § 5: `first` and `last` are the picker's own computed bounds, and a
+    // `first` and `last` are the picker's own computed bounds, and a
     // caller that gets them the wrong way round — a history whose newest
     // workout predates the window it is being offered — used to hand
     // `_CalendarCard` a range it cannot page inside. The picker owns the

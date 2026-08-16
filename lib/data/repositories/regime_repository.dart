@@ -265,7 +265,7 @@ class RegimeRepository {
   /// Every regime with the two numbers that decide whether it is safe to
   /// delete: how big it is, and how much was trained under it.
   ///
-  /// Drift rather than raw (DEBT § 3): both counts are grouped by regime, so
+  /// Drift rather than raw: both counts are grouped by regime, so
   /// the row count is the number of programmes you have ever made — single
   /// figures — and the `IN (…)` lists are one parameter per regime rather than
   /// per workout counted.

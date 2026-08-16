@@ -735,7 +735,8 @@ class TrainingRepository {
   /// been counted. That transfer is the hitch you feel when Consistency opens.
   ///
   /// **Raw, and unbounded is why.** Its row count is one per day you have ever
-  /// trained, so it is the shape DEBT § 3 asks about: at four grouped columns
+  /// trained, so it is the shape the row-mapping rule is about: at four grouped
+  /// columns
   /// per row through drift's `TypedResult.read` — 14µs a call — a long history
   /// spends most of Consistency's open inside the row mapper rather than inside
   /// SQLite. Read positionally off a `QueryRow` the same rows and the same
@@ -1360,7 +1361,7 @@ class TrainingRepository {
   /// read eight columns of them, then collect their sets with
   /// `WHERE workout_exercise_id IN (…)` — one bound parameter per performance,
   /// which on a long history is a statement thousands of variables wide, built
-  /// and bound on the UI isolate (DEBT § 9). The slot list is now a subquery
+  /// and bound on the UI isolate. The slot list is now a subquery
   /// inside the set statement instead: the same predicate text, built once
   /// below so the two statements cannot drift apart, and four bound parameters
   /// however long the history gets.
@@ -1486,8 +1487,8 @@ class TrainingRepository {
     String? regimeId,
     bool deloadOnly = false,
   }) async {
-    // **Bounded by the page, not by the log** — the answer DEBT § 3 asks every
-    // repository query for. It stays drift rather than raw because its row
+    // **Bounded by the page, not by the log** — the answer every query in this
+    // repository owes. It stays drift rather than raw because its row
     // count is what the user has scrolled into view; the `IN (…)` gathers below
     // are one bound parameter per row of *that*. The ceiling is not a product
     // rule, it is the assert § 1 asks for: a limit this large is a paging bug
