@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**732 tests and nine pgTAP tests, analyzer clean.**
+**745 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -94,7 +94,7 @@ Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
 
 - [x] **0 · The ground** — migration ladder at `schemaVersion` 2 with every rung idempotent, the nine `dirty` indexes, WAL, the shared table registry both readers answer to, the wire proved, `INTERNET` in the release manifest.
 - [x] **1 · The server** — nine tables, RLS on every one with `using` and `with check`, granted to `authenticated` and never `anon`, the `server_updated_at` trigger, a `(user_id, server_updated_at)` index per table, `supabase/migrations` in the repo and proved by pgTAP.
-- [ ] **2 · Identity** — Google sign-in, the welcome screen, seeding moved behind it, the account section in Settings.
+- [x] **2 · Identity** — Google sign-in behind `SyncAuth`, the welcome screen, seeding moved behind its answer, the account section in Settings. Not yet driven on hardware.
 - [ ] **3 · Push** — one writer, so no merge and no conflict rules. The `dirty` drain, the triggers, the lifecycle hook.
 - [ ] **4 · Pull** — last-write-wins, collisions on the twelve unique indexes, one bad row never stopping a restore.
 - [ ] **5 · Adoption** — the three shapes at sign-in, and the `starterKey` dedup.

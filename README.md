@@ -39,7 +39,8 @@ either fails. `git push --no-verify` is the only way past it.
 
 |                                   |                                                          |
 | --------------------------------- | -------------------------------------------------------- |
-| `flutter run`                     | run on a connected device or emulator                    |
+| `flutter run --dart-define-from-file=deltoid.env.json` | run with the account configured (see `deltoid.env.example.json`) |
+| `flutter run`                     | run on a connected device or emulator, without sync      |
 | `flutter analyze && flutter test` | the gate — both must be clean before anything is done    |
 | `dart run build_runner build`     | regenerate after a schema change                         |
 | `flutter build apk --release`     | release build                                            |
@@ -107,7 +108,7 @@ backup).
 
 ## Testing
 
-732 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
+745 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
 unit and widget tests, `test/integrity/` holds two pieces worth knowing about:
 
 - `test/integrity/invariant_oracle.dart` — sixteen structural rules re-derived in

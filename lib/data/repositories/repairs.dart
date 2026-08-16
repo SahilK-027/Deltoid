@@ -19,10 +19,22 @@ import 'training_repository.dart';
 /// Cheap on a database with nothing wrong with it — each step is a scan that
 /// finds nothing and opens no transaction — which is what lets it sit on the
 /// path before first paint.
-Future<void> repairDatabase(AppDatabase db) async {
+/// [seed] is false for exactly one moment in the app's life: a first launch
+/// that has not answered the welcome screen yet. Seeding before that answer is
+/// what puts **two catalogs** on a phone that then signs in — roughly 120
+/// exercises, `Bench Press` twice under different ids, and a history split
+/// across both, which breaks the one thing the app exists for because
+/// per-session progression is keyed to an exercise id
+/// ([SYNC.md § 10](SYNC.md#10-adoption)). `answerWelcome` seeds instead, before
+/// it records the answer.
+///
+/// A restore passes true and seeds nothing anyway — the seeder declines a table
+/// that is not empty, and a file that carries no catalog at all is a file
+/// exported before anything was seeded.
+Future<void> repairDatabase(AppDatabase db, {bool seed = true}) async {
   // A database with no exercise catalog at all cannot start a session. A file
   // that carries its own is left alone; this only fills an empty table.
-  await ensureStarterCatalog(db);
+  if (seed) await ensureStarterCatalog(db);
 
   final repo = TrainingRepository(db);
   // A mis-tapped Start leaves a workout that blocks every other session behind

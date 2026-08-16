@@ -10,10 +10,12 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/ids.dart';
 import '../../core/providers.dart';
+import '../../core/sync_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
+import '../../data/sync/sync_auth.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
@@ -78,6 +80,7 @@ class SettingsScreen extends ConsumerWidget {
           // asked for daily, which is why it had never once been logged
           // through the UI. Tapping the figure is the log; the past is a link.
           _BodyweightCard(bodyweight: bodyweight),
+          const _AccountSection(),
           const SizedBox(height: Space.section),
           const SectionHeader('Data'),
           ListCard(
@@ -518,6 +521,104 @@ class _BodyweightCard extends ConsumerWidget {
 /// to tell which is which afterwards. The keypad's ± step follows this too —
 /// 2.5 kg is a pair of plates, and so is 5 lb.
 ///
+/// Where a `Local` install connects, and where a signed-in one sees which
+/// account it is on.
+///
+/// The same connection the welcome screen offered, offered again — that is what
+/// makes declining there a real answer rather than a decision the user is stuck
+/// with ([SYNC.md § 3](SYNC.md#3-identity)). Nothing nags: there is no prompt
+/// that comes back when the network does, and this row is the whole of the
+/// second chance.
+///
+/// **It claims no backup yet.** Push is the next phase; until rows actually
+/// leave the phone, a row here saying a history is safe would be the one kind
+/// of lie this app cannot afford. What it says is what is true — which account
+/// this device is signed in to.
+///
+/// Absent entirely from a build with no configuration, rather than present and
+/// broken: a clone of this repo has no project to reach.
+class _AccountSection extends ConsumerWidget {
+  const _AccountSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(syncAuthProvider) == null) return const SizedBox.shrink();
+    final account = ref.watch(accountProvider).valueOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: Space.section),
+        const SectionHeader('Account'),
+        ListCard(
+          inset: Space.lg,
+          children: account == null
+              ? [
+                  AppRow(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Back up to your Google account',
+                    subtitle:
+                        'Your history is on this phone and nowhere else.',
+                    onTap: () => _signIn(context, ref),
+                    chevron: true,
+                  ),
+                ]
+              : [
+                  AppRow(
+                    icon: Icons.account_circle_outlined,
+                    title: account.email ?? 'Signed in',
+                    subtitle: 'Signed in on this device.',
+                  ),
+                  AppRow(
+                    icon: Icons.logout,
+                    title: 'Sign out',
+                    subtitle: 'Your training stays on this phone.',
+                    onTap: () => _signOut(context, ref),
+                    chevron: true,
+                  ),
+                ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
+    final auth = ref.read(syncAuthProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    if (auth == null) return;
+    try {
+      await auth.signInWithGoogle();
+    } on SyncAuthCancelled {
+      // An answer to Google, not to this screen.
+    } on SyncAuthFailure catch (e) {
+      showToastOn(messenger, e.message, destructive: true);
+    }
+  }
+
+  /// Signing out leaves every row where it is.
+  ///
+  /// [SYNC.md § 11](SYNC.md#11-signing-out) describes a second door — sign out
+  /// *and* clear this phone — which needs a confirmation naming the number of
+  /// sessions it is about to remove. It arrives with the states in phase 6; one
+  /// door that does the safe thing is better than two where the dangerous one
+  /// is half-built.
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final auth = ref.read(syncAuthProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await confirmAction(
+      context,
+      title: 'Sign out?',
+      message: 'Your training stays on this phone. You can sign back in from '
+          'here at any time.',
+      confirmLabel: 'Sign out',
+      destructive: false,
+    );
+    if (!confirmed || auth == null) return;
+    await auth.signOut();
+    showToastOn(messenger, 'Signed out.');
+  }
+}
+
 /// Rows with radios, not a segmented pill: a pill fits the labels and nothing
 /// else, and the unit is the one setting here that changes what every number
 /// in the app means. A row has the width to say so.

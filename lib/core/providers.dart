@@ -8,6 +8,7 @@ import '../data/repositories/repairs.dart';
 import '../data/repositories/training_repository.dart';
 import '../domain/cycle_engine.dart';
 import '../domain/units.dart';
+import 'sync_providers.dart';
 
 /// Single database instance for the app's lifetime.
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -16,14 +17,23 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-/// Resolves once the schema exists and the exercise catalog has its starting
-/// rows. No programme is created here — the user picks or builds their own.
-/// The UI waits on this before rendering anything data-driven.
+/// Resolves once the schema exists and the database has been looked over. No
+/// programme is created here — the user picks or builds their own. The UI waits
+/// on this before rendering anything data-driven.
 ///
 /// The list itself is [repairDatabase], shared with `BackupService.restore` so
 /// a launch and a restore cannot check different things.
+///
+/// **The catalog is seeded only once the welcome screen has been answered.**
+/// It used to be seeded here, before first paint, which is what would give a
+/// phone that then signs in two catalogs and a history split across both
+/// ([SYNC.md § 10](SYNC.md#10-adoption)). The welcome screen renders perfectly
+/// well over an unseeded database — it asks about accounts, not exercises — and
+/// `answerWelcome` seeds before it records the answer, so nothing downstream
+/// ever sees the gap.
 final appInitProvider = FutureProvider<void>((ref) async {
-  await repairDatabase(ref.watch(databaseProvider));
+  final db = ref.watch(databaseProvider);
+  await repairDatabase(db, seed: await welcomeAnswered(db));
 });
 
 /// The regime being trained. Exactly one row is active at a time, but the query

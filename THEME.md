@@ -497,9 +497,14 @@ uses colour here.
 ### Illustration
 
 **One drawing, one screen, and only where a screen has nothing else to be.**
-Today that is the welcome screen and nowhere else. An illustration inside a
-working screen is decoration, and decoration is what rule 1 spends the whole
-colour system avoiding.
+An illustration inside a working screen is decoration, and decoration is what
+rule 1 spends the whole colour system avoiding.
+
+**No screen carries one today.** The welcome screen was where it would have
+gone, and it leads with the mark instead — which is itself a drawn shape, in
+one ink, inverting with the theme. A second drawn object under it was one
+drawing too many on a page whose whole job is to ask one question. The rules
+below stand for the day a screen genuinely has nothing else to be.
 
 - **A single continuous stroke**, hand-drawn rather than geometric — a barbell,
   a figure mid-rep, a plate. Weight 2, round caps and joins. It should look
@@ -903,8 +908,8 @@ stays inside the rule while all of this holds:
 - **It says what it will do before it asks.** The subtitle names the outcome — a
   history that survives a lost phone — rather than the mechanism.
 
-Top to bottom: the mark, the illustration, a `display` line, a `body` line, the
-primary button, an `OR` rule, the decline action. Centred, generous vertical
+Top to bottom: the mark, a `display` line, a `body` line, the primary button,
+an `OR` rule, the decline action. Centred, generous vertical
 space, everything inside the gutter. The only screen with a centred `display`
 line, which is what makes it read as a threshold rather than a page.
 

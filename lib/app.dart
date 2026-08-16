@@ -12,7 +12,9 @@ import 'core/theme/theme.dart';
 import 'core/theme/tokens.dart';
 import 'core/widgets/scroll.dart';
 import 'core/widgets/toast.dart';
+import 'core/sync_providers.dart';
 import 'features/shell/app_shell.dart';
+import 'features/welcome/welcome_screen.dart';
 import 'features/workouts/workouts_providers.dart';
 
 class DeltoidApp extends ConsumerWidget {
@@ -143,16 +145,24 @@ class _Boot extends ConsumerWidget {
     );
 
     final init = ref.watch(appInitProvider);
-    // Waiting on Today here rather than inside the shell keeps the tab bar from
-    // sliding in over an empty page. It is one local query behind the seeder,
-    // so this costs a frame or two, not a visible wait.
-    final today = ref.watch(workoutsProvider);
+    // Whether the one question has been put. Unanswered, the shell is not what
+    // comes next — and the database behind it has no catalog yet, because
+    // seeding waits for the answer (SYNC.md § 10, and `answerWelcome`).
+    final answered = ref.watch(welcomeAnsweredProvider).valueOrNull;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlay,
       child: init.when(
-        data: (_) =>
-            today.hasValue ? const _Ready(child: AppShell()) : const _Holding(),
+        data: (_) => switch (answered) {
+          null => const _Holding(),
+          false => const _Ready(child: WelcomeScreen()),
+          // Waiting on Today here rather than inside the shell keeps the tab
+          // bar from sliding in over an empty page. It is one local query
+          // behind the seeder, so this costs a frame or two, not a visible
+          // wait. Watched inside this arm so the welcome screen does not wait
+          // on a snapshot of a database that has not been seeded yet.
+          true => _ShellWhenReady(),
+        },
         loading: () => const _Holding(),
         error: (e, st) => _Ready(
           child: Scaffold(
@@ -177,6 +187,19 @@ class _Boot extends ConsumerWidget {
       Theme.of(context).brightness == Brightness.dark
           ? Brightness.light
           : Brightness.dark;
+}
+
+/// The shell, once Today has its data.
+///
+/// Its own widget so the `switch` above reads as three outcomes rather than
+/// three outcomes and a condition, and so the Today snapshot is watched only on
+/// the arm that needs it.
+class _ShellWhenReady extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final today = ref.watch(workoutsProvider);
+    return today.hasValue ? const _Ready(child: AppShell()) : const _Holding();
+  }
 }
 
 /// What Flutter paints while the system splash is still up: nothing but the
