@@ -44,6 +44,8 @@ either fails. `git push --no-verify` is the only way past it.
 | `dart run build_runner build`     | regenerate after a schema change                         |
 | `flutter build apk --release`     | release build                                            |
 | `flutter test tool/test/`         | tests for the seed generator, which `flutter test` skips |
+| `supabase db push`                | apply `supabase/migrations` to the linked project        |
+| `supabase test db`                | the RLS suite, against a local stack (needs Docker)      |
 
 ## Layout
 
@@ -105,8 +107,8 @@ backup).
 
 ## Testing
 
-719 tests. Beyond the usual unit and widget tests, `test/integrity/` holds two
-pieces worth knowing about:
+732 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
+unit and widget tests, `test/integrity/` holds two pieces worth knowing about:
 
 - `test/integrity/invariant_oracle.dart` — sixteen structural rules re-derived in
   SQL, callable after any write, each with a test that has watched it fire.
@@ -142,11 +144,37 @@ dart run tool/seed_years.dart --years 5 --out seed.json
 
 ## Schema changes
 
-`schemaVersion` is **1** and there is no `onUpgrade`. While the app is
-unreleased, a schema change is an edit to `tables.dart`, a regenerate, a default
-in the backup codec, and a reinstall. The migration ladder starts the day a build
-reaches a phone that is not yours — see
+`schemaVersion` is **2** and the migration ladder is running. A schema change is
+an edit to `tables.dart`, a regenerate, a default in `data/db/table_spec.dart`,
+and an idempotent rung in `upgradeSchema` — see
 [RULES § 3](RULES.md#3-schema-and-migrations) before touching a column.
+
+A column on a syncable table is also a column on the server, in
+`supabase/migrations/`. `test/data/server_schema_test.dart` compares the two and
+fails if they drift apart, which is the quietest failure sync has.
+
+## The server
+
+Cloud backup's half that is not Dart lives in `supabase/`:
+
+```
+supabase/
+  config.toml               the local stack's shape, committed
+  migrations/*.sql          nine tables, RLS, indexes, the server clock
+  tests/database/*.sql      pgTAP — proves the policies, which nothing else can
+```
+
+The RLS policies are the whole of the security ([SYNC § 3](SYNC.md#3-identity)),
+so they live in the repo where they have a diff and a review rather than only in
+a browser. Running them needs Docker and a local stack. This Mac has 3.8 GiB
+given to Docker, which the full stack does not fit in, so start only what the
+tests need:
+
+```bash
+supabase start -x realtime,storage-api,imgproxy,studio,postgres-meta,mailpit,edge-runtime,logflare,vector,supavisor
+```
+
+Then `supabase test db`, and `supabase stop` when finished.
 
 ## The docs
 
