@@ -17,6 +17,16 @@
     <!-- So a rest scheduled before a reboot is put back afterwards. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Cloud backup, and nothing else — see SYNC.md. Declared here rather than
+         relied on, because the only other declaration is in the *debug*
+         manifest, which Flutter injects for hot reload and the tooling's own
+         connection to a running app. Every debug build therefore has network
+         and no release build does, which is the worst shape a permission bug
+         can take: it cannot be reproduced on the build you develop on, and on
+         the build that ships every request fails with a SocketException that
+         reads like a server that is down. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="Deltoid"
         android:name="${applicationName}"
