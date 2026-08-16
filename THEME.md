@@ -367,6 +367,11 @@ two together give a page sections starting at different heights.
 optional trailing **text link** *or* one small figure, vertically centred with
 the title. 12 below, 28 between sections.
 
+One exception, a list: an exercise's history is a `ListView.separated` whose
+separator is already 8, so a heading inside it adds 20 rather than 28 and the
+gap arrives in two pieces. Named here because the next change to the 28 would
+otherwise find one of them and not the other.
+
 **Every heading on a page background is the same component.** A hand-rolled
 `Row` that looks like one drifts off every other heading within a week. A
 heading needing something other than a link on its right gets a trailing slot —
@@ -910,6 +915,23 @@ colour and insets belong to the input theme; a call site passes a hint, a prefix
 or a suffix and nothing else. Seven fields each carrying their own copy is how
 one search box ends up with no focused outline and a different glyph than the
 identical box on the next screen.
+
+*Decoration* is what that rule is about. What a field **does** — its keyboard,
+its input formatters, its action key — and the type role its text is set at are
+the call site's, because they are facts about the value being typed rather than
+about how a field looks. A number field asks for a number keypad and carries
+`labelSmall`, the size every number typed in this app is entered at, and no
+theme can know that for it.
+
+Two standing exceptions, both narrow, both here rather than argued in a comment:
+
+* **The reps cell on the exercise screen** overrides the theme's insets. It is a
+  centred cell two or three digits wide inside a table, and 16 either side
+  leaves no room for the number. It is the one field that touches
+  `contentPadding`.
+* **The weigh-in field's suffix** is set at `labelSmall` in `textSecondary`, so
+  `kg` sits beside a number entered at `labelLarge` without competing with it.
+  The theme has no suffix style because this is the only suffix in the app.
 
 **Free text is capped and the counter says so** — a limit that fits where the
 text is rendered, counted in `label`, turning `negative` on the last character.

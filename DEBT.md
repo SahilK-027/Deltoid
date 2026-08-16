@@ -27,8 +27,11 @@ because every weakness below is one that a sync layer *multiplies*:
   a migration to write. Everything that should be deleted should be deleted
   first.
 
-The order to work in: **§1** first, then **§6**. §7, §8 and §9 are ongoing rather
-than blocking. §4 is closed — the volume providers are `autoDispose` and
+The order to work in: **§1** first, then **§6**. §7 and §9 are ongoing rather than
+blocking. §8 is closed: the three field call sites and the two-piece gap are named
+exceptions in THEME now, and `test/core/documented_exceptions_test.dart` fails
+a comment that cites THEME or RULES, claims an exception, and does not say
+which section grants it. §4 is closed — the volume providers are `autoDispose` and
 `test/features/volume_provider_lifetime_test.dart` says so. §5 is closed — the rule is in RULES § Interface and enforced by
 `test/core/clamp_bounds_test.dart`. §3, the row-mapping conversions, is closed — the queries whose
 row count grows with the log are raw and covered by
@@ -125,55 +128,6 @@ than a copy. Prefer *"bounded by the range control — see the assert below"* ov
 **Done when**: nothing, really. This is a habit rather than a task. It is here so
 that the next person who finds a stale comment treats it as a category rather
 than an accident.
-
----
-
-## 8. Comments that grant themselves exceptions to the docs
-
-A specific failure inside §1, and the one most likely to spread, because each
-instance is individually reasonable.
-
-The pattern: a comment states a global rule, notes that this code breaks it, and
-explains why — and that is the whole approval process. THEME is never told. So
-the rule stays written down as absolute while the code accumulates exceptions,
-and the next person to read THEME believes something about the app that is no
-longer true.
-
-**Done right** (keep doing this): `hold_pad.dart:180` runs its clock at 44sp over
-the 30sp type cap, and says *"the one place in the app that goes over it — see
-THEME → Type"*. THEME → Type says the same thing from the other side: *"One
-exception, a clock. The hold pad's timer runs at 44sp."* Two documents, one
-fact, neither surprising.
-
-**Done wrong**, currently:
-
-- THEME → Fields: *"Fields are declared once, in the theme. Fill, radius, focused
-  outline, hint colour and insets belong to the input theme; a call site passes a
-  hint, a prefix or a suffix **and nothing else**."* Three call sites pass more:
-  `exercise_screen.dart:1054` (type, alignment **and** `contentPadding`, with a
-  comment declaring itself *"the one field that overrides the theme's insets"*),
-  `bodyweight_screen.dart:793` (type and suffix style),
-  `regime_screen.dart:736` (type). The rule reads as absolute and has three
-  standing exceptions, one of which announces itself.
-- `exercise_history_screen.dart:207` builds the 28 between sections out of
-  `Space.xl` plus an 8 separator, calling itself *"the one place the gap is built
-  out of two pieces"*. The value obeys THEME; the construction is a local
-  invention that the next spacing change will not find.
-- `exercise_screen.dart:46` says the General section *"was the exception"* to
-  editing one question at a time. It reads as historical, and I could not tell
-  from the code whether it still is — which is its own problem: a comment about
-  a rule should not need archaeology to evaluate.
-
-**What to do.** One rule, and it is cheap: **an exception to a documented rule is
-a change to the document.** If code needs to break THEME or RULES, the fix is a
-sentence in THEME naming the exception and why — as the hold pad already does —
-and the comment then points at it rather than arguing its own case. An exception
-that is not worth writing into the document is not worth taking.
-
-**Done when**: every comment in `lib/` that cites THEME or RULES either conforms
-or points at a named exception in the document it cites. The three field call
-sites above are the immediate work: either widen the theme's input decoration to
-cover them, or write the exception down.
 
 ---
 

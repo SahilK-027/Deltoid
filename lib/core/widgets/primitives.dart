@@ -1297,8 +1297,8 @@ class AppRadio extends StatelessWidget {
 /// It was hand-built seven times — the summary's rows, the bodyweight header,
 /// Today's elapsed clock, two volume widgets — each deciding for itself whether
 /// the unit was `bodyMedium` or `bodySmall` and whether the pair shared a
-/// baseline or a centre line. The rule is in THEME; this is the one place that
-/// implements it.
+/// baseline or a centre line. The rule is THEME → Value and unit; this is the
+/// one place that implements it.
 ///
 /// [dense] is the row form: `labelLarge` against a trailing edge, where the
 /// page form is `displaySmall` and is the number a card is about.

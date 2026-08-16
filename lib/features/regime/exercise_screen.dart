@@ -42,8 +42,9 @@ final exerciseByIdProvider =
 ///   are true of this exercise *in that day*, which is the one section that has
 ///   no meaning anywhere else.
 /// * **General**, always — the catalog row itself, as ordinary rows you tap,
-///   not a form. Every screen in this app edits by opening one question at a
-///   time (THEME → Components); this one was the exception.
+///   not a form. It conforms to the rule the old edit sheet broke: every screen
+///   in this app edits by opening one question at a time (THEME →
+///   Components), and each row here opens exactly one.
 ///
 /// Existing rows **save as you go**, like every other settings surface here. A
 /// new one holds a draft until `Create`, because a half-filled exercise
@@ -1055,9 +1056,10 @@ class _RepField extends StatelessWidget {
           cursorColor: c.textPrimary,
           decoration: const InputDecoration(
             hintText: 'Optional',
-            // The one field that overrides the theme's insets: it is a narrow
-            // centred cell in a table, and 16 of horizontal padding either side
-            // leaves no room for three digits.
+            // The one field that overrides the theme's insets — a named
+            // exception, see THEME → Fields, rather than a comment granting
+            // itself one: a narrow centred cell in a table, where 16 of
+            // horizontal padding either side leaves no room for three digits.
             contentPadding: EdgeInsets.symmetric(vertical: Space.md),
           ),
         ),

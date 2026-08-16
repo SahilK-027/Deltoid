@@ -204,8 +204,9 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
               final row = rows[i];
               if (row.heading != null) {
                 // 20 here plus the separator's 8 above it is the 28 between
-                // sections everywhere else — this list is the one place the
-                // gap is built out of two pieces.
+                // sections everywhere else. The list is the exception THEME →
+                // Section headers names, so a change to the 28 finds both
+                // halves of it.
                 return Padding(
                   padding: const EdgeInsets.only(top: Space.xl),
                   child: SectionHeader(row.heading!),

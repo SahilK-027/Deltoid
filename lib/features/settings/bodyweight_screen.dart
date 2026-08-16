@@ -861,6 +861,9 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
             // headline you are somehow editing.
             style: context.t.labelLarge,
             cursorColor: c.textPrimary,
+            // The app's only suffix, and the second named exception in
+            // THEME → Fields: `kg` sits beside the number at `labelSmall` so it
+            // reads as a unit rather than as part of the value.
             decoration: InputDecoration(
               suffixText: widget.unit.label,
               suffixStyle:
