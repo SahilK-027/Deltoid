@@ -88,9 +88,19 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 ## Left
 
-- [ ] **Migration ladder** — `schemaVersion` is 1 with no `onUpgrade`. Prerequisite of sync, not a consequence. [RULES § 3](RULES.md#3-schema-and-migrations).
-- [ ] **Cloud backup, push-only** — one writer, so no merge and no conflict rules. Auth, a push loop over `dirty`, restore into an empty database, Settings.
-- [ ] **Cloud backup, the second writer** — pull, last-write-wins, collisions on the nine unique indexes, adoption at sign-in. Every row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does) as a test.
+Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
+[SYNC.md](SYNC.md) before writing any of it — the design is § 1–16, the code is
+§ 17–20.
 
-Both halves are designed in full in [SYNC.md](SYNC.md); read it before writing any
-of it. Needs `connectivity_plus`, and `journal_mode` is still open ([SYNC § 16](SYNC.md#16-still-to-decide)).
+- [ ] **0 · The ground** — migration ladder, the `dirty` indexes, WAL, the shared table registry, the wire proved, `INTERNET` in the release manifest.
+- [ ] **1 · The server** — nine tables, RLS on every one, the `server_updated_at` trigger, `supabase/migrations` in the repo.
+- [ ] **2 · Identity** — Google sign-in, the welcome screen, seeding moved behind it, the account section in Settings.
+- [ ] **3 · Push** — one writer, so no merge and no conflict rules. The `dirty` drain, the triggers, the lifecycle hook.
+- [ ] **4 · Pull** — last-write-wins, collisions on the twelve unique indexes, one bad row never stopping a restore.
+- [ ] **5 · Adoption** — the three shapes at sign-in, and the `starterKey` dedup.
+- [ ] **6 · States and failures** — the three states in Settings, every row of [SYNC § 13](SYNC.md#13-when-it-fails), the backstop interval chosen on hardware.
+- [ ] **The tests** — every row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does), and a two-device fuzz that has to converge.
+
+Needs `supabase_flutter` and `connectivity_plus`. Phase 1 onwards is blocked on a
+Supabase project and Google OAuth clients that only the user can create — see
+[SYNC § 20](SYNC.md#20-what-this-needs-from-outside-the-repo).
