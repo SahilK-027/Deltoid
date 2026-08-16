@@ -9,81 +9,14 @@ rather than rediscovered.
 Each entry says what to change and how to know it worked. An entry leaves this
 file when the check it names passes, not when it feels handled.
 
-## This comes before sync
+## One entry left, and it cannot be closed at a keyboard
 
 **Nothing in [SYNC.md](SYNC.md) should be written until this file is empty.**
-
-Not because sync is hard — it is designed in full and the design is good — but
-because every weakness below is one that a sync layer *multiplies*:
-
-- **§1, invariants in prose.** Sync is fifteen sections of rules about what may
-  never happen: a write never lost, never fabricated, never refused. If this
-  codebase's existing invariants can rot into comments that lie — and they have,
-  three times — then sync's will too, and sync's failures are silent and
-  permanent rather than a slow screen. A conflict rule that is only a paragraph
-  is a data-loss bug waiting for the second device.
-- **§6, twelve features never used in a gym.** Sync is the point after which
-  deleting a feature stops being free — there will be rows of it on a server and
-  a migration to write. Everything that should be deleted should be deleted
-  first.
-
-The order to work in: **§1** first, then **§6**. §7 is ongoing rather than blocking. §9 is closed: the light ramp is measured pair by pair in
-`test/core/light_theme_test.dart`, with the four pairs that sit under AA written
-into THEME → Contrast and pinned at the numbers they hold, and the chart's zoom
-is held to not resizing on any frame of a range switch
-(`test/features/chart_transition_test.dart`). §8 is closed: the three field call sites and the two-piece gap are named
-exceptions in THEME now, and `test/core/documented_exceptions_test.dart` fails
-a comment that cites THEME or RULES, claims an exception, and does not say
-which section grants it. §4 is closed — the volume providers are `autoDispose` and
-`test/features/volume_provider_lifetime_test.dart` says so. §5 is closed — the rule is in RULES § Interface and enforced by
-`test/core/clamp_bounds_test.dart`. §3, the row-mapping conversions, is closed — the queries whose
-row count grows with the log are raw and covered by
-`test/data/query_conversion_test.dart`, and the ones that stay in drift say in
-a comment why their row count does not grow.
-
-The gate itself — a pre-push hook and a linter with rules in it — was §2 and is
-done. The numbering below keeps its gap deliberately, because
-[HARDENING.md](HARDENING.md) names the remaining entries by number.
-
----
-
-## 1. The invariants live in prose
-
-**The most serious one**, because it is the mechanism behind three of the bugs
-below rather than a bug itself.
-
-This codebase carries its rules in comments — and they are good comments, better
-than most projects have. But a comment cannot fail a build. Every rule stated
-only in prose is a rule that holds exactly as long as everyone reads the prose,
-and the record shows they do not:
-
-- `setsByMuscleDaily` said *"Bounded, never open-ended: … the range control means
-  nothing ever asks for more than a year at once. That bound is why this is a
-  day-level query"* — and then an `All` range was added, asked for fifty years,
-  and the screen took 380ms per rebuild. The comment was correct and load-bearing
-  and did nothing.
-- `WeeklyBars` documented the bar geometry carefully and still shipped
-  `clamp(1.0, slot)`, which throws when a slot is under a point wide. Latent
-  until a range widened enough to reach it, then fatal on every repaint.
-- `TrendChart` documented "one chart and one range control, both shared" in
-  THEME. Three chart dialects grew anyway.
-
-**What to do.** Pick the rules that are load-bearing and give each one a
-mechanism. Roughly in order of value:
-
-- An `assert` at the boundary is the cheapest and costs nothing in release.
-  `assert(spanDays <= 400, 'this query is day-level and unbounded above a year')`
-  would have caught the volume regression at the moment it was introduced.
-- A type is better where one fits. A `BoundedSpan` that cannot be constructed
-  wider than a year makes the rule unstateable rather than unenforced.
-- A test is right where the rule is about behaviour rather than shape — the
-  `nothing ever draws more marks than the ceiling` test in
-  `test/domain/chart_buckets_test.dart` is the model: it asserts the *property*
-  across a range of inputs rather than one example.
-
-**Done when**: every comment in `lib/` containing the words *bounded*, *never*,
-*must not* or *always* either has an assert/test beside it or has been rewritten
-to stop making a promise nothing keeps.
+Everything that could be closed by writing code has been. What is left is § 6:
+a third of the app has never been used in a gym, and sync is the point after
+which deleting a feature stops being free — there will be rows of it on a server
+and a migration to write. Everything that should be deleted should be deleted
+first.
 
 ---
 
@@ -109,25 +42,23 @@ by use or by deletion.
 
 ---
 
-## 7. The comments are an asset with a maintenance cost
+## What closed, and what checks it now
 
-Said plainly because it is the one item here that is a *trade*, not a defect.
+Kept as a record rather than as work. Each line is a weakness this file used to
+describe and the mechanism that replaced it — because an entry deleted with no
+check behind it is an entry that comes back.
 
-The comment density is why this codebase can be picked up quickly, and it should
-not be reduced wholesale. But prose goes stale silently, and this project has
-already produced a comment that became a lie (§1). The failure mode is specific:
-comments that state **facts about other code** — how many rows a query returns,
-what another provider does, what a caller guarantees — rot when that other code
-changes, and nothing points back at them.
+| Was | Now checked by |
+| --- | --- |
+| **§1** Invariants lived in prose; a comment cannot fail a build | The register in [RULES § 7](RULES.md#7-working-on-it), and every row below it. `nextPosition` and the JSON converter — the two rules small enough that nobody had tested them — are in `test/data/db_helpers_test.dart` |
+| **§2** No gate: a broken test could be pushed | `hooks/pre-push`, plus four lints including `unawaited_futures` |
+| **§3** Drift's row mapping on queries that grow with the log | Converted, each behind a field-by-field parity test against the drift query it replaced — `test/data/query_conversion_test.dart`. The queries that stayed say why their row count does not grow, and the paged ones assert their bound |
+| **§4** `volumeHistoryProvider` re-queried forever after one visit | `test/features/volume_provider_lifetime_test.dart` |
+| **§5** Painters clamping to bounds they computed | RULES § Interface, enforced over `lib/` by `test/core/clamp_bounds_test.dart` |
+| **§7** Comments stating facts about other code go stale silently | Folded into the RULES register: a fact about other code becomes an assert, a test, or a reference — never a copy |
+| **§8** Comments granting themselves exceptions to THEME | The exceptions are in THEME; `test/core/documented_exceptions_test.dart` fails a comment that claims one without naming the section |
+| **§9** No light-theme test; chart transitions unverified | `test/core/light_theme_test.dart` measures both ramps pair by pair, and `test/features/chart_transition_test.dart` holds the zoom to not resizing on any frame |
 
-Comments that explain **why this code is shaped this way** do not rot, because
-the reasoning outlives the numbers.
-
-**What to do.** When a comment states a fact about something outside its own
-function, either move the fact into an assert/test or make it a reference rather
-than a copy. Prefer *"bounded by the range control — see the assert below"* over
-*"nothing ever asks for more than a year"*.
-
-**Done when**: nothing, really. This is a habit rather than a task. It is here so
-that the next person who finds a stale comment treats it as a category rather
-than an accident.
+The two audits that produced much of this — [INVARIANTS.md](INVARIANTS.md) and
+[INTERPRETATION.md](INTERPRETATION.md) — are back to their prompts, ready to run
+again once sync exists.

@@ -426,3 +426,35 @@ tone, the haptics, the wakelock, audio ducking and the share sheet.
 **Make one commit per coherent change**, and put the reasoning in the body. Say
 why the change was made rather than what it changed, because the diff already
 says what.
+
+### A rule that matters is a rule something checks
+
+A comment cannot fail a build. Every rule that lives only in prose holds exactly
+as long as everyone reads the prose, and the record says they do not: the volume
+query documented its own bound, an `All` range was added, and the screen took
+380ms a rebuild with the comment still sitting there being correct.
+
+So a load-bearing rule gets a mechanism, in this order of preference: a **type**
+that makes the violation unstateable, a **schema constraint**, an **assert** at
+the boundary (free in release), or a **test** where the rule is about behaviour
+rather than shape. Where the checks live now:
+
+| Rule | Mechanism |
+| --- | --- |
+| The structural invariants of the database | `test/integrity/invariant_oracle.dart` — sixteen rules re-derived in SQL, each with a perturbation test |
+| Those invariants under arbitrary use | `test/integrity/model_fuzz_test.dart` |
+| Every derived number | `test/domain/` — hand-computed literals, never `expect(f(x), f(x))` |
+| A query's row count is bounded | an `assert` at the boundary, or a comment saying why it does not grow — `training_repository.dart` |
+| A painter never clamps to a bound it computed | `test/core/clamp_bounds_test.dart` |
+| A screen you left stops querying | `test/features/volume_provider_lifetime_test.dart` |
+| An exception to THEME or RULES is written into the document | `test/core/documented_exceptions_test.dart` |
+| The light ramp is legible | `test/core/light_theme_test.dart` |
+| A rewritten query returns what the old one did | `test/data/query_conversion_test.dart` |
+
+**A comment that states a fact about other code is the kind that rots** — how
+many rows a query returns, what another provider does, what a caller
+guarantees. When you write one, either move the fact into an assert or a test,
+or make it a reference rather than a copy: *"bounded by the range control — see
+the assert below"* beats *"nothing ever asks for more than a year"*. Comments
+that say why this code is shaped this way do not rot, because the reasoning
+outlives the numbers, and those are worth their density.
