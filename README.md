@@ -14,7 +14,7 @@ edit it — a template writes ordinary rows, and nothing about it stays special.
 
 The one idea the app exists for: **progression is scoped to the session, not the
 exercise.** Push 1 and Push 2 keep separate histories of the same movement, so
-what the fields prefill with is what you did on *this* day last time.
+what the fields prefill with is what you did on _this_ day last time.
 
 ## Quick start
 
@@ -30,19 +30,20 @@ flutter run
 ```
 
 `build_runner` generates `lib/data/db/database.g.dart` and must be re-run after
-any edit to `lib/data/db/tables.dart`. `core.hooksPath` is once per clone and
-points git at [`hooks/`](hooks/), whose `pre-push` refuses a push that fails
-analyze or test; `--no-verify` is the only way past it.
+any edit to `lib/data/db/tables.dart`. `core.hooksPath` is once per clone —
+`.git/hooks` is not version-controlled — and points git at [`hooks/`](hooks/),
+whose `pre-push` runs `flutter analyze && flutter test` and refuses the push if
+either fails. `git push --no-verify` is the only way past it.
 
 ## Commands
 
-| | |
-| --- | --- |
-| `flutter run` | run on a connected device or emulator |
-| `flutter analyze && flutter test` | the gate — both must be clean before anything is done |
-| `dart run build_runner build` | regenerate after a schema change |
-| `flutter build apk --release` | release build |
-| `flutter test tool/test/` | tests for the seed generator, which `flutter test` skips |
+|                                   |                                                          |
+| --------------------------------- | -------------------------------------------------------- |
+| `flutter run`                     | run on a connected device or emulator                    |
+| `flutter analyze && flutter test` | the gate — both must be clean before anything is done    |
+| `dart run build_runner build`     | regenerate after a schema change                         |
+| `flutter build apk --release`     | release build                                            |
+| `flutter test tool/test/`         | tests for the seed generator, which `flutter test` skips |
 
 ## Layout
 
@@ -68,16 +69,24 @@ lib/
                                                  progress, volume
                             regime_repository    programmes, sessions, catalog
     seed/                   starter catalog + optional templates
-    backup/                 whole-database JSON export / restore
+    backup/                 whole-database JSON export / restore, Downloads writer
 
-  core/                     theme tokens, shared providers, the primitives every
-                            screen composes from, ids, failure reporting,
-                            notifications, the end-of-rest alert
+  core/
+    theme/                  tokens.dart, theme.dart — the language in code
+    widgets/                primitives.dart (cards, rows, chips, sheets),
+                            trend_chart.dart (the one chart), calendar.dart
+                            (the one day picker), reorder_sheet.dart,
+                            ticking.dart (every per-second rebuild)
+    providers.dart · ids.dart · rest_alert.dart · failure.dart
+    workout_notifications.dart
 
   features/                 workouts · log · history · regime · settings · shell
 
-test/                       domain · data · features · core · integrity
+test/                       domain · data · features · core
+test/integrity/             the oracle and the fuzz harness
 tool/seed_years.dart        generates years of plausible history
+tool/test/                  its tests, outside test/ so they never run by default
+assets/audio/rest_done.mp3  the end-of-rest tone
 ```
 
 Four layers, dependencies one way only: `features` → `data` → `domain`, with
@@ -99,11 +108,12 @@ backup).
 719 tests. Beyond the usual unit and widget tests, `test/integrity/` holds two
 pieces worth knowing about:
 
-- `invariant_oracle.dart` — sixteen structural rules re-derived in SQL, callable
-  after any write, each with a test that has watched it fire.
-- `model_fuzz_test.dart` — seeded random operations against the real database and
-  a deliberately dumb in-memory model, checking the oracle after every one. A
-  failure prints the seed and the shortest sequence that still reproduces it.
+- `test/integrity/invariant_oracle.dart` — sixteen structural rules re-derived in
+  SQL, callable after any write, each with a test that has watched it fire.
+- `test/integrity/model_fuzz_test.dart` — seeded random operations against the
+  real database and a deliberately dumb in-memory model, checking the oracle
+  after every one. A failure prints the seed and the shortest sequence that still
+  reproduces it.
 
 The committed fuzz run is small enough to live in the suite. Environment
 variables turn it into a soak:
@@ -114,11 +124,17 @@ FUZZ_REPORT=1 FUZZ_SEEDS=500 FUZZ_OPS=2000 FUZZ_BACKUP_EVERY=10 flutter test tes
 
 `FUZZ_SEEDS` × `FUZZ_OPS` is the size of the run, `FUZZ_REPORT=1` prints how many
 operations each seed applied, and `FUZZ_BACKUP_EVERY=N` thins the one operation
-whose cost grows with the history behind it. Replay a printed failure with
-`FUZZ_SEED=17 FUZZ_SEEDS=1`.
+whose cost grows with the history behind it — it rewrites every row, and
+thinning it is what makes a run of millions of operations finish in an
+afternoon. Replay a printed failure exactly:
+
+```bash
+FUZZ_SEED=17 FUZZ_SEEDS=1 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_test.dart
+```
 
 To test at a size no fresh install reaches, generate a history and restore it
-through Settings → Backup:
+through Settings → Backup. What it writes progresses over time, keeps each
+session's numbers separate and includes deload weeks:
 
 ```bash
 dart run tool/seed_years.dart --years 5 --out seed.json
@@ -136,14 +152,14 @@ reaches a phone that is not yours — see
 
 Each has one job, and nothing belongs in two of them.
 
-| File | Holds |
-| --- | --- |
-| **README.md** (this) | What it is, how to set it up, how to run it, where things live |
-| **[RULES.md](RULES.md)** | Every rule the app is held to — data invariants, migrations, code traps, scope |
-| **[THEME.md](THEME.md)** | The app screen by screen, and the design language it is drawn in |
-| **[SYNC.md](SYNC.md)** | The sync design: what syncs, how a conflict resolves, what it may never do |
-| **[TODO.md](TODO.md)** | One list — what is done, what is left. Status lives here and nowhere else |
-| [CLAUDE.md](CLAUDE.md) | Orientation for AI sessions; points at the five above and holds nothing of its own |
+| File                     | Holds                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| **README.md** (this)     | What it is, how to set it up, how to run it, where things live                     |
+| **[RULES.md](RULES.md)** | Every rule the app is held to — data invariants, migrations, code traps, scope     |
+| **[THEME.md](THEME.md)** | The app screen by screen, and the design language it is drawn in                   |
+| **[SYNC.md](SYNC.md)**   | The sync design: what syncs, how a conflict resolves, what it may never do         |
+| **[TODO.md](TODO.md)**   | One list — what is done, what is left. Status lives here and nowhere else          |
+| [CLAUDE.md](CLAUDE.md)   | Orientation for AI sessions; points at the five above and holds nothing of its own |
 
 It is a single-user personal tool rather than a product, so scope discipline is a
 requirement — [RULES § 6](RULES.md#6-scope) lists what stays out, and the answer
