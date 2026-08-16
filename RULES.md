@@ -47,10 +47,10 @@ Never "simplify" this to a plain most-recent lookup.
 | Rule                                                          | Why                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WorkoutExercise` / `SetLog` are **snapshots**, not pointers  | Reordering or swapping mid-workout must never rewrite what you did in March. Same reason switching regimes creates a new `Regime` rather than editing sessions in place.                                                                                                                                                                                                            |
-| **What a set trained is snapshotted too**                     | `workout_exercises.muscle`, copied at log time. Weekly volume used to count through a join onto `exercises.muscle`, which is fine over seven days and a lie over years: refiling one movement in the catalog silently rewrote every week it had ever appeared in, and a chart of "sets per muscle since 2026" redrew itself because you fixed a label today. **Nullable, and null is not `other`** — it means the row predates the column, so readers coalesce onto the catalog. `other` belongs to no region, so defaulting to it would have dropped every pre-existing set out of every chart instead of saying "unknown". |
+| **What a set trained is snapshotted too**                     | `workout_exercises.muscle`, copied at log time. Counting through a join onto `exercises.muscle` is fine over seven days and a lie over years: refiling one movement rewrote every week it had ever appeared in. **Nullable, and null is not `other`** — it means the row predates the column, so readers coalesce onto the catalog. `other` belongs to no region, so defaulting to it would drop every pre-existing set out of every chart instead of saying "unknown". |
 | `LoadMode` decides what the **weight** means                  | `22.5` on a dumbbell is 45kg of load; `73` on a pec deck is 73kg. Without it every comparison downstream is garbage.                                                                                                                                                                                                                                                                |
 | `MeasureMode` decides what the **count** means                | `set_logs.reps` holds reps _or_ seconds, read through the exercise's mode exactly as `weight` is read through `LoadMode`. Comparisons carry over unchanged; arithmetic that assumes reps does not — a hold has **no e1RM** and adds **nothing to session volume**, because kg × seconds is a different unit. It sits on the exercise, not the set: a plank is never sometimes reps. |
-| `set_logs.partialReps` is **recorded, never arithmetic**       | A partial is a fact about how the set went, not a rep. Nothing that adds up may read it — it is out of session volume, out of `estimated1RM` and out of `beatsPrevious` — or a set of grinding halves reads as a personal record. It is shown from the ghost but **never adopted from it** — `_adoptGhost` fills blanks with a plan for today, and partials are a note on what happened, so prefilling them would log halves nobody did. In the log it is the second half of a split count cell, and everywhere else it prints as a suffix (`8+3`) — never inside the count, which is what keeps the two numbers from ever being summed by accident. Meaningless on a hold: there is no half-second. |
+| `set_logs.partialReps` is **recorded, never arithmetic**       | A partial is a fact about how the set went, not a rep. Nothing that adds up may read it — out of session volume, out of `estimated1RM`, out of `beatsPrevious` — or grinding halves read as a record. **Shown from the ghost, never adopted from it**: `_adoptGhost` fills blanks with a plan for today, and prefilling partials would log halves nobody did. Printed as a suffix (`8+3`) or as the second half of the log's split cell, never inside the count, so the two can never be summed by accident. Meaningless on a hold — there is no half-second. |
 | Warm-ups, drops and rest-pause are **excluded from progress** | `scorePerformance` counts `working` and `amrap` only. Including the rest is how naive logs claim progress that isn't there.                                                                                                                                                                                                                                                         |
 | A **backoff set is volume**, though it is not progress        | `countsForProgress` protects a comparison; `countsAsVolume` counts work done. Two questions, two answers.                                                                                                                                                                                                                                                                           |
 | `estimated1RM` caps reps at 12                                | Right for the long-range chart. **Wrong** for "did I beat last time" — it makes 12 → 13 reps invisible. That comparison is `beatsPrevious`, deliberately strict: more load at no cost in reps, or more reps at the same load. Heavier-for-fewer is a trade-off, not a win.                                                                                                          |
@@ -60,10 +60,10 @@ Never "simplify" this to a plain most-recent lookup.
 | **No programme is hardcoded**                                 | `seed/` ships an exercise catalog and _optional_ templates. Never seed a regime, and never put personal numbers, cues or video links in `seed_data.dart` — those are the user's, added through the UI.                                                                                                                                                                              |
 | A rate needs the weeks to have happened                       | Sessions-per-week was `sessionsInTheLast29Days / 4`, which told a two-day-old install it trained "0.3 / week". `domain/consistency.dart` divides by the weeks it actually has and prints a plain count below a fortnight of history.                                                                                                                                                |
 | **A position is unique among live rows**                      | `sessions`, `session_exercises`, `workout_exercises` and `set_logs` all carry a partial unique index on their parent plus `orderIndex`. Every append takes one past the highest live position rather than the live count — a tombstone leaves a gap and nothing renumbers behind it — and the index is what holds when the writer is a restore rather than a tap. **A reorder therefore cannot renumber in place**: see `renumber` in [§ 4](#4-code). |
-| **One session is open at a time**                             | A partial unique index on `workouts (status) WHERE status = 'inProgress'`, the same shape as the single-active-regime one. `startWorkout`'s check is a read outside the transaction that writes, so two doors onto it — Start and the backfill sheet — could both find nothing running. The loser is then hidden behind the newer one by `openWorkout`: unreachable, in progress forever, counted by nothing. |
+| **One session is open at a time**                             | A partial unique index on `workouts (status) WHERE status = 'inProgress'`, the same shape as the single-active-regime one. `startWorkout`'s check reads outside the transaction that writes, so Start and the backfill sheet could both find nothing running — and `openWorkout` then hides the loser behind the newer one: unreachable, in progress forever, counted by nothing. |
 | **A day answers to one name in its regime**                   | `idx_sessions_name_live`, keyed on `lower(trim(name))`. The prefill disclosure names the day it borrowed from, History filters by it, and the chart labels its lines with it — two live `Push 1`s makes all three ambiguous. Across regimes is fine, which is why `LoggedSession` carries the regime name. |
-| **An enum column is checked in the database**                 | `textEnum` throws on a string no member answers to, and the throw takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a `CHECK … IN (…)`, written out by hand, and `schema_constraints_test` walks every member of every enum, so a value added to the enum and not to the column fails a test rather than a screen. |
-| **A number that cannot mean anything is refused at the column** | Deload percentages, rep ranges that run backwards, a `dayKey` of 0, a session that ended before it started, a set that is a leg of itself, a bodyweight of 850. Each was reachable only through a restore or a merged row — exactly the writer that does not pass the repository, and exactly what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke. |
+| **An enum column is checked in the database**                 | `textEnum` throws on a string no member answers to, and takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a hand-written `CHECK … IN (…)`, and `schema_constraints_test` walks every member of every enum, so a value added to one and not the other fails a test rather than a screen. |
+| **A number that cannot mean anything is refused at the column** | Deload percentages, backwards rep ranges, a `dayKey` of 0, a session ending before it started, a set that is a leg of itself, a bodyweight of 850. Each is reachable only through a restore or a merged row — the writer that does not pass the repository, which is what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke. |
 
 **Cloud backup has its own invariants, and they live in
 [SYNC.md § 13](SYNC.md#15-what-sync-may-never-do).** The four that are really
@@ -117,45 +117,38 @@ that exists is one we made and can throw away, so a schema change is:
 4. reinstall the app on every device, because there is no upgrade path and
    the old database will not be migrated onto the new shape.
 
-This carried a v2..v8 ladder, one step per schema change made during the build,
-each migrating a database shape that only ever existed on a test device. Every
-future change would have had to keep all of them working forever, for installs
-that will never exist. It went, and it starts again — properly, one step per
-released change, with `schemaVersion` climbing from 1 — the day a build reaches
-a phone that is not ours. **Once that happens this section is wrong and has to
-be rewritten before the next schema change**, along with the rules the ladder
-needs: every step idempotent (`addColumnIfMissing`, `CREATE INDEX IF NOT
-EXISTS`, never bare `m.addColumn` / `m.createIndex`, because a device given an
-earlier build comes back with the structure in place and the stamp behind it,
-and the bare form throws on launch before any screen), and a test that runs a
-full upgrade over a database that already has everything.
+This carried a v2..v8 ladder, each step migrating a shape that only ever existed
+on a test device, and every future change would have had to keep all of them
+working forever for installs that will never exist. It went, and it starts again
+— one step per *released* change, `schemaVersion` climbing from 1 — the day a
+build reaches a phone that is not ours. **Once that happens this section is
+wrong and has to be rewritten before the next schema change**, along with the
+rules the ladder needs: every step idempotent (`addColumnIfMissing`, `CREATE
+INDEX IF NOT EXISTS`, never bare `m.addColumn` / `m.createIndex` — a device
+given an earlier build comes back with the structure in place and the stamp
+behind it, and the bare form throws on launch before any screen), and a test
+that runs a full upgrade over a database that already has everything.
 
-**Sync is that day, and it arrives before any second phone does.** The ladder is
-a prerequisite of the sync work rather than a consequence of it, for a reason
-worth stating plainly: sync does not merely put the app on a second device, it
-lets two devices running *different builds* exchange rows. So a released schema
-change needs two things this section has never needed — an upgrade path for the
-local file, and a wire format that survives a row from a build that knows one
-more column, or one fewer, than the reader does. A pull that drops a column it
-has not heard of loses data silently; one that refuses the row stops the sync.
-Neither is decided yet, and neither can be decided after the first release.
+**Sync is that day, and it arrives before any second phone does**, because it
+lets two devices running *different builds* exchange rows. That needs two things
+this section has never needed: an upgrade path for the local file, and a wire
+format that survives a row carrying one column more or fewer than the reader
+knows. A pull that drops an unknown column loses data silently; one that refuses
+the row stops the sync. Neither is decided, and neither can be decided after the
+first release. Until then the four steps above hold and the reinstall is the
+upgrade path.
 
-Until that is built, the four steps above still hold and the reinstall is still
-the upgrade path.
-
-Step 3 stays true whether or not a ladder exists, and it is the easy one to
-miss and the expensive one to get wrong. `Exercise.fromJson` is generated
-against _today's_ columns and reads every one of them unconditionally, so a
-file exported before the column existed throws a null cast on restore — with
-the only copy of a user's history in the file picker. `backup/backup_service.dart`
-spreads a default map under each restored row for exactly this reason, and
-`test/data/backup_service_test.dart` restores a payload with a column stripped
-out to keep it honest. An **index-only** change is the one case that skips it:
-nothing new is stored, so nothing can be missing from an older file. A
-**constraint-only** change skips it for the same reason — but a constraint
-cannot be altered in place: SQLite has no `ALTER … DROP CHECK`, so loosening or
-tightening one is a table rebuild, and a step that re-maps a retired value has
-to run *before* the rebuild that narrows the column, never after it.
+Step 3 holds with or without a ladder, and is the easy one to miss and the
+expensive one to get wrong. `Exercise.fromJson` is generated against _today's_
+columns and reads every one unconditionally, so a file exported before a column
+existed throws a null cast on restore — with the only copy of a history in the
+file picker. `backup/backup_service.dart` spreads a default map under each
+restored row for this reason, and `test/data/backup_service_test.dart` restores
+a payload with a column stripped out to keep it honest. **Index-only** changes
+skip step 3, since nothing new is stored; so do **constraint-only** ones — but a
+constraint cannot be altered in place (SQLite has no `ALTER … DROP CHECK`), so
+changing one is a table rebuild, and a step re-mapping a retired value must run
+*before* the rebuild that narrows the column.
 
 A backup also carries the `schemaVersion` it was written against, and import
 refuses anything **newer** than the running build can read rather than clearing
@@ -185,13 +178,12 @@ held. Domain files take **plain values, never a drift row** — that is what kee
 them testable without a database.
 
 **Anything that turns data into a string is domain, not a screen.** A formatter
-written where it is first needed gets copied to the second screen that needs it,
-and the copies then drift silently: `_load` in workout detail and `_loadLabel`
-in exercise history were byte-identical, while the two functions picking a day's
-top set disagreed about every hold ever logged — one ranked by weight, the other
-by duration, and both carried a comment claiming they matched. `formatWeight`
-had likewise settled in `history_screen.dart`, so six screens imported a screen
-to render a number. `lib/domain/set_format.dart` is where these live.
+written where it is first needed gets copied to the next screen, and the copies
+drift silently: `_load` and `_loadLabel` were byte-identical, while two
+functions picking a day's top set disagreed about every hold ever logged — one
+ranked by weight, the other by duration, both commented as matching.
+`formatWeight` had settled in `history_screen.dart`, so six screens imported a
+screen to render a number. These live in `lib/domain/set_format.dart`.
 
 **Never watch a constant query.** The "invalidate on write" trick —
 `db.customSelect('SELECT 1', readsFrom: {…}).watch()` — emits **once** and then
@@ -201,21 +193,21 @@ from `lib/data/db/watch.dart`.
 
 **`ref.read` on a provider nobody watches returns nothing.** The regime switcher
 read `allRegimesProvider` on demand, got `AsyncLoading` every time and rendered
-an empty list — which is why creating a regime looked like it deleted the old
-one. Watch it, or go through the repository.
+an empty list — so creating a regime looked like it deleted the old one. Watch
+it, or go through the repository.
 
 **Never capture a `WidgetRef` in a callback that outlives its widget.** A sheet
-that closes itself before opening the next one leaves its `ref` disposed, and
-`ref.read` from the second sheet then throws `Cannot use "ref" after the widget
-was disposed`. It surfaces from a gesture handler, so the visible symptom is a
-button that does nothing at all. Read the repository _before_ popping and pass
-that — a repository is a plain object and outlives the widget that looked it up.
+closing itself before opening the next leaves its `ref` disposed, and the second
+sheet's `ref.read` throws `Cannot use "ref" after the widget was disposed` — from
+a gesture handler, so the symptom is a button that does nothing. Read the
+repository _before_ popping and pass that: a plain object outlives the widget
+that looked it up.
 
 **Don't hold a `WidgetRef` across an `await` that changes the screen.** Starting
 a workout swaps the "up next" card for the resume card, disposing the widget
-that started it; clearing a flag through that dead ref throws inside `finally`
-and leaves the button disabled forever. Capture
-`ProviderScope.containerOf(context)` before the first await.
+that started it; clearing a flag through that dead ref throws inside `finally`,
+leaving the button disabled forever. Capture `ProviderScope.containerOf(context)`
+before the first await.
 
 **`valueOrNull ?? const []` turns "loading" into "empty".** Loading and empty
 are different states; a screen with more than one query needs them told apart,
@@ -223,9 +215,8 @@ or it needs one query.
 
 **`Isolate.run` inside a class captures `this`.** Moving the backup's
 `jsonEncode` off the UI isolate failed at the _send_, not the JSON: the closure
-carried an `AppDatabase` wrapping a sqlite3 FFI handle — "object is
-unsendable". Both helpers are top-level functions in `backup_service.dart`; keep
-them there.
+carried an `AppDatabase` wrapping a sqlite3 FFI handle — "object is unsendable".
+Both helpers are top-level functions in `backup_service.dart`; keep them there.
 
 **Every per-second rebuild goes through `core/widgets/ticking.dart`**, wrapping
 the clock and never the screen around it.
@@ -234,64 +225,62 @@ the clock and never the screen around it.
 silently blanks the screen with nothing in logcat. Use `IntrinsicHeight`.
 
 **A signed delta is computed from what is shown.** Two bodyweights 0.2 apart
-differ in kilograms, so the row printed a sign, and then the display rounding
-snapped the difference and it read `+0`. Compare `unit.display(a)` against
-`unit.display(b)` — `formatDeltaInUnit` does, and returns null when both round
+differ in kilograms, so the row printed a sign — and display rounding then
+snapped the difference to `+0`. Compare `unit.display(a)` against
+`unit.display(b)`, as `formatDeltaInUnit` does; it returns null when both round
 to the same figure.
 
 **`formatWeight` also formats computed numbers.** An estimated 1RM is an
 arbitrary double; `55.733333333333334 kg` shipped to a screen once.
 
 **Adopt ghost values when completing a set.** Typing only the reps is the normal
-case — same weight as last week, one more rep. Without `_adoptGhost` the set
-stores reps against a null weight: invisible to the chart, useless as next
-week's prefill.
+case — same weight, one more rep. Without `_adoptGhost` the set stores reps
+against a null weight: invisible to the chart, useless as next week's prefill.
 
-**A write that is not awaited still has to report.** The log screen cannot
-await its writes — `_flushWrite` runs from a `Timer` and from `dispose`, neither
-of which can wait on a disk — so a throw used to land on the floor. The tick
-stayed on screen because the tick came from the local buffer, the summary
-counted the set, and the number was not in the database; you found out weeks
-later looking at a hole in a chart. `core/failure.dart` is the channel:
-`reportOnError` on anything deliberately not awaited, `reportFailure` from
-anywhere else, and `main` installs `FlutterError.onError` and
-`PlatformDispatcher.onError` so an uncaught error in a gesture handler — whose
-only symptom is a button that does nothing — reaches the same place. A toast
-under `MaterialApp` says it, which is above the log rather than inside a tab.
+**A write that is not awaited still has to report.** The log screen cannot await
+its writes — `_flushWrite` runs from a `Timer` and from `dispose`, neither of
+which can wait on a disk — so a throw used to land on the floor: the tick stayed
+on screen (it came from the local buffer), the summary counted the set, and the
+number was not in the database. You found out weeks later, looking at a hole in
+a chart. `core/failure.dart` is the channel — `reportOnError` on anything
+deliberately not awaited, `reportFailure` everywhere else — and `main` installs
+`FlutterError.onError` and `PlatformDispatcher.onError`, so an uncaught error in
+a gesture handler reaches the same place. A toast under `MaterialApp` says it,
+above the log rather than inside a tab.
 
-**A reorder is two passes, not one.** A position is unique among live rows
-(§ 2) and SQLite checks that on every statement, so writing `i` to the row that
-should end up at `i` collides with whoever is still standing there and rolls the
-whole reorder back — for a permutation that is perfectly legal once it has
-finished. `renumber` in `data/db/renumber.dart` moves everything to a free range
-first, computed inside the same transaction as one past the highest live
-position, then brings it down to `0..n-1`.
+**A reorder is two passes, not one.** A position is unique among live rows (§ 2)
+and SQLite checks that on every statement, so writing `i` to the row that should
+end up at `i` collides with whoever is standing there and rolls the whole reorder
+back — for a permutation that is legal once finished. `renumber` in
+`data/db/renumber.dart` moves everything to a free range first (one past the
+highest live position, computed in the same transaction), then brings it down to
+`0..n-1`.
 
 **`nowMs` never goes backwards.** It is what last-write-wins compares, and a
 clock moved back — a network correction after a flat battery, a manual change —
-made a row lose to the version it was written to replace. Clamped to the last
-stamp issued, which is the half of the problem that is local; agreeing on time
-with another device is a server's job.
+made a row lose to the version written to replace it. Clamped to the last stamp
+issued, which is the local half; agreeing on time with another device is a
+server's job.
 
 **Every update stamps `deviceId`, not just the insert.** `clientDefault` fires
 once, so the column used to name the row's creator for the rest of its life —
 and it exists to break a same-millisecond tie between two devices, which it
 cannot do if both copies carry the same originating id.
 
-**`dirty` is cleared only against an unchanged `updatedAt`, and
-`last_pull_at` advances only after its batch commits.** Both are the same
-mistake in two directions: acknowledging work that has not landed. A row edited
-while its own push was in flight is still owed, and clearing it on the response
-strands that edit on the phone forever — invisibly, because nothing downstream
-ever looks at a row that is not dirty. A cursor advanced before the write loses
-every row in the batch it did not finish. See [SYNC.md](SYNC.md).
+**`dirty` is cleared only against an unchanged `updatedAt`, and `last_pull_at`
+advances only after its batch commits.** The same mistake in two directions:
+acknowledging work that has not landed. A row edited while its own push was in
+flight is still owed, and clearing it on the response strands that edit forever —
+invisibly, because nothing downstream looks at a row that is not dirty. A cursor
+advanced before the write loses every row in the batch it did not finish. See
+[SYNC.md](SYNC.md).
 
-**Never copy the project to keep an old version around.** No `old-*/` folders,
-no `*.bak`, no second checkout, no `git worktree` for "reference". Git holds
-every previous state; a copy is 100 MB of build output that goes stale the
-moment it is made, gets edited by mistake, and shows up in searches as a second
-answer to every question. One was found at 99 MB, nine commits back, holding a
-test file two revisions out of date. Read history instead:
+**Never copy the project to keep an old version around.** No `old-*/`, no
+`*.bak`, no second checkout, no `git worktree` for "reference". Git holds every
+previous state; a copy goes stale the moment it is made, gets edited by mistake,
+and shows up in searches as a second answer to every question. One was found at
+99 MB, nine commits back, holding a test file two revisions out of date. Read
+history instead:
 
 ```bash
 git show <commit>:lib/features/workouts/workouts_screen.dart

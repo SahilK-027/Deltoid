@@ -55,6 +55,10 @@ explained properly in [RULES.md](RULES.md).
     `*.bak`, no second checkout, no worktree "for reference". Read history with
     `git show <commit>:<path>`.
 
+A load-bearing rule gets a mechanism rather than a comment — an assert, a schema
+constraint, a test. [RULES § 7](RULES.md#7-working-on-it) lists where each one is
+checked today; add to that table rather than writing a paragraph nothing runs.
+
 ## Working here
 
 Run both of these before calling any change done, and make sure both come back

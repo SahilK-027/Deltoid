@@ -297,9 +297,8 @@ it ended, and a stretch indicator says it twice.
 state on reload — a write anywhere must not replace the list you are reading
 with a spinner.
 
-**Loading and empty are different states.** A screen with more than one query
-either tells them apart or is rebuilt around one query, or the frame between
-them renders "nothing here" at data that is merely late.
+**Loading and empty are different states**, and that one is a behaviour rule —
+see [RULES § 5](RULES.md#5-interface).
 
 ---
 
@@ -330,14 +329,12 @@ is for*: finish the session, save the exercise, confirm the delete — and an
 empty state's one button, which is the whole point of a page with nothing on it.
 
 **An action that adds one more row to a list you are browsing floats instead.**
-Compact, bottom right, over the rows rather than in a strip beneath them: a bar
-across the foot of a screen that is nothing but list spends a row's worth of it
-on page background, and reads as the end of a flow when it is the beginning of
-one. The list keeps enough padding to scroll its last row clear of it, and it
-carries no shadow — depth is surface colour, and the fill is already the
-brightest thing on the screen. It hides while an empty state is up, because that
-state's own button is the same action and two of them read as two different
-things.
+Compact, bottom right, over the rows: a bar across the foot of a screen that is
+nothing but list spends a row's worth on page background and reads as the end of
+a flow when it is the beginning of one. The list keeps padding enough to scroll
+its last row clear, and it carries no shadow — the fill is already the brightest
+thing on screen. It hides while an empty state is up, whose own button is the
+same action.
 
 ### Chips
 
@@ -416,13 +413,13 @@ goes in the trailing slot, on the title's line.
 
 ### Sheets — the default for any choice
 
-**A sheet reserves the gesture bar itself, and `SafeArea` is not how.** The
-route consumes the bottom padding before the builder runs, so a `SafeArea`
-inside sees zero and adds nothing — every sheet had its last row under the
-system nav bar except the one passing `useSafeArea: true`. `AppSheet` reserves
-`viewPadding.bottom`, taking **the larger** of that and `viewInsets.bottom`, not
-the sum: with the keyboard up the gesture bar is behind it, and adding both
-lifts the sheet off the keyboard by the height of a bar nobody can see.
+**A sheet reserves the gesture bar itself, and `SafeArea` is not how.** The route
+consumes the bottom padding before the builder runs, so a `SafeArea` inside sees
+zero and adds nothing — every sheet had its last row under the system nav bar
+except the one passing `useSafeArea: true`. `AppSheet` reserves
+`viewPadding.bottom`, taking **the larger** of that and `viewInsets.bottom`,
+never the sum: with the keyboard up the gesture bar is behind it, and adding both
+lifts the sheet by the height of a bar nobody can see.
 
 `surface`, top radius 24, our own drag handle 36×4 eight points from the top.
 Header row: **bold `title` centred, ✕ on the right** in a 48 tap target,
@@ -529,15 +526,15 @@ Dashes are for a card that has a reason to exist and one missing figure.
 
 **"Not here" and "not yet" are different sentences.** An index built from what
 you have *done* — History's exercises, the days in a filter — must not answer a
-search with "no such thing" about something you own and have not used. At rest
-it lists what happened; searched, it falls through to the catalog and lists the
-rest **below** the matches, under one heading, each saying plainly that it has
-never been logged. Only a name nothing is called gets an empty state.
+search with "no such thing" about something you own and have not used. At rest it
+lists what happened; searched, it falls through to the catalog and lists the rest
+**below** the matches, under one heading, each saying it has never been logged.
+Only a name nothing is called gets an empty state.
 
-**A thing with no data still has a page**, and it is the same page it will have
-once there is some — the name, the controls, the figures as dashes. A separate
-"nothing here yet" screen that disappears the first time you finish a set means
-the first thing you learn about a screen is a layout you will never see again.
+**A thing with no data still has a page**, and it is the page it will have once
+there is some — the name, the controls, the figures as dashes. A separate
+"nothing here yet" screen that vanishes the first time you finish a set teaches
+you a layout you will never see again.
 
 ### Value and unit
 
@@ -547,8 +544,8 @@ it, sharing a baseline. `dense` is the row form (`labelLarge`, trailing an
 about). `StatTile` is this plus a label under it.
 
 **Every value carrying a unit is this widget.** It was hand-built in seven
-places, each deciding for itself whether the unit was `bodyMedium` or
-`bodySmall` and whether the pair shared a baseline or a centre line.
+places, each deciding for itself whether the unit was `bodyMedium` or `bodySmall`
+and whether the pair shared a baseline or a centre line.
 
 ### Stat tile
 
@@ -560,11 +557,11 @@ layout and prints `——` where the value goes, so a grid stays a grid.
 `value` 22, so the name reads as the label of a figure rather than the heading
 of a card. A screen where the name should lead is a screen of rows.
 
-**Two to a row, matching without being measured.** Every tile is the same shape
-— title, caption, fixed chart, one figure — so a row is
-`CrossAxisAlignment.start` and nothing else. `stretch` in a scrolling list asks
-for infinite height and throws; `IntrinsicHeight` works but lays the subtree out
-twice to discover what the tiles already agree on.
+**Two to a row, matching without being measured.** Every tile is the same shape —
+title, caption, fixed chart, one figure — so a row is `CrossAxisAlignment.start`
+and nothing else. `stretch` in a scrolling list asks for infinite height and
+throws; `IntrinsicHeight` works but lays the subtree out twice to discover what
+the tiles already agree on.
 
 **The caption is the tile's readout.** It names the span at rest — what the
 chart is scaled against and how many periods it covers — and names the period
@@ -583,13 +580,13 @@ ones, never in a different order, and never a second control of its own
 somewhere else on the page.
 
 **No chart ever plots raw rows.** Fifty years of daily entries is eighteen
-thousand marks across a phone, which is not a chart, it is a texture. Every
-chart folds its data into buckets — daily, weekly, monthly, yearly — and draws
-one mark per bucket, so the mark count stays under about sixty at *any* range.
-`Auto` picks the **finest** level that stays under that ceiling rather than the
-coarsest that fits, which is what makes a week open on days and fifty years open
-on years without either being a special case. The chip always names the level in
-force, because a silently smoothed chart is a chart lying about its resolution.
+thousand marks across a phone — a texture, not a chart. Every chart folds into
+buckets (daily, weekly, monthly, yearly) and draws one mark each, keeping the
+count under about sixty at *any* range. `Auto` picks the **finest** level under
+that ceiling rather than the coarsest that fits, which is what makes a week open
+on days and fifty years open on years without either being a special case. The
+chip always names the level in force: a silently smoothed chart lies about its
+resolution.
 
 - **A measurement averages; a count totals — into a rate.** Bodyweight in March
   is the mean of March's weigh-ins, because the mean of measurements is a
@@ -629,9 +626,8 @@ force, because a silently smoothed chart is a chart lying about its resolution.
 - **Markers only while they mark something.** Past ~40 points the circles touch
   and the line is lost inside them; drop them and offer zoom.
 - **A bucket is a bar, not a point on a line.** A line between two weeks claims
-  the value between them means something, and weekly set counts have no between
-  — you did eleven that week and nine the next. Bars carry a *count over a
-  period*; a line carries a measurement taken at a moment.
+  the value between them means something, and weekly counts have no between —
+  eleven that week, nine the next.
 - **A bar's gap is a share of its slot, never a constant.** At thirteen bars a
   fixed 2pt gap is a quarter of each column and reads as separation; at
   fifty-two it is three quarters, and the chart becomes a grey band with
@@ -639,17 +635,16 @@ force, because a silently smoothed chart is a chart lying about its resolution.
   with the gap — a 2pt radius on a 2pt bar is a lozenge.
 - **A week that was trained never draws as a week that was not.** A bar rounded
   to zero pixels is the chart contradicting the data; clamp it to a point of ink.
-- **Bars and lines share everything except the mark.** A line is a measurement
-  taken at a moment, a bar is a count over a period, and no amount of visual
-  consistency makes one honest as the other. What they do share is the whole of
-  the rest of it: the range row, the averaging, the gridlines, the right-hand
-  axis, the label ladder, and the motion.
-- **Changing range zooms; it does not cut.** Every range ends today, so motion
-  is anchored on the **right edge**: widening from three months to a year is
-  stepping back from the same wall — the weeks you were looking at stay put and
+- **Bars and lines share everything except the mark** — the range row, the
+  averaging, the gridlines, the right-hand axis, the label ladder, the motion. A
+  line is a measurement taken at a moment and a bar a count over a period, and no
+  amount of visual consistency makes one honest as the other.
+- **Changing range zooms; it does not cut.** Every range ends today, so motion is
+  anchored on the **right edge**: widening from three months to a year is
+  stepping back from the same wall, the weeks you were reading staying put while
   more arrive on the left. Scaling about the centre slides this week sideways,
-  and this week is the bar the eye is holding. Bar pitch and value scale both
-  interpolate; weeks that were off-screen fade in rather than arriving drawn.
+  and this week is the bar the eye is holding. Pitch and value scale interpolate;
+  off-screen weeks fade in rather than arriving drawn.
 - **Only a change of range animates** — and a change of averaging, which is the
   same act one level down. New data in the same range moves a bar and nothing
   else; animating a zoom when a set is ticked makes logging look like
@@ -697,27 +692,21 @@ force, because a silently smoothed chart is a chart lying about its resolution.
   days, so a fortnight of air goes either side of it.
 - **An empty range is an empty chart, not a box where the chart was.** Same
   height, same gridlines, same right-hand gutter, and the **time axis of the
-  window you asked for** — so the range chips still mean something with nothing
-  under them, and changing range zooms rather than resizing the page under your
-  thumb. The value axis keeps the scale of the *whole* history, so an untrained
-  month reads as an empty stretch of the same chart.
-- **An empty chart still states its value axis.** With a history to scale
-  against it uses that; with none it falls back to a plain zero-to-round-number
-  band in the unit being counted — the one place the trend chart anchors at
-  zero, because the rule against it exists to stop a real line being flattened
-  and there is no line here. Dropping the labels was tried and reads as a chart
-  that failed to draw. A scale under an empty plot claims nothing: there is
-  nothing on it to read against.
-- **A chart explains itself under the plot, never across it.** A sentence in the
-  middle of the frame is a dialog box wearing a chart's clothes. And it only
-  speaks when the emptiness is something you could not read off the plot —
-  unscoreable days, or a range that is all deloads. A range you simply did not
-  train in needs no caption; the empty graph is the sentence.
+  window you asked for**, so the chips still mean something with nothing under
+  them. The value axis keeps the scale of the *whole* history, so an untrained
+  month reads as an empty stretch of the same chart; with no history at all it
+  falls back to a zero-to-round-number band in the unit counted — the one place
+  the trend chart anchors at zero, since the rule against it exists to stop a
+  real line being flattened and there is no line here. Dropping the labels reads
+  as a chart that failed to draw.
+- **A chart explains itself under the plot, never across it**, and only when the
+  emptiness is something you could not read off the plot — unscoreable days, a
+  range that is all deloads. A range you did not train in needs no caption; the
+  empty graph is the sentence.
 - **A chart that has not loaded yet claims nothing.** It draws its frame and
-  waits. "Nothing logged" is a statement about the log, and a frame that has not
-  read the log is not entitled to make it — and a header that collapses to
-  nothing while it reads shoves the list under it down a chart's height when it
-  arrives.
+  waits: "nothing logged" is a statement about the log, and a frame that has not
+  read the log may not make it. A header that collapses while it reads shoves
+  the list down a chart's height when it arrives.
 
 ### Bar list
 
@@ -898,12 +887,10 @@ progress bar, no "we will build you a plan" — the user is the planner. One
 question per sheet; a second genuinely required question is a second sheet.
 
 **The welcome screen is the one illustrated page, and it is not a wizard.** The
-rule above bans an illustrated intro in front of *creating something* — the
-regime flow, where a drawing stands between the user and what they came to
-build. The welcome screen is one screen, one question, asked once, with the
-answer that skips it given equal standing.
-
-It stays inside the rule while all of this holds:
+rule above bans an illustrated intro in front of *creating something*, where a
+drawing stands between the user and what they came to build. This is one screen,
+one question, asked once, with the answer that skips it given equal standing. It
+stays inside the rule while all of this holds:
 
 - **One screen, never two.** No carousel, no progress dots, no "next".
 - **One question**, and not about training: where the history is kept, the only
