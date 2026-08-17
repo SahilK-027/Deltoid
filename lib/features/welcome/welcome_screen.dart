@@ -134,7 +134,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                   children: [
                     Image.asset(
                       mark,
-                      height: 22,
+                      height: _Threshold.markHeight,
                       filterQuality: FilterQuality.high,
                     ),
                     const SizedBox(width: Space.sm),
@@ -143,42 +143,44 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                     // before anything else on it means anything.
                     Text(
                       'Deltoid',
-                      style: context.t.displayMedium?.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
+                      style: context.t.displaySmall?.copyWith(
+                        fontWeight: _Threshold.lockupWeight,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // The drawing is a fixed share of the page rather than everything
-              // left over: it sits in the upper third with the display line
-              // under it, and the empty space belongs *below* the pair, which is
-              // what pushes the answers to the bottom edge where a threshold
-              // wants them.
-              const Spacer(flex: 2),
-              AnimatedBuilder(
-                animation: _step(1),
-                builder: (context, child) {
-                  final t = _step(1).value.clamp(0.0, 1.0);
-                  return Opacity(
-                    opacity: t,
-                    // Settles down to its size rather than growing into it: a
-                    // shape that ends on 1.0 from above has landed, one that
-                    // arrives from below is still going somewhere.
-                    child: Transform.scale(
-                      scale: 1 + 0.04 * (1 - t),
-                      child: child,
-                    ),
-                  );
-                },
-                child: SizedBox(
-                  height: MediaQuery.sizeOf(context).height * 0.26,
+              // The drawing takes whatever is left between the wordmark and the
+              // display line, rather than a fixed height: on a short phone it
+              // scales down instead of pushing the answers off the bottom.
+              const SizedBox(height: Space.xxl),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _step(1),
+                  builder: (context, child) {
+                    final t = _step(1).value.clamp(0.0, 1.0);
+                    return Opacity(
+                      opacity: t,
+                      // Settles down to its size rather than growing into it: a
+                      // shape that ends on 1.0 from above has landed, one that
+                      // arrives from below is still going somewhere.
+                      child: Transform.scale(
+                        scale: 1 + 0.04 * (1 - t),
+                        child: child,
+                      ),
+                    );
+                  },
+                  // A shade under the space it is given, so the drawing has air
+                  // on both sides of it rather than touching the line above and
+                  // the line below.
                   child: const Center(
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      child: CurlIllustration(),
+                    child: FractionallySizedBox(
+                      heightFactor: _Threshold.drawing,
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: CurlIllustration(),
+                      ),
                     ),
                   ),
                 ),
@@ -201,16 +203,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                     // Lighter and a shade smaller than the page-title scale: the
                     // reference line is a sentence, not a heading, and w800 makes
                     // it shout at the one screen with nothing to shout about.
-                    style: context.t.displayLarge?.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
-                      letterSpacing: -0.3,
+                    style: context.t.displaySmall?.copyWith(
+                      fontWeight: _Threshold.lockupWeight,
+                      height: _Threshold.taglineHeight,
                     ),
                   ),
                 ),
               ),
-              const Spacer(flex: 4),
+              const SizedBox(height: Space.huge),
 
               _Arrive(
                 step: _step(3),
@@ -240,7 +240,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                   filled: false,
                   icon: Icon(
                     Icons.smartphone_rounded,
-                    size: 19,
+                    size: Sizes.glyph,
                     color: c.textPrimary,
                   ),
                   onTap: _signingIn ? null : _decline,
@@ -270,6 +270,30 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
       ),
     );
   }
+}
+
+/// The three things on this screen that the app's tokens do not already say.
+///
+/// Everything else comes from them: the answer buttons are [Sizes.control] tall
+/// with a [Sizes.glyph] icon, like every button in the app, and the wordmark and
+/// the display line are `displaySmall` — the size and the tracking are the
+/// scale's, and only the weight and the line spacing are set here, because a
+/// name and a sentence are not the number a card is about.
+abstract final class _Threshold {
+  /// The mark, set to the cap height of the name beside it.
+  static const markHeight = 22.0;
+
+  /// A wordmark and a sentence at `displaySmall`'s size but not its weight:
+  /// `w700` is the weight a number is read at, and neither of these is one.
+  static const lockupWeight = FontWeight.w600;
+
+  /// Looser than `displaySmall`'s 26 on 22, so two centred lines read as a
+  /// sentence rather than as a heading that wrapped.
+  static const taglineHeight = 1.4;
+
+  /// The drawing's share of the space left between the wordmark and the line.
+  /// Under 1 so it has air on both sides rather than touching either.
+  static const drawing = 0.88;
 }
 
 /// A hairline broken by the word `OR`, between the two answers.
@@ -360,7 +384,7 @@ class _ThresholdButton extends StatelessWidget {
       onTap: onTap,
       scale: 0.975,
       child: Container(
-        height: 54,
+        height: Sizes.control,
         decoration: BoxDecoration(
           // `surfaceHigh` is the app's secondary-button fill everywhere else,
           // so the unfilled answer is the same material as every other quiet

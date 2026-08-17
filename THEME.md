@@ -512,7 +512,8 @@ theme.
   spectacles. **A drawing is authored, not computed.** What code may do is
   colour it, place it and animate it.
 - **Line and mass, in two files.** The figure takes `textPrimary` and inverts
-  with the theme. The weight takes a hue, and the split is what stops the two
+  with the theme. The weight takes one fixed hue, `lavender`, the same in both
+  themes like the identity marks it is drawn from, and the split is what stops the two
   merging into one silhouette — they are the same value otherwise.
 - **No fill under the line, no second weight, no shadow.**
 - **Monochrome, including the accent.** Most likely rule to be broken: the
@@ -520,8 +521,9 @@ theme.
   chrome, and here a warm dot is `deload`, so the drawing means something it
   does not mean. Emphasis is `accent`, which inverts with the theme.
 - **It themes by inverting**, not by having two assets. One path, one token.
-- **Inline vector, not an image asset** — it must take the theme colour at build
-  time and stay sharp at any size.
+- **Vector, never a raster** — an SVG loaded as an asset and tinted at build
+  time, so it takes the theme colour and stays sharp at any size. A PNG of the
+  same drawing is two files, both wrong in one theme.
 - **Never load-bearing.** Remove it and the screen still reads.
 
 ### Empty states
@@ -904,10 +906,14 @@ stays inside the rule while all of this holds:
 - **One screen, never two.** No carousel, no progress dots, no "next".
 - **One question**, and not about training: where the history is kept, the only
   thing the app cannot infer.
-- **Declining is a real answer, not a delay.** `Use without an account` is a
-  plain text action directly under the primary — not greyed, not small print,
-  not a corner `Skip`. Final and repairable: Settings offers the same connection
-  later, and nothing nags.
+- **Declining is a real answer, not a delay.** `Continue on this phone` is a
+  button of the same size, shape and type as the one above it — not greyed, not
+  small print, not a corner `Skip`. Only the fill differs, `surfaceHigh` with a
+  `border` hairline against the `accent` above, because one of the two opens
+  somebody else's sheet. Final and repairable: Settings offers the same
+  connection later, and nothing nags.
+- **A rule reading `OR` between them.** The two are alternatives, not a
+  sequence, and a gap alone says "and then".
 - **Seen once.** Answered either way, it never appears again.
 - **It says what it will do before it asks.** The subtitle names the outcome — a
   history that survives a lost phone — rather than the mechanism.
@@ -918,6 +924,13 @@ wordmark sits at the top, the answers at the bottom, and the mark takes the
 space between. The only screen with a centred `display` line, which is what
 makes it read as a threshold rather than a page.
 
+Its measurements are its own, and they live in `_Threshold` in
+`welcome_screen.dart` rather than in `tokens.dart`: the wordmark and the display
+line are set between rungs of the type scale, the answer button is taller than a
+control anywhere else, and the drawing takes a fraction of the space left over.
+A token is a decision the whole app makes, and none of these may spread — a
+second screen adopting one would be a second threshold, which cannot exist.
+
 ### What the threshold screen is allowed, and nothing else is
 
 Four things, all of them because this screen is a **door rather than a page**:
@@ -927,11 +940,10 @@ would be wrong on a screen with a set on it.
 
 | Allowed here | The rule it stands outside | Why |
 | --- | --- | --- |
-| **Two equal buttons**, both `accent` | *One primary action per screen* | There are two answers and neither is the recommendation. A primary with a text link under it is a screen that has already decided, and the decline has to have equal standing |
+| **Two equal buttons**, one `accent` and one `surfaceHigh` | *One primary action per screen* | There are two answers and neither is the recommendation. A primary with a text link under it is a screen that has already decided, and the decline has to have equal standing. Equal is the size, the shape and the type; the fill differs only so two full-width pills do not read as one control repeated |
 | **`Radii.pill`** on those buttons | Buttons wear `Radii.control` | A pill is the shape of a choice; the control radius is the shape of the app. Nothing else on this screen is a control, so there is nothing for them to disagree with |
 | **The wordmark**, mark plus name | The app never says its own name | Once, at the top of the one screen a person can arrive at without knowing what they opened |
-| **A hue on the drawing**, cycling the six identity colours every 3s | *Chrome is monochrome; colour is data* | Nothing on this screen is data for it to be confused with: no regime exists yet, no series, no deload. It cycles rather than picking one because a single hue here would look like a *particular* programme's mark, which is the one meaning the six do carry |
-| **A loop that never settles** | *Motion is still; it confirms a change* | The consequence of the row above — and the reason `pumpAndSettle` cannot be used on this screen in tests. It stops the moment the question is answered, because the screen is gone |
+| **A hue on the drawing**, one fixed `lavender` | *Chrome is monochrome; colour is data* | Nothing on this screen is data for it to be confused with: no regime exists yet, no series, no deload. It is **one** colour and it does not move — a hue that cycles is motion performing, and the drawing is not reporting a change |
 | **An entrance**: the page arrives in parts, 620ms, once | *Motion confirms a change; it never performs* | There is nothing on screen to confirm yet. It is the first frame of the app anyone sees, and a page that assembles itself reads as something being made for you rather than a form being presented to you. One shot, never replayed |
 | **Google's four colours** on the Google button | *Chrome is monochrome; colour is data* | Not our hue and not our palette: somebody else's identity, on the one control that opens their sheet, and what a user's eye actually looks for. The official asset, never redrawn — an arc a few degrees out reads as a knock-off and no test can tell you it is wrong |
 

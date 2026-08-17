@@ -31,10 +31,10 @@ void main() {
 
   /// A few frames, rather than `pumpAndSettle`.
   ///
-  /// The drawing cycles its hue on a repeating timer, so this screen never
-  /// settles by design — `pumpAndSettle` waits for a quiet frame that will not
-  /// come. See `CurlIllustration`, and THEME → the threshold screen for why a
-  /// loop is allowed here.
+  /// The screen does settle now that the drawing holds one fixed hue, so this
+  /// is no longer forced — it stays because these tests care about the screen
+  /// being *reachable* part-way through its 620ms entrance, not about the frame
+  /// after it finishes.
   Future<void> beats(WidgetTester tester, [int n = 6]) async {
     for (var i = 0; i < n; i++) {
       await tester.pump(const Duration(milliseconds: 120));

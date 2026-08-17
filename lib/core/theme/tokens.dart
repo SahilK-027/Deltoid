@@ -400,6 +400,23 @@ abstract final class Space {
 /// and `Radii.lg` was 18. Two scales sharing one set of suffixes in one file is
 /// a trap: it invites you to pair `Space.md` padding with `Radii.md` corners on
 /// the assumption they were drawn together, and they never were.
+/// The heights and glyph sizes a control is built from.
+///
+/// These were three literals in `primitives.dart` and a fourth on the threshold
+/// screen, all of them the same decision made four times. A button is 54 tall
+/// because that is the height a thumb aims at; the compact one is 46 because it
+/// sits in a row with something else; a glyph beside `titleMedium` is 20.
+abstract final class Sizes {
+  /// A full-width button, and anything that has to line up beside one.
+  static const control = 54.0;
+
+  /// The same button where it shares a row: a sheet's footer, a header action.
+  static const controlCompact = 46.0;
+
+  /// A glyph inside a control, beside a `titleMedium` label.
+  static const glyph = 20.0;
+}
+
 abstract final class Radii {
   /// Small marks: a checkbox, a done square, the delete chip on a set row.
   static const mark = 6.0;

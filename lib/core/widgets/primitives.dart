@@ -706,7 +706,7 @@ class PrimaryButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: Motion.base,
         curve: Motion.curve,
-        height: compact ? 46 : 54,
+        height: compact ? Sizes.controlCompact : Sizes.control,
         padding: compact
             ? const EdgeInsets.symmetric(horizontal: Space.xl)
             : null,
@@ -719,7 +719,7 @@ class PrimaryButton extends StatelessWidget {
           mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20, color: fg),
+              Icon(icon, size: Sizes.glyph, color: fg),
               const SizedBox(width: Space.sm),
             ],
             Flexible(
@@ -760,7 +760,7 @@ class SecondaryButton extends StatelessWidget {
       onTap: onPressed,
       scale: 0.975,
       child: Container(
-        height: 54,
+        height: Sizes.control,
         decoration: BoxDecoration(
           color: c.surfaceHigh,
           borderRadius: BorderRadius.circular(Radii.control),
@@ -769,7 +769,7 @@ class SecondaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20, color: fg),
+              Icon(icon, size: Sizes.glyph, color: fg),
               const SizedBox(width: Space.sm),
             ],
             Flexible(
