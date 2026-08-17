@@ -30,6 +30,12 @@ class FakeBackend implements SyncBackend {
   Future<void> Function(String table, List<Map<String, dynamic>> rows)?
       onStored;
 
+  /// Sequence numbers of every request, so a test can assert that a drain read
+  /// before it wrote — the ordering SYNC.md § 7 rests on.
+  final reads = <int>[];
+  final writes = <int>[];
+  int _requests = 0;
+
   int _clock = 0;
 
   int get storedRows =>
@@ -53,6 +59,7 @@ class FakeBackend implements SyncBackend {
 
   @override
   Future<void> upsert(String table, List<Map<String, dynamic>> batch) async {
+    writes.add(_requests++);
     _maybeFail();
     calls.add((
       table: table,
@@ -75,6 +82,7 @@ class FakeBackend implements SyncBackend {
     DateTime? cursor, {
     required int limit,
   }) async {
+    reads.add(_requests++);
     _maybeFail();
     final all = this.table(table).toList()
       ..sort(

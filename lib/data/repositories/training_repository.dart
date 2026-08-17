@@ -536,18 +536,43 @@ class TrainingRepository {
           ..where(db.workoutExercises.deletedAt.isNull() &
               db.workouts.deletedAt.isNotNull()))
         .get();
-    if (orphaned.isEmpty) return 0;
 
     final stamp = nowMs();
     final workoutIds = {
       for (final row in orphaned) row.readTable(db.workouts).id,
     };
-    await db.transaction(() async {
-      for (final id in workoutIds) {
-        await _tombstoneChildren(id, stamp);
-      }
-    });
-    return orphaned.length;
+    if (workoutIds.isNotEmpty) {
+      await db.transaction(() async {
+        for (final id in workoutIds) {
+          await _tombstoneChildren(id, stamp);
+        }
+      });
+    }
+
+    // And a live set under a snapshot that is already tombstoned, which the
+    // pass above cannot see: it looks for *live* snapshots, and this row's
+    // parent is dead.
+    //
+    // **A sync pull is what makes this reachable.** One phone deletes a
+    // session, taking the whole tree; the other, offline, adds a set inside it
+    // and pushes afterwards — [SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does)
+    // row 8. The set arrives under a tombstoned parent, and `invariant_oracle`
+    // calls that *live sets under a dead slot*. The set is kept, as a
+    // tombstone: nothing logged is deleted, and nothing that cannot be reached
+    // from a screen is left carrying `dirty`.
+    final adopted = await db.customUpdate(
+      'UPDATE set_logs SET deleted_at = ?, updated_at = ?, device_id = ?, '
+      'dirty = 1 WHERE deleted_at IS NULL AND workout_exercise_id IN ('
+      'SELECT id FROM workout_exercises WHERE deleted_at IS NOT NULL)',
+      variables: [
+        Variable<int>(stamp),
+        Variable<int>(stamp),
+        Variable<String>(currentDeviceId),
+      ],
+      updates: {db.setLogs},
+    );
+
+    return orphaned.length + adopted;
   }
 
   Future<List<String>> _sessionIds(String regimeId) async {

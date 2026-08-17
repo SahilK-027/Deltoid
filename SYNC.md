@@ -263,6 +263,25 @@ the problem that is local. Agreement *between* devices is a server's job, and
 `server_updated_at` is that answer. The client's `updatedAt` keeps doing its own
 job — ordering the offline queue on the device that made it.
 
+### The one row the server's clock cannot decide
+
+**A local row that is `dirty` has never been pushed, so it has no
+`server_updated_at` at all.** Nothing above gives an answer for it, and the
+schema does not change to give it one ([§ 4](#4-what-the-server-holds)).
+
+So that one case falls back to the two phones' own `updatedAt`, ties broken on
+`deviceId`, in `resolveRow`. Both alternatives are worse: taking the remote
+always discards an edit made seconds ago on the phone in your hand, and keeping
+the local always lets a device offline for a month overwrite every newer row on
+reconnect, which [§ 12](#12-every-edge-case-and-what-it-does) row 10 forbids.
+
+The blast radius is one comparison. A *clean* local row is a copy of what the
+account already holds — every local write sets `dirty` — so it is taken from the
+server without weighing anything, which is what almost every pulled row does.
+And an unpushed edit that wins stays dirty, is pushed immediately behind the
+pull, and every conflict it is in afterwards is decided on the server's clock,
+exactly as this section requires.
+
 ### Why not field-level merge
 
 Because for the tables that matter it fabricates data. A `SetLog` is not a bag
@@ -331,8 +350,23 @@ state without negotiating.
 | `regimes_single_active` | A activates PPL, B activates Upper/Lower | The *flag* is the conflict, not the row. LWW on activation; the losing regime survives, just not active |
 | `bodyweight_day_live` | both log today's weight | Genuinely the same measurement. LWW, tombstone the loser |
 | `cycles_regime_index_live` | both advance the cycle → two "cycle 7" | Both are real cycles. Loser renumbers to the next free index |
-| `regimes_identity_live` | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. A shelf with no free slot wraps, exactly as [§ 12](#12-every-edge-case-and-what-it-does) row 15 already allows |
+| `regimes_identity_live` | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. **A shelf with no free slot cannot wrap** — see below |
 | `cycles_regime_open_live` | both advance a regime's cycle → two open cycles | Newer stays open, older is **completed** — the same answer as `workouts_single_open`, and `healDuplicateOpenCycles` already writes it |
+
+**The seventh regime.** This section said a full shelf wraps and two programmes
+share a colour, and the schema says otherwise: `identity_index` carries a
+`CHECK (0..5)` *and* a unique index over live rows, so **six live regimes is the
+ceiling**. Five live plus two devices each creating one offline is seven rows
+for six slots, and no re-slotting makes that fit — it is reachable by ordinary
+use, not only by a merge.
+
+So `freeIdentitySlot` returns null and the applier lands that regime
+**tombstoned**, reporting it through `core/failure.dart`. The programme and
+every session, workout and set under it still arrive and are kept: rule 2 of
+[§ 15](#15-what-sync-may-never-do) is about logged work, and refusing the row
+outright would orphan its children — the same loss with more steps. It is not on
+the shelf until a slot frees, and that is the honest price. Row 15 of
+[§ 12](#12-every-edge-case-and-what-it-does) is corrected to match.
 
 The twelfth, `set_logs_slot_identity`, needs no rule and is listed so the count
 stops drifting. It is not partial and it is not a rule about the data: it exists
@@ -449,14 +483,14 @@ fails a build rather than a history.
 | 5 | Both activate a different regime | LWW on the flag. Both regimes survive. |
 | 6 | Both log today's bodyweight | Same measurement. LWW, loser tombstoned. |
 | 7 | Both append a set, exercise or day | Both survive; loser takes the next free position. |
-| 8 | A deletes a workout, B adds a set to it | The set arrives under a tombstoned parent. `healOrphanedSnapshots` already runs at every launch and tombstones it. |
+| 8 | A deletes a workout, B adds a set to it | The set arrives under a tombstoned parent, and `healOrphanedSnapshots` tombstones it at the end of every pull. It had to grow a second half for this: a delete takes the whole tree, so the set's *snapshot* is already tombstoned and the original pass — which looks for live snapshots under dead workouts — could not see it. |
 | 9 | Both delete, or one deletes and one restores | `deletedAt` is a column like any other. LWW. |
 | 10 | A device offline for months reconnects | Its old edits lose to newer server rows; rows it *created* are new and survive. Correct in both directions. |
 | 11 | Both train on the same day | Legal — no constraint, and training twice in a day is real. Two sessions appear; the user deletes one if it was a mistake. |
 | 12 | Killed mid-push | `dirty` stays set, upserts are idempotent, the retry is free. |
 | 13 | Killed mid-pull | The batch transaction rolls back and `last_pull_at` never moved. Re-pulled next time. |
 | 14 | Devices with skewed clocks | Ordering is `server_updated_at`, so a fast phone wins nothing. [§ 8](#8-conflict--two-versions-of-one-row) |
-| 15 | Merge pushes past six regimes | Hues wrap; two programmes share a colour until one is deleted. |
+| 15 | Merge pushes past six regimes | Six live regimes is the schema's ceiling, so the seventh lands **tombstoned** and is reported — everything logged under it arrives and is kept. [§ 9](#9-collision--two-rows-one-slot) |
 | 16 | A pulled row fails a local CHECK | Skipped, named through the failure channel, batch continues. [§ 13](#13-when-it-fails) |
 | 17 | Sign out mid-sync | Nothing shared. The queue stays on the device and resumes if the same account signs back in. |
 | 18 | Account holds rows from a newer build | [§ 14](#14-two-builds-one-account). Unknown columns ignored, missing ones defaulted. |

@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**765 tests and nine pgTAP tests, analyzer clean.**
+**802 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -97,10 +97,10 @@ Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
 - [x] **1 · The server** — nine tables, RLS on every one with `using` and `with check`, granted to `authenticated` and never `anon`, the `server_updated_at` trigger, a `(user_id, server_updated_at)` index per table, `supabase/migrations` in the repo and proved by pgTAP.
 - [x] **2 · Identity** — Google sign-in behind `SyncAuth`, the welcome screen, seeding moved behind its answer, the account section in Settings. Not yet driven on hardware.
 - [x] **3 · Push** — the `dirty` drain in keyset pages, parents before children, `dirty` cleared only against an unchanged `updatedAt`; the transport behind an interface with an in-memory fake; four triggers (debounce, resume, connectivity, backstop) with exponential backoff; `SyncScope` at the root; Local / Synced / Pending derived off the database and shown in Settings. The backstop interval is a placeholder until phase 6 chooses it on hardware. Not yet driven on hardware.
-- [ ] **4 · Pull** — last-write-wins, collisions on the twelve unique indexes, one bad row never stopping a restore.
+- [x] **4 · Pull** — the merge as arithmetic in `domain/sync_merge.dart`, the applier in `pull.dart`: cursor in `app_settings` advanced only after a whole pass commits, one transaction per batch, parents before children, tombstones staying tombstones, a bad row skipped and named, `repairDatabase` after. The engine pulls before it pushes. Every § 12 row this phase owns is a named test against two databases and one fake backend. Not yet driven on hardware.
 - [ ] **5 · Adoption** — the three shapes at sign-in, and the `starterKey` dedup.
 - [ ] **6 · States and failures** — the three states in Settings, every row of [SYNC § 13](SYNC.md#13-when-it-fails), the backstop interval chosen on hardware.
-- [ ] **The tests** — every row of [SYNC § 12](SYNC.md#12-every-edge-case-and-what-it-does), and a two-device fuzz that has to converge.
+- [ ] **The tests** — the § 12 rows are written; what is left is `test/integrity/sync_fuzz_test.dart`, in the shape `model_fuzz_test.dart` established: two devices, random operations on both, syncing at random points, the oracle on both plus a convergence check.
 
 `supabase_flutter`, `google_sign_in` and `connectivity_plus` are in. Driving any
 of it needs a Supabase project and Google OAuth clients that only the user can

@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import '../../core/failure.dart';
 import '../db/database.dart';
 import '../db/table_spec.dart';
+import 'pull.dart';
 import 'push.dart';
 import 'sync_backend.dart';
 
@@ -35,11 +36,14 @@ class SyncEngine {
     this.minBackoff = const Duration(seconds: 30),
     this.maxBackoff = const Duration(minutes: 30),
     PushService? push,
+    PullService? pull,
   })  : _db = db,
-        _push = push ?? PushService(db, backend);
+        _push = push ?? PushService(db, backend),
+        _pull = pull ?? PullService(db, backend);
 
   final AppDatabase _db;
   final PushService _push;
+  final PullService _pull;
 
   /// How long a write has to settle before it is pushed. Long enough that a set
   /// logged and immediately corrected is one push, short enough that putting
@@ -146,6 +150,14 @@ class SyncEngine {
     try {
       do {
         _again = false;
+        // **Pull before push**, always. A conflict is resolved before it is
+        // propagated ([SYNC.md § 7](SYNC.md#7-pull)): a local row that wins one
+        // stays dirty, and the push immediately behind this is what tells the
+        // account about it. The other order sends a version that has not met
+        // the account's yet, and the two phones take turns overwriting each
+        // other.
+        await _pull.pull();
+        if (_disposed) return;
         await _push.drain();
         if (_disposed) return;
       } while (_again);

@@ -3,10 +3,12 @@
 A personal, offline-first training log. Flutter, Riverpod and drift over SQLite,
 Android only, one user.
 
-Everything lives on the device and no screen waits on a server — the app makes
-no network call at all today. Sync across your own devices is designed and in
-scope but not built; the schema has carried its columns from the start
-(`updatedAt`, `deletedAt`, `deviceId`, `dirty`).
+Everything lives on the device and no screen waits on a server. Sync across your
+own devices runs behind that: signed in, a background worker drains `dirty` to a
+Supabase project and applies what the account holds that this phone has not seen.
+A build with no configuration — every clone of this repo — cannot reach an
+account and works exactly as it did. The schema has carried its columns from the
+start (`updatedAt`, `deletedAt`, `deviceId`, `dirty`).
 
 **No programme is baked in.** A fresh install ships with an exercise catalog and
 nothing else. Build a split or start from a template (PPL 6-day, Upper/Lower) and
@@ -77,7 +79,8 @@ lib/
                             supabase_backend.dart (the only file that imports
                             the client), sync_auth.dart, push.dart (drains
                             dirty), sync_engine.dart (when a push runs),
-                            sync_state.dart (Local / Synced / Pending)
+                            pull.dart (applies a batch: conflict, collision,
+                            cursor), sync_state.dart (Local / Synced / Pending)
 
   core/
     theme/                  tokens.dart, theme.dart — the language in code
@@ -113,7 +116,7 @@ backup).
 
 ## Testing
 
-745 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
+802 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
 unit and widget tests, `test/integrity/` holds two pieces worth knowing about:
 
 - `test/integrity/invariant_oracle.dart` — sixteen structural rules re-derived in
