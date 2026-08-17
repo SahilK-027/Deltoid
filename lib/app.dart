@@ -13,6 +13,7 @@ import 'core/theme/tokens.dart';
 import 'core/widgets/scroll.dart';
 import 'core/widgets/toast.dart';
 import 'core/sync_providers.dart';
+import 'core/sync_scope.dart';
 import 'features/shell/app_shell.dart';
 import 'features/welcome/welcome_screen.dart';
 import 'features/workouts/workouts_providers.dart';
@@ -66,7 +67,7 @@ class DeltoidApp extends ConsumerWidget {
           child: child!,
         );
       },
-      home: const _FailureToasts(child: _Boot()),
+      home: const _FailureToasts(child: SyncScope(child: _Boot())),
     );
   }
 }

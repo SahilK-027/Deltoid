@@ -40,10 +40,10 @@ class AppFailure {
 /// installed in `main` is not in the tree at all, and both have to be able to
 /// speak without knowing who is listening.
 ///
-/// Deliberately **not** an error-reporting service. Nothing leaves the phone —
-/// the app makes no network calls and this does not change that. It exists so
-/// the screen can say "that did not save", which is the whole of the
-/// requirement.
+/// Deliberately **not** an error-reporting service. Nothing announced here
+/// leaves the phone: sync sends rows to an account and never a failure, a log
+/// line or a stack trace. It exists so the screen can say "that did not save",
+/// which is the whole of the requirement.
 final _failures = StreamController<AppFailure>.broadcast();
 
 Stream<AppFailure> get failures => _failures.stream;

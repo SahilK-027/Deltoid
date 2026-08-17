@@ -73,6 +73,11 @@ lib/
                             regime_repository    programmes, sessions, catalog
     seed/                   starter catalog + optional templates
     backup/                 whole-database JSON export / restore, Downloads writer
+    sync/                   sync_backend.dart (the transport, three methods),
+                            supabase_backend.dart (the only file that imports
+                            the client), sync_auth.dart, push.dart (drains
+                            dirty), sync_engine.dart (when a push runs),
+                            sync_state.dart (Local / Synced / Pending)
 
   core/
     theme/                  tokens.dart, theme.dart — the language in code

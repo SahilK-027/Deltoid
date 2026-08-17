@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../db/table_spec.dart';
 import 'sync_auth.dart';
+import 'sync_backend.dart';
 import 'sync_config.dart';
 
 /// The only two packages in this file, and the only file they are in.
@@ -17,7 +19,7 @@ import 'sync_config.dart';
 /// two phones do not need to see each other's writes within seconds, and a held
 /// connection costs a battery budget to serve a case that does not occur
 /// ([SYNC.md § 1](SYNC.md#1-what-this-is-and-is-not)).
-class SupabaseBackend {
+class SupabaseBackend implements SyncBackend {
   SupabaseBackend._(this.client, this._config);
 
   /// Starts the client, once per process.
@@ -44,6 +46,62 @@ class SupabaseBackend {
   final SyncConfig _config;
 
   late final SyncAuth auth = _GoogleSupabaseAuth(client, _config);
+
+  /// Upserts on the primary key, which is `id` on all nine tables.
+  ///
+  /// `user_id` is never in [rows]: the column defaults to `auth.uid()` and RLS
+  /// checks it with `with check`, so the one value a client must not be trusted
+  /// to assert is one it never sends.
+  @override
+  Future<void> upsert(String table, List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return;
+    await _guard(() => client.from(table).upsert(rows));
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> since(
+    String table,
+    DateTime? cursor, {
+    required int limit,
+  }) async {
+    final rows = await _guard(() {
+      final query = client.from(table).select();
+      // `gte`, not `gt` — see [SyncBackend.since].
+      final filtered = cursor == null
+          ? query
+          : query.gte(serverUpdatedAtColumn, cursor.toUtc().toIso8601String());
+      return filtered.order(serverUpdatedAtColumn, ascending: true).limit(limit);
+    });
+    return [for (final row in rows) Map<String, dynamic>.from(row)];
+  }
+
+  @override
+  Future<int> count(String table) =>
+      _guard(() => client.from(table).count(CountOption.exact));
+
+  /// Everything the network can do, as the two answers sync has for it.
+  ///
+  /// A `PostgrestException` means the request reached PostgREST and was
+  /// refused — a policy, a column that does not exist, a row it will not take —
+  /// and retrying changes nothing, so it is worth saying out loud. Its 5xx
+  /// codes are the exception: the server was there and unwell, which is the
+  /// same shape as no server at all. Everything else — a socket, a DNS failure,
+  /// a timeout, an expired token that could not be refreshed — is a phone
+  /// without signal, and a phone without signal is not an error
+  /// ([SYNC.md § 13](SYNC.md#13-when-it-fails)).
+  Future<T> _guard<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on PostgrestException catch (e) {
+      final code = e.code ?? '';
+      throw SyncTransportFailure(
+        'The server refused that: ${e.message}',
+        transient: code.startsWith('5') || code.isEmpty,
+      );
+    } on Object catch (e) {
+      throw SyncTransportFailure('$e', transient: true);
+    }
+  }
 }
 
 class _GoogleSupabaseAuth implements SyncAuth {

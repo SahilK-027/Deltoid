@@ -16,6 +16,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
 import '../../data/sync/sync_auth.dart';
+import '../../data/sync/sync_state.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
@@ -530,10 +531,12 @@ class _BodyweightCard extends ConsumerWidget {
 /// that comes back when the network does, and this row is the whole of the
 /// second chance.
 ///
-/// **It claims no backup yet.** Push is the next phase; until rows actually
-/// leave the phone, a row here saying a history is safe would be the one kind
-/// of lie this app cannot afford. What it says is what is true — which account
-/// this device is signed in to.
+/// **Signed in, it says which of the three states this install is in**
+/// ([SYNC.md § 2](SYNC.md#2-the-three-states)), read off the database rather
+/// than off the engine — there is no second copy of the answer, and no state
+/// for *syncing right now*. `Pending` is normal: a session logged in a basement
+/// gym is pending for an hour and that is the design working. Phase 6 is where
+/// it says for how long, and what a failure was.
 ///
 /// Absent entirely from a build with no configuration, rather than present and
 /// broken: a clone of this repo has no project to reach.
@@ -567,7 +570,7 @@ class _AccountSection extends ConsumerWidget {
                   AppRow(
                     icon: Icons.account_circle_outlined,
                     title: account.email ?? 'Signed in',
-                    subtitle: 'Signed in on this device.',
+                    subtitle: _backupState(ref.watch(syncStateProvider)),
                   ),
                   AppRow(
                     icon: Icons.logout,
@@ -580,6 +583,31 @@ class _AccountSection extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// What the account row says under the address.
+  ///
+  /// The loading case is the one that matters here: `valueOrNull` on an
+  /// `AsyncValue` that has not resolved is null, and reading null as *nothing
+  /// owed* would show `Backed up` over a phone that is holding a session
+  /// ([SYNC.md § 19](SYNC.md#19-traps)). Until the count arrives this says only
+  /// what is certain — that this device is signed in.
+  static String _backupState(AsyncValue<SyncState> state) {
+    final value = state.valueOrNull;
+    if (value == null) return 'Signed in on this device.';
+
+    return switch (value.status) {
+      SyncStatus.pending => value.owed == 1
+          ? '1 change still to back up.'
+          : '${value.owed} changes still to back up.',
+      SyncStatus.synced || SyncStatus.local => switch (value.lastPushAt) {
+          final at? =>
+            'Backed up ${DateFormat('d MMM, HH:mm').format(at.toLocal())}.',
+          // Signed in, nothing owed, and nothing has ever left: a fresh install
+          // that has not been trained on yet.
+          _ => 'Signed in on this device.',
+        },
+    };
   }
 
   Future<void> _signIn(BuildContext context, WidgetRef ref) async {

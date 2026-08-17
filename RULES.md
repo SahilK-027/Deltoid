@@ -437,6 +437,9 @@ rather than shape. Where the checks live now:
 | A rewritten query returns what the old one did | `test/data/query_conversion_test.dart` |
 | Every column has a default, or has always been written | `test/data/table_spec_test.dart` — walks every column of every table |
 | Every rung of the ladder can be replayed | `test/data/migrations_test.dart` — a full upgrade over a database that already has everything |
+| The server schema is the local one | `test/data/server_schema_test.dart` — every column of every syncable table, read off `supabase/migrations` |
+| Nothing above `data/sync/` knows which backend this is | `test/features/no_supabase_in_features_test.dart` |
+| `dirty` is cleared only against an unchanged `updatedAt` | `test/data/sync/push_test.dart` — a row edited while its own push is in flight is still owed |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

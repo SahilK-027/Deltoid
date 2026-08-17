@@ -2,9 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/database.dart';
 import '../data/seed/seeder.dart';
+import '../data/sync/connectivity.dart';
 import '../data/sync/supabase_backend.dart';
 import '../data/sync/sync_auth.dart';
 import '../data/sync/sync_config.dart';
+import '../data/sync/sync_engine.dart';
+import '../data/sync/sync_state.dart';
 import 'providers.dart';
 
 /// Which answer the welcome screen was given, or null if it has not been asked.
@@ -86,6 +89,44 @@ final accountProvider = StreamProvider<SyncAccount?>((ref) {
   final auth = ref.watch(syncAuthProvider);
   if (auth == null) return Stream.value(null);
   return auth.changes.startWith(auth.current);
+});
+
+/// The engine, started once and running for the life of the process.
+///
+/// Null when this build carries no configuration, which is a working app that
+/// cannot sync rather than a broken one — `flutter test` runs in exactly that
+/// state and so does a clone of this repo.
+///
+/// Nothing watches this for a value. It is kept alive by [SyncScope] at the
+/// root, and everything a screen wants to know about sync comes off
+/// [syncStateProvider], which reads the database rather than the engine
+/// ([SYNC.md § 17](SYNC.md#17-the-architecture) — the state is read, not
+/// remembered).
+final syncEngineProvider = Provider<SyncEngine?>((ref) {
+  final backend = ref.watch(syncBackendProvider).valueOrNull;
+  if (backend == null) return null;
+
+  final engine = SyncEngine(db: ref.watch(databaseProvider), backend: backend);
+  engine.start(
+    // Distinct, so a token refresh — which emits an account every hour — is not
+    // a sign-in and does not trigger a drain of its own.
+    signedIn: backend.auth.changes
+        .map((account) => account != null)
+        .startWith(backend.auth.current != null)
+        .distinct(),
+    networkRegained: networkRegained(),
+  );
+  ref.onDispose(engine.dispose);
+  return engine;
+});
+
+/// Local, Synced or Pending, off the database.
+final syncStateProvider = StreamProvider<SyncState>((ref) {
+  final account = ref.watch(accountProvider).valueOrNull;
+  return watchSyncState(
+    ref.watch(databaseProvider),
+    signedIn: account != null,
+  );
 });
 
 extension _StartWith<T> on Stream<T> {

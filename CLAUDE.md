@@ -3,13 +3,14 @@
 Deltoid is a personal, offline-first training log built with Flutter, Riverpod
 and drift over SQLite. It runs on Android only and serves one user.
 
-**It makes no network calls today, and online sync is now in scope.** Offline-
-first is the finished half and stays the architecture: every screen reads local
-disk, and nothing waits on a server. Sync is an additive layer over the columns
-every syncable row already carries — see [RULES.md § 6](RULES.md#6-scope) for
-what that decision does and does not open, and [TODO.md](TODO.md) for what it
-still needs. Until it is built, "no network calls" is a true statement about the
-code and a stale one about the plan.
+**It now pushes to a server, and no screen has noticed.** Offline-first is the
+finished half and stays the architecture: every screen reads local disk, and
+nothing waits on a server — a build with no configuration, which is every clone
+of this repo and every `flutter test`, cannot sync at all and works exactly as
+it did. Sync is an additive layer over the columns every syncable row already
+carries: a background drain of `dirty`, and nothing else so far. See
+[RULES.md § 6](RULES.md#6-scope) for what that decision does and does not open,
+and [TODO.md](TODO.md) for the four phases still to come.
 
 ## The docs, and which one you want
 

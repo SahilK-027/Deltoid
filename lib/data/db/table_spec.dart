@@ -207,3 +207,34 @@ String jsonKeyOf(String columnName) => columnName.replaceAllMapped(
       RegExp('_([a-z])'),
       (m) => m[1]!.toUpperCase(),
     );
+
+/// A drift row's `toJson` → what PostgREST is handed.
+///
+/// Keys only. The values are already what the wire wants: drift serialises an
+/// int column to an int, a bool to a bool, and a `JsonTypeConverter` column to
+/// its *SQL* form — which is why `exercises.form_video_urls` is `text`
+/// server-side and arrives as a string containing JSON rather than an array
+/// ([SYNC.md § 17](SYNC.md#17-the-architecture)).
+///
+/// `user_id` is not added here. The server column defaults to `auth.uid()`, so
+/// the one value a client must never be trusted to assert is one it never
+/// sends; `server_updated_at` is stamped by a trigger for the same reason.
+Map<String, dynamic> wireRow(Map<String, dynamic> json) => {
+      for (final entry in json.entries) columnNameOf(entry.key): entry.value,
+    };
+
+/// And back, for a row read off the server.
+///
+/// The two columns the server adds are dropped: neither exists locally
+/// ([SYNC.md § 4](SYNC.md#4-what-the-server-holds)), and drift's `fromJson`
+/// ignores keys it does not know — but a pull reads `server_updated_at` for its
+/// cursor before the row is parsed, and leaving it in the map invites a reader
+/// to think the column landed somewhere.
+Map<String, dynamic> jsonRow(Map<String, dynamic> wire) => {
+      for (final entry in wire.entries)
+        if (entry.key != 'user_id' && entry.key != serverUpdatedAtColumn)
+          jsonKeyOf(entry.key): entry.value,
+    };
+
+/// The server's clock, and the only column name that exists at one end only.
+const serverUpdatedAtColumn = 'server_updated_at';
