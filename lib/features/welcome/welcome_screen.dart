@@ -26,8 +26,9 @@ import 'google_mark.dart';
 /// Top to bottom: the wordmark, the mark at the size a drawing would have been,
 /// a display line, the two answers, and one paragraph saying what each does.
 /// Nothing is centred on the page as a whole — the wordmark sits at the top,
-/// the answers at the bottom, and the mark takes the space between, which is
-/// what makes it read as a door rather than as a form.
+/// the answers at the bottom, and the drawing and its line sit in the upper
+/// third with the empty space under them, which is what makes it read as a door
+/// rather than as a form.
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -125,10 +126,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: Space.lg),
-              // The wordmark: small, centred, and the only place the app says
-              // its own name. Everywhere else the name is the launcher icon and
-              // the header band.
+              const SizedBox(height: Space.xxxl),
               _Arrive(
                 step: _step(0),
                 child: Row(
@@ -136,35 +134,47 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                   children: [
                     Image.asset(
                       mark,
-                      height: 18,
+                      height: 22,
                       filterQuality: FilterQuality.high,
                     ),
                     const SizedBox(width: Space.sm),
-                    Text('Deltoid', style: context.t.titleMedium),
+                    // The one lockup in the app, and the only place a wordmark
+                    // is set at display size — the threshold names the app
+                    // before anything else on it means anything.
+                    Text(
+                      'Deltoid',
+                      style: context.t.displayMedium?.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
 
-              // The drawing takes whatever is left between the wordmark and
-              // the answers, rather than a fixed height: on a short phone it
-              // scales down instead of pushing the buttons off the bottom.
-              const SizedBox(height: Space.xxl),
-              Expanded(
-                child: AnimatedBuilder(
-                  animation: _step(1),
-                  builder: (context, child) {
-                    final t = _step(1).value.clamp(0.0, 1.0);
-                    return Opacity(
-                      opacity: t,
-                      // Settles down to its size rather than growing into it: a
-                      // shape that ends on 1.0 from above has landed, one that
-                      // arrives from below is still going somewhere.
-                      child: Transform.scale(
-                        scale: 1 + 0.04 * (1 - t),
-                        child: child,
-                      ),
-                    );
-                  },
+              // The drawing is a fixed share of the page rather than everything
+              // left over: it sits in the upper third with the display line
+              // under it, and the empty space belongs *below* the pair, which is
+              // what pushes the answers to the bottom edge where a threshold
+              // wants them.
+              const Spacer(flex: 2),
+              AnimatedBuilder(
+                animation: _step(1),
+                builder: (context, child) {
+                  final t = _step(1).value.clamp(0.0, 1.0);
+                  return Opacity(
+                    opacity: t,
+                    // Settles down to its size rather than growing into it: a
+                    // shape that ends on 1.0 from above has landed, one that
+                    // arrives from below is still going somewhere.
+                    child: Transform.scale(
+                      scale: 1 + 0.04 * (1 - t),
+                      child: child,
+                    ),
+                  );
+                },
+                child: SizedBox(
+                  height: MediaQuery.sizeOf(context).height * 0.26,
                   child: const Center(
                     child: FittedBox(
                       fit: BoxFit.contain,
@@ -173,20 +183,34 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: Space.xl),
+              const SizedBox(height: Space.xxl),
               _Arrive(
                 step: _step(2),
-                child: Text(
-                  // What the app is, in one line, rather than what this screen
-                  // does. The screen's own question is answered by the two
-                  // buttons under it, and a line asking it as well would be the
-                  // same fact twice (THEME rule 6).
-                  'A training log that keeps every session apart',
-                  textAlign: TextAlign.center,
-                  style: context.t.displaySmall?.copyWith(height: 1.25),
+                // Inset past the page gutter, so the line breaks well short of
+                // the buttons under it. A display line that runs the full width
+                // of the widest control on the page reads as a paragraph.
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xl),
+                  child: Text(
+                    // What the app is, in one line, rather than what this screen
+                    // does. The screen's own question is answered by the two
+                    // buttons under it, and a line asking it as well would be the
+                    // same fact twice (THEME rule 6).
+                    'Your training sidekick, right in the pocket!',
+                    textAlign: TextAlign.center,
+                    // Lighter and a shade smaller than the page-title scale: the
+                    // reference line is a sentence, not a heading, and w800 makes
+                    // it shout at the one screen with nothing to shout about.
+                    style: context.t.displayLarge?.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: Space.xxl),
+              const Spacer(flex: 4),
 
               _Arrive(
                 step: _step(3),
@@ -198,32 +222,40 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                   onTap: _signingIn ? null : _signIn,
                 ),
               ),
-              const SizedBox(height: Space.md),
-              // **Equal standing**, which on this screen means an equal button
-              // rather than a text link under a louder one. Declining is a real
+              const SizedBox(height: Space.lg),
+              // The two answers are alternatives, not a sequence, and the rule
+              // with a word in it is what says so — without it a second pill
+              // under the first reads as the next step.
+              _Arrive(step: _step(4), child: const _OrDivider()),
+              const SizedBox(height: Space.lg),
+              // **Equal standing**, which on this screen means a button of the
+              // same size and shape rather than a text link. Declining is a real
               // answer: Settings offers the same connection later, and nothing
-              // ever asks again.
+              // ever asks again. Only the fill differs, because one of the two
+              // opens someone else's sheet and the other does not.
               _Arrive(
-                step: _step(4),
+                step: _step(5),
                 child: _ThresholdButton(
                   label: 'Continue on this phone',
+                  filled: false,
                   icon: Icon(
                     Icons.smartphone_rounded,
                     size: 19,
-                    color: c.onAccent,
+                    color: c.textPrimary,
                   ),
                   onTap: _signingIn ? null : _decline,
                 ),
               ),
               const SizedBox(height: Space.xl),
               _Arrive(
-                step: _step(5),
+                step: _step(6),
                 child: Text(
                   // Both outcomes, in the order the buttons are in, each in terms
                   // of what happens to the *training* rather than to the data.
-                  'Signing in copies your training to your Google account, so a '
-                  'lost phone is not a lost history. Either way the app works '
-                  'offline, and you can connect later in Settings.',
+                  'Sign in with Google to back up your training data, '
+                  'so that a lost phone doesn\'t mean lost progress. '
+                  'The app works fully offline regardless, and you can '
+                  'connect to Google at any time from Settings.',
                   textAlign: TextAlign.center,
                   style: context.t.bodySmall?.copyWith(
                     color: c.textTertiary,
@@ -236,6 +268,34 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A hairline broken by the word `OR`, between the two answers.
+///
+/// A rule rather than a gap, because the gap alone says "and then", and these
+/// two are "or".
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final line = Expanded(child: Container(height: 1, color: c.border));
+
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.md),
+          child: Text(
+            'OR',
+            style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+          ),
+        ),
+        line,
+      ],
     );
   }
 }
@@ -278,11 +338,18 @@ class _ThresholdButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.filled = true,
   });
 
   final String label;
   final Widget icon;
   final VoidCallback? onTap;
+
+  /// Filled with `accent`, or the same pill drawn as an outline.
+  ///
+  /// Not a primary/secondary split — both answers are equally real. The outline
+  /// is what keeps two full-width pills from reading as one control repeated.
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +362,11 @@ class _ThresholdButton extends StatelessWidget {
       child: Container(
         height: 54,
         decoration: BoxDecoration(
-          color: enabled ? c.accent : c.surfaceHigh,
+          // `surfaceHigh` is the app's secondary-button fill everywhere else,
+          // so the unfilled answer is the same material as every other quiet
+          // control rather than a hole in the page.
+          color: filled ? (enabled ? c.accent : c.surfaceHigh) : c.surfaceHigh,
+          border: filled ? null : Border.all(color: c.border),
           borderRadius: BorderRadius.circular(Radii.pill),
         ),
         child: Row(
@@ -309,7 +380,11 @@ class _ThresholdButton extends StatelessWidget {
               child: Text(
                 label,
                 style: context.t.titleMedium?.copyWith(
-                  color: enabled ? c.onAccent : c.textTertiary,
+                  color: !enabled
+                      ? c.textTertiary
+                      : filled
+                      ? c.onAccent
+                      : c.textPrimary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
