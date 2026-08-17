@@ -57,4 +57,14 @@ Future<void> repairDatabase(AppDatabase db, {bool seed = true}) async {
   // backup file can still carry**: a tombstone is a column, not a foreign key,
   // so nothing in the schema refuses it on the way in.
   await repo.healOrphanedSnapshots();
+  // A cycle left alive under a programme the *other phone* deleted. No tap can
+  // produce it — `deleteRegime` takes its cycles with it — and a merge can, so
+  // this arrived with the pull applier and runs here for the same reason as the
+  // four above: the list is the point, and a repair in one caller and not the
+  // other is how the two drifted apart in the first place.
+  await repo.healCyclesUnderDeadRegimes();
+  // And a workout left naming a cycle the *other* phone tombstoned. After the
+  // step above, so a regime deleted on one device settles before this asks
+  // which of its cycles a workout should be on.
+  await repo.healWorkoutsNamingDeadCycles();
 }

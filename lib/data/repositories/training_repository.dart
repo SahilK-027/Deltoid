@@ -382,8 +382,17 @@ class TrainingRepository {
         .getSingleOrNull();
     if (open != null) return open;
 
+    // **A deleted programme opens no new cycles.** A tombstoned regime is gone
+    // from every screen, and `invariant_oracle` refuses a live cycle under one
+    // — the cycle is the counter a deload is scheduled off, and scheduling
+    // against a programme nobody can see is meaningless.
+    //
+    // Reachable without sync at all: delete the active regime while a session
+    // logged under it is still open, then finish that session. The two-device
+    // fuzz found it; `model_fuzz_test` could not, because deleting a regime is
+    // not one of its operations.
     final regime = await (db.select(db.regimes)
-          ..where((t) => t.id.equals(regimeId)))
+          ..where((t) => t.id.equals(regimeId) & t.deletedAt.isNull()))
         .getSingleOrNull();
     if (regime == null) return null;
     final last = await (db.select(db.cycles)
@@ -516,6 +525,70 @@ class TrainingRepository {
       }
     }
     return healed;
+  }
+
+  /// Moves a live workout off a cycle that has been tombstoned under it.
+  ///
+  /// `healDuplicateOpenCycles` already repoints **its own** workouts before it
+  /// tombstones a duplicate — but only the ones on the phone it runs on. The
+  /// other device is holding workouts on the same loser cycle, learns about the
+  /// tombstone through a pull, and is left with live workouts naming a dead
+  /// cycle under a live regime, which `invariant_oracle` refuses.
+  ///
+  /// Repointed at the regime's open cycle where there is one, its newest cycle
+  /// otherwise, and null when the programme has none left. Null is a legal
+  /// value here and an honest one: the session happened, and which cycle it
+  /// counted towards is no longer known.
+  ///
+  /// **The qualifier is the same one the oracle uses.** A *deleted* programme
+  /// keeps its history and its workouts go on naming its tombstoned cycles by
+  /// design; this is only about live ones.
+  Future<int> healWorkoutsNamingDeadCycles() async {
+    final stamp = nowMs();
+    return db.customUpdate(
+      'UPDATE workouts SET cycle_id = ('
+      '  SELECT c.id FROM cycles c'
+      '  WHERE c.regime_id = workouts.regime_id AND c.deleted_at IS NULL'
+      '  ORDER BY c.completed_at IS NULL DESC, c.cycle_index DESC LIMIT 1'
+      '), updated_at = ?, device_id = ?, dirty = 1 '
+      'WHERE deleted_at IS NULL '
+      'AND cycle_id IN (SELECT id FROM cycles WHERE deleted_at IS NOT NULL) '
+      'AND regime_id IN (SELECT id FROM regimes WHERE deleted_at IS NULL)',
+      variables: [
+        Variable<int>(stamp),
+        Variable<String>(currentDeviceId),
+      ],
+      updates: {db.workouts},
+    );
+  }
+
+  /// Tombstones cycles left alive under a deleted regime.
+  ///
+  /// `deleteRegime` takes its cycles with it, so no tap can produce this — but a
+  /// merge can, and it is not an exotic case: one phone deletes a programme
+  /// while the other, offline, trains under it and advances its cycle. The
+  /// cycle arrives naming a regime that is gone, and `invariant_oracle` calls
+  /// that *live cycles under a dead regime*.
+  ///
+  /// **Only the cycles.** A deleted programme keeps its history — that is why
+  /// the oracle has no rule about workouts under a dead regime — and the cycle
+  /// is the counter the deload is scheduled off rather than a record of
+  /// anything performed.
+  ///
+  /// Idempotent, and one scan on a database with nothing wrong with it.
+  Future<int> healCyclesUnderDeadRegimes() async {
+    final stamp = nowMs();
+    return db.customUpdate(
+      'UPDATE cycles SET deleted_at = ?, updated_at = ?, device_id = ?, '
+      'dirty = 1 WHERE deleted_at IS NULL AND regime_id IN ('
+      'SELECT id FROM regimes WHERE deleted_at IS NOT NULL)',
+      variables: [
+        Variable<int>(stamp),
+        Variable<int>(stamp),
+        Variable<String>(currentDeviceId),
+      ],
+      updates: {db.cycles},
+    );
   }
 
   /// Tombstones exercise snapshots and sets left alive under a deleted workout.

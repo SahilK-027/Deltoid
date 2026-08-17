@@ -443,6 +443,7 @@ rather than shape. Where the checks live now:
 | A pulled row is never re-stamped, and `last_pull_at` moves only after its batch commits | `test/data/sync/pull_test.dart` |
 | Every merge rule is deterministic **and symmetric** | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped |
 | Two devices converge | `TwoDevices.converge` in `test/data/sync/two_devices.dart`, used by every collision test |
+| Two devices under arbitrary use converge, and lose nothing | `test/integrity/sync_fuzz_test.dart` — the oracle on both phones after every operation |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

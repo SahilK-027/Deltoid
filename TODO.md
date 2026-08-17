@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**802 tests and nine pgTAP tests, analyzer clean.**
+**808 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -100,7 +100,7 @@ Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
 - [x] **4 · Pull** — the merge as arithmetic in `domain/sync_merge.dart`, the applier in `pull.dart`: cursor in `app_settings` advanced only after a whole pass commits, one transaction per batch, parents before children, tombstones staying tombstones, a bad row skipped and named, `repairDatabase` after. The engine pulls before it pushes. Every § 12 row this phase owns is a named test against two databases and one fake backend. Not yet driven on hardware.
 - [ ] **5 · Adoption** — the three shapes at sign-in, and the `starterKey` dedup.
 - [ ] **6 · States and failures** — the three states in Settings, every row of [SYNC § 13](SYNC.md#13-when-it-fails), the backstop interval chosen on hardware.
-- [ ] **The tests** — the § 12 rows are written; what is left is `test/integrity/sync_fuzz_test.dart`, in the shape `model_fuzz_test.dart` established: two devices, random operations on both, syncing at random points, the oracle on both plus a convergence check.
+- [x] **The tests** — the § 12 rows, plus `test/integrity/sync_fuzz_test.dart`: two phones, random operations on both, syncing at random points, the oracle after every step, a real convergence check and *nothing logged is lost*. It found five bugs on its first run — see the commit.
 
 `supabase_flutter`, `google_sign_in` and `connectivity_plus` are in. Driving any
 of it needs a Supabase project and Google OAuth clients that only the user can

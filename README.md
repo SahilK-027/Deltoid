@@ -116,7 +116,7 @@ backup).
 
 ## Testing
 
-802 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
+808 tests, plus nine pgTAP tests behind `supabase test db`. Beyond the usual
 unit and widget tests, `test/integrity/` holds two pieces worth knowing about:
 
 - `test/integrity/invariant_oracle.dart` — sixteen structural rules re-derived in
@@ -125,6 +125,15 @@ unit and widget tests, `test/integrity/` holds two pieces worth knowing about:
   real database and a deliberately dumb in-memory model, checking the oracle
   after every one. A failure prints the seed and the shortest sequence that still
   reproduces it.
+- `test/integrity/sync_fuzz_test.dart` — the same idea with two phones and one
+  fake account: random operations on both, syncing at random points, the oracle
+  after every step, and then a convergence check. No model — what the merge
+  rules should produce is what is under test, and a model that predicted it
+  would be a second copy of `sync_merge.dart`.
+
+  ```bash
+  SYNC_FUZZ_SEEDS=40 SYNC_FUZZ_OPS=400 flutter test test/integrity/sync_fuzz_test.dart
+  ```
 
 The committed fuzz run is small enough to live in the suite. Environment
 variables turn it into a soak:

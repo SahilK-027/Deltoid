@@ -151,12 +151,18 @@ class PullService {
       // restore needs for the same reason.
       await _db.customStatement('PRAGMA defer_foreign_keys = ON');
 
+      // Everything this batch is about to move, moved out of the way first.
+      // See [_parkMovers].
+      final parked = await _parkMovers(spec, page);
+      final landed = <String>{};
+
       for (final wire in page) {
         final row = jsonRow(wire);
         try {
           switch (await _applyRow(spec, row)) {
             case _Outcome.applied:
               applied++;
+              landed.add(row['id'] as String);
             case _Outcome.keptLocal:
               kept++;
             case _Outcome.unchanged:
@@ -174,6 +180,15 @@ class PullService {
                 'saved on this phone.',
           );
         }
+      }
+
+      // A row parked for a move that then did not happen — its own version lost
+      // to a newer local edit, or could not land at all — is brought back.
+      // Leaving it in the scratch range would be a row the user finds at the
+      // bottom of a list it was never moved out of.
+      for (final entry in parked.entries) {
+        if (landed.contains(entry.key)) continue;
+        await _unpark(spec, entry.key, entry.value);
       }
     });
 
@@ -228,7 +243,25 @@ class PullService {
     // dirty flag.
     resolved = await _resolveCollisions(spec, resolved, hadLocal: local != null);
 
-    await _db.into(spec.table).insertOnConflictUpdate(spec.parse(resolved));
+    // **Every column, nulls included** — which is why this is not an upsert.
+    //
+    // `insertOnConflictUpdate` builds its `DO UPDATE SET` from
+    // `toColumns(nullToAbsent: true)`, so a null field is left out of the
+    // statement entirely. That is right for an insert of a partly-specified row
+    // and wrong for this one: it means a pulled row can never *clear* anything.
+    // A workout un-deleted on the other phone stays deleted here, a note
+    // cleared stays written, a weight removed stays. `replace` is drift's
+    // whole-row write and says so in its own source — nulls are written as
+    // nulls.
+    //
+    // The two-device fuzz found it as a regime one phone had deleted and the
+    // other had restored, with neither ever giving way.
+    final entity = spec.parse(resolved);
+    if (local == null) {
+      await _db.into(spec.table).insert(entity);
+    } else {
+      await _db.update(spec.table).replace(entity);
+    }
     return _Outcome.applied;
   }
 
@@ -288,6 +321,182 @@ class PullService {
   // `domain/sync_merge.dart` and tested there; what is here is the scope query
   // and the write.
   // ---------------------------------------------------------------------------
+
+  /// The columns a person can move a row *across*, per table.
+  ///
+  /// Each one carries a unique index over live rows, and each one is a value a
+  /// user changes rather than a value a row is born with — which is exactly the
+  /// difference [_parkMovers] turns on. `bodyweight_logs.day_key` and
+  /// `regimes.identity_index` are unique too and are deliberately absent: no
+  /// operation in the app moves a reading to another day or a programme to
+  /// another hue, so two of those can never trade places.
+  /// [parent] is the column each unique index is scoped to, because every one
+  /// of them is: two regimes may both hold a `Push 1`, and two workouts may
+  /// both hold a slot at position 0.
+  static const _movable = <String, _Movable>{
+    'sessions': (
+      parent: 'regime_id',
+      columns: [
+        (column: 'order_index', key: 'orderIndex'),
+        (column: 'name', key: 'name'),
+      ],
+    ),
+    'session_exercises': (
+      parent: 'session_id',
+      columns: [(column: 'order_index', key: 'orderIndex')],
+    ),
+    'workout_exercises': (
+      parent: 'workout_id',
+      columns: [(column: 'order_index', key: 'orderIndex')],
+    ),
+    'set_logs': (
+      parent: 'workout_exercise_id',
+      columns: [(column: 'set_index', key: 'setIndex')],
+    ),
+    'cycles': (
+      parent: 'regime_id',
+      columns: [(column: 'cycle_index', key: 'cycleIndex')],
+    ),
+  };
+
+  /// Moves every row this batch is about to reposition out of the way, before
+  /// a single row of it is applied.
+  ///
+  /// **A reorder is a permutation, and a permutation cannot be applied one row
+  /// at a time.** Move the second row to the front and the first write lands on
+  /// a position the row already there still holds; SQLite refuses it
+  /// mid-statement. `renumber` solves this inside one device by going through a
+  /// scratch range nothing is standing in, and this is the same two passes at
+  /// batch scope.
+  ///
+  /// Without it the collision rule in [SYNC.md § 9](SYNC.md#9-collision--two-rows-one-slot)
+  /// answers instead — and it is the wrong question. § 9 is about two devices
+  /// *appending*, where the right answer is that the loser takes the next free
+  /// slot. Applied to a reorder it shunts every row of the permutation to the
+  /// end of the list in turn: the order the user chose is destroyed, the
+  /// positions climb away from zero, and each device then re-slots what the
+  /// other sent it. The two-device fuzz found this in seeds it took under a
+  /// minute to reach, which is precisely the collision the design document
+  /// anticipated in the abstract and got wrong in the particular.
+  ///
+  /// Only rows that are **genuinely moving** are parked: a row whose incoming
+  /// version has the same value, or is not a new version at all, is left alone.
+  /// So the ordinary batch — nothing reordered — parks nothing and costs one
+  /// read per row that it was going to do anyway.
+  Future<Map<String, _Parked>> _parkMovers(
+    TableSpec spec,
+    List<Map<String, dynamic>> page,
+  ) async {
+    final movable = _movable[spec.name];
+    if (movable == null) return const {};
+
+    final parked = <String, _Parked>{};
+    for (final wire in page) {
+      final row = jsonRow(wire);
+      if (row['deletedAt'] != null) continue;
+      final id = row['id'] as String;
+      final local = await _localRow(spec, id);
+      if (local == null) continue;
+      // Not a new version, so nothing about it is moving.
+      if ((local['dirty'] as int? ?? 0) == 0 &&
+          local['updated_at'] == row['updatedAt'] &&
+          local['device_id'] == row['deviceId']) {
+        continue;
+      }
+
+      final before = <String, Object?>{};
+      for (final column in movable.columns) {
+        final was = local[column.column];
+        if (was == row[column.key]) continue;
+        before[column.column] = was;
+      }
+      if (before.isEmpty) continue;
+
+      parked[id] = _Parked(local[movable.parent] as String, before);
+      await _write(spec, id, {
+        for (final column in before.keys)
+          column: await _scratchFor(spec, column, id),
+      });
+    }
+    return parked;
+  }
+
+  /// A value nothing else can be standing on.
+  ///
+  /// For a position, one past the highest in the whole table — higher than any
+  /// live row and higher than anything parked a moment ago, because parking
+  /// raises that maximum as it goes. For a name, the row's own id, which is
+  /// unique by definition and, at 37 characters with its marker, inside the
+  /// column's CHECK of 60.
+  ///
+  /// **The whole id, not a prefix of it.** Ids are UUID v7, so rows created in
+  /// the same millisecond share their leading characters — two sessions renamed
+  /// in one breath parked onto the same scratch name and the second one was
+  /// refused by the very index this exists to get out of the way of.
+  ///
+  /// It is visible on screen only in the window between the two passes, which
+  /// is inside one transaction and therefore never.
+  Future<Object?> _scratchFor(TableSpec spec, String column, String id) async {
+    if (column == 'name') return '~$id';
+    final highest = await _db
+        .customSelect('SELECT COALESCE(MAX($column), -1) AS top '
+            'FROM ${spec.name}')
+        .map((row) => row.read<int>('top'))
+        .getSingle();
+    return highest + 1;
+  }
+
+  /// Puts a parked row back where it was, or somewhere free if the slot it came
+  /// from has since been taken by a row that did land.
+  Future<void> _unpark(TableSpec spec, String id, _Parked parked) async {
+    final parent = _movable[spec.name]!.parent;
+    final restore = <String, Object?>{};
+
+    for (final entry in parked.before.entries) {
+      // Scoped to the parent, because every one of these indexes is: a name
+      // free in this regime may well be taken in the next one.
+      final taken = await _db
+          .customSelect(
+            'SELECT COUNT(*) AS n FROM ${spec.name} '
+            'WHERE $parent = ? AND ${entry.key} = ? '
+            'AND deleted_at IS NULL AND id != ?',
+            variables: [
+              Variable<String>(parked.parent),
+              Variable(entry.value),
+              Variable<String>(id),
+            ],
+          )
+          .map((row) => row.read<int>('n'))
+          .getSingle();
+      restore[entry.key] = taken == 0
+          ? entry.value
+          : await _scratchFor(spec, entry.key, id);
+    }
+    await _write(spec, id, restore);
+  }
+
+  /// A plain write, with no stamp of any kind.
+  ///
+  /// The two passes are bookkeeping about *where* a row sits while a batch is
+  /// being applied, not an edit to it — the row's own arriving version decides
+  /// what it says, and stamping here would push a scratch position to the
+  /// account.
+  Future<void> _write(
+    TableSpec spec,
+    String id,
+    Map<String, Object?> columns,
+  ) async {
+    if (columns.isEmpty) return;
+    await _db.customUpdate(
+      'UPDATE ${spec.name} SET '
+      '${columns.keys.map((c) => '$c = ?').join(', ')} WHERE id = ?',
+      variables: [
+        for (final value in columns.values) Variable(value),
+        Variable<String>(id),
+      ],
+      updates: {spec.table},
+    );
+  }
 
   /// A pulled row this device had to change, stamped as **its own write**.
   ///
@@ -370,16 +579,24 @@ class PullService {
   }) async {
     final id = row['id'] as String;
     final parentId = row[jsonKeyOf(parent)];
+    // **The whole live scope, this row's own copy included.** The free slot has
+    // to be free of that too: the incoming row has not been written yet, so its
+    // local version is still standing on its old position, and a scope that
+    // left it out handed the occupant a slot that was already taken — which the
+    // unique index refused, and which the fuzz reproduced as an unsyncable
+    // cycle within a dozen operations.
     final scope = await _db
         .customSelect(
           'SELECT id, $position AS pos FROM $table '
-          'WHERE $parent = ? AND deleted_at IS NULL AND id != ?',
-          variables: [Variable<String>(parentId as String), Variable<String>(id)],
+          'WHERE $parent = ? AND deleted_at IS NULL',
+          variables: [Variable<String>(parentId as String)],
         )
         .get();
 
     final wanted = row[key] as int;
-    final occupant = scope.where((r) => r.read<int>('pos') == wanted).toList();
+    final occupant = scope
+        .where((r) => r.read<int>('pos') == wanted && r.read<String>('id') != id)
+        .toList();
     if (occupant.isEmpty) return row;
 
     final occupantId = occupant.first.read<String>('id');
@@ -406,28 +623,29 @@ class PullService {
     );
 
     final id = positioned['id'] as String;
-    final siblings = await _db
+    final scope = await _db
         .customSelect(
           'SELECT id, name FROM sessions '
-          'WHERE regime_id = ? AND deleted_at IS NULL AND id != ?',
-          variables: [
-            Variable<String>(positioned['regimeId'] as String),
-            Variable<String>(id),
-          ],
+          'WHERE regime_id = ? AND deleted_at IS NULL',
+          variables: [Variable<String>(positioned['regimeId'] as String)],
         )
         .get();
 
     final name = (positioned['name'] as String).trim();
+    // Every live name in the regime, this row's own included — a suffix must
+    // not land on the name the row is still wearing.
     final taken = {
-      for (final r in siblings) r.read<String>('name').trim().toLowerCase(),
+      for (final r in scope) r.read<String>('name').trim().toLowerCase(),
     };
-    if (!taken.contains(name.toLowerCase())) return positioned;
+    final clash = scope
+        .where((r) =>
+            r.read<String>('name').trim().toLowerCase() ==
+                name.toLowerCase() &&
+            r.read<String>('id') != id)
+        .toList();
+    if (clash.isEmpty) return positioned;
 
-    final occupantId = siblings
-        .firstWhere(
-          (r) => r.read<String>('name').trim().toLowerCase() == name.toLowerCase(),
-        )
-        .read<String>('id');
+    final occupantId = clash.first.read<String>('id');
 
     // The same ordering as a slot: the day created later is the one that gets
     // the suffix, and both devices agree which that is.
@@ -466,29 +684,44 @@ class PullService {
             deviceId: resolved['deviceId'] as String,
           ),
         );
+        // **Neither side of this mints a new version, and that is the whole
+        // point.** Which regime is active is *derived*: both phones compute it
+        // from the same two stamps and reach the same answer without being
+        // told. Stamping it would make a merge's own bookkeeping outrank a real
+        // edit — the two-device fuzz found precisely that, as a programme one
+        // phone had deleted and the other silently brought back, because the
+        // deactivation that a merge wrote a millisecond later won the
+        // last-write-wins against the delete.
         if (remoteWins) {
           // Both programmes survive; one of them is simply not the one being
           // trained.
-          await _restamp('regimes', other.read<String>('id'), {'is_active': 0});
+          await _write(_byName['regimes']!, other.read<String>('id'), {
+            'is_active': 0,
+          });
         } else {
-          resolved = _ours(resolved, {'isActive': false});
+          resolved = {...resolved, 'isActive': false};
         }
       }
     }
 
-    final taken = await _db
+    // Every live regime, this row's own copy included: the slot it is standing
+    // on right now is not free either, until the row itself has been written.
+    // The same self-exclusion mistake made the seventh regime take a hue the
+    // sixth was still wearing, and the unique index refused the whole row.
+    final live = await _db
         .customSelect(
-          'SELECT id, identity_index FROM regimes '
-          'WHERE deleted_at IS NULL AND id != ?',
-          variables: [Variable<String>(id)],
+          'SELECT id, identity_index FROM regimes WHERE deleted_at IS NULL',
         )
         .get();
     final wanted = resolved['identityIndex'] as int;
-    final holder =
-        taken.where((r) => r.read<int>('identity_index') == wanted).toList();
+    final holder = live
+        .where((r) =>
+            r.read<int>('identity_index') == wanted &&
+            r.read<String>('id') != id)
+        .toList();
     if (holder.isEmpty) return resolved;
 
-    final slots = {for (final r in taken) r.read<int>('identity_index')};
+    final slots = {for (final r in live) r.read<int>('identity_index')};
     final free = freeIdentitySlot(slots);
 
     if (free == null) {
@@ -519,13 +752,17 @@ class PullService {
     final id = row['id'] as String;
     final regimeId = row['regimeId'] as String;
 
-    final siblings = await _db
+    // Self included, for the same reason [_resolvePosition] reads the whole
+    // scope: the number this row is about to leave is not free until it has.
+    final scope = await _db
         .customSelect(
           'SELECT id, cycle_index, started_at, completed_at FROM cycles '
-          'WHERE regime_id = ? AND deleted_at IS NULL AND id != ?',
-          variables: [Variable<String>(regimeId), Variable<String>(id)],
+          'WHERE regime_id = ? AND deleted_at IS NULL',
+          variables: [Variable<String>(regimeId)],
         )
         .get();
+    final siblings =
+        scope.where((r) => r.read<String>('id') != id).toList();
 
     final wanted = resolved['cycleIndex'] as int;
     final sameNumber =
@@ -533,7 +770,7 @@ class PullService {
     if (sameNumber.isNotEmpty) {
       // Both are real cycles — the loser renumbers rather than disappearing.
       final free =
-          freeCycleIndex(siblings.map((r) => r.read<int>('cycle_index')));
+          freeCycleIndex(scope.map((r) => r.read<int>('cycle_index')));
       final holderId = sameNumber.first.read<String>('id');
       if (id.compareTo(holderId) > 0) {
         resolved = _ours(resolved, {'cycleIndex': free});
@@ -684,3 +921,18 @@ class PullService {
 }
 
 enum _Outcome { applied, keptLocal, unchanged }
+
+/// A table's live-unique columns, and the parent each one is scoped to.
+typedef _Movable = ({
+  String parent,
+  List<({String column, String key})> columns,
+});
+
+/// Where a row was standing before the batch moved it aside, so it can be put
+/// back if its own arriving version never lands.
+class _Parked {
+  const _Parked(this.parent, this.before);
+
+  final String parent;
+  final Map<String, Object?> before;
+}

@@ -1,8 +1,12 @@
 # Deltoid — cloud backup
 
 Everything about getting a training history off one phone and onto another.
-Nothing here is built yet: this is the design, agreed before the code, because
-the parts that are expensive to change are the parts you cannot see.
+The design came before the code, because the parts that are expensive to change
+are the parts you cannot see. Phases 0–4 of [§ 18](#18-the-phases) are built —
+the server, sign-in, the push and the pull — and where the two-device fuzz
+proved a rule here wrong, this document was corrected rather than the test
+loosened. Adoption and the failure states are still ahead; see
+[TODO.md](TODO.md).
 
 The rules this must not break live in [RULES.md](RULES.md). The screens it adds
 are drawn in [THEME.md](THEME.md). What is done and what is left is in
@@ -378,6 +382,23 @@ collided on `set_logs_position_live`.
 Resolution happens in the pull applier, using `nextPosition` and `renumber` from
 `data/db/renumber.dart` — the same code that chooses a slot for a thumb, so a
 slot is chosen the same way whether the row came from a tap or from a server.
+
+**A reorder is not one of these collisions, and answering it as though it were
+destroys the order.** The table above is about two devices *appending*, where
+the loser taking the next free slot is right. A permutation arriving row by row
+looks identical to the applier and is not: every row of it lands on a position
+another row of the same batch still holds, and shunting each one to the end in
+turn leaves an order nobody chose and positions climbing away from zero. So a
+batch parks every row it is about to move into a scratch range first, exactly as
+`renumber` does within one device, and only what is left over after that is a
+collision at all.
+
+**A resolution that both devices compute must not mint a new version.** Which
+regime is active is derived from two stamps both phones can see, so writing it
+with a fresh `updatedAt` makes a merge's own bookkeeping outrank a real edit —
+the fuzz found it as a programme one phone had deleted and the other silently
+brought back, because a deactivation written a millisecond later won the
+last-write-wins against the delete.
 Which slot is free is arithmetic over plain values, so the deciding lives in
 `domain/` and is tested without a database; see [§ 17](#17-the-architecture).
 
