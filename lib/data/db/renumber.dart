@@ -1,3 +1,7 @@
+import '../../domain/slots.dart';
+
+export '../../domain/slots.dart' show nextPosition;
+
 /// Rewriting a run of positions without ever holding two rows on one.
 ///
 /// Sessions, session slots, workout slots and sets all carry an `orderIndex`
@@ -54,11 +58,3 @@ Future<void> renumber(
     await write(orderedIds[i], i);
   }
 }
-
-/// One past the highest position in [indexes], and never negative.
-///
-/// The same arithmetic every append in the app already does — "one past the
-/// highest live position, not the number of live rows" — named once so the
-/// reorder path and the append path cannot drift apart.
-int nextPosition(Iterable<int> indexes) =>
-    indexes.fold<int>(-1, (m, i) => i > m ? i : m) + 1;
