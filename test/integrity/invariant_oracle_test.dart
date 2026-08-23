@@ -9,6 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:deltoid/data/db/invariants.dart';
+import 'package:deltoid/data/db/table_spec.dart';
 
 import 'invariant_oracle.dart';
 
@@ -447,11 +448,88 @@ void main() {
       expect(await broken(), contains('a workout claims two different days'));
     });
 
+    // ── The columns a merge decides on ──────────────────────────────────
+    //
+    // Nothing else in the app looks at these. `updated_at` and `device_id` are
+    // only ever *compared*, by `resolveRow`, which has no way to say the number
+    // it is reading is absurd — so a row wrong in one of these ways is invisible
+    // until it has already won a conflict it should have lost.
+
+    test('a row is stamped at or before the epoch', () async {
+      final regime = await activeRegime();
+      // No CHECK holds `updated_at`, so this is a plain write rather than a
+      // constraint stood down. That is the point: it is the one shape a build
+      // that forgot a default, or a file written by one, arrives in.
+      await db.customStatement(
+        'UPDATE regimes SET updated_at = 0 WHERE id = ?',
+        [regime.id],
+      );
+
+      expect(await broken(), contains(stampAtOrBeforeEpoch));
+    });
+
+    test('a row is stamped further ahead than any clock explains', () async {
+      final regime = await activeRegime();
+      final wall = DateTime.now().toUtc().millisecondsSinceEpoch;
+      await db.customStatement(
+        'UPDATE regimes SET updated_at = ? WHERE id = ?',
+        [wall + stampSkewToleranceMs + 60 * 1000, regime.id],
+      );
+
+      expect(await broken(), contains(stampBeyondAnyClock));
+    });
+
+    test('the lease a launch writes is not called skew', () async {
+      // The tolerance has to clear `stampLeaseMs`, or every phone would report
+      // itself broken in the first minutes after a launch that clamped.
+      final regime = await activeRegime();
+      final wall = DateTime.now().toUtc().millisecondsSinceEpoch;
+      await db.customStatement(
+        'UPDATE regimes SET updated_at = ? WHERE id = ?',
+        [wall + stampLeaseMs, regime.id],
+      );
+
+      expect(await broken(), isNot(contains(stampBeyondAnyClock)));
+    });
+
+    test('a row names no device', () async {
+      final regime = await activeRegime();
+      await db.customStatement(
+        "UPDATE regimes SET device_id = '' WHERE id = ?",
+        [regime.id],
+      );
+
+      expect(await broken(), contains(rowNamesNoDevice));
+    });
+
+    test('every syncable table is judged, not just the one with a test',
+        () async {
+      // The SQL is one UNION ALL per table, built from `tableSpecs`, so a table
+      // added later is covered without anyone remembering. This is what says
+      // the loop really ran over all of them.
+      final tables = [
+        for (final spec in tableSpecs(db))
+          if (spec.syncs) spec.name,
+      ];
+      for (final table in tables) {
+        await db.customStatement('UPDATE $table SET updated_at = 0');
+      }
+
+      final violations = await invariantViolations(db);
+      final epoch = violations.firstWhere((v) => v.rule == stampAtOrBeforeEpoch);
+      // Every table that had a row in it is named by one, and `detail` carries
+      // which — a count alone would not say the union covered more than one.
+      expect(epoch.count, greaterThan(1));
+    });
+
     test('every rule has a test that has seen it fire', () {
       // The list this group must keep up with. A rule added to the oracle
       // without a perturbation is a `COUNT(*)` nobody has watched return
       // anything, which is indistinguishable from a typo in its join.
       const perturbed = {
+        stampAtOrBeforeEpoch,
+        stampBeyondAnyClock,
+        rowNamesNoDevice,
         'live sets under a dead slot',
         'live snapshots under a dead workout',
         'live slots under a dead session',
@@ -473,7 +551,13 @@ void main() {
           reason: 'add the perturbation test, then add the name here');
     });
 
-    test('every rule a repair claims to fix is a rule', () {
+    test('every rule a repair claims to fix, or refuses to refuse, is a rule',
+        () {
+      expect(
+        advisoryInvariants.difference(invariantRuleNames.toSet()),
+        isEmpty,
+        reason: 'advice cannot be given about a rule that does not exist',
+      );
       // `healableInvariants` is what the restore subtracts before deciding
       // whether a file can be put back at all, so a name that no longer
       // matches a rule silently widens what a restore refuses — and the file it
@@ -485,9 +569,16 @@ void main() {
         reason: 'a repair cannot fix a rule that does not exist',
       );
       expect(
-        unhealableInvariantNames.union(healableInvariants.keys.toSet()),
+        unhealableInvariantNames
+            .union(healableInvariants.keys.toSet())
+            .union(advisoryInvariants),
         invariantRuleNames.toSet(),
-        reason: 'every rule is on exactly one of the two lists',
+        reason: 'every rule is on exactly one of the three lists',
+      );
+      expect(
+        healableInvariants.keys.toSet().intersection(advisoryInvariants),
+        isEmpty,
+        reason: 'a rule a repair fixes is not merely advice',
       );
     });
   });

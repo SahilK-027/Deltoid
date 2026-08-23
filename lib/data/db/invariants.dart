@@ -1,4 +1,5 @@
 import 'database.dart';
+import 'table_spec.dart';
 
 /// One judge of the whole database, callable after any mutation.
 ///
@@ -173,6 +174,70 @@ const _rules = <String, String>{
   ''',
 };
 
+/// How far ahead of this phone's clock a row may be stamped before it is
+/// treated as wrong rather than merely early.
+///
+/// It cannot be zero, and not only for network skew. `nowMs` is clamped to a
+/// mark that `AppDatabase` leases five minutes past the clock at every open, so
+/// a row written seconds after a launch is legitimately in the future. Rows
+/// from another device add whatever the two clocks disagree by.
+///
+/// A day is far past both and still far short of the failure this is for, which
+/// is not a minute of drift but a phone that stamped the year 2099 — after a
+/// flat battery, a manual change, a hand-edited file. That row wins every
+/// conflict it is ever part of, against every device, until real time catches
+/// up with it, and `resolveRow` never revisits a verdict. Nothing in the app
+/// could see it before this rule existed.
+const stampSkewToleranceMs = 24 * 60 * 60 * 1000;
+
+/// The rules about the five columns `SyncColumns` adds, one name each.
+///
+/// Written as constants because [invariantRuleNames] has to answer without a
+/// database, and the SQL behind them cannot: it is one `UNION ALL` per syncable
+/// table, built from `tableSpecs` so a table added later is judged without
+/// anyone remembering to add it here.
+const stampAtOrBeforeEpoch = 'a row is stamped at or before the epoch';
+const stampBeyondAnyClock =
+    'a row is stamped further ahead than any clock explains';
+const rowNamesNoDevice = 'a row names no device';
+
+/// The sync-column rules, as SQL over every table that carries those columns.
+///
+/// **These are about the columns a merge decides on, and nothing else looks at
+/// them.** The structural rules above judge shapes the app's own writers could
+/// produce; `updated_at` and `device_id` are only ever compared — by
+/// `resolveRow`, on a phone that has no way to say the number it is reading is
+/// absurd. A schema CHECK cannot help: `updated_at > 0` would refuse a row from
+/// a build that wrote zero, and "not absurdly in the future" is a question
+/// about now, which a CHECK is not allowed to ask.
+Map<String, String> _syncRules(AppDatabase db) {
+  final tables = [
+    for (final spec in tableSpecs(db))
+      if (spec.syncs) spec.name,
+  ];
+
+  String union(String predicate) => [
+        for (final table in tables)
+          "SELECT '$table#' || id AS detail FROM $table WHERE $predicate",
+      ].join(' UNION ALL ');
+
+  return {
+    // Zero is what a column with no default holds, and a row stamped at zero
+    // loses every conflict it is ever in — including against the version it was
+    // written to replace.
+    stampAtOrBeforeEpoch: union('updated_at <= 0'),
+    stampBeyondAnyClock: union(
+      "updated_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000 "
+      '+ $stampSkewToleranceMs',
+    ),
+    // The tie-break `resolveRow` falls to when two devices stamp one
+    // millisecond. Empty on both sides compares equal, so each device keeps its
+    // own copy and neither ever learns the other has one — the exact split
+    // sync exists to prevent, and silent.
+    rowNamesNoDevice: union("device_id = ''"),
+  };
+}
+
 /// The rules a repair can put right, and which repair does it.
 ///
 /// **Not a lesser class of wrong.** Every rule here describes a database the
@@ -196,9 +261,31 @@ const healableInvariants = <String, String>{
   'a regime holds two open cycles': 'healDuplicateOpenCycles',
 };
 
-/// The rules no repair can fix, which are the ones worth refusing a file over.
-Set<String> get unhealableInvariantNames =>
-    _rules.keys.toSet().difference(healableInvariants.keys.toSet());
+/// The rules that are real but must never cost a history.
+///
+/// A restore refuses a file it cannot put back. These are the faults where
+/// refusing costs more than the fault does: a backup whose rows were stamped by
+/// a phone with a broken clock is still that person's entire training log, and
+/// handing it back is worth more than the merges it may go on to win. No repair
+/// fixes them either — clamping a stamp down to now is a defensible move and it
+/// is not one to make silently, inside a restore, on rows the user has not been
+/// told about.
+///
+/// So they are reported wherever they are found and refuse nothing. Everything
+/// that reads this list should say why in the same breath.
+const advisoryInvariants = <String>{
+  stampAtOrBeforeEpoch,
+  stampBeyondAnyClock,
+  rowNamesNoDevice,
+};
+
+/// The rules worth refusing a file over: what no repair fixes and what is not
+/// merely advice.
+Set<String> get unhealableInvariantNames => _ruleNames
+    .difference(healableInvariants.keys.toSet())
+    .difference(advisoryInvariants);
+
+Set<String> get _ruleNames => {..._rules.keys, ...advisoryInvariants};
 
 /// Every rule broken by the current contents of [db], empty when it is sound.
 ///
@@ -213,7 +300,7 @@ Future<List<InvariantViolation>> invariantViolations(
   Set<String>? only,
 }) async {
   final found = <InvariantViolation>[];
-  for (final entry in _rules.entries) {
+  for (final entry in {..._rules, ..._syncRules(db)}.entries) {
     if (only != null && !only.contains(entry.key)) continue;
     final rows = await db.customSelect(entry.value).get();
     if (rows.isNotEmpty) {
@@ -228,4 +315,4 @@ Future<List<InvariantViolation>> invariantViolations(
 }
 
 /// The rule names, for a test that wants to assert the oracle covers something.
-Iterable<String> get invariantRuleNames => _rules.keys;
+Iterable<String> get invariantRuleNames => _ruleNames;

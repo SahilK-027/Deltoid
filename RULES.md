@@ -426,7 +426,7 @@ rather than shape. Where the checks live now:
 
 | Rule | Mechanism |
 | --- | --- |
-| The structural invariants of the database | `lib/data/db/invariants.dart` — sixteen rules re-derived in SQL, each with a perturbation test in `test/integrity/invariant_oracle_test.dart`. **It ships**: a restore refuses a file breaking a rule no repair can fix, and reports what the repairs could not reach; a pull reports rather than refuses, because § 15 rule 9 |
+| The structural invariants of the database | `lib/data/db/invariants.dart` — sixteen rules re-derived in SQL, each with a perturbation test in `test/integrity/invariant_oracle_test.dart`. **It ships**: a restore refuses a file breaking a rule no repair can fix, and reports what the repairs could not reach; a pull reports rather than refuses, because § 15 rule 9. The three sync-column rules are advisory everywhere — a log stamped by a broken clock is still the whole log |
 | Those invariants under arbitrary use | `test/integrity/model_fuzz_test.dart` |
 | Every derived number | `test/domain/` — hand-computed literals, never `expect(f(x), f(x))` |
 | A query's row count is bounded | an `assert` at the boundary, or a comment saying why it does not grow — `training_repository.dart` |
