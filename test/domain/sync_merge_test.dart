@@ -15,8 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// first* converges on nothing. So each test that decides between two rows also
 /// asks the same question with the arguments swapped.
 void main() {
-  Stamp stamp(int updatedAt, [String device = 'a']) =>
-      (updatedAt: updatedAt, deviceId: device);
+  Stamp stamp(int updatedAt, [String device = 'a', String fingerprint = '']) =>
+      (updatedAt: updatedAt, deviceId: device, fingerprint: fingerprint);
 
   group('which version of a row survives', () {
     test('a clean local row is a copy, so the server always wins', () {
@@ -211,5 +211,55 @@ void main() {
       remoteWinsTheDay(local: stamp(1000, 'b'), remote: stamp(1000, 'a')),
       isFalse,
     );
+  });
+
+  group('two installs writing under one device id', () {
+    /// **The tie-break has to break.**
+    ///
+    /// `device_id` is minted once into `app_settings`, inside the database
+    /// file, and nothing re-mints it — so a copy of that file opened on a
+    /// second phone writes under the first one's name. Both then walk `nowMs`
+    /// from one restored floor, which makes an equal `updated_at` between them
+    /// ordinary rather than a coincidence.
+    ///
+    /// Every rule in this file is asserted with its arguments swapped because
+    /// two phones never speak: the property is that both compute the *same*
+    /// winner. On an exhausted order they do not. Each keeps its own version,
+    /// which is the one answer a merge may not give — and it is silent, because
+    /// nothing about either row is wrong.
+    test('two versions on one stamp still resolve to one winner', () {
+      const mine = (updatedAt: 5000, deviceId: 'twin', fingerprint: 'aaa');
+      const theirs = (updatedAt: 5000, deviceId: 'twin', fingerprint: 'bbb');
+
+      // The phone holding `mine` asks about `theirs`, and the phone holding
+      // `theirs` asks about `mine`. Exactly one of them must give way.
+      final iTakeTheirs =
+          resolveRow(localDirty: true, local: mine, remote: theirs) ==
+              RowVerdict.takeRemote;
+      final theyTakeMine =
+          resolveRow(localDirty: true, local: theirs, remote: mine) ==
+              RowVerdict.takeRemote;
+
+      expect(iTakeTheirs, isNot(theyTakeMine),
+          reason: 'both kept their own copy, and neither ever learns');
+    });
+
+    test('the same two versions always pick the same winner', () {
+      const a = (updatedAt: 5000, deviceId: 'twin', fingerprint: 'aaa');
+      const b = (updatedAt: 5000, deviceId: 'twin', fingerprint: 'bbb');
+
+      expect(resolveRow(localDirty: true, local: a, remote: b),
+          RowVerdict.takeRemote);
+      expect(resolveRow(localDirty: true, local: b, remote: a),
+          RowVerdict.keepLocal);
+    });
+
+    test('identical content on one stamp is not a conflict at all', () {
+      const same = (updatedAt: 5000, deviceId: 'twin', fingerprint: 'aaa');
+
+      expect(resolveRow(localDirty: true, local: same, remote: same),
+          RowVerdict.keepLocal,
+          reason: 'nothing to take: the two rows are the same row');
+    });
   });
 }

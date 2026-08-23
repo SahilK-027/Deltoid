@@ -50,6 +50,51 @@ void main() {
     return row.read<String>('name');
   }
 
+  /// **This one passes with or without the fingerprint tie-break, and is kept
+  /// for what it does prove.** Two clones editing one row still converge
+  /// without it, because both keep their own copy, both push, and the server
+  /// serialises them — the next pull finds each row clean and takes the
+  /// account's. What is lost on an exhausted order is not convergence but
+  /// determinism: the winner becomes whoever pushed last rather than a
+  /// property of the rows. `sync_merge_test` is where that is asserted, and it
+  /// is red without the tie-break. This asserts only that a shared id does not
+  /// split the two phones outright.
+  test('two clones editing one row still converge', () async {
+    await devices.as(clone, () async {
+      await ensureStarterCatalog(a);
+      await createRegimeFromTemplate(
+        a,
+        regimeTemplates.firstWhere((t) => t.key == 'ppl6'),
+      );
+    });
+    await devices.push(a);
+    await devices.pull(b);
+
+    final id = (await a
+            .customSelect('SELECT id FROM sessions ORDER BY id LIMIT 1')
+            .getSingle())
+        .read<String>('id');
+
+    // The same millisecond, the same name, two different edits, and both owed.
+    // Inside `stampSkewToleranceMs`, or the oracle calls the row absurd and a
+    // repair restamps it — which breaks the tie by itself and leaves the test
+    // green over a merge that cannot break it.
+    final shared = DateTime.now().millisecondsSinceEpoch;
+    for (final (db, name) in [(a, 'Mine'), (b, 'Theirs')]) {
+      await db.customStatement(
+        "UPDATE sessions SET name = ?, updated_at = ?, "
+        "device_id = ?, dirty = 1 WHERE id = ?",
+        [name, shared, clone, id],
+      );
+    }
+
+    await devices.converge();
+
+    final onA = await sessionName(a, id);
+    expect(onA, await sessionName(b, id));
+    expect(onA, anyOf('Mine', 'Theirs'));
+  });
+
   test('a clone does not eat the row it should have taken', () async {
     await devices.as(clone, () async {
       await ensureStarterCatalog(a);
@@ -68,8 +113,9 @@ void main() {
 
     // The stamp both clones walk to independently. A real pair reaches it by
     // running the same clamp from the same restored floor; writing it directly
-    // is the same state without waiting for the clocks to line up.
-    const shared = 1893456000000;
+    // is the same state without waiting for the clocks to line up. Inside the
+    // skew tolerance, or a repair restamps the row and decides the test.
+    final shared = DateTime.now().millisecondsSinceEpoch;
 
     // Phone B renames the day and pushes it. This is the row the account holds.
     await b.customStatement(

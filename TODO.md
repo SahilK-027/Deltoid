@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**871 tests and nine pgTAP tests, analyzer clean.**
+**875 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -80,6 +80,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The gate: `hooks/pre-push` runs analyze and test, plus four lints including `unawaited_futures`.
 - [x] Both audits run and worked through — can it corrupt data, and are the numbers right.
 - [x] A found-after-the-audit hole: two installs could share one `device_id`, and the pull applier read `(updated_at, device_id)` as a version identity. Auto Backup is refused, and the pair is compared by value.
+- [x] The merge order has a last resort: two versions on one stamp and one device id are separated by the rows themselves, so both phones pick one winner instead of each keeping its own.
 - [x] The connection's four pragmas are asserted off a real file rather than described in a comment — `synchronous` is `FULL`, so no commit is traded away.
 - [x] `lib/data/db/invariants.dart`: sixteen structural rules in SQL, each with a perturbation test.
 - [x] A backup arrives by rename, so a write that dies never leaves a truncated file under a real backup name.

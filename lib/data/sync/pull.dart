@@ -299,6 +299,7 @@ class PullService {
         remote: (
           updatedAt: row['updatedAt'] as int,
           deviceId: row['deviceId'] as String,
+          fingerprint: _fingerprint(row, wireKeys: true),
         ),
       );
       // The local row is a newer unpushed edit. It stays dirty, and the push
@@ -380,6 +381,30 @@ class PullService {
     return false;
   }
 
+  /// A row reduced to one string, for the last tie-break in `sync_merge.dart`.
+  ///
+  /// Both phones must compute this identically from their own copy, so it is
+  /// built off the column names rather than the wire's: [wireKeys] says which
+  /// shape arrived. Sorted, because a map's order is not part of the row.
+  ///
+  /// `dirty` is left out for the reason `_sameAsLocal` leaves it out — it is a
+  /// fact about a device's push queue, and including it would make every local
+  /// row sort against every incoming one on a column neither is claiming.
+  ///
+  /// The values on both sides are already the same primitives: `wireRow` and
+  /// `jsonRow` convert key case only, and drift's `toJson` gives back what the
+  /// column holds.
+  String _fingerprint(Map<String, dynamic> row, {required bool wireKeys}) {
+    final parts = <String>[];
+    for (final entry in row.entries) {
+      final column = wireKeys ? columnNameOf(entry.key) : entry.key;
+      if (column == 'dirty') continue;
+      parts.add('$column=${entry.value}');
+    }
+    parts.sort();
+    return parts.join('\u0000');
+  }
+
   /// The row as it is on this phone, or null.
   ///
   /// Read as a raw map rather than a typed row: the applier is generic over the
@@ -398,6 +423,7 @@ class PullService {
   Stamp _stampOfLocal(Map<String, dynamic> row) => (
     updatedAt: row['updated_at'] as int,
     deviceId: row['device_id'] as String,
+    fingerprint: _fingerprint(row, wireKeys: false),
   );
 
   Future<DateTime?> _cursor() async {
@@ -799,13 +825,17 @@ class PullService {
       if (active.isNotEmpty) {
         final other = active.first;
         final remoteWins = remoteKeepsActive(
+          // Two *different* rows contesting one flag, so the discriminator of
+          // last resort is the id: already unique, and the same on both phones.
           local: (
             updatedAt: other.read<int>('updated_at'),
             deviceId: other.read<String>('device_id'),
+            fingerprint: other.read<String>('id'),
           ),
           remote: (
             updatedAt: resolved['updatedAt'] as int,
             deviceId: resolved['deviceId'] as String,
+            fingerprint: resolved['id'] as String,
           ),
         );
         // **Neither side of this mints a new version, and that is the whole
@@ -985,13 +1015,16 @@ class PullService {
 
     final other = sameDay.first;
     final remoteWins = remoteWinsTheDay(
+      // As above: two rows, one day. The id separates them on any clock.
       local: (
         updatedAt: other.read<int>('updated_at'),
         deviceId: other.read<String>('device_id'),
+        fingerprint: other.read<String>('id'),
       ),
       remote: (
         updatedAt: row['updatedAt'] as int,
         deviceId: row['deviceId'] as String,
+        fingerprint: row['id'] as String,
       ),
     );
 

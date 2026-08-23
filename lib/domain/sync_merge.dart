@@ -19,7 +19,20 @@ import 'slots.dart';
 
 /// What a row was stamped with by the device that wrote the version in front of
 /// you.
-typedef Stamp = ({int updatedAt, String deviceId});
+///
+/// [fingerprint] is the last resort of the order below, and it exists because
+/// `deviceId` is not the unique name it reads as: it is minted once into
+/// `app_settings`, inside the database file, and a copy of that file opened on
+/// another phone writes under the first one's name. Two such installs also walk
+/// `nowMs` from one restored floor, so an equal `updatedAt` between them is
+/// ordinary rather than a coincidence — and on an exhausted order each device
+/// keeps its own version and neither ever learns the other has one.
+///
+/// It must be **derived from the row and nothing else**, so that both devices
+/// compute the same string for the same row without conferring. For two
+/// versions of one row that is the row's own values; for two different rows
+/// competing over one slot it is the id, which is already unique.
+typedef Stamp = ({int updatedAt, String deviceId, String fingerprint});
 
 /// Which version of one row survives.
 enum RowVerdict {
@@ -37,9 +50,17 @@ enum RowVerdict {
 /// [nowMs] has millisecond resolution and two devices saving the same row on
 /// the same second is exactly the case sync exists to survive. Without it each
 /// device keeps its own version and neither ever learns the other did.
-bool _isNewer(Stamp a, Stamp b) => a.updatedAt != b.updatedAt
-    ? a.updatedAt > b.updatedAt
-    : a.deviceId.compareTo(b.deviceId) > 0;
+bool _isNewer(Stamp a, Stamp b) {
+  if (a.updatedAt != b.updatedAt) return a.updatedAt > b.updatedAt;
+  final byDevice = a.deviceId.compareTo(b.deviceId);
+  if (byDevice != 0) return byDevice > 0;
+  // Same millisecond and the same name on both rows. The order is not out of
+  // discriminators yet — the rows themselves differ, or there would be nothing
+  // to decide — so it falls to what they differ by. Equal fingerprints mean one
+  // row, not two, and `false` is then the right answer in both directions:
+  // there is nothing to take.
+  return a.fingerprint.compareTo(b.fingerprint) > 0;
+}
 
 /// A pulled row, against the local row of the same id.
 ///
