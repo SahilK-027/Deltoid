@@ -385,8 +385,16 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Off, and only for the local stack. `supabase start` brings up Vector to feed
+# the analytics service; on this machine Vector starts, logs that its own
+# healthcheck passed, and the CLI tears the stack down calling it unhealthy
+# anyway (CLI 2.114 against Docker 29). Nothing in Deltoid reads local
+# analytics — it is a dashboard convenience — and without this the local
+# Postgres never comes up, which is where `supabase test db` runs the nine RLS
+# tests. The hosted project is unaffected: this key is read by `supabase start`
+# and by nothing else.
 [analytics]
-enabled = true
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
