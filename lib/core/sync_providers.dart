@@ -135,6 +135,38 @@ final syncEngineProvider = Provider<SyncEngine?>((ref) {
   return engine;
 });
 
+/// What the welcome screen was answered with, or null if it has not been.
+///
+/// Read rather than watched: the answer is written once and the screens that
+/// care are built after it. What it is *for* is the difference between a phone
+/// that chose to stay local and one that is signed out because a token could
+/// not be refreshed — the first is working as asked and the second is
+/// [SYNC.md § 13](SYNC.md#13-when-it-fails) row 2, where Settings asks for a
+/// sign-in and the app keeps working.
+final welcomeAnswerProvider = FutureProvider<WelcomeAnswer?>((ref) async {
+  final db = ref.watch(databaseProvider);
+  final row = await (db.select(db.appSettings)
+        ..where((t) => t.key.equals(welcomeKey)))
+      .getSingleOrNull();
+  return WelcomeAnswer.values
+      .where((answer) => answer.name == row?.value)
+      .firstOrNull;
+});
+
+/// Why the last drain did not land, or null when it did.
+///
+/// Off the engine rather than the database, because it is the one thing about
+/// sync that is *not* on disk: nothing about a row says whether the last
+/// attempt to send it hit a basement or a refusal
+/// ([SYNC.md § 13](SYNC.md#13-when-it-fails)).
+final syncTroubleProvider = StreamProvider<SyncTrouble?>((ref) {
+  final engine = ref.watch(syncEngineProvider);
+  if (engine == null) return Stream.value(null);
+  // Seeded with what the engine already knows: a failure that happened before
+  // this screen was opened is exactly the one worth explaining.
+  return engine.troubles.startWith(engine.trouble);
+});
+
 /// Local, Synced or Pending, off the database.
 final syncStateProvider = StreamProvider<SyncState>((ref) {
   final account = ref.watch(accountProvider).valueOrNull;

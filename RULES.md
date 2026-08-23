@@ -447,6 +447,9 @@ rather than shape. Where the checks live now:
 | The catalog is seeded once, whichever order sign-in and first use arrive in | `test/data/sync/adoption_test.dart` — no `starterKey` is live twice after any of the three shapes |
 | Two seeded catalogs fold the same way on both phones | `test/domain/catalog_merge_test.dart` — the plan over one union and its reverse |
 | The losing side of a sign-in is on disk before anything is overwritten | `test/data/sync/adoption_test.dart` — the file is read back and the history checked in it |
+| A duplicate catalog is folded however it arrived, not only at sign-in | `test/data/sync/sync_engine_test.dart` — a drain folds one planted between pull and push |
+| Pending says how long it has been pending, and why | `test/features/backup_state_test.dart`, `test/data/sync/sync_state_test.dart` |
+| Removing the history from this phone leaves no tombstone to push | `test/data/sync/forget_test.dart` |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

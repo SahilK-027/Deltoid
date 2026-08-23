@@ -8,6 +8,7 @@ import 'package:deltoid/data/sync/push.dart';
 import 'package:deltoid/data/sync/sync_backend.dart';
 import 'package:deltoid/data/sync/sync_engine.dart';
 import 'package:deltoid/core/failure.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -102,8 +103,10 @@ void main() {
     start();
 
     signedIn.add(true);
-    await waitUntil(() => backend.table('exercises').isNotEmpty,
-        reason: 'signing in never triggered a push');
+    await waitUntil(
+      () => backend.table('exercises').isNotEmpty,
+      reason: 'signing in never triggered a push',
+    );
   });
 
   test('every drain pulls before it pushes', () async {
@@ -117,8 +120,11 @@ void main() {
     // other order sends a version that has not met the account's yet, and the
     // two phones take turns overwriting each other.
     expect(pull.pulls, greaterThan(0));
-    expect(backend.reads.first, lessThan(backend.writes.first),
-        reason: 'the first request of a drain must be a read');
+    expect(
+      backend.reads.first,
+      lessThan(backend.writes.first),
+      reason: 'the first request of a drain must be a read',
+    );
   });
 
   test('a burst of writes is one push', () async {
@@ -136,7 +142,8 @@ void main() {
     expect(
       push.drains,
       lessThanOrEqualTo(2),
-      reason: 'the debounce coalesces a burst; the second drain is the one the '
+      reason:
+          'the debounce coalesces a burst; the second drain is the one the '
           'push\'s own dirty-clearing writes provoke, and it sends nothing',
     );
     expect(await _owed(db), 0);
@@ -150,16 +157,22 @@ void main() {
     expect(push.drains, 0);
 
     engine!.resumed();
-    await waitUntil(() => push.drains > 0,
-        reason: 'a resume must not wait out a thirty-second debounce');
-    await waitUntil(() async => await _owed(db) == 0,
-        reason: 'and the drain behind it must actually finish');
+    await waitUntil(
+      () => push.drains > 0,
+      reason: 'a resume must not wait out a thirty-second debounce',
+    );
+    await waitUntil(
+      () async => await _owed(db) == 0,
+      reason: 'and the drain behind it must actually finish',
+    );
   });
 
   test('a failed push is backed off, then retried on its own', () async {
     await ensureStarterCatalog(db);
-    backend.failEverything =
-        const SyncTransportFailure('no signal', transient: true);
+    backend.failEverything = const SyncTransportFailure(
+      'no signal',
+      transient: true,
+    );
 
     start();
     signedIn.add(true);
@@ -170,30 +183,41 @@ void main() {
     // resumes, and the backstop is longer than this wait.
     final tries = pull.pulls;
     backend.failEverything = null;
-    await waitUntil(() => pull.pulls > tries,
-        reason: 'the backoff never retried on its own');
-    await waitUntil(() async => await _owed(db) == 0,
-        reason: 'and the retry must land the rows it backed off over');
+    await waitUntil(
+      () => pull.pulls > tries,
+      reason: 'the backoff never retried on its own',
+    );
+    await waitUntil(
+      () async => await _owed(db) == 0,
+      reason: 'and the retry must land the rows it backed off over',
+    );
   });
 
-  test('connectivity regained pushes without waiting out the backoff',
-      () async {
-    await ensureStarterCatalog(db);
-    backend.failEverything =
-        const SyncTransportFailure('no signal', transient: true);
+  test(
+    'connectivity regained pushes without waiting out the backoff',
+    () async {
+      await ensureStarterCatalog(db);
+      backend.failEverything = const SyncTransportFailure(
+        'no signal',
+        transient: true,
+      );
 
-    start(minBackoff: const Duration(seconds: 30));
-    signedIn.add(true);
-    await waitUntil(() => pull.pulls > 0);
-    final tries = pull.pulls;
+      start(minBackoff: const Duration(seconds: 30));
+      signedIn.add(true);
+      await waitUntil(() => pull.pulls > 0);
+      final tries = pull.pulls;
 
-    backend.failEverything = null;
-    network.add(null);
-    await waitUntil(() => pull.pulls > tries,
-        reason: 'a thirty-second backoff must not outlast the signal coming '
-            'back');
-    await waitUntil(() async => await _owed(db) == 0);
-  });
+      backend.failEverything = null;
+      network.add(null);
+      await waitUntil(
+        () => pull.pulls > tries,
+        reason:
+            'a thirty-second backoff must not outlast the signal coming '
+            'back',
+      );
+      await waitUntil(() async => await _owed(db) == 0);
+    },
+  );
 
   test('a rejection is reported; no signal is not', () async {
     await ensureStarterCatalog(db);
@@ -202,21 +226,103 @@ void main() {
     // no second one.
     final sub = _listenToFailures(reported);
 
-    backend.failEverything =
-        const SyncTransportFailure('no signal', transient: true);
+    backend.failEverything = const SyncTransportFailure(
+      'no signal',
+      transient: true,
+    );
     start(minBackoff: const Duration(seconds: 30));
     signedIn.add(true);
     await waitUntil(() => pull.pulls > 0);
     expect(reported, isEmpty, reason: 'a phone in a basement is not an error');
 
-    backend.failEverything =
-        const SyncTransportFailure('row rejected', transient: false);
+    backend.failEverything = const SyncTransportFailure(
+      'row rejected',
+      transient: false,
+    );
     engine!.resumed();
-    await waitUntil(() => reported.isNotEmpty,
-        reason: 'a rejection is the one failure worth a sentence');
+    await waitUntil(
+      () => reported.isNotEmpty,
+      reason: 'a rejection is the one failure worth a sentence',
+    );
 
     await sub.cancel();
   });
+
+  test('a catalog that doubled is folded on the way past', () async {
+    await ensureStarterCatalog(db);
+    final original =
+        await (db.select(db.exercises)
+              ..where((t) => t.starterKey.isNotNull())
+              ..limit(1))
+            .getSingle();
+    // What a sign-in whose pull failed halfway leaves behind: the account's
+    // copy of a movement this phone already seeded, under another id.
+    await db
+        .into(db.exercises)
+        .insert(
+          original
+              .toCompanion(false)
+              .copyWith(
+                id: Value('zzz-${original.id}'),
+                dirty: const Value(true),
+              ),
+        );
+
+    start();
+    signedIn.add(true);
+    await waitUntil(() async {
+      final row = await (db.select(
+        db.exercises,
+      )..where((t) => t.id.equals('zzz-${original.id}'))).getSingle();
+      return row.deletedAt != null;
+    }, reason: 'the duplicate was never folded');
+
+    // The survivor is the smaller id, and it is still live.
+    final survivor = await (db.select(
+      db.exercises,
+    )..where((t) => t.id.equals(original.id))).getSingle();
+    expect(survivor.deletedAt, isNull);
+  });
+
+  test(
+    'why it is still pending outlives the sentence that said it once',
+    () async {
+      await ensureStarterCatalog(db);
+      final seen = <SyncTrouble?>[];
+
+      backend.failEverything = const SyncTransportFailure(
+        'no signal',
+        transient: true,
+      );
+      start(minBackoff: const Duration(seconds: 30));
+      final sub = engine!.troubles.listen(seen.add);
+      signedIn.add(true);
+      await waitUntil(() => engine!.trouble == SyncTrouble.offline);
+
+      // A screen opened after the fact still gets the answer: the failure
+      // happened whether or not anyone was listening.
+      expect(engine!.trouble, SyncTrouble.offline);
+
+      backend.failEverything = const SyncTransportFailure(
+        'row rejected',
+        transient: false,
+      );
+      engine!.resumed();
+      await waitUntil(() => engine!.trouble == SyncTrouble.refused);
+
+      backend.failEverything = null;
+      engine!.resumed();
+      await waitUntil(
+        () => engine!.trouble == null,
+        reason: 'a drain that lands clears the reason it did not',
+      );
+
+      // Only on change: a phone offline for a week must not push an event per
+      // retry into whatever is watching.
+      expect(seen, [SyncTrouble.offline, SyncTrouble.refused, null]);
+      await sub.cancel();
+    },
+  );
 }
 
 Future<int> _owed(AppDatabase db) => db

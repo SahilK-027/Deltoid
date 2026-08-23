@@ -15,8 +15,10 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
-import '../../data/sync/sync_auth.dart';
+import '../../data/sync/forget.dart';
+import '../../data/sync/sync_engine.dart';
 import '../../data/sync/sync_state.dart';
+import '../account/sign_in_flow.dart';
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
@@ -30,7 +32,8 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bodyweight = ref.watch(bodyweightSummaryProvider).valueOrNull ??
+    final bodyweight =
+        ref.watch(bodyweightSummaryProvider).valueOrNull ??
         (latest: null, count: 0);
     final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
     final c = context.c;
@@ -43,10 +46,7 @@ class SettingsScreen extends ConsumerWidget {
           // the band made this the only tab whose header was one line, which is
           // what made it read as a screen from a different app.
           const HeaderBand(
-            child: PageHeader(
-              title: 'Settings',
-              eyebrow: 'On this device',
-            ),
+            child: PageHeader(title: 'Settings', eyebrow: 'On this device'),
           ),
           Expanded(child: _body(context, ref, bodyweight, lastBackup, c)),
         ],
@@ -62,84 +62,88 @@ class SettingsScreen extends ConsumerWidget {
     DeltoidColors c,
   ) {
     return ListView(
-        padding: const EdgeInsets.fromLTRB(
-            Space.gutter, Space.lg, Space.gutter, Space.huge),
-        children: [
-          SectionHeader(
-            'Bodyweight',
-            actionLabel: bodyweight.latest == null ? null : 'History',
-            onAction: bodyweight.latest == null
-                ? null
-                : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const BodyweightScreen()),
-                    ),
-          ),
-          // The figure logs one, it does not open a screen that offers to.
-          // Bodyweight was behind a cog, then behind a card that pushed a
-          // screen with a `+` in its bar — three taps to type a number you are
-          // asked for daily, which is why it had never once been logged
-          // through the UI. Tapping the figure is the log; the past is a link.
-          _BodyweightCard(bodyweight: bodyweight),
-          const _AccountSection(),
-          const SizedBox(height: Space.section),
-          const SectionHeader('Data'),
-          ListCard(
-            inset: Space.lg,
-            children: [
-              AppRow(
-                icon: Icons.ios_share,
-                title: 'Export backup',
-                subtitle: 'One file with every workout, ready for Drive or '
-                    'iCloud.',
-                onTap: () => _export(context, ref),
-                chevron: true,
-              ),
-              AppRow(
-                icon: Icons.settings_backup_restore,
-                title: 'Restore from backup',
-                subtitle: 'Replaces everything currently on this device.',
-                onTap: () => _restore(context, ref),
-                chevron: true,
-              ),
-              AppRow(
-                icon: Icons.schedule,
-                // "Last backup" over a date that only ever moves for the
-                // automatic file, while a manual export you made a minute ago
-                // is nowhere on the screen, reads as a backup that did not
-                // happen. Only the automatic copy is the app's to speak for:
-                // Save to Downloads and Share hand the file to the system, and
-                // where it goes afterwards is not something this row can know.
-                title: lastBackup == null
-                    ? 'No automatic backup yet'
-                    : 'Last auto backup '
-                        '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
-                // The distinction is carried by "automatic" in the title.
-                // Spelling it out again down here ran the row past the two
-                // lines it draws and cut the sentence in half.
-                subtitle: 'Written after each finished session.',
-              ),
-            ],
-          ),
-          const SizedBox(height: Space.section),
-          const SectionHeader('Units'),
-          const _UnitPicker(),
-          const SizedBox(height: Space.section),
-          const SectionHeader('Appearance'),
-          const _ThemePicker(),
-          const SizedBox(height: Space.section),
-          const SectionHeader('About'),
-          AppCard(
-            child: Text(
-              // Not "everything stays on this device" — the masthead's eyebrow
-              // says that, and a fact stated twice on one screen is the rule
-              // this app breaks most often (THEME rule 6).
-              'Sessions carry their own history, so the same exercise '
-              'progresses independently in each one.',
-              style: context.t.bodySmall,
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        Space.lg,
+        Space.gutter,
+        Space.huge,
+      ),
+      children: [
+        SectionHeader(
+          'Bodyweight',
+          actionLabel: bodyweight.latest == null ? null : 'History',
+          onAction: bodyweight.latest == null
+              ? null
+              : () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BodyweightScreen()),
+                ),
+        ),
+        // The figure logs one, it does not open a screen that offers to.
+        // Bodyweight was behind a cog, then behind a card that pushed a
+        // screen with a `+` in its bar — three taps to type a number you are
+        // asked for daily, which is why it had never once been logged
+        // through the UI. Tapping the figure is the log; the past is a link.
+        _BodyweightCard(bodyweight: bodyweight),
+        const _AccountSection(),
+        const SizedBox(height: Space.section),
+        const SectionHeader('Data'),
+        ListCard(
+          inset: Space.lg,
+          children: [
+            AppRow(
+              icon: Icons.ios_share,
+              title: 'Export backup',
+              subtitle:
+                  'One file with every workout, ready for Drive or '
+                  'iCloud.',
+              onTap: () => _export(context, ref),
+              chevron: true,
             ),
+            AppRow(
+              icon: Icons.settings_backup_restore,
+              title: 'Restore from backup',
+              subtitle: 'Replaces everything currently on this device.',
+              onTap: () => _restore(context, ref),
+              chevron: true,
+            ),
+            AppRow(
+              icon: Icons.schedule,
+              // "Last backup" over a date that only ever moves for the
+              // automatic file, while a manual export you made a minute ago
+              // is nowhere on the screen, reads as a backup that did not
+              // happen. Only the automatic copy is the app's to speak for:
+              // Save to Downloads and Share hand the file to the system, and
+              // where it goes afterwards is not something this row can know.
+              title: lastBackup == null
+                  ? 'No automatic backup yet'
+                  : 'Last auto backup '
+                        '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
+              // The distinction is carried by "automatic" in the title.
+              // Spelling it out again down here ran the row past the two
+              // lines it draws and cut the sentence in half.
+              subtitle: 'Written after each finished session.',
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.section),
+        const SectionHeader('Units'),
+        const _UnitPicker(),
+        const SizedBox(height: Space.section),
+        const SectionHeader('Appearance'),
+        const _ThemePicker(),
+        const SizedBox(height: Space.section),
+        const SectionHeader('About'),
+        AppCard(
+          child: Text(
+            // Not "everything stays on this device" — the masthead's eyebrow
+            // says that, and a fact stated twice on one screen is the rule
+            // this app breaks most often (THEME rule 6).
+            'Sessions carry their own history, so the same exercise '
+            'progresses independently in each one.',
+            style: context.t.bodySmall,
           ),
-        ],
+        ),
+      ],
     );
   }
 
@@ -169,7 +173,8 @@ class SettingsScreen extends ConsumerWidget {
             AppRow(
               icon: Icons.download_outlined,
               title: 'Save to Downloads',
-              subtitle: 'Into $downloadsFolder, where a file manager can '
+              subtitle:
+                  'Into $downloadsFolder, where a file manager can '
                   'find it',
               onTap: () => Navigator.of(sheet).pop(_ExportTo.downloads),
             ),
@@ -189,10 +194,9 @@ class SettingsScreen extends ConsumerWidget {
       final result = await _withProgress<File>(
         context,
         title: 'Exporting',
-        task: (report) =>
-            BackupService(ref.read(databaseProvider)).exportToFile(
-          onProgress: report,
-        ),
+        task: (report) => BackupService(
+          ref.read(databaseProvider),
+        ).exportToFile(onProgress: report),
       );
       if (result == null) return;
       file = result;
@@ -213,18 +217,18 @@ class SettingsScreen extends ConsumerWidget {
 
     // The file is kept whether or not the share sheet is used, so say where
     // it went — a backup you cannot find later is one you have to trust.
-showToastOn(messenger, 'Saved to ${file.parent.path}');
+    showToastOn(messenger, 'Saved to ${file.parent.path}');
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
         subject: 'Deltoid backup',
         // iPad needs an anchor for the share popover or it throws.
-        sharePositionOrigin:
-            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
       ),
     );
   }
-
 
   Future<void> _restore(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -322,7 +326,8 @@ showToastOn(messenger, 'Saved to ${file.parent.path}');
     final confirmed = await confirmAction(
       context,
       title: 'Replace everything?',
-      message: 'This backup is from '
+      message:
+          'This backup is from '
           '${DateFormat('d MMM yyyy, HH:mm').format(summary.exportedAt)} and '
           'holds ${summary.counts['workouts'] ?? 0} workouts. Restoring '
           'deletes everything currently on this device and replaces it with '
@@ -367,16 +372,18 @@ Future<T?> _withProgress<T>(
   final step = ValueNotifier<BackupStep?>(null);
   final navigator = Navigator.of(context);
 
-  unawaited(showModalBottomSheet<void>(
-    context: context,
-    isDismissible: false,
-    enableDrag: false,
-    showDragHandle: false,
-    builder: (_) => PopScope(
-      canPop: false,
-      child: _ProgressSheet(title: title, step: step),
+  unawaited(
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      showDragHandle: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _ProgressSheet(title: title, step: step),
+      ),
     ),
-  ));
+  );
 
   try {
     // The notifier is written from a callback that fires between database
@@ -400,7 +407,11 @@ class _ProgressSheet extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-            Space.xl, Space.xl, Space.xl, Space.xxl),
+          Space.xl,
+          Space.xl,
+          Space.xl,
+          Space.xxl,
+        ),
         child: ValueListenableBuilder<BackupStep?>(
           valueListenable: step,
           builder: (context, current, _) {
@@ -419,7 +430,8 @@ class _ProgressSheet extends StatelessWidget {
                     // silence here is what made the whole thing look hung.
                     BackupPhase.encoding =>
                       'Packing ${current!.detail} into one file',
-                    BackupPhase.decoding => 'Reading the file · ${current!.detail}',
+                    BackupPhase.decoding =>
+                      'Reading the file · ${current!.detail}',
                     BackupPhase.clearing => 'Clearing this device',
                     BackupPhase.writing =>
                       '${current!.rows} rows · ${current.detail}',
@@ -493,10 +505,10 @@ class _BodyweightCard extends ConsumerWidget {
           subtitle: latest == null
               ? 'Needed to score bodyweight and BW+ lifts'
               : loggedToday
-                  ? 'Logged today  ·  ${bodyweight.count} entries'
-                  : 'Last entry '
-                      '${DateFormat('d MMM').format(dateFromDayKey(latest.dayKey))}'
-                      '  ·  ${bodyweight.count} entries',
+              ? 'Logged today  ·  ${bodyweight.count} entries'
+              : 'Last entry '
+                    '${DateFormat('d MMM').format(dateFromDayKey(latest.dayKey))}'
+                    '  ·  ${bodyweight.count} entries',
           onTap: () => logBodyweightPrompt(
             context,
             ref,
@@ -547,6 +559,12 @@ class _AccountSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(syncAuthProvider) == null) return const SizedBox.shrink();
     final account = ref.watch(accountProvider).valueOrNull;
+    // Answered `account` and signed out anyway is § 13 row 2: a token that
+    // could not be refreshed. The queue keeps filling and no data is lost, and
+    // the only thing that fixes it is a sign-in.
+    final dropped =
+        account == null &&
+        ref.watch(welcomeAnswerProvider).valueOrNull == WelcomeAnswer.account;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -558,10 +576,16 @@ class _AccountSection extends ConsumerWidget {
           children: account == null
               ? [
                   AppRow(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Back up to your Google account',
-                    subtitle:
-                        'Your history is on this phone and nowhere else.',
+                    icon: dropped
+                        ? Icons.cloud_sync_outlined
+                        : Icons.cloud_off_outlined,
+                    title: dropped
+                        ? 'Sign in again to keep backing up'
+                        : 'Back up to your Google account',
+                    subtitle: dropped
+                        ? 'This phone was signed out. Everything logged since '
+                              'is still here and still waiting.'
+                        : 'Your history is on this phone and nowhere else.',
                     onTap: () => _signIn(context, ref),
                     chevron: true,
                   ),
@@ -570,7 +594,10 @@ class _AccountSection extends ConsumerWidget {
                   AppRow(
                     icon: Icons.account_circle_outlined,
                     title: account.email ?? 'Signed in',
-                    subtitle: _backupState(ref.watch(syncStateProvider)),
+                    subtitle: backupState(
+                      ref.watch(syncStateProvider).valueOrNull,
+                      ref.watch(syncTroubleProvider).valueOrNull,
+                    ),
                   ),
                   AppRow(
                     icon: Icons.logout,
@@ -579,64 +606,31 @@ class _AccountSection extends ConsumerWidget {
                     onTap: () => _signOut(context, ref),
                     chevron: true,
                   ),
+                  AppRow(
+                    icon: Icons.delete_sweep_outlined,
+                    title: 'Sign out and remove from this phone',
+                    subtitle: 'The account keeps its copy.',
+                    onTap: () => _signOutAndForget(context, ref),
+                    chevron: true,
+                  ),
                 ],
         ),
       ],
     );
   }
 
-  /// What the account row says under the address.
-  ///
-  /// The loading case is the one that matters here: `valueOrNull` on an
-  /// `AsyncValue` that has not resolved is null, and reading null as *nothing
-  /// owed* would show `Backed up` over a phone that is holding a session
-  /// ([SYNC.md § 19](SYNC.md#19-traps)). Until the count arrives this says only
-  /// what is certain — that this device is signed in.
-  static String _backupState(AsyncValue<SyncState> state) {
-    final value = state.valueOrNull;
-    if (value == null) return 'Signed in on this device.';
-
-    return switch (value.status) {
-      SyncStatus.pending => value.owed == 1
-          ? '1 change still to back up.'
-          : '${value.owed} changes still to back up.',
-      SyncStatus.synced || SyncStatus.local => switch (value.lastPushAt) {
-          final at? =>
-            'Backed up ${DateFormat('d MMM, HH:mm').format(at.toLocal())}.',
-          // Signed in, nothing owed, and nothing has ever left: a fresh install
-          // that has not been trained on yet.
-          _ => 'Signed in on this device.',
-        },
-    };
-  }
-
-  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
-    final auth = ref.read(syncAuthProvider);
-    final messenger = ScaffoldMessenger.of(context);
-    if (auth == null) return;
-    try {
-      await auth.signInWithGoogle();
-    } on SyncAuthCancelled {
-      // An answer to Google, not to this screen.
-    } on SyncAuthFailure catch (e) {
-      showToastOn(messenger, e.message, destructive: true);
-    }
-  }
+  Future<void> _signIn(BuildContext context, WidgetRef ref) =>
+      signInAndAdopt(context, ref);
 
   /// Signing out leaves every row where it is.
-  ///
-  /// [SYNC.md § 11](SYNC.md#11-signing-out) describes a second door — sign out
-  /// *and* clear this phone — which needs a confirmation naming the number of
-  /// sessions it is about to remove. It arrives with the states in phase 6; one
-  /// door that does the safe thing is better than two where the dangerous one
-  /// is half-built.
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final auth = ref.read(syncAuthProvider);
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await confirmAction(
       context,
       title: 'Sign out?',
-      message: 'Your training stays on this phone. You can sign back in from '
+      message:
+          'Your training stays on this phone. You can sign back in from '
           'here at any time.',
       confirmLabel: 'Sign out',
       destructive: false,
@@ -645,6 +639,99 @@ class _AccountSection extends ConsumerWidget {
     await auth.signOut();
     showToastOn(messenger, 'Signed out.');
   }
+
+  /// The second door, and it is forced open rather than found by accident.
+  ///
+  /// [SYNC.md § 11](SYNC.md#11-signing-out): *sign out and remove the history
+  /// from this phone*, after a confirmation naming the number of sessions. The
+  /// count is the whole point — a prompt that says *everything* is a prompt
+  /// nobody can weigh, and this is the one control in Settings that cannot be
+  /// undone from Settings.
+  ///
+  /// The rows are hard-deleted rather than tombstoned. This is not *the user
+  /// deleted their training*, which every other phone would then hear about and
+  /// apply; it is *this phone is no longer carrying it*.
+  Future<void> _signOutAndForget(BuildContext context, WidgetRef ref) async {
+    final auth = ref.read(syncAuthProvider);
+    final db = ref.read(databaseProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final sessions = await localSessionCount(db);
+    if (!context.mounted) return;
+
+    final counted = sessions == 1 ? '1 session' : '$sessions sessions';
+    final confirmed = await confirmAction(
+      context,
+      title: 'Remove your training from this phone?',
+      message:
+          '$counted will be deleted from this device. Your account keeps '
+          'its copy, and signing in again brings it back.',
+      confirmLabel: 'Sign out and remove',
+      highlight: [counted],
+    );
+    if (!confirmed || auth == null) return;
+
+    await auth.signOut();
+    await forgetLocalHistory(db);
+    showToastOn(messenger, 'Removed from this phone.');
+  }
+}
+
+/// What the account row says under the address: which state, for how long, and
+/// why.
+///
+/// [SYNC.md § 2](SYNC.md#2-the-three-states) asks for all three, and *for how
+/// long* is the one that carries the meaning. **Pending is normal** — a session
+/// logged in a basement gym is pending for an hour and that is the design
+/// working — so the number of changes alone says nothing. Since this morning is
+/// a gym with no signal; since Tuesday is something to look at.
+///
+/// The loading case is the other half: `valueOrNull` on an `AsyncValue` that has
+/// not resolved is null, and reading null as *nothing owed* would show
+/// `Backed up` over a phone that is holding a session
+/// ([SYNC.md § 19](SYNC.md#19-traps)). Until the count arrives this says only
+/// what is certain — that this device is signed in.
+@visibleForTesting
+String backupState(SyncState? state, SyncTrouble? trouble) {
+  if (state == null) return 'Signed in on this device.';
+
+  return switch (state.status) {
+    SyncStatus.pending => [
+      state.owed == 1 ? '1 change waiting' : '${state.owed} changes waiting',
+      if (state.owedSince case final since?) ' since ${_since(since)}',
+      '.',
+      // Only when the last attempt actually failed. Rows written a minute ago
+      // are pending because the debounce has not elapsed, and explaining that
+      // to a user would be inventing a problem to reassure them about.
+      switch (trouble) {
+        SyncTrouble.offline => " There's no connection right now.",
+        SyncTrouble.refused =>
+          ' The account turned the last attempt down — it will keep trying.',
+        null => '',
+      },
+    ].join(),
+    SyncStatus.synced || SyncStatus.local => switch (state.lastPushAt) {
+      final at? =>
+        'Backed up ${DateFormat('d MMM, HH:mm').format(at.toLocal())}.',
+      // Signed in, nothing owed, and nothing has ever left: a fresh install
+      // that has not been trained on yet.
+      _ => 'Signed in on this device.',
+    },
+  };
+}
+
+/// A time if it is today, a date if it is not.
+///
+/// `09:14` on the day it happened and `12 Aug` after that: the hour matters
+/// while it is still this session, and stops meaning anything the moment the
+/// answer is *days*.
+String _since(DateTime at) {
+  final local = at.toLocal();
+  final now = DateTime.now();
+  final sameDay =
+      local.year == now.year &&
+      local.month == now.month &&
+      local.day == now.day;
+  return DateFormat(sameDay ? 'HH:mm' : 'd MMM').format(local);
 }
 
 /// Rows with radios, not a segmented pill: a pill fits the labels and nothing
@@ -799,15 +886,15 @@ class _ThemeTile extends StatelessWidget {
                   // Both halves, split on the diagonal the way the OS setting
                   // itself is neither one nor the other.
                   ThemeMode.system => const Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _ThemeMiniature(DeltoidColors.dark),
-                        ClipPath(
-                          clipper: _DiagonalClipper(),
-                          child: _ThemeMiniature(DeltoidColors.light),
-                        ),
-                      ],
-                    ),
+                    fit: StackFit.expand,
+                    children: [
+                      _ThemeMiniature(DeltoidColors.dark),
+                      ClipPath(
+                        clipper: _DiagonalClipper(),
+                        child: _ThemeMiniature(DeltoidColors.light),
+                      ),
+                    ],
+                  ),
                 },
               ),
             ),
@@ -895,8 +982,10 @@ class _ThemeMiniature extends StatelessWidget {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration:
-                      BoxDecoration(shape: BoxShape.circle, color: colour),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colour,
+                  ),
                 ),
                 const SizedBox(width: Space.xs),
               ],

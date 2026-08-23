@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../account/recovery_note.dart';
 import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
@@ -60,7 +61,11 @@ Future<void> _startSession(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
   } catch (e) {
-    showToastOn(messenger, 'Could not start the session: $e', destructive: true);
+    showToastOn(
+      messenger,
+      'Could not start the session: $e',
+      destructive: true,
+    );
   } finally {
     container.read(_startingProvider.notifier).state = false;
   }
@@ -217,7 +222,9 @@ Future<void> _logPastSession(
   final existing = picked.workoutId;
   if (existing != null) {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => WorkoutDetailScreen(workoutId: existing)),
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(workoutId: existing),
+      ),
     );
     return;
   }
@@ -249,7 +256,11 @@ Future<void> _logPastSession(
   } on StateError catch (e) {
     showToastOn(messenger, e.message, destructive: true);
   } catch (e) {
-    showToastOn(messenger, 'Could not open that session: $e', destructive: true);
+    showToastOn(
+      messenger,
+      'Could not open that session: $e',
+      destructive: true,
+    );
   }
 }
 
@@ -259,10 +270,8 @@ Future<void> _logPastSession(
 /// workout that day already holds and you asked to see.
 class _BackfillResult {
   const _BackfillResult.log({required this.sessionId, required this.date})
-      : workoutId = null;
-  const _BackfillResult.open(this.workoutId)
-      : sessionId = null,
-        date = null;
+    : workoutId = null;
+  const _BackfillResult.open(this.workoutId) : sessionId = null, date = null;
 
   final String? sessionId;
   final DateTime? date;
@@ -417,10 +426,9 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
         for (final s in widget.sessions)
           _SessionPickRow(
             session: s,
-            onTap: () =>
-                Navigator.of(context).pop(
-                  _BackfillResult.log(sessionId: s.id, date: _date),
-                ),
+            onTap: () => Navigator.of(
+              context,
+            ).pop(_BackfillResult.log(sessionId: s.id, date: _date)),
           ),
       ],
     );
@@ -785,6 +793,11 @@ class _NoRegimeState extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Nothing logged and signed out: the history may be on an
+                    // account this phone has not reached yet, and saying so is
+                    // the difference between waiting and reinstalling in a
+                    // panic (SYNC.md § 2).
+                    AccountRecoveryNote(hasHistory: hasHistory),
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
                     const _VolumeCard(),
@@ -971,10 +984,7 @@ class _ResumeHero extends ConsumerWidget {
               ),
             ),
             if (total > 0)
-              Text(
-                '$done of $total sets',
-                style: context.t.labelSmall,
-              ),
+              Text('$done of $total sets', style: context.t.labelSmall),
           ],
         ),
         const SizedBox(height: Space.lg),
@@ -1529,8 +1539,11 @@ class _ConsistencyCard extends StatelessWidget {
                     ),
                   ),
                   if (hasHistory)
-                    Icon(Icons.chevron_right_rounded,
-                        size: 20, color: context.c.textSecondary),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: context.c.textSecondary,
+                    ),
                 ],
               ),
             ],
@@ -1589,9 +1602,9 @@ class _VolumeCard extends ConsumerWidget {
     // rest of this screen exists to avoid.
     if (volume == null) return const SizedBox.shrink();
 
-    void openHistory() => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const VolumeHistoryScreen()),
-        );
+    void openHistory() => Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const VolumeHistoryScreen()));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -8,6 +8,7 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/data/sync/adoption.dart';
+import 'package:deltoid/data/sync/catalog_dedup.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -417,7 +418,7 @@ void main() {
       // The other phone runs the same dedup over the same union and must reach
       // the same answer, or each tombstones the other's survivor.
       await devices.sync(other);
-      await adoptionOf(other).dedupeCatalog();
+      await dedupeCatalog(other);
 
       expect(await devices.converge(), lessThanOrEqualTo(6));
     });

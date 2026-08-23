@@ -563,6 +563,12 @@ and the other twenty thousand still arrive.
 Everything reportable goes through `core/failure.dart`, which already exists and
 already surfaces. Sync gets no error channel of its own.
 
+**A sentence said once is not an answer to *why is this still pending*.** A
+toast is gone in four seconds and a phone can be offline for a week, so the
+engine also carries a standing `SyncTrouble` — `offline` or `refused`, cleared
+by the first drain that lands — and Settings reads it under the account row. It
+is a state, not an event: it changes on change and says nothing per retry.
+
 ---
 
 ## 14. Two builds, one account

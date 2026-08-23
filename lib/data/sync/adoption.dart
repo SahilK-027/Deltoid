@@ -5,11 +5,12 @@ import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
-import '../../domain/catalog_merge.dart';
 import '../backup/backup_service.dart';
 import '../db/database.dart';
 import '../db/table_spec.dart';
 import '../seed/seeder.dart';
+import 'catalog_dedup.dart';
+import 'forget.dart';
 import 'pull.dart';
 import 'push.dart';
 import 'sync_backend.dart';
@@ -153,11 +154,17 @@ class AdoptionService {
   Future<File?> adopt(AdoptionShape shape, {AdoptionChoice? choice}) async {
     switch (shape) {
       case AdoptionShape.pull:
-        await _pull.pull();
-        // The account may hold no catalog either — a first sign-in on a first
-        // phone. Seeding is deferred to exactly here so that the *other* order
-        // never produces two catalogs; see [answerWelcome].
-        await ensureStarterCatalog(_db);
+        try {
+          await _pull.pull();
+        } finally {
+          // Seeded even when the pull did not finish. A phone with no catalog
+          // cannot be trained on at all, and the welcome screen is answered by
+          // now, so nothing else would ever seed it. The duplicate this risks —
+          // the account's catalog arriving behind a locally seeded one — is
+          // what [dedupeCatalog] is for, and the engine runs it after every
+          // pull rather than only here.
+          await ensureStarterCatalog(_db);
+        }
         return null;
 
       case AdoptionShape.push:
@@ -177,7 +184,9 @@ class AdoptionService {
     switch (choice) {
       case AdoptionChoice.keepAccount:
         final backup = await _writePhoneBackup();
-        await _clearLocal();
+        // Not seeded: the account's own catalog is about to arrive, and
+        // seeding here is exactly how a phone ends up with two.
+        await forgetLocalHistory(_db, seed: false);
         await _pull.pull();
         await ensureStarterCatalog(_db);
         return backup;
@@ -192,56 +201,11 @@ class AdoptionService {
       case AdoptionChoice.merge:
         // No loser, so no backup: a union overwrites nothing.
         await _pull.pull();
-        await dedupeCatalog();
+        await dedupeCatalog(_db);
         await _markEverythingDirty();
         await _push.drain();
         return null;
     }
-  }
-
-  /// Folds two seeded catalogs into one, on `starterKey`.
-  ///
-  /// The plan is [planCatalogMerge] and it is pure. This is only the writing:
-  /// every reference to a duplicate moves to the survivor, and the duplicate is
-  /// tombstoned.
-  ///
-  /// **`workout_exercises.muscle` is never touched.** It is a snapshot of what
-  /// the movement trained on the day it was logged, and repointing a row at
-  /// another exercise does not change what the user did that day
-  /// ([RULES § 2](RULES.md)). The same goes for every other snapshot column on
-  /// a logged row: only the id moves.
-  Future<int> dedupeCatalog() async {
-    final rows = await _db.select(_db.exercises).get();
-    final plan = planCatalogMerge([
-      for (final row in rows)
-        (id: row.id, starterKey: row.starterKey, deletedAt: row.deletedAt),
-    ]);
-    if (plan.repoint.isEmpty) return 0;
-
-    final now = nowMs();
-    await _db.transaction(() async {
-      for (final entry in plan.repoint.entries) {
-        for (final table in ['workout_exercises', 'session_exercises']) {
-          await _db.customUpdate(
-            'UPDATE $table SET exercise_id = ?, updated_at = ?, dirty = 1 '
-            'WHERE exercise_id = ?',
-            variables: [
-              Variable(entry.value),
-              Variable(now),
-              Variable(entry.key),
-            ],
-          );
-        }
-      }
-      for (final id in plan.tombstone) {
-        await _db.customUpdate(
-          'UPDATE exercises SET deleted_at = ?, updated_at = ?, dirty = 1 '
-          'WHERE id = ? AND deleted_at IS NULL',
-          variables: [Variable(now), Variable(now), Variable(id)],
-        );
-      }
-    });
-    return plan.tombstone.length;
   }
 
   /// Every row the account holds that this phone does not, written locally as a
@@ -375,25 +339,6 @@ class AdoptionService {
       if (last == null) return;
       cursor = last;
     }
-  }
-
-  /// Everything that syncs, hard-deleted, children first.
-  ///
-  /// The one place in the app that hard-deletes outside a restore, and it is
-  /// the same act: the file is written before this runs, and what is being
-  /// cleared is a history the user has just been told is being replaced.
-  Future<void> _clearLocal() async {
-    final specs = tableSpecs(_db).where((s) => s.syncs).toList().reversed;
-    await _db.transaction(() async {
-      for (final spec in specs) {
-        await _db.customStatement('DELETE FROM ${spec.name}');
-      }
-      // The cursor is bookkeeping about rows that no longer exist, and a pull
-      // that starts from the account's beginning is exactly what comes next.
-      await (_db.delete(
-        _db.appSettings,
-      )..where((t) => t.key.equals(lastPullKey))).go();
-    });
   }
 
   /// Marks every syncable row owed to the server.

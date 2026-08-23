@@ -31,6 +31,7 @@ class SyncState {
     required this.status,
     required this.owed,
     required this.lastPushAt,
+    this.owedSince,
   });
 
   /// What a build with no configuration, or a phone that declined, is in.
@@ -48,6 +49,16 @@ class SyncState {
 
   /// When the last drain finished, or null if none has on this install.
   final DateTime? lastPushAt;
+
+  /// When the oldest thing still owed was written, or null when nothing is.
+  ///
+  /// **The whole of *for how long*** ([SYNC.md § 2](SYNC.md#2-the-three-states)).
+  /// Pending is normal — a session logged in a basement gym is pending for an
+  /// hour and that is the design working — and the only thing that makes it
+  /// worth mentioning is how long it has been true. A screen that says *3
+  /// changes waiting* says nothing; one that says *since Tuesday* says
+  /// something has gone wrong.
+  final DateTime? owedSince;
 }
 
 /// What is on disk, watched: how much is owed and when the last push landed.
@@ -69,6 +80,11 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
   final owedSql = specs
       .map((s) => '(SELECT COUNT(*) FROM ${s.name} WHERE dirty = 1)')
       .join(' + ');
+  // MIN over MINs: each inner one rides the same partial index the count does,
+  // so the oldest thing owed costs no more than counting it.
+  final oldestSql = specs
+      .map((s) => 'SELECT MIN(updated_at) AS t FROM ${s.name} WHERE dirty = 1')
+      .join(' UNION ALL ');
 
   return db.watchQuery(
     [...specs.map((s) => s.table), db.appSettings],
@@ -77,10 +93,14 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
       // that table owes nothing — so the common answer costs nine index probes
       // rather than a scan of 168k set logs, on a query re-run every time a set
       // is ticked.
-      final owed = await db
-          .customSelect('SELECT $owedSql AS owed')
-          .map((row) => row.read<int>('owed'))
+      final counted = await db
+          .customSelect(
+            'SELECT $owedSql AS owed, '
+            '(SELECT MIN(t) FROM ($oldestSql)) AS oldest',
+          )
           .getSingle();
+      final owed = counted.read<int>('owed');
+      final oldest = counted.read<int?>('oldest');
 
       final stamp = await (db.select(db.appSettings)
             ..where((t) => t.key.equals(lastPushKey)))
@@ -94,6 +114,8 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
         status: owed == 0 ? SyncStatus.synced : SyncStatus.pending,
         owed: owed,
         lastPushAt: lastPushAt,
+        owedSince:
+            oldest == null ? null : DateTime.fromMillisecondsSinceEpoch(oldest),
       );
     },
   );

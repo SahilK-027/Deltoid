@@ -43,6 +43,34 @@ void main() {
     expect(state.lastPushAt, isNull);
   });
 
+  test('pending says since when, off the oldest thing owed', () async {
+    await ensureStarterCatalog(db);
+    // Two ages, so the answer is the older one and not simply the last write.
+    await db.customStatement(
+      'UPDATE exercises SET updated_at = 5000, dirty = 1',
+    );
+    await db.customStatement(
+      "UPDATE exercises SET updated_at = 1000 WHERE starter_key = "
+      "(SELECT starter_key FROM exercises WHERE starter_key IS NOT NULL "
+      'ORDER BY id LIMIT 1)',
+    );
+
+    final state = await watchSyncState(db, signedIn: true).first;
+
+    expect(state.status, SyncStatus.pending);
+    expect(state.owedSince, DateTime.fromMillisecondsSinceEpoch(1000));
+  });
+
+  test('nothing owed is nothing to date', () async {
+    await ensureStarterCatalog(db);
+    await db.customStatement('UPDATE exercises SET dirty = 0');
+
+    final state = await watchSyncState(db, signedIn: true).first;
+
+    expect(state.status, SyncStatus.synced);
+    expect(state.owedSince, isNull);
+  });
+
   test('the state follows a drain without being told about it', () async {
     await ensureStarterCatalog(db);
     final states = watchSyncState(db, signedIn: true);

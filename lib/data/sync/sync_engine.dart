@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import '../../core/failure.dart';
 import '../db/database.dart';
 import '../db/table_spec.dart';
+import 'catalog_dedup.dart';
 import 'pull.dart';
 import 'push.dart';
 import 'sync_backend.dart';
@@ -27,6 +28,23 @@ import 'sync_backend.dart';
 /// here to move; `Isolate.run` would only capture `this`, and an `AppDatabase`
 /// wrapping an FFI handle fails at the send
 /// ([SYNC.md § 17](SYNC.md#17-the-architecture)).
+/// Why the last attempt did not land, for the one screen that says so.
+///
+/// **Not an error channel.** Everything reportable already goes through
+/// `core/failure.dart` and says itself once ([SYNC.md § 13](SYNC.md#13-when-it-fails));
+/// this is the standing answer to *why is this still pending*, which is a
+/// different question with a different lifetime — a toast is gone in four
+/// seconds and a phone can be offline for a week.
+enum SyncTrouble {
+  /// No signal, a timeout, a token that could not be refreshed. The ordinary
+  /// state of a phone in a basement, and not an error.
+  offline,
+
+  /// The server was reached and refused the request — a policy, a column, a row
+  /// it will not take. Retrying changes nothing until something else does.
+  refused,
+}
+
 class SyncEngine {
   SyncEngine({
     required AppDatabase db,
@@ -70,6 +88,16 @@ class SyncEngine {
   Timer? _debounce;
   Timer? _backstop;
   Timer? _retry;
+
+  /// Why the last drain did not land, or null when the last one did.
+  ///
+  /// Seeded onto the stream for a screen that starts watching after the fact:
+  /// the failure happened whether or not anyone was listening at the time.
+  SyncTrouble? get trouble => _trouble;
+  SyncTrouble? _trouble;
+
+  Stream<SyncTrouble?> get troubles => _troubles.stream;
+  final _troubles = StreamController<SyncTrouble?>.broadcast();
 
   bool _running = false;
   bool _again = false;
@@ -158,11 +186,18 @@ class SyncEngine {
         // other.
         await _pull.pull();
         if (_disposed) return;
+        // Between the two, so a duplicate catalog is folded before the rows
+        // that repoint it are sent. Two phones reach the same answer over the
+        // same union, so this converges rather than ping-ponging
+        // ([SYNC.md § 10](SYNC.md#10-adoption)).
+        await dedupeCatalog(_db);
+        if (_disposed) return;
         await _push.drain();
         if (_disposed) return;
       } while (_again);
       _failures = 0;
       _retry?.cancel();
+      _setTrouble(null);
     } on Object catch (error, stack) {
       _onFailure(error, stack);
     } finally {
@@ -170,17 +205,17 @@ class SyncEngine {
     }
   }
 
-  /// Backed off, and — for now — silent.
+  /// Backed off, said once, and remembered.
   ///
   /// [SYNC.md § 13](SYNC.md#13-when-it-fails): no network means the rows stay
   /// dirty and the user sees nothing, because a phone in a basement is not a
-  /// broken phone. A rejection is different in kind and is the one worth a
-  /// sentence, which is why [SyncTransportFailure] carries [transient] at all;
-  /// the sentence itself is phase 6's, where every row of that table reaches
-  /// `core/failure.dart` with the wording decided in one place.
+  /// broken phone — it changes [trouble] and announces nothing. A rejection is
+  /// different in kind and is the one worth a sentence, which is why
+  /// [SyncTransportFailure] carries [transient] at all.
   void _onFailure(Object error, StackTrace stack) {
     _failures++;
     final permanent = error is SyncTransportFailure && !error.transient;
+    _setTrouble(permanent ? SyncTrouble.refused : SyncTrouble.offline);
     // **Once per run of failures, not once per retry.** § 13's column says *the
     // failure channel says it once*, and a rejection that repeats every thirty
     // seconds for an hour would say it a hundred and twenty times, over
@@ -203,6 +238,12 @@ class SyncEngine {
     });
   }
 
+  void _setTrouble(SyncTrouble? trouble) {
+    if (_trouble == trouble) return;
+    _trouble = trouble;
+    if (!_troubles.isClosed) _troubles.add(trouble);
+  }
+
   void _cancelTimers() {
     _debounce?.cancel();
     _retry?.cancel();
@@ -215,5 +256,6 @@ class SyncEngine {
     await _writes?.cancel();
     await _network?.cancel();
     await _account?.cancel();
+    await _troubles.close();
   }
 }

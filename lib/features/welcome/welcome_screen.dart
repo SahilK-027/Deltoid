@@ -1,18 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../data/db/database.dart';
 import '../../core/sync_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
-import '../../core/widgets/toast.dart';
-import '../../data/sync/adoption.dart';
-import '../../data/sync/sync_auth.dart';
-import '../../data/sync/sync_backend.dart';
-import 'adoption_sheet.dart';
+import '../account/sign_in_flow.dart';
 import 'curl_illustration.dart';
 import 'google_mark.dart';
 
@@ -88,92 +81,31 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
   /// ([SYNC.md § 15](SYNC.md#15-what-sync-may-never-do) rule 1).
   bool _signingIn = false;
 
+  /// Sign in, settle the two histories, and record the answer.
+  ///
+  /// The flow itself is shared with Settings — [signInAndAdopt] — because the
+  /// same question is asked at both doors and the *other* door is the likelier
+  /// one to meet a phone with a month of training on it.
+  ///
+  /// [answerWelcome] is told not to seed **when adoption ran**: it has already
+  /// dealt with the catalog, and an account that holds one hands over the
+  /// user's own rather than being given a second under different ids
+  /// ([SYNC.md § 10](SYNC.md#10-adoption)). A build that can authenticate but
+  /// cannot reach an account settled nothing, so that phone still needs a
+  /// catalog to train from.
   Future<void> _signIn() async {
-    final auth = ref.read(syncAuthProvider);
-    final adoption = ref.read(adoptionProvider);
-    final messenger = ScaffoldMessenger.of(context);
     // Captured before the await, because answering swaps this whole screen out
     // from under the widget that started it.
     final db = ref.read(databaseProvider);
-
-    if (auth == null) {
-      showToastOn(messenger, 'This build cannot sign in.', destructive: true);
-      return;
-    }
+    final adopted = ref.read(adoptionProvider) != null;
 
     setState(() => _signingIn = true);
     try {
-      await auth.signInWithGoogle();
-      if (adoption == null) {
-        await answerWelcome(db, WelcomeAnswer.account);
-        return;
-      }
-      await _adopt(auth, adoption, db, messenger);
-    } on SyncAuthCancelled {
-      // Backing out of Google's own sheet is an answer to Google, not to this
-      // screen. Nothing is said and the question stands.
-    } on SyncAuthFailure catch (e) {
-      showToastOn(messenger, e.message, destructive: true);
+      final outcome = await signInAndAdopt(context, ref);
+      if (outcome != SignInOutcome.signedIn) return;
+      await answerWelcome(db, WelcomeAnswer.account, seed: !adopted);
     } finally {
       if (mounted) setState(() => _signingIn = false);
-    }
-  }
-
-  /// What the account turns out to hold, and what that means for what is on
-  /// this phone — [SYNC.md § 10](SYNC.md#10-adoption).
-  ///
-  /// **The survey is read before anything is written.** A phone with no signal
-  /// between the sign-in and the survey is signed back out and asked again,
-  /// because the alternative is an answered welcome screen over a database
-  /// whose shape was never established — which is the state that produces two
-  /// catalogs.
-  ///
-  /// Past the survey it is the other way round. Adoption writes rows, and a
-  /// failure partway through leaves work the engine will finish on its own; the
-  /// answer is recorded so the app opens on training rather than back on this
-  /// door.
-  Future<void> _adopt(
-    SyncAuth auth,
-    AdoptionService adoption,
-    AppDatabase db,
-    ScaffoldMessengerState messenger,
-  ) async {
-    final AdoptionSurvey survey;
-    try {
-      survey = await adoption.survey();
-    } on SyncTransportFailure catch (e) {
-      await auth.signOut();
-      showToastOn(messenger, e.message, destructive: true);
-      return;
-    }
-
-    AdoptionChoice? choice;
-    if (survey.shape == AdoptionShape.ask) {
-      if (!mounted) return;
-      choice = await showAdoptionSheet(context, survey);
-      if (choice == null) {
-        // Dismissed without answering. Nothing has been written, so the way
-        // back is the way in: sign out, and the question stands.
-        await auth.signOut();
-        return;
-      }
-    }
-
-    File? backup;
-    try {
-      backup = await adoption.adopt(survey.shape, choice: choice);
-    } on SyncTransportFailure catch (e) {
-      showToastOn(messenger, e.message, destructive: true);
-    }
-
-    // Seeded by [AdoptionService.adopt] on the paths that need it, and not on
-    // the paths where the account's own catalog just arrived.
-    await answerWelcome(db, WelcomeAnswer.account, seed: false);
-    if (backup != null) {
-      showToastOn(
-        messenger,
-        'Saved ${backup.uri.pathSegments.last} to your backups folder.',
-      );
     }
   }
 
