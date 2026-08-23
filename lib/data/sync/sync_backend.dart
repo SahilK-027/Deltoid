@@ -1,4 +1,4 @@
-/// The transport, as three methods and no package.
+/// The transport, as four methods and no package.
 ///
 /// [SYNC.md § 17](SYNC.md#17-the-architecture): everything above this deals in
 /// `Map<String, dynamic>`, never in typed rows. That is the same currency the
@@ -37,6 +37,16 @@ abstract interface class SyncBackend {
   /// Exists so [SYNC.md § 10](SYNC.md#10-adoption)'s prompt can say *214
   /// sessions* rather than *some*.
   Future<int> count(String table);
+
+  /// The largest value of [column] in [table], read as epoch milliseconds, or
+  /// null when the table is empty.
+  ///
+  /// The other half of the same sentence: *most recently 3 March*. The column
+  /// is named by the caller because the date the prompt wants is when the user
+  /// trained — `workouts.started_at` — and not `updated_at`, which is when a
+  /// row was last touched and would report a decade-old session as today's the
+  /// moment a merge restamped it.
+  Future<DateTime?> latestAt(String table, String column);
 }
 
 /// A request did not go through.

@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**808 tests and nine pgTAP tests, analyzer clean.**
+**829 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -52,6 +52,13 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Settings: units, three themes drawn as miniatures, adaptive launcher icon.
 - [x] One day picker for backfill, bodyweight and re-dating, ringing the days already logged.
 - [x] Backfill asks for the day first and keeps it on screen.
+
+### Sync
+
+- [x] 0–4 · The ground, the server, identity, push, pull — every row of SYNC § 12 a test, and the two-device fuzz converges.
+- [x] 5 · Adoption: the three shapes at sign-in, the `starterKey` dedup, and the losing side written to a backup file first.
+- [ ] 6 · The states and the failures — Settings says which state and for how long, every row of SYNC § 13 reaches `core/failure.dart`, and the backstop interval is chosen on hardware.
+- [ ] Nothing has met a real server: needs the Supabase project and the Google OAuth clients of SYNC § 20.
 
 ### The rebrand
 

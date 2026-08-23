@@ -468,6 +468,33 @@ app seeded them and left alone where the user created them. "Nothing is lost"
 and "the result is clean" are different promises, and merge only makes the
 first.
 
+### What each answer costs mechanically
+
+`adoption.dart` runs one of three things, and the backup file is written before
+any of them:
+
+- **Keep the account's history** — the phone's database is written to a file,
+  every syncable table is cleared, the cursor is dropped and the account is
+  pulled from its beginning. The catalog arrives with it; seeding is skipped.
+- **Keep this phone's history** — the account is written to a file first, in the
+  backup format, straight off the wire. Then **every row the account holds and
+  the phone does not is written locally as a tombstone and pushed.** The
+  transport upserts and never deletes, so this is the only way the account's
+  history stops arriving on the next pull. A tombstone claims nothing — every
+  unique index in [§ 9](#9-collision--two-rows-one-slot) is partial on
+  `deleted_at IS NULL` — so none of them can collide with the history being kept.
+- **Merge both** — pull, then the `starterKey` dedup, then push. Nothing is
+  overwritten, so nothing is backed up.
+
+The dedup is [`catalog_merge.dart`](lib/domain/catalog_merge.dart) and is pure:
+among the live rows sharing a `starterKey`, the smallest id survives and every
+reference moves to it. *Deterministic* is the load-bearing half rather than
+*oldest*, because both phones run it over the same union without asking each
+other — a rule that disagreed with itself across two devices would tombstone
+both survivors and empty the catalog. **`workout_exercises.muscle` never moves.**
+It is a snapshot of what the movement trained the day it was logged, and only
+the id is repointed.
+
 Three global rules still apply to a merge: one active regime, one open workout,
 one bodyweight per day — resolved as [§ 9](#9-collision--two-rows-one-slot) says.
 A merged shelf can also exceed the six identity hues, in which case two
@@ -673,9 +700,13 @@ document had been stating twice in prose.
 
 ### The transport is an interface
 
-Three methods: upsert a batch, read everything since a cursor, count the rows on
-the account. That last one exists only so [§ 10](#10-adoption)'s prompt can say
-*214 sessions* rather than *some*.
+Four methods: upsert a batch, read everything since a cursor, count the rows on
+the account, and read the largest value of one column. The last two exist only
+so [§ 10](#10-adoption)'s prompt can say *214 sessions, most recently 3 March*
+rather than *some*. The column is named by the caller because the date the
+prompt wants is `workouts.started_at` — when the user trained — and not
+`updated_at`, which would report a decade-old session as today's the moment a
+merge restamped it.
 
 It deals in `Map<String, dynamic>`, never in typed rows. That is the same
 currency the backup codec speaks, and it is the only one that can carry a column

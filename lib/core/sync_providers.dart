@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/database.dart';
 import '../data/seed/seeder.dart';
+import '../data/sync/adoption.dart';
 import '../data/sync/connectivity.dart';
 import '../data/sync/supabase_backend.dart';
 import '../data/sync/sync_auth.dart';
@@ -52,13 +53,19 @@ Future<bool> welcomeAnswered(AppDatabase db) async {
 /// that is filling in behind it. Killed in between, the flag is absent and the
 /// screen simply asks again, which is the harmless half of the failure.
 ///
-/// [SYNC.md § 10](SYNC.md#10-adoption) will make the seeding conditional on
-/// what the account turns out to hold: signing into an account that already has
-/// a catalog must adopt it rather than seed a second one under different ids.
-/// That needs a pull, which does not exist yet, so today both answers seed and
-/// phase 5 is where this function grows its third case.
-Future<void> answerWelcome(AppDatabase db, WelcomeAnswer answer) async {
-  await ensureStarterCatalog(db);
+/// **[seed] is false on the one path that has already dealt with the catalog.**
+/// Signing in runs [AdoptionService.adopt] first, and an account that holds a
+/// catalog hands over the user's own — with their notes and their edits on it —
+/// rather than being given a second one under different ids. Seeding anyway
+/// would leave roughly 120 exercises twice over, "Bench Press" under two ids,
+/// and a history split across both, which breaks the one thing this app exists
+/// for ([SYNC.md § 10](SYNC.md#10-adoption)).
+Future<void> answerWelcome(
+  AppDatabase db,
+  WelcomeAnswer answer, {
+  bool seed = true,
+}) async {
+  if (seed) await ensureStarterCatalog(db);
   await db.into(db.appSettings).insertOnConflictUpdate(
         AppSettingsCompanion.insert(key: welcomeKey, value: answer.name),
       );
@@ -74,6 +81,14 @@ Future<void> answerWelcome(AppDatabase db, WelcomeAnswer answer) async {
 final syncBackendProvider = FutureProvider<SupabaseBackend?>(
   (ref) => SupabaseBackend.start(SyncConfig.fromEnvironment),
 );
+
+/// The three shapes at sign-in. Null when this build carries no configuration,
+/// which is a build that cannot reach an account and so has nothing to adopt.
+final adoptionProvider = Provider<AdoptionService?>((ref) {
+  final backend = ref.watch(syncBackendProvider).valueOrNull;
+  if (backend == null) return null;
+  return AdoptionService(ref.watch(databaseProvider), backend);
+});
 
 /// Sign in, sign out, who is signed in. Null when there is no backend.
 final syncAuthProvider = Provider<SyncAuth?>(

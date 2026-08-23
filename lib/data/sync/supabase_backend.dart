@@ -79,6 +79,23 @@ class SupabaseBackend implements SyncBackend {
   Future<int> count(String table) =>
       _guard(() => client.from(table).count(CountOption.exact));
 
+  @override
+  Future<DateTime?> latestAt(String table, String column) async {
+    final rows = await _guard(
+      () => client
+          .from(table)
+          .select(column)
+          .order(column, ascending: false)
+          .limit(1),
+    );
+    if (rows.isEmpty) return null;
+    final value = rows.first[column];
+    // Every date column here is the phones' epoch-ms integer rather than a
+    // timestamptz, and PostgREST may hand a bigint over as either.
+    final ms = value is int ? value : int.tryParse('$value');
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
   /// Everything the network can do, as the two answers sync has for it.
   ///
   /// A `PostgrestException` means the request reached PostgREST and was

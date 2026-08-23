@@ -8,7 +8,8 @@ finished half and stays the architecture: every screen reads local disk, and
 nothing waits on a server — a build with no configuration, which is every clone
 of this repo and every `flutter test`, cannot sync at all and works exactly as
 it did. Sync is an additive layer over the columns every syncable row already
-carries: a background drain of `dirty`, and nothing else so far. See
+carries: a drain of `dirty`, a pull that merges, and one question at the first
+sign-in when both sides have been trained on. See
 [RULES.md § 6](RULES.md#6-scope) for what that decision does and does not open,
 and [TODO.md](TODO.md) for the four phases still to come.
 

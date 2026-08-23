@@ -444,6 +444,9 @@ rather than shape. Where the checks live now:
 | Every merge rule is deterministic **and symmetric** | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped |
 | Two devices converge | `TwoDevices.converge` in `test/data/sync/two_devices.dart`, used by every collision test |
 | Two devices under arbitrary use converge, and lose nothing | `test/integrity/sync_fuzz_test.dart` — the oracle on both phones after every operation |
+| The catalog is seeded once, whichever order sign-in and first use arrive in | `test/data/sync/adoption_test.dart` — no `starterKey` is live twice after any of the three shapes |
+| Two seeded catalogs fold the same way on both phones | `test/domain/catalog_merge_test.dart` — the plan over one union and its reverse |
+| The losing side of a sign-in is on disk before anything is overwritten | `test/data/sync/adoption_test.dart` — the file is read back and the history checked in it |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

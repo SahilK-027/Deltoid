@@ -104,4 +104,15 @@ class FakeBackend implements SyncBackend {
     _maybeFail();
     return this.table(table).length;
   }
+
+  @override
+  Future<DateTime?> latestAt(String table, String column) async {
+    _maybeFail();
+    final stamps = [
+      for (final row in this.table(table))
+        if (row[column] case final int ms) ms,
+    ];
+    if (stamps.isEmpty) return null;
+    return DateTime.fromMillisecondsSinceEpoch(stamps.reduce((a, b) => a > b ? a : b));
+  }
 }
