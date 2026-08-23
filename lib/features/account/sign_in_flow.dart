@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/sync_providers.dart';
+import '../../core/widgets/progress_sheet.dart';
 import '../../core/widgets/toast.dart';
 import '../../data/sync/adoption.dart';
 import '../../data/sync/sync_auth.dart';
@@ -85,9 +86,28 @@ Future<SignInOutcome> signInAndAdopt(
     }
   }
 
+  // **A sheet only where a human is waiting on one.** A first pull is the same
+  // volume as a restore down a slower path, and a decade of training arriving
+  // in silence looks like a hang — the failure that gets an app killed halfway
+  // ([SYNC.md § 16](SYNC.md#16-still-to-decide)). A phone with nothing to
+  // adopt is a round trip, and a sheet that flashes for one frame is worse than
+  // no sheet at all.
+  final watched = survey.shape == AdoptionShape.pull
+      ? survey.accountSessions > 0
+      : choice != AdoptionChoice.keepPhone;
+
   File? backup;
   try {
-    backup = await adoption.adopt(survey.shape, choice: choice);
+    if (watched && context.mounted) {
+      backup = await withProgressSheet<File?>(
+        context,
+        title: 'Getting your training',
+        task: (report) =>
+            adoption.adopt(survey.shape, choice: choice, onProgress: report),
+      );
+    } else {
+      backup = await adoption.adopt(survey.shape, choice: choice);
+    }
   } on SyncTransportFailure catch (e) {
     showToastOn(messenger, e.message, destructive: true);
   }

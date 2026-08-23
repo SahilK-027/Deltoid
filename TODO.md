@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**844 tests and nine pgTAP tests, analyzer clean.**
+**847 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -58,6 +58,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 0–4 · The ground, the server, identity, push, pull — every row of SYNC § 12 a test, and the two-device fuzz converges.
 - [x] 5 · Adoption: the three shapes at sign-in, the `starterKey` dedup, and the losing side written to a backup file first.
 - [x] 6 · The states and the failures — Settings says which state, for how long and why; the second door of § 11; the empty state for a phone that has never had signal; sign-in from Settings runs adoption, same flow as the welcome screen.
+- [x] A first pull shows progress, behind the sheet the export and the restore already use. Background drains show nothing.
 - [ ] The backstop interval, chosen on a phone over a real week. 20 min and a 4 s debounce are placeholders, and only hardware can settle them.
 - [ ] Nothing has met a real server: needs the Supabase project and the Google OAuth clients of SYNC § 20.
 

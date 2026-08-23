@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/progress.dart';
 import '../db/database.dart';
 import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
@@ -16,26 +17,6 @@ import '../seed/seeder.dart';
 /// half-restoring a file from the future.
 const backupFormatVersion = 1;
 
-/// Which half of a long job is running, so the screen can say something more
-/// useful than "working".
-enum BackupPhase { reading, encoding, writing, decoding, clearing }
-
-/// A step of a long job: what it is doing, what on, and how far through.
-///
-/// [fraction] is null while a phase genuinely cannot say — a `jsonEncode` of a
-/// hundred thousand rows is one opaque call. A bar that sits still is honest;
-/// one that invents a percentage and then jumps is not.
-typedef BackupStep = ({
-  BackupPhase phase,
-  String detail,
-  int rows,
-  double? fraction,
-});
-
-typedef BackupProgress = void Function(BackupStep step);
-
-/// `set_logs` → `set logs`. The table names are the wire format, not English.
-String _label(String table) => table.replaceAll('_', ' ');
 
 /// JSON in another isolate.
 ///
@@ -300,7 +281,7 @@ class BackupService {
   /// The whole database as one map. Kept for the tests and the seed tool, which
   /// want a payload in hand; **the app writes files with [writeBackup]**, which
   /// never holds one.
-  Future<Map<String, dynamic>> buildPayload({BackupProgress? onProgress}) async {
+  Future<Map<String, dynamic>> buildPayload({ProgressReport? onProgress}) async {
     final data = <String, dynamic>{};
     final counts = <String, int>{};
 
@@ -320,8 +301,8 @@ class BackupService {
       counts[codec.name] = rows.length;
       read += rows.length;
       onProgress?.call((
-        phase: BackupPhase.reading,
-        detail: _label(codec.name),
+        phase: JobPhase.reading,
+        detail: tableLabel(codec.name),
         rows: read,
         // The tables are read one at a time and nothing knows the total until
         // the last one lands, so this half of the job reports how far through
@@ -355,7 +336,7 @@ class BackupService {
   ///
   /// The shape is byte-identical to what [buildPayload] produces, which is what
   /// the round-trip tests hold it to.
-  Future<File> writeBackup(File file, {BackupProgress? onProgress}) async {
+  Future<File> writeBackup(File file, {ProgressReport? onProgress}) async {
     final counts = <String, int>{};
     for (final codec in _codecs) {
       counts[codec.name] = await codec.count();
@@ -396,8 +377,8 @@ class BackupService {
 
             written += page.length;
             onProgress?.call((
-              phase: BackupPhase.writing,
-              detail: _label(codec.name),
+              phase: JobPhase.writing,
+              detail: tableLabel(codec.name),
               rows: written,
               fraction: total == 0 ? null : (written / total).clamp(0.0, 1.0),
             ));
@@ -436,7 +417,7 @@ class BackupService {
   /// Streamed row by row through [writeBackup]: the file is never a string, and
   /// the indent is gone with it — nothing reads this by eye, and pretty
   /// printing a decade of sets doubled both the time and the file.
-  Future<File> exportToFile({BackupProgress? onProgress}) async {
+  Future<File> exportToFile({ProgressReport? onProgress}) async {
     final dir = await backupDirectory();
     final name =
         'deltoid-${DateFormat('yyyy-MM-dd-HHmm').format(DateTime.now())}.json';
@@ -608,7 +589,7 @@ class BackupService {
   /// halfway through it.
   Future<ImportResult> restore(
     String? json, {
-    BackupProgress? onProgress,
+    ProgressReport? onProgress,
     /// An already-parsed file, from [decode] or [decodeStream]. Passing it is
     /// the difference between reading a fifty-year backup once and reading it
     /// twice — and it is the only form that never needs the file as a string,
@@ -619,7 +600,7 @@ class BackupService {
     final summary = summarise(payload);
 
     onProgress?.call((
-      phase: BackupPhase.decoding,
+      phase: JobPhase.decoding,
       detail: '${summary.totalRows} rows',
       rows: 0,
       fraction: null,
@@ -645,7 +626,7 @@ class BackupService {
       await db.customStatement('PRAGMA defer_foreign_keys = ON');
 
       onProgress?.call((
-        phase: BackupPhase.clearing,
+        phase: JobPhase.clearing,
         detail: 'making room',
         rows: 0,
         fraction: 0,
@@ -680,8 +661,8 @@ class BackupService {
           await db.batch((b) => b.insertAll(codec.table, slice.toList()));
           written += slice.length;
           onProgress?.call((
-            phase: BackupPhase.writing,
-            detail: _label(codec.name),
+            phase: JobPhase.writing,
+            detail: tableLabel(codec.name),
             rows: written,
             fraction: total == 0 ? null : (written / total).clamp(0.0, 1.0),
           ));
@@ -709,7 +690,7 @@ class BackupService {
         if (landed < declared) {
           throw FormatException(
             'This backup is incomplete. It says it holds $declared '
-            '${_label(codec.name)} and only $landed arrived, so nothing has '
+            '${tableLabel(codec.name)} and only $landed arrived, so nothing has '
             'been restored.',
           );
         }

@@ -623,10 +623,14 @@ consequence of it. See [RULES.md § 3](RULES.md#3-schema-and-migrations).
   this list that cannot be reasoned to an answer — it wants a real phone, a real
   week, and the ordinary rhythm of actually training. Chosen in
   [§ 18](#18-the-phases)'s last phase, on hardware.
-- **Whether a first pull shows progress.** A full history through the importer
-  needs a bar; a first pull is the same volume down a different path. Probably
-  reuses `BackupPhase`, and cheap to add once [§ 18](#18-the-phases)'s pull
-  exists — so it waits until there is something to watch.
+- ~~**Whether a first pull shows progress.**~~ **Settled: it does**, and only
+  it. `JobPhase` in `core/progress.dart` is one vocabulary for an export, a
+  restore and a pull, behind one sheet; `PullService.pull` takes an `onProgress`
+  and the row count the account reported, so the bar has a denominator rather
+  than an invented number. **Every background drain passes neither** — a spinner
+  on a job nobody is waiting for is a spinner that teaches the user to wait
+  ([§ 2](#2-the-three-states)) — and so is a sign-in with nothing to adopt,
+  where a sheet would flash for one frame.
 
 ### Settled, and where
 

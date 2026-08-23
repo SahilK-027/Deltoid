@@ -1,4 +1,5 @@
 import 'package:deltoid/core/failure.dart';
+import 'package:deltoid/core/progress.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
@@ -564,6 +565,61 @@ void main() {
             .weightKg,
         72.0,
       );
+    });
+  });
+
+  group('the one pull anybody watches', () {
+    test('the bar counts rows arriving and ends on all of them', () async {
+      await devices.as('device-a', () async {
+        await ensureStarterCatalog(devices.a);
+        await createRegimeFromTemplate(
+          devices.a,
+          regimeTemplates.firstWhere((t) => t.key == 'ppl6'),
+        );
+      });
+      await devices.push(devices.a);
+      final total = devices.backend.storedRows;
+
+      final steps = <JobStep>[];
+      await PullService(devices.b, devices.backend, batchSize: 50).pull(
+        onProgress: steps.add,
+        expectedRows: total,
+      );
+
+      expect(steps, isNotEmpty);
+      expect(steps.every((s) => s.phase == JobPhase.pulling), isTrue);
+      // Never backwards, and never past the end.
+      var last = 0;
+      for (final step in steps) {
+        expect(step.rows, greaterThanOrEqualTo(last));
+        expect(step.fraction, inInclusiveRange(0.0, 1.0));
+        last = step.rows;
+      }
+      expect(steps.last.rows, total);
+      expect(steps.last.fraction, 1.0);
+    });
+
+    test('no denominator leaves the bar indeterminate rather than inventing one',
+        () async {
+      await devices.as('device-a', () => ensureStarterCatalog(devices.a));
+      await devices.push(devices.a);
+
+      final steps = <JobStep>[];
+      await PullService(devices.b, devices.backend).pull(onProgress: steps.add);
+
+      expect(steps, isNotEmpty);
+      expect(steps.every((s) => s.fraction == null), isTrue);
+    });
+
+    test('a background drain reports nothing at all', () async {
+      await devices.as('device-a', () => ensureStarterCatalog(devices.a));
+      await devices.push(devices.a);
+
+      // Nothing to assert but the absence: a spinner on a job nobody is waiting
+      // for is a spinner that teaches the user to wait (SYNC.md § 2).
+      final report = await PullService(devices.b, devices.backend).pull();
+
+      expect(report.applied, greaterThan(0));
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/failure.dart';
 import '../../core/ids.dart';
+import '../../core/progress.dart';
 import '../../domain/enums.dart';
 import '../../domain/sync_merge.dart';
 import '../db/database.dart';
@@ -54,12 +55,29 @@ class PullService {
   final SyncBackend _backend;
   final int batchSize;
 
-  Future<PullReport> pull() async {
+  /// Applies everything the account holds that this device has not seen.
+  ///
+  /// [onProgress] is for the one pull anybody watches: the first one, at a
+  /// sign-in, where a decade of training arrives down a slower path than a
+  /// restore reads a file ([SYNC.md § 16](SYNC.md#16-still-to-decide)). Every
+  /// other pull is a background drain nobody is waiting on and passes nothing —
+  /// **a spinner on a background job is a spinner that teaches the user to
+  /// wait** ([§ 2](SYNC.md#2-the-three-states)).
+  ///
+  /// [expectedRows] is what the account said it holds, so the bar has a
+  /// denominator. Null leaves it indeterminate rather than inventing one, and a
+  /// pull that turns out to be larger than expected — rows written while it ran
+  /// — clamps rather than reporting more than all of it.
+  Future<PullReport> pull({
+    ProgressReport? onProgress,
+    int? expectedRows,
+  }) async {
     final cursor = await _cursor();
     var applied = 0;
     var kept = 0;
     var skipped = 0;
     var unchanged = 0;
+    var seenRows = 0;
     DateTime? highest;
 
     // Parents before children, so a row never lands ahead of the row it points
@@ -83,6 +101,18 @@ class PullService {
           kept += result.kept;
           skipped += result.skipped;
           unchanged += result.unchanged;
+          seenRows += fresh.length;
+          // Every row that arrived, not every row that changed something: a
+          // pull that finds nothing new still spent the time, and a bar that
+          // counted only the writes would sit at zero through it.
+          onProgress?.call((
+            phase: JobPhase.pulling,
+            detail: tableLabel(spec.name),
+            rows: seenRows,
+            fraction: expectedRows == null || expectedRows == 0
+                ? null
+                : (seenRows / expectedRows).clamp(0.0, 1.0),
+          ));
         }
 
         final last = _stampOf(page.last);
@@ -97,8 +127,8 @@ class PullService {
         after = last == null
             ? after
             : (fresh.isEmpty
-                ? last.add(const Duration(milliseconds: 1))
-                : last);
+                  ? last.add(const Duration(milliseconds: 1))
+                  : last);
       }
     }
 
@@ -176,7 +206,8 @@ class PullService {
           reportFailure(
             error,
             stack,
-            what: 'One ${_label(spec.name)} row from your account could not be '
+            what:
+                'One ${_label(spec.name)} row from your account could not be '
                 'saved on this phone.',
           );
         }
@@ -241,7 +272,11 @@ class PullService {
     // Unless resolving a collision changed it. Then this device holds a version
     // the account does not, and the only thing that can tell the account is the
     // dirty flag.
-    resolved = await _resolveCollisions(spec, resolved, hadLocal: local != null);
+    resolved = await _resolveCollisions(
+      spec,
+      resolved,
+      hadLocal: local != null,
+    );
 
     // **Every column, nulls included** — which is why this is not an upsert.
     //
@@ -281,20 +316,22 @@ class PullService {
   }
 
   Stamp _stampOfLocal(Map<String, dynamic> row) => (
-        updatedAt: row['updated_at'] as int,
-        deviceId: row['device_id'] as String,
-      );
+    updatedAt: row['updated_at'] as int,
+    deviceId: row['device_id'] as String,
+  );
 
   Future<DateTime?> _cursor() async {
-    final row = await (_db.select(_db.appSettings)
-          ..where((t) => t.key.equals(lastPullKey)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.appSettings,
+    )..where((t) => t.key.equals(lastPullKey))).getSingleOrNull();
     final value = row?.value;
     return value == null ? null : DateTime.tryParse(value);
   }
 
   Future<void> _advanceCursor(DateTime to) {
-    return _db.into(_db.appSettings).insertOnConflictUpdate(
+    return _db
+        .into(_db.appSettings)
+        .insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: lastPullKey,
             value: to.toUtc().toIso8601String(),
@@ -439,8 +476,10 @@ class PullService {
   Future<Object?> _scratchFor(TableSpec spec, String column, String id) async {
     if (column == 'name') return '~$id';
     final highest = await _db
-        .customSelect('SELECT COALESCE(MAX($column), -1) AS top '
-            'FROM ${spec.name}')
+        .customSelect(
+          'SELECT COALESCE(MAX($column), -1) AS top '
+          'FROM ${spec.name}',
+        )
         .map((row) => row.read<int>('top'))
         .getSingle();
     return highest + 1;
@@ -515,14 +554,13 @@ class PullService {
   Map<String, dynamic> _ours(
     Map<String, dynamic> row,
     Map<String, dynamic> changes,
-  ) =>
-      {
-        ...row,
-        ...changes,
-        'updatedAt': nowMs(),
-        'deviceId': currentDeviceId,
-        'dirty': true,
-      };
+  ) => {
+    ...row,
+    ...changes,
+    'updatedAt': nowMs(),
+    'deviceId': currentDeviceId,
+    'dirty': true,
+  };
 
   Future<Map<String, dynamic>> _resolveCollisions(
     TableSpec spec,
@@ -536,26 +574,26 @@ class PullService {
     return switch (spec.name) {
       'sessions' => await _resolveSession(row),
       'session_exercises' => await _resolvePosition(
-          row,
-          table: 'session_exercises',
-          parent: 'session_id',
-          position: 'order_index',
-          key: 'orderIndex',
-        ),
+        row,
+        table: 'session_exercises',
+        parent: 'session_id',
+        position: 'order_index',
+        key: 'orderIndex',
+      ),
       'workout_exercises' => await _resolvePosition(
-          row,
-          table: 'workout_exercises',
-          parent: 'workout_id',
-          position: 'order_index',
-          key: 'orderIndex',
-        ),
+        row,
+        table: 'workout_exercises',
+        parent: 'workout_id',
+        position: 'order_index',
+        key: 'orderIndex',
+      ),
       'set_logs' => await _resolvePosition(
-          row,
-          table: 'set_logs',
-          parent: 'workout_exercise_id',
-          position: 'set_index',
-          key: 'setIndex',
-        ),
+        row,
+        table: 'set_logs',
+        parent: 'workout_exercise_id',
+        position: 'set_index',
+        key: 'setIndex',
+      ),
       'regimes' => await _resolveRegime(row),
       'cycles' => await _resolveCycle(row),
       'workouts' => await _resolveWorkout(row),
@@ -595,7 +633,9 @@ class PullService {
 
     final wanted = row[key] as int;
     final occupant = scope
-        .where((r) => r.read<int>('pos') == wanted && r.read<String>('id') != id)
+        .where(
+          (r) => r.read<int>('pos') == wanted && r.read<String>('id') != id,
+        )
         .toList();
     if (occupant.isEmpty) return row;
 
@@ -638,10 +678,12 @@ class PullService {
       for (final r in scope) r.read<String>('name').trim().toLowerCase(),
     };
     final clash = scope
-        .where((r) =>
-            r.read<String>('name').trim().toLowerCase() ==
-                name.toLowerCase() &&
-            r.read<String>('id') != id)
+        .where(
+          (r) =>
+              r.read<String>('name').trim().toLowerCase() ==
+                  name.toLowerCase() &&
+              r.read<String>('id') != id,
+        )
         .toList();
     if (clash.isEmpty) return positioned;
 
@@ -715,9 +757,11 @@ class PullService {
         .get();
     final wanted = resolved['identityIndex'] as int;
     final holder = live
-        .where((r) =>
-            r.read<int>('identity_index') == wanted &&
-            r.read<String>('id') != id)
+        .where(
+          (r) =>
+              r.read<int>('identity_index') == wanted &&
+              r.read<String>('id') != id,
+        )
         .toList();
     if (holder.isEmpty) return resolved;
 
@@ -732,7 +776,8 @@ class PullService {
       reportFailure(
         StateError('no free identity slot for regime $id'),
         StackTrace.current,
-        what: 'A programme from your account could not fit on this phone — you '
+        what:
+            'A programme from your account could not fit on this phone — you '
             'already have $identitySlots.',
       );
       return _ours(resolved, {'deletedAt': nowMs()});
@@ -761,16 +806,15 @@ class PullService {
           variables: [Variable<String>(regimeId)],
         )
         .get();
-    final siblings =
-        scope.where((r) => r.read<String>('id') != id).toList();
+    final siblings = scope.where((r) => r.read<String>('id') != id).toList();
 
     final wanted = resolved['cycleIndex'] as int;
-    final sameNumber =
-        siblings.where((r) => r.read<int>('cycle_index') == wanted).toList();
+    final sameNumber = siblings
+        .where((r) => r.read<int>('cycle_index') == wanted)
+        .toList();
     if (sameNumber.isNotEmpty) {
       // Both are real cycles — the loser renumbers rather than disappearing.
-      final free =
-          freeCycleIndex(scope.map((r) => r.read<int>('cycle_index')));
+      final free = freeCycleIndex(scope.map((r) => r.read<int>('cycle_index')));
       final holderId = sameNumber.first.read<String>('id');
       if (id.compareTo(holderId) > 0) {
         resolved = _ours(resolved, {'cycleIndex': free});
@@ -780,8 +824,9 @@ class PullService {
     }
 
     if (resolved['completedAt'] != null) return resolved;
-    final open =
-        siblings.where((r) => r.read<int?>('completed_at') == null).toList();
+    final open = siblings
+        .where((r) => r.read<int?>('completed_at') == null)
+        .toList();
     if (open.isEmpty) return resolved;
 
     // The same answer `healDuplicateOpenCycles` already writes: the newer stays
@@ -791,7 +836,7 @@ class PullService {
       a: (id: id, startedAt: resolved['startedAt'] as int),
       b: (
         id: other.read<String>('id'),
-        startedAt: other.read<int>('started_at')
+        startedAt: other.read<int>('started_at'),
       ),
     );
     if (stays == id) {
@@ -823,7 +868,7 @@ class PullService {
       a: (id: id, startedAt: row['startedAt'] as int),
       b: (
         id: other.read<String>('id'),
-        startedAt: other.read<int>('started_at')
+        startedAt: other.read<int>('started_at'),
       ),
     );
     if (stays == id) {

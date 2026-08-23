@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:deltoid/core/progress.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
@@ -354,9 +355,9 @@ class _CountingPull extends PullService {
   int pulls = 0;
 
   @override
-  Future<PullReport> pull() {
+  Future<PullReport> pull({ProgressReport? onProgress, int? expectedRows}) {
     pulls++;
-    return super.pull();
+    return super.pull(onProgress: onProgress, expectedRows: expectedRows);
   }
 }
 

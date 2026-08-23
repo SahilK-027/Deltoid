@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
+import '../../core/progress.dart';
 import '../backup/backup_service.dart';
 import '../db/database.dart';
 import '../db/table_spec.dart';
@@ -151,11 +152,18 @@ class AdoptionService {
   /// other two shapes have nothing to choose between. Being handed [ask] with
   /// no choice is a bug in the caller rather than a state to recover from, and
   /// it throws.
-  Future<File?> adopt(AdoptionShape shape, {AdoptionChoice? choice}) async {
+  Future<File?> adopt(
+    AdoptionShape shape, {
+    AdoptionChoice? choice,
+    ProgressReport? onProgress,
+  }) async {
     switch (shape) {
       case AdoptionShape.pull:
         try {
-          await _pull.pull();
+          await _pull.pull(
+            onProgress: onProgress,
+            expectedRows: onProgress == null ? null : await _accountRows(),
+          );
         } finally {
           // Seeded even when the pull did not finish. A phone with no catalog
           // cannot be trained on at all, and the welcome screen is answered by
@@ -176,18 +184,24 @@ class AdoptionService {
         if (choice == null) {
           throw ArgumentError('The third shape is never resolved silently.');
         }
-        return _resolve(choice);
+        return _resolve(choice, onProgress);
     }
   }
 
-  Future<File?> _resolve(AdoptionChoice choice) async {
+  Future<File?> _resolve(
+    AdoptionChoice choice,
+    ProgressReport? onProgress,
+  ) async {
     switch (choice) {
       case AdoptionChoice.keepAccount:
         final backup = await _writePhoneBackup();
         // Not seeded: the account's own catalog is about to arrive, and
         // seeding here is exactly how a phone ends up with two.
         await forgetLocalHistory(_db, seed: false);
-        await _pull.pull();
+        await _pull.pull(
+          onProgress: onProgress,
+          expectedRows: onProgress == null ? null : await _accountRows(),
+        );
         await ensureStarterCatalog(_db);
         return backup;
 
@@ -200,12 +214,28 @@ class AdoptionService {
 
       case AdoptionChoice.merge:
         // No loser, so no backup: a union overwrites nothing.
-        await _pull.pull();
+        await _pull.pull(
+          onProgress: onProgress,
+          expectedRows: onProgress == null ? null : await _accountRows(),
+        );
         await dedupeCatalog(_db);
         await _markEverythingDirty();
         await _push.drain();
         return null;
     }
+  }
+
+  /// How many rows the account holds in total, for a bar with a denominator.
+  ///
+  /// Nine counts, and they are worth it exactly once: this runs only where a
+  /// human is watching a first pull land. Every background drain passes no
+  /// progress and so never asks.
+  Future<int> _accountRows() async {
+    var total = 0;
+    for (final spec in tableSpecs(_db).where((s) => s.syncs)) {
+      total += await _backend.count(spec.name);
+    }
+    return total;
   }
 
   /// Every row the account holds that this phone does not, written locally as a

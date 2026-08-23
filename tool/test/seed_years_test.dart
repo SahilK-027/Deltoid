@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:deltoid/core/progress.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/domain/enums.dart';
@@ -46,7 +47,7 @@ void main() {
     final result = await BackupService(db).restore(
       json,
       onProgress: (step) {
-        if (step.phase != BackupPhase.writing) return;
+        if (step.phase != JobPhase.writing) return;
         counts[step.detail] = step.rows;
         if (step.fraction != null) fractions.add(step.fraction!);
       },

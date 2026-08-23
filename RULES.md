@@ -450,6 +450,7 @@ rather than shape. Where the checks live now:
 | A duplicate catalog is folded however it arrived, not only at sign-in | `test/data/sync/sync_engine_test.dart` — a drain folds one planted between pull and push |
 | Pending says how long it has been pending, and why | `test/features/backup_state_test.dart`, `test/data/sync/sync_state_test.dart` |
 | Removing the history from this phone leaves no tombstone to push | `test/data/sync/forget_test.dart` |
+| A progress bar never goes backwards, past its end, or invents a denominator | `test/data/sync/pull_test.dart` — the steps of a first pull |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller
