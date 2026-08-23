@@ -1,6 +1,7 @@
 import 'package:deltoid/core/failure.dart';
 import 'package:deltoid/core/progress.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/db/invariants.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
@@ -622,4 +623,53 @@ void main() {
       expect(report.applied, greaterThan(0));
     });
   });
+
+  group('what the merge left behind', () {
+    test('a pull that produced a shape the repairs fix says nothing', () async {
+      // The sweep at the end of a pull is the only thing watching for a merge
+      // producing a database no writer in the app could have written, and the
+      // way a check like that dies is by crying wolf: a report on every sync
+      // is a report nobody reads. So this is § 12 row 8 — one phone deletes a
+      // workout the other was still adding sets to, which leaves live
+      // snapshots under a tombstoned workout — run all the way through, with
+      // the assertion being **silence**.
+      //
+      // The states with no healer behind them are all refused by an index or a
+      // CHECK on the way in, so no merge can reach one today. The sweep is
+      // what says so if that ever stops being true, and it cannot be tested by
+      // building one: the schema will not let it exist.
+      await bothInStep();
+
+      final session = await sessionNamed(a, 'Push 1');
+      await devices.as('device-a', () async {
+        await TrainingRepository(a).startWorkout(
+          regimeId: session.regimeId,
+          sessionId: session.id,
+        );
+      });
+      await devices.push(a);
+      await devices.pull(b);
+
+      // A tombstones the workout; B never hears about it until the pull.
+      final workout = await (a.select(a.workouts)
+            ..where((t) => t.status.equalsValue(WorkoutStatus.inProgress)))
+          .getSingle();
+      await devices.as(
+        'device-a',
+        () => TrainingRepository(a).deleteWorkout(workout.id),
+      );
+      await devices.push(a);
+
+      final reported = <String>[];
+      final sub = failures.listen((f) => reported.add(f.what));
+      await devices.pull(b);
+      await Future<void>.delayed(Duration.zero);
+      await sub.cancel();
+
+      expect(await invariantViolations(b), isEmpty);
+      expect(reported, isEmpty,
+          reason: 'the repairs ran first; there is nothing left to announce');
+    });
+  });
+
 }

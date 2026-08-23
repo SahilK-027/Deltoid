@@ -5,6 +5,7 @@ import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/db/invariants.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
@@ -810,6 +811,62 @@ void main() {
       final (workoutIdAfter, after) = await census();
       expect(after, before, reason: 'the clear was not rolled back');
       expect(workoutIdAfter, workoutId);
+    });
+
+    test('a file with two workouts in progress is refused', () async {
+      // The oracle's rule, and nothing else in the restore's path holds it: it
+      // is a `status` column rather than a constraint, so the schema takes two
+      // `inProgress` rows without complaint and `openWorkout` then returns the
+      // newer one while the older keeps its sets and becomes unreachable. No
+      // repair knows a move for it — which of two half-logged sessions is the
+      // one you are in is not a question code can answer — so the file is
+      // refused whole and the old rows stay.
+      await logASession();
+      await logASession();
+      final (workoutId, before) = await census();
+
+      final payload = await backup.buildPayload();
+      final workouts = (payload['data']['workouts'] as List).cast<Map>();
+      expect(workouts.length, greaterThan(1),
+          reason: 'the fixture must hold two workouts');
+      for (final w in workouts) {
+        w['status'] = 'inProgress';
+      }
+
+      await expectLater(backup.restore(jsonEncode(payload)), throwsA(anything));
+
+      final (workoutIdAfter, after) = await census();
+      expect(after, before, reason: 'the clear was not rolled back');
+      expect(workoutIdAfter, workoutId);
+    });
+
+    test('a file a repair can straighten out is restored, then straightened',
+        () async {
+      // The other half of the same check, and the reason it is only ever asked
+      // about the unhealable rules. Discarding a session used to tombstone the
+      // workout and leave its snapshots alive underneath — a tombstone is a
+      // column rather than a foreign key, so nothing refuses one on the way in
+      // and every export written by those builds carries the shape.
+      // `healOrphanedSnapshots` has always put it right on the next launch.
+      // Refusing the file instead would be refusing a history the app can
+      // read.
+      await logASession();
+
+      final payload = await backup.buildPayload();
+      final workouts = (payload['data']['workouts'] as List).cast<Map>();
+      workouts.first['deletedAt'] = 1;
+
+      await backup.restore(jsonEncode(payload));
+
+      // Restored — and `repairDatabase`, which the restore runs on the way
+      // out, has taken the snapshots down with the workout.
+      expect(await invariantViolations(db), isEmpty);
+      final orphanId = workouts.first['id'] as String;
+      final snapshots = await (db.select(db.workoutExercises)
+            ..where((t) => t.workoutId.equals(orphanId)))
+          .get();
+      expect(snapshots, isNotEmpty, reason: 'the fixture must have snapshots');
+      expect(snapshots.every((s) => s.deletedAt != null), isTrue);
     });
   });
 }

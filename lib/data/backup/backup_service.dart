@@ -6,8 +6,10 @@ import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/failure.dart';
 import '../../core/progress.dart';
 import '../db/database.dart';
+import '../db/invariants.dart';
 import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
 import '../seed/seeder.dart';
@@ -714,6 +716,48 @@ class BackupService {
           regimeRows.any((row) =>
               row is Map && !row.containsKey('identityIndex'));
       if (needsSlots) await backfillIdentityIndexes(db);
+
+      // And the rows describe a database that could exist.
+      //
+      // The counts check above asks whether the *file* arrived whole. This
+      // asks whether what it holds is coherent — the same rules the fuzz
+      // harness judges every operation by, re-derived in SQL rather than
+      // delegated to the constraints that normally enforce them
+      // (`invariants.dart` says why). A restore is the writer those rules were
+      // written for: it clears every table and streams a file this build did
+      // not necessarily export, under `defer_foreign_keys`, and a partial
+      // index says nothing about a file that arrived already wrong.
+      //
+      // **Only the rules no repair can fix.** A backup legitimately carries
+      // the healable ones — `healOrphanedSnapshots` exists because a discarded
+      // session used to leave live snapshots under a tombstoned workout, and
+      // nothing in the schema refuses one on the way in. Refusing those files
+      // would be refusing histories the app has always straightened out on the
+      // next launch. What is left is the states nothing knows a move for: two
+      // workouts in progress, a day carrying two bodyweights, a workout filed
+      // under one day and ringed on another.
+      //
+      // **Inside the transaction, unlike `repairDatabase` below**, and the
+      // distinction is the one that comment already draws. A repair is a
+      // judgement about rows that are legitimately there, so a healer failing
+      // must not take a correctly restored history down with it. This is not a
+      // repair — it is the same refusal as the counts check, and the whole
+      // point of making it here is that the old rows are still on disk to go
+      // back to.
+      //
+      // After `backfillIdentityIndexes`, because a pre-v5 file legitimately
+      // arrives with every regime on slot 0 and the backfill is what makes
+      // `two live regimes wear one identity` true again.
+      final unfixable = await invariantViolations(
+        db,
+        only: unhealableInvariantNames,
+      );
+      if (unfixable.isNotEmpty) {
+        throw FormatException(
+          'This backup describes a history that cannot be put back '
+          '(${unfixable.first.rule}), so nothing has been restored.',
+        );
+      }
     });
 
     // A restore is the one moment the database goes from empty to a decade in
@@ -738,6 +782,24 @@ class BackupService {
     // awaited by the screen that called it, and the streams behind Today rebuild
     // on the table updates the commit emits.
     await repairDatabase(db);
+
+    // What the repairs did not put right.
+    //
+    // The check inside the transaction refused the states nothing knows a move
+    // for; the repairs have now made their moves on the rest. Anything still
+    // standing is a shape neither half accounted for, and the user is holding
+    // it — the file is committed and there is nothing left to roll back to. So
+    // it is said out loud rather than swallowed: the alternative is the
+    // silence this whole file was written against, where the restore reports
+    // success and the wrong number turns up in a chart months later.
+    for (final violation in await invariantViolations(db)) {
+      reportFailure(
+        StateError(violation.toString()),
+        StackTrace.current,
+        what: 'Your history was restored, but part of it did not fit together '
+            'the way it should. It is worth a look before you train on it.',
+      );
+    }
 
     return ImportResult(summary: summary, rowsWritten: written);
   }

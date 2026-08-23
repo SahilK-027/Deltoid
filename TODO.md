@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**848 tests and nine pgTAP tests, analyzer clean.**
+**857 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -79,7 +79,8 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 - [x] The gate: `hooks/pre-push` runs analyze and test, plus four lints including `unawaited_futures`.
 - [x] Both audits run and worked through — can it corrupt data, and are the numbers right.
-- [x] `test/integrity/invariant_oracle.dart`: sixteen structural rules in SQL, each with a perturbation test.
+- [x] `lib/data/db/invariants.dart`: sixteen structural rules in SQL, each with a perturbation test.
+- [x] The oracle ships — a restore refuses a file it cannot put back, and a pull says what the repairs could not reach.
 - [x] The stamp clamp survives a restart, so a phone whose clock moved backwards cannot lose every row it wrote to the version it replaced.
 - [x] `test/integrity/model_fuzz_test.dart`: 1,350,000 operations, no violation, survives an unclean shutdown.
 - [x] Queries that grow with the log are raw SQL behind a parity test against the drift path.

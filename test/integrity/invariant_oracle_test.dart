@@ -8,6 +8,8 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:deltoid/data/db/invariants.dart';
+
 import 'invariant_oracle.dart';
 
 /// Two halves, and the second is the one that makes the first mean anything.
@@ -469,6 +471,24 @@ void main() {
       };
       expect(invariantRuleNames.toSet(), perturbed,
           reason: 'add the perturbation test, then add the name here');
+    });
+
+    test('every rule a repair claims to fix is a rule', () {
+      // `healableInvariants` is what the restore subtracts before deciding
+      // whether a file can be put back at all, so a name that no longer
+      // matches a rule silently widens what a restore refuses — and the file it
+      // starts refusing is one the app could have healed. Renaming a rule has
+      // to rename it here too.
+      expect(
+        healableInvariants.keys.toSet().difference(invariantRuleNames.toSet()),
+        isEmpty,
+        reason: 'a repair cannot fix a rule that does not exist',
+      );
+      expect(
+        unhealableInvariantNames.union(healableInvariants.keys.toSet()),
+        invariantRuleNames.toSet(),
+        reason: 'every rule is on exactly one of the two lists',
+      );
     });
   });
 }

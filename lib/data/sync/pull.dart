@@ -6,6 +6,7 @@ import '../../core/progress.dart';
 import '../../domain/enums.dart';
 import '../../domain/sync_merge.dart';
 import '../db/database.dart';
+import '../db/invariants.dart';
 import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
 import 'sync_backend.dart';
@@ -151,6 +152,38 @@ class PullService {
     // prevent. Whether to seed is answered by the welcome screen and by
     // adoption, never by a batch of rows.
     if (applied > 0) await repairDatabase(_db, seed: false);
+
+    // Then ask whether the rows another device sent describe a database that
+    // could exist.
+    //
+    // A pulled row is the third writer `invariants.dart` names, and the only
+    // one with no gate in front of it: the healers above fix the four shapes a
+    // merge is known to produce, and this is what says whether anything else
+    // got through.
+    //
+    // **Reported, never thrown**, which is the opposite of the restore's
+    // answer to the same question and for two reasons. Rolling a batch back
+    // would strand the account — the cursor has not advanced, so the next pull
+    // reads the same rows, fails the same rule and rolls back again, forever.
+    // And [§ 15](SYNC.md#15-what-sync-may-never-do) rule 9 is that a bad row
+    // never stops a pull. So the rows stay, the user is told in their own
+    // words, and the rule that broke is named in the console for the one
+    // person who can act on it.
+    //
+    // Outside every transaction and after the cursor has moved, so the cost is
+    // sixteen `COUNT(*)`s once per pass rather than once per page.
+    if (applied > 0) {
+      final violations = await invariantViolations(_db);
+      for (final violation in violations) {
+        reportFailure(
+          StateError(violation.toString()),
+          StackTrace.current,
+          what: 'Some rows from your account did not fit together on this '
+              'phone. Your training is all here — something in it may look '
+              'doubled until the next sync.',
+        );
+      }
+    }
 
     return (
       applied: applied,
