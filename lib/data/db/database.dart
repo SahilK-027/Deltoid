@@ -72,9 +72,18 @@ class AppDatabase extends _$AppDatabase {
           // take turns, and with the timeout above that turn is a screen
           // waiting on a background job for up to five seconds
           // ([SYNC.md § 16](SYNC.md#16-still-to-decide)). WAL lets them
-          // overlap: a writer no longer blocks readers, and the durability
-          // given up is a `NORMAL`-synchronous transaction losing its last
-          // commit to a power cut, never a corrupt file.
+          // overlap: a writer no longer blocks readers.
+          //
+          // **No durability is given up.** `synchronous` is left at the
+          // packaged default of `FULL`, which under WAL fsyncs the log on
+          // every commit — a set that returned from its transaction survives a
+          // power cut, and the file is never corrupt either way. `NORMAL` is
+          // the setting that would trade the first of those for speed, and
+          // this deliberately does not take it: the one thing this app must
+          // never do is lose a set the user watched it accept.
+          // `connection_pragmas_test` asserts the value rather than trusting
+          // this paragraph, because the default is the whole mechanism and a
+          // default is exactly what a later line can quietly move.
           //
           // Decided in the first phase on purpose, so every later test runs on
           // the mode the phone runs on. It is a property of the file, so this
