@@ -441,6 +441,9 @@ rather than shape. Where the checks live now:
 | Nothing above `data/sync/` knows which backend this is | `test/features/no_supabase_in_features_test.dart` |
 | `dirty` is cleared only against an unchanged `updatedAt` | `test/data/sync/push_test.dart` — a row edited while its own push is in flight is still owed |
 | A pulled row is never re-stamped, and `last_pull_at` moves only after its batch commits | `test/data/sync/pull_test.dart` |
+| A pull that has nothing to do writes nothing | `test/data/sync/pull_test.dart` — a second pull applies zero, or the rewrite wakes every stream on the table and calls the engine back |
+| `(updated_at, device_id)` is not treated as a version identity | `test/data/sync/cloned_device_test.dart` — two installs under one `device_id`, which the manifest now refuses to let Android create |
+| The connection opens on the pragmas the durability claim rests on | `test/data/connection_pragmas_test.dart` — read off a real file, because in-memory sqlite is always `journal_mode = memory` |
 | A backup file is never half a file | `test/data/backup_service_test.dart` — the rows go to a `.part` and the backup arrives by rename |
 | A stamp handed out is never handed out again, across a restart | `test/data/stamp_floor_test.dart` — the mark is seeded from `app_settings` at open, leased ahead of the clock, and written down at close |
 | Every merge rule is deterministic **and symmetric** | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped |
