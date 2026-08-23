@@ -869,6 +869,80 @@ void main() {
       expect(snapshots.every((s) => s.deletedAt != null), isTrue);
     });
   });
+
+  group('a backup file appears whole or not at all', () {
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('deltoid-export');
+    });
+    tearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+
+    List<String> namesIn(Directory d) =>
+        d.listSync().map((e) => e.uri.pathSegments.last).toList()..sort();
+
+    test('a write that dies halfway leaves nothing behind', () async {
+      await logASession();
+      final target = File('${dir.path}/deltoid-2026-03-01-0900.json');
+
+      // The kill happens between pages, which is where a real one lands: the
+      // sink has flushed part of the file to disk and the JSON is a fragment.
+      final dying = BackupService(
+        db,
+        pageSize: 1,
+        betweenPages: () async => throw const FileSystemException('disk full'),
+      );
+
+      await expectLater(
+        dying.writeBackup(target),
+        throwsA(isA<FileSystemException>()),
+      );
+
+      // Not the destination — a truncated file under a legitimate backup name
+      // is the failure this is all for — and not the `.part` either.
+      expect(namesIn(dir), isEmpty);
+    });
+
+    test('a failed write does not take the last good backup with it', () async {
+      await logASession();
+      final target = File('${dir.path}/deltoid-2026-03-01-0900.json');
+
+      await backup.writeBackup(target);
+      final good = target.readAsStringSync();
+      expect(good, isNotEmpty);
+
+      final dying = BackupService(
+        db,
+        pageSize: 1,
+        betweenPages: () async => throw const FileSystemException('disk full'),
+      );
+      await expectLater(dying.writeBackup(target), throwsA(anything));
+
+      // Byte for byte what was there before. The rename is what buys this: the
+      // old file is never opened for writing at all.
+      expect(target.readAsStringSync(), good);
+      expect(namesIn(dir), ['deltoid-2026-03-01-0900.json']);
+    });
+
+    test('a finished write is a file the restore accepts', () async {
+      // The rename must not be the place the file loses its tail.
+      await logASession();
+      final target = File('${dir.path}/deltoid-2026-03-01-0900.json');
+      await backup.writeBackup(target);
+
+      final fresh = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(fresh.close);
+      await BackupService(fresh).restore(target.readAsStringSync());
+
+      expect(
+        (await fresh.select(fresh.workouts).get()).length,
+        (await db.select(db.workouts).get()).length,
+      );
+    });
+  });
+
 }
 
 /// [days] before [key], as a day key — calendar arithmetic, so it holds at a

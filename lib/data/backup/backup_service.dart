@@ -338,6 +338,19 @@ class BackupService {
   ///
   /// The shape is byte-identical to what [buildPayload] produces, which is what
   /// the round-trip tests hold it to.
+  ///
+  /// **The file appears whole or not at all.** It streamed straight into its
+  /// final name, which meant a crash, a kill, a full disk or an OOM halfway
+  /// through left a truncated `.json` sitting under a legitimate backup
+  /// filename — indistinguishable from a good one until the day it was needed,
+  /// and the restore's own counts check is the thing that would eventually say
+  /// so, months later. [autoExport] made it worse: it prunes by filename, so a
+  /// run of half-written files would evict the last complete one.
+  ///
+  /// So the rows go to a sibling `.part` and the finished file arrives by
+  /// rename, which is atomic within a filesystem — a reader sees the old file
+  /// or the new one, never half of either. A write that does not finish takes
+  /// its `.part` with it and leaves what was already there alone.
   Future<File> writeBackup(File file, {ProgressReport? onProgress}) async {
     final counts = <String, int>{};
     for (final codec in _codecs) {
@@ -345,8 +358,13 @@ class BackupService {
     }
     final total = counts.values.fold(0, (a, b) => a + b);
 
-    final sink = file.openWrite();
+    // Beside the destination rather than in a temp directory, so the rename
+    // below cannot cross a filesystem — across one it is a copy and a delete,
+    // which is the very thing being avoided.
+    final partial = File('${file.path}.part');
+    final sink = partial.openWrite();
     var written = 0;
+    var complete = false;
     try {
       sink
         ..write('{"format":$backupFormatVersion')
@@ -392,10 +410,12 @@ class BackupService {
         sink.write(']');
       }
       sink.write('}}');
+      complete = true;
     } finally {
       await sink.close();
+      if (!complete && partial.existsSync()) partial.deleteSync();
     }
-    return file;
+    return partial.rename(file.path);
   }
 
   /// Where backups live: a `Deltoid` folder the user can actually open.
@@ -447,6 +467,18 @@ class BackupService {
       ..sort((a, b) => b.path.compareTo(a.path));
     for (final stale in files.skip(keep)) {
       stale.deleteSync();
+    }
+
+    // A `.part` that [writeBackup] did not clean up after itself, which means
+    // the process was killed rather than the write failing — the one case its
+    // `finally` cannot cover. Swept here rather than there: this is the caller
+    // that runs after every session, and a half-file from a session two weeks
+    // ago is otherwise a permanent resident. Never counted against [keep], and
+    // never restorable, because nothing looks for anything but `.json`.
+    for (final scrap in dir.listSync().whereType<File>().where(
+          (f) => f.path.endsWith('.json.part'),
+        )) {
+      scrap.deleteSync();
     }
   }
 
