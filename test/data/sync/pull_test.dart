@@ -672,4 +672,24 @@ void main() {
     });
   });
 
+  group('the pull that has nothing left to do', () {
+    /// **The guard against a phone that never stops syncing.**
+    ///
+    /// The cursor compares `>=`, so the row stamped exactly on it arrives with
+    /// every pull. Writing one back wakes every stream on its table, which
+    /// wakes the engine, which pulls again. Nothing asserted this until now —
+    /// the applier's short-circuit could be disabled outright and the whole
+    /// suite stayed green, because every other test here pulls once.
+    test('a second pull applies nothing and rewrites nothing', () async {
+      await bothInStep();
+
+      final again = await devices.pull(b);
+
+      expect(again.applied, 0, reason: 'a rewritten row wakes the engine');
+      expect(again.kept, 0);
+      expect(again.skipped, 0);
+      expect(again.unchanged, greaterThan(0),
+          reason: 'the boundary row is re-read, recognised, and left alone');
+    });
+  });
 }

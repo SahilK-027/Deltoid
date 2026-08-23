@@ -275,11 +275,21 @@ class PullService {
       // engine, which pulls again. A phone that had finished syncing would
       // never stop.
       //
-      // `updatedAt` and `deviceId` together identify a version: no local edit
-      // can produce the same pair, because every one of them stamps both.
-      if ((local['dirty'] as int? ?? 0) == 0 &&
-          local['updated_at'] == row['updatedAt'] &&
-          local['device_id'] == row['deviceId']) {
+      // **The stamp pair is not an identity, so the values are compared too.**
+      // It reads like one — every local write stamps both columns, so no *edit*
+      // can land on the pair a pulled row carries. What can is a second install
+      // writing under the first one's `device_id`: that column is minted once
+      // into `app_settings` and nothing re-mints it, so a database file copied
+      // to another phone is a second writer with the first one's name. Both
+      // then walk `nowMs` from one restored floor, which makes an equal
+      // `updated_at` the ordinary case between them rather than a coincidence.
+      //
+      // Trusting the pair there discards the account's row without reading it —
+      // no verdict, no conflict, nothing said. Comparing the values keeps the
+      // loop this guard exists for closed, because the boundary row the `>=`
+      // cursor re-reads is equal column by column, while a row that merely
+      // shares a stamp is not.
+      if ((local['dirty'] as int? ?? 0) == 0 && _sameAsLocal(row, local)) {
         return _Outcome.unchanged;
       }
 
@@ -331,6 +341,43 @@ class PullService {
       await _db.update(spec.table).replace(entity);
     }
     return _Outcome.applied;
+  }
+
+  /// Whether the incoming row and the local one hold the same values.
+  ///
+  /// Keyed off the incoming row, so a column the server has and this build does
+  /// not is ignored rather than counted as a difference — a newer phone's
+  /// column must not make every pull rewrite every row here. Server-only
+  /// bookkeeping is already dropped before this point.
+  bool _sameAsLocal(Map<String, dynamic> row, Map<String, dynamic> local) {
+    for (final entry in row.entries) {
+      final column = columnNameOf(entry.key);
+      // `dirty` is a fact about a device's push queue, not about the row — the
+      // two phones in `two_devices.dart` drop it for the same reason before
+      // comparing histories. It is answered above, on the local side, and an
+      // incoming `true` must not read as a difference and rewrite every row.
+      if (column == 'dirty') continue;
+      if (!local.containsKey(column)) continue;
+      if (!_sameValue(local[column], entry.value)) return false;
+    }
+    return true;
+  }
+
+  /// One column, across the two shapes it arrives in.
+  ///
+  /// `local` is raw sqlite, so a bool is 0 or 1 and a timestamp is an integer;
+  /// the incoming row is already typed. Equality has to cross that, and a
+  /// mismatch here is not a wrong answer but a needless rewrite — which wakes
+  /// every stream on the table and calls the engine back.
+  bool _sameValue(Object? local, Object? incoming) {
+    if (local == incoming) return true;
+    if (incoming is bool) return local == (incoming ? 1 : 0);
+    if (incoming is DateTime) {
+      return local == incoming.millisecondsSinceEpoch ||
+          local == incoming.millisecondsSinceEpoch ~/ 1000;
+    }
+    if (incoming is Enum) return local == incoming.index;
+    return false;
   }
 
   /// The row as it is on this phone, or null.
@@ -467,10 +514,12 @@ class PullService {
       final id = row['id'] as String;
       final local = await _localRow(spec, id);
       if (local == null) continue;
-      // Not a new version, so nothing about it is moving.
-      if ((local['dirty'] as int? ?? 0) == 0 &&
-          local['updated_at'] == row['updatedAt'] &&
-          local['device_id'] == row['deviceId']) {
+      // Not a new version, so nothing about it is moving. Compared by value
+      // rather than by stamp for the reason `_applyRow` gives: two installs
+      // sharing a `device_id` can present a different version on the same pair,
+      // and reading that as "not moving" leaves a row unparked that is about to
+      // land on an occupied index.
+      if ((local['dirty'] as int? ?? 0) == 0 && _sameAsLocal(row, local)) {
         continue;
       }
 

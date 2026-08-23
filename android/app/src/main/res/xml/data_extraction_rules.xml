@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 and up. The pair above covers older releases.
+
+  Nothing leaves this app by OS copy. `device_id` is minted once into
+  `app_settings`, inside the database file, and nothing re-mints it — so a file
+  Android copies to a second phone is a second install writing under the first
+  one's name, which is the one thing the merge cannot see. The `-wal` and
+  `-shm` sidecars are the other half: Auto Backup copies files one at a time
+  with no snapshot, and a database restored beside a log captured at a
+  different instant is the ordinary way to corrupt SQLite.
+
+  Nothing is lost by refusing. A phone moves to another phone by signing in,
+  and off it by the JSON backup, and neither carries the identity.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>
