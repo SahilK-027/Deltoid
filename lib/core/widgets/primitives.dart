@@ -229,9 +229,9 @@ class SectionHeader extends StatelessWidget {
     this.onAction,
     this.trailing,
   }) : assert(
-          trailing == null || actionLabel == null,
-          'A heading has one thing on its right: a link or a figure.',
-        );
+         trailing == null || actionLabel == null,
+         'A heading has one thing on its right: a link or a figure.',
+       );
 
   final String title;
   final String? actionLabel;
@@ -661,6 +661,35 @@ class InkRow extends StatelessWidget {
   }
 }
 
+/// A spinner sized to sit where a row's glyph or chevron was.
+///
+/// **Busy is not disabled, and it is not empty either.** A row that drops its
+/// chevron and changes its title has told the user something happened; only a
+/// moving thing tells them it is still happening. Sized inside the glyph box
+/// rather than filling it, so it carries the same weight as the mark it stands
+/// in for and the row does not change height.
+class RowSpinner extends StatelessWidget {
+  const RowSpinner({super.key, this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: Sizes.glyph,
+    height: Sizes.glyph,
+    child: Center(
+      child: SizedBox(
+        width: Sizes.glyph - 4,
+        height: Sizes.glyph - 4,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: color ?? context.c.textSecondary,
+        ),
+      ),
+    ),
+  );
+}
+
 // ─── Buttons ────────────────────────────────────────────────────────────────
 
 /// The one loud action on a screen: full width, white, dark label.
@@ -987,27 +1016,29 @@ class SegmentedPill<T> extends StatelessWidget {
               )
             else
               Pressable(
-              onTap: () => onChanged(segment.value),
-              scale: 0.96,
-              child: AnimatedContainer(
-                duration: Motion.base,
-                curve: Motion.emphasized,
-                padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: segment.value == value ? c.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(Radii.pill),
-                ),
-                child: Text(
-                  segment.label,
-                  style: context.t.bodySmall?.copyWith(
+                onTap: () => onChanged(segment.value),
+                scale: 0.96,
+                child: AnimatedContainer(
+                  duration: Motion.base,
+                  curve: Motion.emphasized,
+                  padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
                     color: segment.value == value
-                        ? c.onAccent
-                        : c.textSecondary,
+                        ? c.accent
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                  ),
+                  child: Text(
+                    segment.label,
+                    style: context.t.bodySmall?.copyWith(
+                      color: segment.value == value
+                          ? c.onAccent
+                          : c.textSecondary,
+                    ),
                   ),
                 ),
               ),
-            ),
         ],
       ),
     );
@@ -1140,7 +1171,11 @@ class _Tab extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                  Space.md, Space.md, Space.md, Space.sm),
+                Space.md,
+                Space.md,
+                Space.md,
+                Space.sm,
+              ),
               child: Text(
                 label,
                 style: context.t.titleMedium?.copyWith(
@@ -1454,8 +1489,12 @@ class SheetHeader extends StatelessWidget {
           // the hairline. The gap above used to be the handle's margin plus a
           // header inset, which made it wider than the one below for no reason
           // anyone could name.
-          padding:
-              const EdgeInsets.fromLTRB(Space.sm, Space.lg, Space.sm, Space.lg),
+          padding: const EdgeInsets.fromLTRB(
+            Space.sm,
+            Space.lg,
+            Space.sm,
+            Space.lg,
+          ),
           // A stack, not a row: the ✕ is a 48pt tap target and the title on its
           // own is 26 tall, so in a row the button set the header's height and
           // left 22pt of dead charcoal under a one-line title. Out of the flow,
@@ -1581,7 +1620,8 @@ class AppSheet extends StatelessWidget {
             SheetHeader(title: title, subtitle: subtitle),
             Flexible(
               child: SingleChildScrollView(
-                padding: contentPadding ??
+                padding:
+                    contentPadding ??
                     const EdgeInsets.fromLTRB(
                       Space.gutter,
                       Space.lg,
@@ -1692,20 +1732,21 @@ class _NoteSheetState extends State<_NoteSheet> {
           // `120 / 500` — the convention, and the only form that says what the
           // limit *is* before you hit it. "60 left" answers a question you can
           // only ask once you are already near the end.
-          buildCounter: (
-            context, {
-            required currentLength,
-            required isFocused,
-            required maxLength,
-          }) {
-            final full = currentLength >= (maxLength ?? 0);
-            return Text(
-              '$currentLength / $maxLength',
-              style: context.t.bodySmall?.copyWith(
-                color: full ? context.c.negative : context.c.textTertiary,
-              ),
-            );
-          },
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                required maxLength,
+              }) {
+                final full = currentLength >= (maxLength ?? 0);
+                return Text(
+                  '$currentLength / $maxLength',
+                  style: context.t.bodySmall?.copyWith(
+                    color: full ? context.c.negative : context.c.textTertiary,
+                  ),
+                );
+              },
           textCapitalization: TextCapitalization.sentences,
           style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
           cursorColor: c.textPrimary,
@@ -1884,8 +1925,10 @@ class NoticeBox extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (title != null) ...[
-                  Text(title!,
-                      style: context.t.titleSmall?.copyWith(color: c.warning)),
+                  Text(
+                    title!,
+                    style: context.t.titleSmall?.copyWith(color: c.warning),
+                  ),
                   const SizedBox(height: Space.xxs),
                 ],
                 Text(

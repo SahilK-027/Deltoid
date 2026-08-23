@@ -297,6 +297,17 @@ it ended, and a stretch indicator says it twice.
 state on reload — a write anywhere must not replace the list you are reading
 with a spinner.
 
+**A spinner on a control is allowed only where the app is genuinely waiting on
+somebody else**, which is the sign-in on the threshold screen and the sign-in
+row in Settings, and nowhere else — every other screen reads local disk and
+waits on nothing ([SYNC § 15](SYNC.md#15-what-sync-may-never-do) rule 1). Where
+it is allowed, **busy must not look disabled**: the control keeps its fill and
+swaps its glyph for `RowSpinner`, because a button that greys itself out has
+said it is no longer a button, and Google's sheet can take seconds to open on a
+cold start. Long jobs the app itself runs — an export, a restore, a first pull —
+get the progress sheet instead, which says how far through it is rather than
+only that it is running.
+
 **Loading and empty are different states**, and that one is a behaviour rule —
 see [RULES § 5](RULES.md#5-interface).
 

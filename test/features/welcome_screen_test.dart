@@ -179,6 +179,46 @@ void main() {
       auth.release();
       await beats(tester);
     });
+
+    testWidgets('the wait is visible, and does not look disabled',
+        (tester) async {
+      final auth = _FakeAuth(hold: true);
+      await pump(tester, auth: auth);
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pump();
+
+      // Google's own sheet can take seconds to appear on a cold start, and a
+      // button that only greys itself out is a button that gets tapped again.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // The other answer is the one that is genuinely disabled, so the two must
+      // not look alike: this one keeps its fill.
+      final busy = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.text('Signing in'),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final quiet = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.text('Continue on this phone'),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final busyFill = (busy.decoration! as BoxDecoration).color;
+      final quietFill = (quiet.decoration! as BoxDecoration).color;
+      expect(busyFill, isNot(quietFill), reason: 'busy read as disabled');
+
+      auth.release();
+      await beats(tester);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
   });
 }
 

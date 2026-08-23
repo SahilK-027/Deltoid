@@ -432,11 +432,25 @@ class _BodyweightCard extends ConsumerWidget {
 ///
 /// Absent entirely from a build with no configuration, rather than present and
 /// broken: a clone of this repo has no project to reach.
-class _AccountSection extends ConsumerWidget {
+class _AccountSection extends ConsumerStatefulWidget {
   const _AccountSection();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AccountSection> createState() => _AccountSectionState();
+}
+
+class _AccountSectionState extends ConsumerState<_AccountSection> {
+  /// True from the tap until Google's sheet closes and the account has been
+  /// reconciled.
+  ///
+  /// The same wait the welcome screen has, and the same reason it is allowed to
+  /// wait: nothing on screen depends on it, and the row that started it has to
+  /// say it is working or it gets tapped again while Google is still opening.
+  /// The adoption that may follow brings its own sheet.
+  bool _signingIn = false;
+
+  @override
+  Widget build(BuildContext context) {
     if (ref.watch(syncAuthProvider) == null) return const SizedBox.shrink();
     final account = ref.watch(accountProvider).valueOrNull;
     // Answered `account` and signed out anyway is § 13 row 2: a token that
@@ -459,15 +473,24 @@ class _AccountSection extends ConsumerWidget {
                     icon: dropped
                         ? Icons.cloud_sync_outlined
                         : Icons.cloud_off_outlined,
-                    title: dropped
+                    title: _signingIn
+                        ? 'Signing in'
+                        : dropped
                         ? 'Sign in again to keep backing up'
                         : 'Back up to your Google account',
-                    subtitle: dropped
+                    subtitle: _signingIn
+                        ? 'Waiting for Google.'
+                        : dropped
                         ? 'This phone was signed out. Everything logged since '
                               'is still here and still waiting.'
                         : 'Your history is on this phone and nowhere else.',
-                    onTap: () => _signIn(context, ref),
-                    chevron: true,
+                    // The chevron is the affordance, so it goes while the
+                    // spinner is there: two of them would say the row is both
+                    // busy and ready.
+                    trailing: _signingIn ? const RowSpinner() : null,
+                    // A second tap would open a second sheet behind the first.
+                    onTap: _signingIn ? null : () => _signIn(context, ref),
+                    chevron: !_signingIn,
                   ),
                 ]
               : [
@@ -499,8 +522,14 @@ class _AccountSection extends ConsumerWidget {
     );
   }
 
-  Future<void> _signIn(BuildContext context, WidgetRef ref) =>
-      signInAndAdopt(context, ref);
+  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
+    setState(() => _signingIn = true);
+    try {
+      await signInAndAdopt(context, ref);
+    } finally {
+      if (mounted) setState(() => _signingIn = false);
+    }
+  }
 
   /// Signing out leaves every row where it is.
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {

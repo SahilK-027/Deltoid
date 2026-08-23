@@ -451,6 +451,7 @@ rather than shape. Where the checks live now:
 | Pending says how long it has been pending, and why | `test/features/backup_state_test.dart`, `test/data/sync/sync_state_test.dart` |
 | Removing the history from this phone leaves no tombstone to push | `test/data/sync/forget_test.dart` |
 | A progress bar never goes backwards, past its end, or invents a denominator | `test/data/sync/pull_test.dart` — the steps of a first pull |
+| A control that is busy does not look disabled | `test/features/welcome_screen_test.dart` — the two answers' fills must differ mid-sign-in |
 
 **A comment that states a fact about other code is the kind that rots** — how
 many rows a query returns, what another provider does, what a caller

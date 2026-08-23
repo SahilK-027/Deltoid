@@ -218,6 +218,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                 child: _ThresholdButton(
                   label: _signingIn ? 'Signing in' : 'Continue with Google',
                   icon: const GoogleMark(),
+                  busy: _signingIn,
                   // Disabled while Google's sheet is up, so a second tap cannot
                   // open a second one behind the first.
                   onTap: _signingIn ? null : _signIn,
@@ -364,11 +365,28 @@ class _ThresholdButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.filled = true,
+    this.busy = false,
   });
 
   final String label;
   final Widget icon;
   final VoidCallback? onTap;
+
+  /// Waiting on Google, with the glyph replaced by a spinner.
+  ///
+  /// **The one spinner the app allows on a screen rather than in a sheet**, and
+  /// it is allowed for the same reason this screen may wait at all: nothing has
+  /// been written yet, there is no history to read, and the user is waiting on
+  /// somebody else's sheet to open. Every screen after this one reads local
+  /// disk and waits on nothing
+  /// ([SYNC.md § 15](SYNC.md#15-what-sync-may-never-do) rule 1), which is why
+  /// there is no second one anywhere.
+  ///
+  /// Dimming the glyph and changing the label said *disabled*, not *working*. A
+  /// tap that produces a greyer button and then nothing — Google's own sheet
+  /// can take seconds to appear on a cold start — is a tap the user makes
+  /// again.
+  final bool busy;
 
   /// Filled with `accent`, or the same pill drawn as an outline.
   ///
@@ -379,7 +397,13 @@ class _ThresholdButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final enabled = onTap != null;
+    // **Busy is not disabled**, and the fill is what says which. A button that
+    // greys itself out the moment it is tapped has told the user it is no
+    // longer a button, and Google's sheet can take seconds to appear on a cold
+    // start — long enough to try again. The other answer *is* disabled while
+    // this one works, and that difference has to be visible.
+    final working = onTap == null && busy;
+    final enabled = onTap != null || working;
 
     return Pressable(
       onTap: onTap,
@@ -397,9 +421,11 @@ class _ThresholdButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Dimmed rather than removed while a sign-in is in flight: the row
-            // must not change width, or the label shifts as it changes.
-            Opacity(opacity: enabled ? 1 : 0.4, child: icon),
+            // The spinner stands in the glyph's own box rather than beside it:
+            // the row must not change width, or the label shifts as it swaps.
+            busy
+                ? RowSpinner(color: filled ? c.onAccent : c.textPrimary)
+                : Opacity(opacity: enabled ? 1 : 0.4, child: icon),
             const SizedBox(width: Space.md),
             Flexible(
               child: Text(
