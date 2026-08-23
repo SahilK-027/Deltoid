@@ -80,6 +80,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The gate: `hooks/pre-push` runs analyze and test, plus four lints including `unawaited_futures`.
 - [x] Both audits run and worked through — can it corrupt data, and are the numbers right.
 - [x] `test/integrity/invariant_oracle.dart`: sixteen structural rules in SQL, each with a perturbation test.
+- [x] The stamp clamp survives a restart, so a phone whose clock moved backwards cannot lose every row it wrote to the version it replaced.
 - [x] `test/integrity/model_fuzz_test.dart`: 1,350,000 operations, no violation, survives an unclean shutdown.
 - [x] Queries that grow with the log are raw SQL behind a parity test against the drift path.
 - [x] The volume screen stops querying when you leave it.

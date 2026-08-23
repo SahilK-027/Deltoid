@@ -441,6 +441,7 @@ rather than shape. Where the checks live now:
 | Nothing above `data/sync/` knows which backend this is | `test/features/no_supabase_in_features_test.dart` |
 | `dirty` is cleared only against an unchanged `updatedAt` | `test/data/sync/push_test.dart` — a row edited while its own push is in flight is still owed |
 | A pulled row is never re-stamped, and `last_pull_at` moves only after its batch commits | `test/data/sync/pull_test.dart` |
+| A stamp handed out is never handed out again, across a restart | `test/data/stamp_floor_test.dart` — the mark is seeded from `app_settings` at open, leased ahead of the clock, and written down at close |
 | Every merge rule is deterministic **and symmetric** | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped |
 | Two devices converge | `TwoDevices.converge` in `test/data/sync/two_devices.dart`, used by every collision test |
 | Two devices under arbitrary use converge, and lose nothing | `test/integrity/sync_fuzz_test.dart` — the oracle on both phones after every operation |

@@ -3,6 +3,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 // Referenced by the generated code: enum columns, clientDefault callbacks and
 // the JSON list converter all resolve against this library's imports.
+import '../../core/failure.dart';
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
 import 'converters.dart';
@@ -87,6 +88,12 @@ class AppDatabase extends _$AppDatabase {
           // Before anything can write a row that carries it.
           await _ensureDeviceId();
 
+          // And before anything can stamp one. See `nowMs`: the clamp that
+          // keeps last-write-wins honest across a clock that moves backwards
+          // is only as good as the mark it starts from, and a mark that starts
+          // at zero protects one run of the app.
+          await _seedStampFloor();
+
           // Give the query planner statistics to plan with.
           //
           // Without them SQLite guesses how selective each table is, and on
@@ -127,6 +134,66 @@ class AppDatabase extends _$AppDatabase {
       AppSettingsCompanion.insert(key: deviceIdKey, value: minted),
     );
     setCurrentDeviceId(minted);
+  }
+
+  /// Raises the stamp clamp to the highest mark this install may have used,
+  /// and writes down a new one covering the session about to start.
+  ///
+  /// In `app_settings` beside `device_id`, and for the same reasons: it
+  /// describes the phone rather than the launch, and it has to survive a
+  /// restore. It is a floor, so a mark restored from an older export is
+  /// harmless — the wall clock is almost always ahead of it and wins.
+  ///
+  /// See `stampLeaseMs` for why it is written here and at `close` rather than
+  /// on every stamp.
+  Future<void> _seedStampFloor() async {
+    final stored = await (select(appSettings)
+          ..where((t) => t.key.equals(lastStampKey)))
+        .getSingleOrNull();
+    final mark = int.tryParse(stored?.value ?? '') ?? 0;
+    seedStampFloor(mark);
+    await _writeStampFloor(
+      DateTime.now().toUtc().millisecondsSinceEpoch + stampLeaseMs,
+      atLeast: mark,
+    );
+  }
+
+  /// Writes [stamp], unless the mark is already at or past it.
+  ///
+  /// Monotonic on purpose: every caller is claiming "no stamp below this will
+  /// ever be handed out again", and a lower claim cannot unsay a higher one.
+  Future<void> _writeStampFloor(int stamp, {required int atLeast}) async {
+    if (stamp <= atLeast) return;
+    await into(appSettings).insertOnConflictUpdate(
+      AppSettingsCompanion.insert(key: lastStampKey, value: '$stamp'),
+    );
+  }
+
+  /// Writes down where the session actually reached before letting go.
+  ///
+  /// The lease written at open covers a kill; this covers everything past it,
+  /// which on a long session is most of it. Failing is survivable and must not
+  /// stop the close — the lease is still on disk and still a floor — so it is
+  /// reported rather than thrown.
+  @override
+  Future<void> close() async {
+    try {
+      final stored = await (select(appSettings)
+            ..where((t) => t.key.equals(lastStampKey)))
+          .getSingleOrNull();
+      await _writeStampFloor(
+        stampMark,
+        atLeast: int.tryParse(stored?.value ?? '') ?? 0,
+      );
+    } on Object catch (error, stack) {
+      reportFailure(
+        error,
+        stack,
+        what: 'The clock this phone stamps your training with could not be '
+            'saved.',
+      );
+    }
+    await super.close();
   }
 
   static QueryExecutor _open() =>

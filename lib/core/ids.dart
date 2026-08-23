@@ -17,17 +17,58 @@ int _lastStamp = 0;
 /// this clock without asking: a network time correction after a flat battery, a
 /// manual change, a timezone database update mid-session.
 ///
-/// Clamping to the last value issued is the cheap half of the answer and the
-/// half that is entirely local: within one run of the app, an edit made after
-/// another edit always carries a later stamp, whatever the clock did in
-/// between. Two rows written inside the same clamped millisecond are then
-/// separated by `deviceId`, exactly as [currentDeviceId] describes. The other
-/// half — agreeing on time with a *different* device — is a server's job and
-/// belongs with whatever sync is eventually built on these columns.
+/// Clamping to the last value issued is the local half of the answer. Two rows
+/// written inside the same clamped millisecond are then separated by
+/// `deviceId`, exactly as [currentDeviceId] describes. The other half —
+/// agreeing on time with a *different* device — is a server's job.
+///
+/// **The clamp survives a restart**, and it has to: a mark held only in memory
+/// protects one run of the app, and the failure it exists for is precisely the
+/// one that spans a launch. A phone comes off a flat battery with its clock at
+/// the build date, the app opens, a session is logged, and the network corrects
+/// the clock an hour later. Every row from that session carries a stamp from
+/// the past, loses to the version it replaced on the next merge, and keeps
+/// losing — `resolveRow` never revisits a verdict. `AppDatabase` seeds this
+/// from `app_settings` at open and writes it back; see [seedStampFloor].
 int nowMs() {
   final wall = DateTime.now().toUtc().millisecondsSinceEpoch;
   return _lastStamp = wall > _lastStamp ? wall : _lastStamp + 1;
 }
+
+/// The highest stamp handed out so far, for whoever is writing it down.
+int get stampMark => _lastStamp;
+
+/// Raises the clamp to a mark read back from `app_settings`.
+///
+/// Called by [AppDatabase]'s `beforeOpen`, before any write can run. Raises
+/// only: a wall clock honestly ahead of the stored mark is the normal case and
+/// needs nothing, and a mark restored from an older export must not drag a
+/// healthy clock backwards.
+void seedStampFloor(int stamp) {
+  if (stamp > _lastStamp) _lastStamp = stamp;
+}
+
+/// `app_settings` key holding the highest stamp this install may have used.
+const lastStampKey = 'last_stamp';
+
+/// How far past the clock the mark is written at open.
+///
+/// The mark cannot be rewritten on every stamp: `nowMs` is called from inside
+/// every write, so a write of its own from there lands in whatever transaction
+/// the caller opened — and under `testWidgets`, in whatever fake-async zone the
+/// test is pumping. Escaping either is worse than the problem.
+///
+/// So it is written twice, at the two moments that are neither: once at open,
+/// far enough ahead to cover an ordinary session, and once at close, at the
+/// mark actually reached. A kill in between loses nothing as long as the
+/// session was shorter than this — and if it was longer, the stamps at risk are
+/// only the ones past the lease.
+///
+/// **`max(wall + lease, stored)`, never `stored + lease`.** The second
+/// compounds: a phone relaunched twenty times in a minute would walk the mark
+/// twenty leases into the future and every row it stamped would beat every row
+/// from every other device, permanently. The first is bounded by the clock.
+const stampLeaseMs = 5 * 60 * 1000;
 
 /// Which install wrote a row.
 ///
@@ -50,7 +91,8 @@ void setCurrentDeviceId(String id) => _deviceId = id;
 const deviceIdKey = 'device_id';
 
 /// Resets the monotonic clock. Tests only — a fresh in-memory database in the
-/// same process would otherwise inherit the stamps of the one before it.
+/// same process would otherwise inherit the stamps of the one before it, and
+/// now the listener of the one before it too.
 void resetStampsForTesting() => _lastStamp = 0;
 
 /// Local calendar day as `yyyyMMdd`. Used for heatmap grouping and bodyweight
