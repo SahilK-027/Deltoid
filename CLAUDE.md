@@ -11,7 +11,7 @@ it did. Sync is an additive layer over the columns every syncable row already
 carries: a drain of `dirty`, a pull that merges, and one question at the first
 sign-in when both sides have been trained on. See
 [RULES.md § 6](RULES.md#6-scope) for what that decision does and does not open,
-and [TODO.md](TODO.md) for the four phases still to come.
+and [TODO.md](TODO.md) for what is left.
 
 ## The docs, and which one you want
 

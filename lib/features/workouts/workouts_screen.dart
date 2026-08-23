@@ -14,6 +14,7 @@ import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
 import '../../domain/consistency.dart';
 import '../../domain/cycle_engine.dart';
+import '../../domain/muscle_volume.dart';
 import '../history/workout_detail_screen.dart';
 import '../log/log_screen.dart';
 import '../log/widgets/exercise_sheets.dart';
@@ -456,24 +457,39 @@ class WorkoutsScreen extends ConsumerWidget {
     // where you are before you go to either, and this costs one aggregated
     // query per change to `workouts`.
     ref.watch(fullHeatmapProvider);
+    // **Warmed here for the same reason, and it is the stronger case.** This
+    // one is drawn *on this screen*, and watching it only where it is drawn
+    // made it strictly slower than everything around it: the card lives inside
+    // the branch that renders once `today` has arrived, so the query did not
+    // start until the snapshot had already landed. Two local reads that could
+    // have run together ran one after the other, and the section visibly
+    // dropped in afterwards — the staged reveal the rest of this screen exists
+    // to avoid. Started here, both are in flight in the same frame.
+    final volume = ref.watch(weeklyVolumeProvider).valueOrNull;
     final regime = today?.regime;
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;
     final open = today?.openWorkout;
 
     return Scaffold(
-      body: switch ((today, regime, sessions.isEmpty)) {
+      body: switch ((today, volume, regime, sessions.isEmpty)) {
         // Nothing has loaded yet. Blank, not a spinner: the answers are on
         // local disk, and a spinner that shows for two frames is worse than
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
-        (null, _, _) => const SizedBox.shrink(),
-        (_, null, _) => _NoRegimeState(
+        //
+        // **Both reads, not just the snapshot.** The page arrives whole or not
+        // at all; waiting on the slower of two queries that started together
+        // costs a frame or two, and a section that appears after the page did
+        // costs the user's attention every time they land here.
+        (null, _, _, _) || (_, null, _, _) => const SizedBox.shrink(),
+        (_, _, null, _) => _NoRegimeState(
           last: today!.lastCompleted,
           heatmap: today.heatmap,
           hasHistory: today.hasHistory,
+          volume: volume!,
         ),
-        (_, final r?, true) => _NoSessionsState(
+        (_, _, final r?, true) => _NoSessionsState(
           regime: r,
           last: today!.lastCompleted,
         ),
@@ -488,7 +504,7 @@ class WorkoutsScreen extends ConsumerWidget {
         // first item in the list, so the one thing you came for — the session,
         // and the button that starts it — slid off the top the moment you
         // looked at the heatmap.
-        (_, final r?, false) => Column(
+        (_, _, final r?, false) => Column(
           children: [
             _WorkoutsHeader(
               last: today!.lastCompleted,
@@ -574,7 +590,7 @@ class WorkoutsScreen extends ConsumerWidget {
                         // moment you are reading it. The zero state carries it
                         // too, so the page is the same page before and after.
                         const SizedBox(height: Space.section),
-                        const _VolumeCard(),
+                        _VolumeCard(volume: volume!),
                         if (today.lastCompleted != null) ...[
                           const SizedBox(height: Space.section),
                           _LastSessionCard(last: today.lastCompleted!),
@@ -745,11 +761,13 @@ class _NoRegimeState extends ConsumerWidget {
     required this.last,
     required this.heatmap,
     required this.hasHistory,
+    required this.volume,
   });
 
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
   final bool hasHistory;
+  final WeeklyVolume volume;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -800,7 +818,7 @@ class _NoRegimeState extends ConsumerWidget {
                     AccountRecoveryNote(hasHistory: hasHistory),
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
-                    const _VolumeCard(),
+                    _VolumeCard(volume: volume),
                     if (last != null) ...[
                       const SizedBox(height: Space.section),
                       _LastSessionCard(last: last!),
@@ -1591,17 +1609,21 @@ class _ConsistencyCard extends StatelessWidget {
 /// Its own `ConsumerWidget` so the query that feeds it rebuilds this card and
 /// not the screen: it watches `set_logs`, which changes on every tick of every
 /// set you log.
-class _VolumeCard extends ConsumerWidget {
-  const _VolumeCard();
+/// **Handed its numbers rather than watching for them.**
+///
+/// It used to read [weeklyVolumeProvider] itself, which is what made it the one
+/// section on this screen that arrived late: a provider starts when something
+/// first watches it, and nothing watched this one until the card was already
+/// being built — after the snapshot it should have been racing. The screen
+/// starts both reads in the same frame now and does not draw until it has both,
+/// so there is nothing left here to be absent.
+class _VolumeCard extends StatelessWidget {
+  const _VolumeCard({required this.volume});
+
+  final WeeklyVolume volume;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final volume = ref.watch(weeklyVolumeProvider).valueOrNull;
-    // Nothing at all until the count arrives — the section is one query deep,
-    // and a card that appears empty and then fills is the staged reveal the
-    // rest of this screen exists to avoid.
-    if (volume == null) return const SizedBox.shrink();
-
+  Widget build(BuildContext context) {
     void openHistory() => Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const VolumeHistoryScreen()));

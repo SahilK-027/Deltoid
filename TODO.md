@@ -45,6 +45,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] An empty chart is still a chart: axes, gridlines, no sentence written across it.
 - [x] History's exercise search falls through to the catalog.
 - [x] Every chart folds through `chart_buckets.dart` and shares one control row, one axis and one transition.
+- [x] Workouts arrives whole: every read it draws starts in the same frame, and no section drops in after the page.
 
 ### Around the edges
 
@@ -59,8 +60,8 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 5 · Adoption: the three shapes at sign-in, the `starterKey` dedup, and the losing side written to a backup file first.
 - [x] 6 · The states and the failures — Settings says which state, for how long and why; the second door of § 11; the empty state for a phone that has never had signal; sign-in from Settings runs adoption, same flow as the welcome screen.
 - [x] A first pull shows progress, behind the sheet the export and the restore already use. Background drains show nothing.
-- [ ] The backstop interval, chosen on a phone over a real week. 20 min and a 4 s debounce are placeholders, and only hardware can settle them.
-- [ ] Nothing has met a real server: needs the Supabase project and the Google OAuth clients of SYNC § 20.
+- [x] The duplicate catalog is folded between the pull and the push of every drain, not only at a sign-in.
+- [x] The Supabase project exists, the schema is on it, and the nine RLS tests pass against a real Postgres.
 
 ### The rebrand
 
@@ -87,31 +88,15 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Both colour ramps measured pair by pair; the four pairs under AA are named in THEME.
 - [x] Where each load-bearing rule is checked: [RULES § 7](RULES.md#7-working-on-it).
 
-### Not yet driven on the device
-
-- [ ] Built and tested but never used in a gym: weekly volume bars, volume history screens, muscle chips, isometric holds, hold pad.
-- [ ] Never verified on real hardware at all: rest tone, haptics, wakelock, audio ducking, share sheet.
-- [ ] Newest and least driven: the ongoing session notification and the scheduled rest alarm.
-- [ ] Sync's first half: a real sign-in, a real push, and the row count on the server against the phone's.
-
 ---
 
 ## Left
 
-Cloud backup, in the seven phases of [SYNC § 18](SYNC.md#18-the-phases). Read
-[SYNC.md](SYNC.md) before writing any of it — the design is § 1–16, the code is
-§ 17–20.
+**Rebrand 7 · Reconciliation**, above, and nothing else. The light theme has
+been checked on five empty screens; everything that needs a populated log is
+still unchecked.
 
-- [x] **0 · The ground** — migration ladder at `schemaVersion` 2 with every rung idempotent, the nine `dirty` indexes, WAL, the shared table registry both readers answer to, the wire proved, `INTERNET` in the release manifest.
-- [x] **1 · The server** — nine tables, RLS on every one with `using` and `with check`, granted to `authenticated` and never `anon`, the `server_updated_at` trigger, a `(user_id, server_updated_at)` index per table, `supabase/migrations` in the repo and proved by pgTAP.
-- [x] **2 · Identity** — Google sign-in behind `SyncAuth`, the welcome screen, seeding moved behind its answer, the account section in Settings. Not yet driven on hardware.
-- [x] **3 · Push** — the `dirty` drain in keyset pages, parents before children, `dirty` cleared only against an unchanged `updatedAt`; the transport behind an interface with an in-memory fake; four triggers (debounce, resume, connectivity, backstop) with exponential backoff; `SyncScope` at the root; Local / Synced / Pending derived off the database and shown in Settings. The backstop interval is a placeholder until phase 6 chooses it on hardware. Not yet driven on hardware.
-- [x] **4 · Pull** — the merge as arithmetic in `domain/sync_merge.dart`, the applier in `pull.dart`: cursor in `app_settings` advanced only after a whole pass commits, one transaction per batch, parents before children, tombstones staying tombstones, a bad row skipped and named, `repairDatabase` after. The engine pulls before it pushes. Every § 12 row this phase owns is a named test against two databases and one fake backend. Not yet driven on hardware.
-- [ ] **5 · Adoption** — the three shapes at sign-in, and the `starterKey` dedup.
-- [ ] **6 · States and failures** — the three states in Settings, every row of [SYNC § 13](SYNC.md#13-when-it-fails), the backstop interval chosen on hardware.
-- [x] **The tests** — the § 12 rows, plus `test/integrity/sync_fuzz_test.dart`: two phones, random operations on both, syncing at random points, the oracle after every step, a real convergence check and *nothing logged is lost*. It found five bugs on its first run — see the commit.
-
-`supabase_flutter`, `google_sign_in` and `connectivity_plus` are in. Driving any
-of it needs a Supabase project and Google OAuth clients that only the user can
-create — see
-[SYNC § 20](SYNC.md#20-what-this-needs-from-outside-the-repo).
+Sync is built and its design is settled. Two numbers in `sync_engine.dart` — a
+20-minute backstop and a 4-second debounce — are placeholders by design rather
+than oversights, and [SYNC § 16](SYNC.md#16-still-to-decide) says why they can
+only be chosen against a phone and a real week.

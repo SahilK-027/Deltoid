@@ -421,12 +421,16 @@ class _ThresholdButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // The spinner stands in the glyph's own box rather than beside it:
-            // the row must not change width, or the label shifts as it swaps.
-            busy
-                ? RowSpinner(color: filled ? c.onAccent : c.textPrimary)
-                : Opacity(opacity: enabled ? 1 : 0.4, child: icon),
-            const SizedBox(width: Space.md),
+            // **The spinner follows the words, the glyph leads them.** A mark
+            // in front of a label says *whose* sheet this opens, which is the
+            // whole reason Google's colours are allowed here; a spinner in the
+            // same place would claim the same thing and be answering a
+            // different question. After the label it reads as what it is — the
+            // sentence, and then the fact that it is still going.
+            if (!busy) ...[
+              Opacity(opacity: enabled ? 1 : 0.4, child: icon),
+              const SizedBox(width: Space.md),
+            ],
             Flexible(
               child: Text(
                 label,
@@ -441,6 +445,10 @@ class _ThresholdButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (busy) ...[
+              const SizedBox(width: Space.md),
+              RowSpinner(color: filled ? c.onAccent : c.textPrimary),
+            ],
           ],
         ),
       ),
