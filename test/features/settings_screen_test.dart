@@ -325,19 +325,21 @@ void main() {
       expect(july.before, isNull);
     });
 
-    test('the chart asks for its window, not for the log', () async {
+    test('the chart reads the whole log, and cuts the window itself', () async {
       final today = DateTime.now();
       await TrainingRepository(db)
           .logBodyweight(today.subtract(const Duration(days: 2)), 76);
       await TrainingRepository(db)
           .logBodyweight(today.subtract(const Duration(days: 200)), 80);
 
-      final window = await container.read(
-        bodyweightRangeProvider(const TrendWindow.rolling(ChartRange.month))
-            .future,
-      );
+      final all = await container.read(bodyweightRangeProvider.future);
 
-      expect(window.length, 1);
+      // Oldest first, and nothing dropped: the range chips are a zoom over
+      // one provider, not a query per range.
+      expect(all.map((p) => p.weightKg).toList(), [80, 76]);
+
+      const month = TrendWindow.rolling(ChartRange.month);
+      final window = [for (final p in all) if (month.contains(p.dayKey)) p];
       expect(window.single.weightKg, 76);
     });
 

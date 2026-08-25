@@ -86,28 +86,26 @@ final bodyweightSummaryProvider = StreamProvider<BodyweightSummary>((ref) {
   });
 });
 
-/// The entries the chart is drawing, oldest first — the window, not the log.
+/// Every weigh-in, oldest first — the log, not the window.
 ///
-/// Filtering the log in Dart on every rebuild was work to throw away, so the
-/// window is the query's. **The window is not always small**: this used to say
-/// the chart never showed more than a year, which stopped being true the day
-/// `All` was added and now asks for `day_key >= 0` — every weigh-in ever, the
-/// same regression `setsByMuscleDaily` had. So it reads the two
-/// columns the chart plots positionally off a `QueryRow` rather than hydrating
-/// a whole `BodyweightLog` per point, which is drift's most expensive path and
-/// pays for columns nothing here reads.
-final bodyweightRangeProvider = StreamProvider.autoDispose
-    .family<List<({int dayKey, double weightKg})>, TrendWindow>((ref, window) {
+/// **Not keyed on the window, deliberately.** A `.family` per [TrendWindow]
+/// made changing range a *different provider*, so the chart card lost its
+/// data for a frame and `TrendChart` was unmounted and rebuilt — which threw
+/// away the zoom in [TrendChart.didUpdateWidget] that every other chart in the
+/// app gets. One provider, filtered in Dart, keeps the same chart on screen
+/// across a range change, exactly as `exercise_trend.dart` does.
+///
+/// It reads the two columns the chart plots positionally off a `QueryRow`
+/// rather than hydrating a whole `BodyweightLog` per point, which is drift's
+/// most expensive path and pays for columns nothing here reads. `All` already
+/// asked for the whole log, so this is the cost that window already had.
+final bodyweightRangeProvider = StreamProvider.autoDispose<
+    List<({int dayKey, double weightKg})>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchQuery([db.bodyweightLogs], () async {
     final rows = await db.customSelect(
       'SELECT day_key AS day_key, weight_kg AS weight_kg '
-      'FROM bodyweight_logs WHERE deleted_at IS NULL '
-      'AND day_key BETWEEN ?1 AND ?2 ORDER BY day_key',
-      variables: [
-        Variable.withInt(window.fromDayKey),
-        Variable.withInt(window.toDayKey),
-      ],
+      'FROM bodyweight_logs WHERE deleted_at IS NULL ORDER BY day_key',
       readsFrom: {db.bodyweightLogs},
     ).get();
     return [
@@ -515,12 +513,18 @@ class _TrendCard extends ConsumerWidget {
     // Oldest first, which is the direction a chart reads — and the query
     // returns the window rather than the log, though on `All` those are the
     // same thing.
-    final points = ref.watch(bodyweightRangeProvider(window)).valueOrNull;
-    if (points == null) {
+    final all = ref.watch(bodyweightRangeProvider).valueOrNull;
+    if (all == null) {
       return const AppCard(
         child: SizedBox(height: 260, child: Center(child: SizedBox.shrink())),
       );
     }
+
+    // The window is cut here rather than in the query so that changing range
+    // keeps the same chart on screen and zooms it.
+    final points = window.isAll
+        ? all
+        : [for (final p in all) if (window.contains(p.dayKey)) p];
 
     // The change over the range is the *log's* first and last reading, not the
     // first and last bucket: averaging is how the line is drawn, and this line
