@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**875 tests and nine pgTAP tests, analyzer clean.**
+**876 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -93,6 +93,9 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] No painter clamps to a bound it computed.
 - [x] Exceptions to THEME are written into THEME, enforced by a test.
 - [x] Both colour ramps measured pair by pair; the four pairs under AA are named in THEME.
+- [x] A deep fuzz campaign — 200 model seeds and 100 two-phone seeds — and the one
+      bug it found: reopening a cycle assumed the only open one could be numbered
+      above it, which stops being true once a merge re-numbers.
 - [x] Where each load-bearing rule is checked: [RULES § 7](RULES.md#7-working-on-it).
 
 ---

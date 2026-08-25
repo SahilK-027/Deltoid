@@ -2253,6 +2253,64 @@ void main() {
     expect(status.completedSessionIds, {push1.id});
   });
 
+  test('a cycle is left closed when an open one sits at a lower index',
+      () async {
+    // **Index order stops matching close order once there are two devices.**
+    // `_reopenCycleIfIncomplete` drops the cycles numbered *above* the one it
+    // reopens, which is the whole check — and it assumes the only cycle that
+    // could still be open is one of them. True on one phone, where cycles close
+    // in order and the open one is always the highest. False after a merge
+    // re-numbers a collided cycle (SYNC.md section 9), which is what the
+    // renumber below stands in for.
+    //
+    // Found by `sync_fuzz_test` at seed 98: the reopen hit
+    // `idx_cycles_regime_open_live` with `UNIQUE constraint failed:
+    // cycles.regime_id` and rolled the whole `deleteWorkout` back. Nothing was
+    // corrupted — the index is what refused it — but the delete could not run.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final logged = await logSession(push1);
+
+    // Cycle 1 closes with sessions still owed, and cycle 2 opens behind it.
+    await repo.advanceCycle(regime.id);
+    final open = (await repo.cycleStatus(regime.id))!;
+    expect(open.cycleIndex, 2);
+
+    final closed = await (db.select(db.cycles)
+          ..where((t) => t.regimeId.equals(regime.id) & t.cycleIndex.equals(1)))
+        .getSingle();
+    expect(closed.completedAt, isNotNull);
+
+    // What the merge does: the closed cycle is re-slotted above the open one,
+    // so nothing numbered higher is left for the tail check to find.
+    await (db.update(db.cycles)..where((t) => t.id.equals(closed.id)))
+        .write(const CyclesCompanion(cycleIndex: Value(9)));
+
+    // The delete has to survive. It used to throw from inside its own
+    // transaction.
+    await repo.deleteWorkout(logged);
+
+    final stillOpen = await (db.select(db.cycles)
+          ..where((t) =>
+              t.regimeId.equals(regime.id) &
+              t.deletedAt.isNull() &
+              t.completedAt.isNull()))
+        .get();
+    expect(stillOpen.length, 1,
+        reason: 'a regime holds one open cycle, and the reopen may not make a '
+            'second one');
+    expect(stillOpen.single.id, open.cycleId,
+        reason: 'the cycle being trained in is the one that stays open');
+
+    final reopened = await (db.select(db.cycles)
+          ..where((t) => t.id.equals(closed.id)))
+        .getSingle();
+    expect(reopened.completedAt, isNotNull,
+        reason: 'leaving it closed is the conservative half of the trade — it '
+            'costs at most a deload landing early, where closing the live '
+            'cycle would end one being trained in right now');
+  });
+
   group('sweeping sessions left open', () {
     /// Ages the row, which is what the sweep reads — see
     /// `sweepAbandonedWorkouts`.

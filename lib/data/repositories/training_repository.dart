@@ -3551,6 +3551,36 @@ class TrainingRepository {
       if (held.isNotEmpty) return;
     }
 
+    // **A regime holds one open cycle, and a later one is not the only one
+    // that can be open.** `later` is every live cycle numbered above this one,
+    // and the loop above is the whole of what used to be checked — which
+    // assumes the only cycle that could still be open is one of them. That
+    // holds on a single device, where cycles close in index order and the open
+    // one is always the highest. It does not hold once a second device exists:
+    // the merge re-numbers a collided cycle ([SYNC.md § 9](../../../SYNC.md#9-collision--two-rows-one-slot)),
+    // so index order stops matching the order they were closed in, and the
+    // regime can carry an open cycle at or below this one's index.
+    //
+    // Reopening on top of that is refused by `idx_cycles_regime_open_live`,
+    // which threw `UNIQUE constraint failed: cycles.regime_id` from inside
+    // `deleteWorkout` and took the whole delete down with it. The index did its
+    // job — nothing was corrupted, the transaction rolled back — but a delete
+    // that cannot run is still a delete that cannot run.
+    //
+    // So this takes the same conservative half the comment above already
+    // takes: leave the earlier cycle closed. It costs at most a deload landing
+    // early, where closing the other open cycle to make room would end a cycle
+    // the user is training in right now.
+    final otherOpen = await (db.select(db.cycles)
+          ..where((t) =>
+              t.regimeId.equals(cycle.regimeId) &
+              t.deletedAt.isNull() &
+              t.completedAt.isNull() &
+              t.id.equals(cycle.id).not() &
+              t.cycleIndex.isSmallerOrEqualValue(cycle.cycleIndex)))
+        .get();
+    if (otherOpen.isNotEmpty) return;
+
     await db.transaction(() async {
       for (final c in later) {
         await (db.update(db.cycles)..where((t) => t.id.equals(c.id))).write(
