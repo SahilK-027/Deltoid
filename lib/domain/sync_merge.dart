@@ -162,14 +162,60 @@ String staysOpen({
   return a.id.compareTo(b.id) > 0 ? a.id : b.id;
 }
 
-/// Which of two regimes keeps the active flag.
+/// Which regime is the active one, out of every live regime on the phone.
 ///
-/// **The flag is the conflict, not the row.** Both programmes survive; one of
-/// them is simply not the one being trained. Last write wins on the stamp of
-/// the row carrying the flag, so the device that activated a regime more
-/// recently is the one both phones agree with.
-bool remoteKeepsActive({required Stamp local, required Stamp remote}) =>
-    _isNewer(remote, local);
+/// **The flag is a singleton, so it cannot be merged row by row.** Activating a
+/// regime deactivates another, which is two rows moving for one decision;
+/// last-write-wins is defined on one row at a time and has nothing to say about
+/// that. Resolving it pairwise — each arriving row against whatever happened to
+/// be active when it landed — makes the answer depend on the order rows arrive
+/// in, and two phones pulling in different orders reached opposite answers.
+/// Nothing then corrected them: the losing side's deactivation minted no new
+/// version on purpose, so both copies carried one version and two values, and
+/// each looked up to date to the other forever. `sync_fuzz_test` seeds 41, 146,
+/// 335 and 531, and [Regimes.activatedAt] carries the rest of the story.
+///
+/// So the answer is computed from all of them at once, and from a column that
+/// merges like any other: **the live regime holding the highest
+/// `activatedAt`.** A pure function of rows both phones agree on is the same
+/// answer on both phones however the rows got there, which is the whole
+/// property that was missing.
+///
+/// **Null is not zero.** A regime nobody has ever activated is not a candidate,
+/// so deleting the only one that was ever active leaves *none* active rather
+/// than promoting a programme the user never chose — `deleteRegime` picks the
+/// successor deliberately, and stamps it. Null in, null out: with no candidate
+/// this returns null and every live regime is left inactive, which is the same
+/// state a phone is in before the first regime is created.
+///
+/// `deviceId` then the `id` break a tie, exactly as [Stamp] does everywhere
+/// else, so two activations in one millisecond still settle the same way twice.
+String? resolveActiveRegime(
+  Iterable<({String id, int? activatedAt, String deviceId})> live,
+) {
+  ({String id, int activatedAt, String deviceId})? best;
+  for (final r in live) {
+    final at = r.activatedAt;
+    if (at == null) continue;
+    final candidate = (id: r.id, activatedAt: at, deviceId: r.deviceId);
+    if (best == null ||
+        _isNewer(
+          (
+            updatedAt: candidate.activatedAt,
+            deviceId: candidate.deviceId,
+            fingerprint: candidate.id,
+          ),
+          (
+            updatedAt: best.activatedAt,
+            deviceId: best.deviceId,
+            fingerprint: best.id,
+          ),
+        )) {
+      best = candidate;
+    }
+  }
+  return best?.id;
+}
 
 /// The identity hue a regime takes when the one it arrived wearing is held, or
 /// null when the shelf is full.

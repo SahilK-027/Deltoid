@@ -107,7 +107,7 @@ Drift code has to be regenerated after any edit to `lib/data/db/tables.dart`:
 dart run build_runner build
 ```
 
-**The ladder is running.** `schemaVersion` is 2 and `MigrationStrategy` has an
+**The ladder is running.** `schemaVersion` is 3 and `MigrationStrategy` has an
 `onUpgrade`, in `lib/data/db/migrations.dart`. So a schema change is:
 
 1. the column or `@TableIndex` in `tables.dart`,
@@ -163,6 +163,13 @@ The schema history so far: version 2 added `set_logs.parent_set_id`, version 3
 added `exercises.bar_kind`, version 4 re-mapped a dropped `bar_kind` value,
 version 5 added `regimes.identity_index`, version 6 indexed
 `bodyweight_logs.day_key`, and version 7 added `exercises.measure_mode`.
+
+The ladder running *today*, the one that started again at 2: **1 → 2** created
+the nine `dirty` indexes, and **2 → 3** added `regimes.activated_at` and
+backfilled it onto whichever regime was active at the time. That backfill is the
+rule above doing its job — the honest default for this column is null, meaning
+*never activated*, and null on every row of an existing phone would leave the
+derivation with no candidate and deactivate the programme the user is training.
 
 ---
 

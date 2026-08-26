@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**876 tests and nine pgTAP tests, analyzer clean.**
+**881 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -96,6 +96,9 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] A deep fuzz campaign — 200 model seeds and 100 two-phone seeds — and the one
       bug it found: reopening a cycle assumed the only open one could be numbered
       above it, which stops being true once a merge re-numbers.
+- [x] The active flag is derived from `regimes.activated_at`, not merged: it is one
+      answer spread over every row, and resolving it row by row let two phones
+      settle on opposite ones permanently. Ten seeds of 1,577 found it.
 - [x] Where each load-bearing rule is checked: [RULES § 7](RULES.md#7-working-on-it).
 
 ---

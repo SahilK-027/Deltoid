@@ -1039,6 +1039,17 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _activatedAtMeta = const VerificationMeta(
+    'activatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> activatedAt = GeneratedColumn<int>(
+    'activated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1065,6 +1076,7 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
     deloadSetDelta,
     deloadWeightPct,
     identityIndex,
+    activatedAt,
     createdAt,
   ];
   @override
@@ -1165,6 +1177,15 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
         ),
       );
     }
+    if (data.containsKey('activated_at')) {
+      context.handle(
+        _activatedAtMeta,
+        activatedAt.isAcceptableOrUnknown(
+          data['activated_at']!,
+          _activatedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1228,6 +1249,10 @@ class $RegimesTable extends Regimes with TableInfo<$RegimesTable, Regime> {
         DriftSqlType.int,
         data['${effectivePrefix}identity_index'],
       )!,
+      activatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}activated_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -1270,6 +1295,28 @@ class Regime extends DataClass implements Insertable<Regime> {
   /// is the one failure it cannot have. A live regime holds its slot; deleting
   /// one hands the slot back.
   final int identityIndex;
+
+  /// When this regime was last made the active one, or null if it never was.
+  ///
+  /// **`is_active` is the answer; this is the fact.** The flag is a singleton
+  /// across the whole account — activating one regime deactivates another — so
+  /// it is the one column that cannot be merged row by row. Two phones that
+  /// each activated something derived the flag pairwise, against whatever
+  /// happened to be active locally when the row arrived, and could reach
+  /// opposite answers; because the derived deactivation deliberately minted no
+  /// new version, both copies then looked up to date to the other side and the
+  /// disagreement was permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
+  ///
+  /// A stamp is a fact about *this row*, so it merges like any other column and
+  /// is never rewritten by the merge. Both phones then compute the same winner
+  /// — the live regime holding the highest one — from data they agree on, which
+  /// is what makes the flag converge without anything having to be stamped on
+  /// its behalf. See `resolveActiveRegime` in `domain/sync_merge.dart`.
+  ///
+  /// Nullable, and null is not zero: it means *never activated*, and a regime
+  /// nobody has ever activated must not become active just because everything
+  /// else was deleted.
+  final int? activatedAt;
   final int createdAt;
   const Regime({
     required this.id,
@@ -1284,6 +1331,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     required this.deloadSetDelta,
     required this.deloadWeightPct,
     required this.identityIndex,
+    this.activatedAt,
     required this.createdAt,
   });
   @override
@@ -1303,6 +1351,9 @@ class Regime extends DataClass implements Insertable<Regime> {
     map['deload_set_delta'] = Variable<int>(deloadSetDelta);
     map['deload_weight_pct'] = Variable<int>(deloadWeightPct);
     map['identity_index'] = Variable<int>(identityIndex);
+    if (!nullToAbsent || activatedAt != null) {
+      map['activated_at'] = Variable<int>(activatedAt);
+    }
     map['created_at'] = Variable<int>(createdAt);
     return map;
   }
@@ -1323,6 +1374,9 @@ class Regime extends DataClass implements Insertable<Regime> {
       deloadSetDelta: Value(deloadSetDelta),
       deloadWeightPct: Value(deloadWeightPct),
       identityIndex: Value(identityIndex),
+      activatedAt: activatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activatedAt),
       createdAt: Value(createdAt),
     );
   }
@@ -1345,6 +1399,7 @@ class Regime extends DataClass implements Insertable<Regime> {
       deloadSetDelta: serializer.fromJson<int>(json['deloadSetDelta']),
       deloadWeightPct: serializer.fromJson<int>(json['deloadWeightPct']),
       identityIndex: serializer.fromJson<int>(json['identityIndex']),
+      activatedAt: serializer.fromJson<int?>(json['activatedAt']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
     );
   }
@@ -1364,6 +1419,7 @@ class Regime extends DataClass implements Insertable<Regime> {
       'deloadSetDelta': serializer.toJson<int>(deloadSetDelta),
       'deloadWeightPct': serializer.toJson<int>(deloadWeightPct),
       'identityIndex': serializer.toJson<int>(identityIndex),
+      'activatedAt': serializer.toJson<int?>(activatedAt),
       'createdAt': serializer.toJson<int>(createdAt),
     };
   }
@@ -1381,6 +1437,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     int? deloadSetDelta,
     int? deloadWeightPct,
     int? identityIndex,
+    Value<int?> activatedAt = const Value.absent(),
     int? createdAt,
   }) => Regime(
     id: id ?? this.id,
@@ -1395,6 +1452,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
     deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
     identityIndex: identityIndex ?? this.identityIndex,
+    activatedAt: activatedAt.present ? activatedAt.value : this.activatedAt,
     createdAt: createdAt ?? this.createdAt,
   );
   Regime copyWithCompanion(RegimesCompanion data) {
@@ -1421,6 +1479,9 @@ class Regime extends DataClass implements Insertable<Regime> {
       identityIndex: data.identityIndex.present
           ? data.identityIndex.value
           : this.identityIndex,
+      activatedAt: data.activatedAt.present
+          ? data.activatedAt.value
+          : this.activatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1440,6 +1501,7 @@ class Regime extends DataClass implements Insertable<Regime> {
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
           ..write('identityIndex: $identityIndex, ')
+          ..write('activatedAt: $activatedAt, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1459,6 +1521,7 @@ class Regime extends DataClass implements Insertable<Regime> {
     deloadSetDelta,
     deloadWeightPct,
     identityIndex,
+    activatedAt,
     createdAt,
   );
   @override
@@ -1477,6 +1540,7 @@ class Regime extends DataClass implements Insertable<Regime> {
           other.deloadSetDelta == this.deloadSetDelta &&
           other.deloadWeightPct == this.deloadWeightPct &&
           other.identityIndex == this.identityIndex &&
+          other.activatedAt == this.activatedAt &&
           other.createdAt == this.createdAt);
 }
 
@@ -1493,6 +1557,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
   final Value<int> deloadSetDelta;
   final Value<int> deloadWeightPct;
   final Value<int> identityIndex;
+  final Value<int?> activatedAt;
   final Value<int> createdAt;
   final Value<int> rowid;
   const RegimesCompanion({
@@ -1508,6 +1573,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.identityIndex = const Value.absent(),
+    this.activatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1524,6 +1590,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.identityIndex = const Value.absent(),
+    this.activatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
@@ -1540,6 +1607,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     Expression<int>? deloadSetDelta,
     Expression<int>? deloadWeightPct,
     Expression<int>? identityIndex,
+    Expression<int>? activatedAt,
     Expression<int>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -1556,6 +1624,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
       if (deloadSetDelta != null) 'deload_set_delta': deloadSetDelta,
       if (deloadWeightPct != null) 'deload_weight_pct': deloadWeightPct,
       if (identityIndex != null) 'identity_index': identityIndex,
+      if (activatedAt != null) 'activated_at': activatedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1574,6 +1643,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     Value<int>? deloadSetDelta,
     Value<int>? deloadWeightPct,
     Value<int>? identityIndex,
+    Value<int?>? activatedAt,
     Value<int>? createdAt,
     Value<int>? rowid,
   }) {
@@ -1590,6 +1660,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
       deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
       deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
       identityIndex: identityIndex ?? this.identityIndex,
+      activatedAt: activatedAt ?? this.activatedAt,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1634,6 +1705,9 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
     if (identityIndex.present) {
       map['identity_index'] = Variable<int>(identityIndex.value);
     }
+    if (activatedAt.present) {
+      map['activated_at'] = Variable<int>(activatedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1658,6 +1732,7 @@ class RegimesCompanion extends UpdateCompanion<Regime> {
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
           ..write('identityIndex: $identityIndex, ')
+          ..write('activatedAt: $activatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7793,6 +7868,7 @@ typedef $$RegimesTableCreateCompanionBuilder =
       Value<int> deloadSetDelta,
       Value<int> deloadWeightPct,
       Value<int> identityIndex,
+      Value<int?> activatedAt,
       Value<int> createdAt,
       Value<int> rowid,
     });
@@ -7810,6 +7886,7 @@ typedef $$RegimesTableUpdateCompanionBuilder =
       Value<int> deloadSetDelta,
       Value<int> deloadWeightPct,
       Value<int> identityIndex,
+      Value<int?> activatedAt,
       Value<int> createdAt,
       Value<int> rowid,
     });
@@ -7942,6 +8019,11 @@ class $$RegimesTableFilterComposer
 
   ColumnFilters<int> get identityIndex => $composableBuilder(
     column: $table.identityIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8095,6 +8177,11 @@ class $$RegimesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8153,6 +8240,11 @@ class $$RegimesTableAnnotationComposer
 
   GeneratedColumn<int> get identityIndex => $composableBuilder(
     column: $table.identityIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
     builder: (column) => column,
   );
 
@@ -8279,6 +8371,7 @@ class $$RegimesTableTableManager
                 Value<int> deloadSetDelta = const Value.absent(),
                 Value<int> deloadWeightPct = const Value.absent(),
                 Value<int> identityIndex = const Value.absent(),
+                Value<int?> activatedAt = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RegimesCompanion(
@@ -8294,6 +8387,7 @@ class $$RegimesTableTableManager
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 identityIndex: identityIndex,
+                activatedAt: activatedAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -8311,6 +8405,7 @@ class $$RegimesTableTableManager
                 Value<int> deloadSetDelta = const Value.absent(),
                 Value<int> deloadWeightPct = const Value.absent(),
                 Value<int> identityIndex = const Value.absent(),
+                Value<int?> activatedAt = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RegimesCompanion.insert(
@@ -8326,6 +8421,7 @@ class $$RegimesTableTableManager
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 identityIndex: identityIndex,
+                activatedAt: activatedAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

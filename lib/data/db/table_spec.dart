@@ -92,7 +92,8 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
         // `Regime.fromJson` casts the missing key straight to int. Everything
         // lands on 0 here and the slots are dealt out properly once the restore
         // is written — see the backfill at the end of `BackupService.restore`.
-        parse: (row) => Regime.fromJson({'identityIndex': 0, ...row}),
+        parse: (row) => Regime.fromJson(
+            {'identityIndex': 0, 'activatedAt': null, ...row}),
         syncs: true,
       ),
       TableSpec(

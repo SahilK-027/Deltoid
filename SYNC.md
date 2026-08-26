@@ -267,6 +267,45 @@ the problem that is local. Agreement *between* devices is a server's job, and
 `server_updated_at` is that answer. The client's `updatedAt` keeps doing its own
 job — ordering the offline queue on the device that made it.
 
+### The one column last-write-wins cannot decide
+
+**`regimes.is_active` is one answer spread across every row.** Activating a
+regime deactivates another, so a single decision moves two rows — and
+last-write-wins is defined on one row at a time. It has nothing to say about a
+pair.
+
+Resolving it pairwise is what the applier used to do: each arriving row was
+compared against whatever happened to be active locally at that moment. That
+makes the answer depend on the order rows arrive in, and two phones pulling in
+different orders reached opposite answers. Nothing corrected them afterwards,
+because the losing side's deactivation deliberately minted no new version — so
+both phones held **one version of the row and two values of the flag**, each
+looking up to date to the other, forever. `sync_fuzz_test` found it on ten seeds
+out of 1,577, all shrinking to an activation on one phone against a delete on
+the other.
+
+**So the flag is not merged at all.** `regimes.activated_at` is a stamp, a fact
+about its own row, and it merges like every other column. Each phone then
+derives the flag from it:
+
+> the active regime is the live one holding the highest `activated_at`,
+> `deviceId` then `id` breaking a tie.
+
+`resolveActiveRegime` in `domain/sync_merge.dart` is that sentence, and
+`PullService._reconcileActiveRegime` applies it to every regime at once at the
+end of each `regimes` batch — inside the batch's own transaction, so no commit
+is ever visible with two active or, on a phone that has one, with none.
+
+A pure function of rows both phones agree on gives the same answer on both
+phones however the rows got there. That is the property the pairwise rule never
+had, and the only reason the flag can still go unstamped: it no longer has to
+travel.
+
+**Null is not zero.** A regime nobody has ever activated is not a candidate, so
+deleting the only one that ever was leaves none active rather than promoting a
+programme the user never chose. `deleteRegime` picks the successor itself and
+stamps it, which is what the other phone reads.
+
 ### The one row the server's clock cannot decide
 
 **A local row that is `dirty` has never been pushed, so it has no
@@ -351,7 +390,7 @@ state without negotiating.
 | `sessions_position_live` | both reorder the training days | as above |
 | `sessions_name_live` | both rename a day to the same thing | Both live. Loser keeps its name with a disambiguating suffix; the user renames it |
 | `workouts_single_open` | both have a session in progress | Newer stays open. Older is **completed**, never discarded — its sets are real work |
-| `regimes_single_active` | A activates PPL, B activates Upper/Lower | The *flag* is the conflict, not the row. LWW on activation; the losing regime survives, just not active |
+| `regimes_single_active` | A activates PPL, B activates Upper/Lower | The *flag* is not merged at all — see [§ 8](#the-one-column-last-write-wins-cannot-decide). Both regimes survive; each phone derives which is active from `activated_at` |
 | `bodyweight_day_live` | both log today's weight | Genuinely the same measurement. LWW, tombstone the loser |
 | `cycles_regime_index_live` | both advance the cycle → two "cycle 7" | Both are real cycles. Loser renumbers to the next free index |
 | `regimes_identity_live` | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. **A shelf with no free slot cannot wrap** — see below |
@@ -528,7 +567,7 @@ fails a build rather than a history.
 | 2 | Two devices edit the **same** row | Row LWW on `server_updated_at`, tie on `deviceId`. [§ 8](#8-conflict--two-versions-of-one-row) |
 | 3 | Two rows claim one slot | [§ 9](#9-collision--two-rows-one-slot). Nothing deleted. |
 | 4 | Both start a session | Newer stays open, older completed with its sets intact. |
-| 5 | Both activate a different regime | LWW on the flag. Both regimes survive. |
+| 5 | Both activate a different regime | Both regimes survive. The flag is derived from `activated_at`, not merged. |
 | 6 | Both log today's bodyweight | Same measurement. LWW, loser tombstoned. |
 | 7 | Both append a set, exercise or day | Both survive; loser takes the next free position. |
 | 8 | A deletes a workout, B adds a set to it | The set arrives under a tombstoned parent, and `healOrphanedSnapshots` tombstones it at the end of every pull. It had to grow a second half for this: a delete takes the whole tree, so the set's *snapshot* is already tombstoned and the original pass — which looks for live snapshots under dead workouts — could not see it. |

@@ -254,6 +254,12 @@ class PullService {
         if (landed.contains(entry.key)) continue;
         await _unpark(spec, entry.key, entry.value);
       }
+
+      // Inside the batch's own transaction, so a commit never leaves the phone
+      // with no active regime — Today would draw the first-launch screen at
+      // someone holding three programmes — and never with two, which the unique
+      // index would refuse on the next write rather than here.
+      if (spec.name == 'regimes') await _reconcileActiveRegime();
     });
 
     return (
@@ -808,55 +814,69 @@ class PullService {
     return positioned;
   }
 
-  /// The flag is the conflict, not the row — and the hue is a slot like any
-  /// other, except that there are only six and they can genuinely run out.
+  /// Sets the active flag on the one regime that should carry it.
+  ///
+  /// [resolveActiveRegime] is the rule and the reason: a pure function of rows
+  /// both phones agree on, so both reach the same answer whatever order the
+  /// rows arrived in.
+  ///
+  /// **Nothing here is stamped.** The flag is derived, and minting a version
+  /// for it would make a merge's own bookkeeping outrank a real edit — a
+  /// programme one phone had deleted came back that way once, because a
+  /// deactivation written a millisecond later beat the delete. It is safe to
+  /// leave unstamped now precisely because it no longer has to travel: both
+  /// phones recompute it from `activated_at`, which does.
+  ///
+  /// Deactivate first, then activate. `idx_regimes_single_active` is checked
+  /// per statement, so the other order refuses its own second write.
+  Future<void> _reconcileActiveRegime() async {
+    final live = await _db
+        .customSelect(
+          'SELECT id, activated_at, device_id FROM regimes '
+          'WHERE deleted_at IS NULL',
+        )
+        .get();
+
+    final winner = resolveActiveRegime([
+      for (final r in live)
+        (
+          id: r.read<String>('id'),
+          activatedAt: r.read<int?>('activated_at'),
+          deviceId: r.read<String>('device_id'),
+        ),
+    ]);
+
+    await _db.customStatement(
+      'UPDATE regimes SET is_active = 0 '
+      'WHERE is_active = 1 AND deleted_at IS NULL AND id IS NOT ?',
+      [winner],
+    );
+    if (winner == null) return;
+    await _db.customStatement(
+      'UPDATE regimes SET is_active = 1 WHERE id = ? AND is_active = 0',
+      [winner],
+    );
+  }
+
+  /// The flag is decided for every regime at once, not here — and the hue is a
+  /// slot like any other, except that there are only six and they can genuinely
+  /// run out.
   Future<Map<String, dynamic>> _resolveRegime(Map<String, dynamic> row) async {
     var resolved = row;
     final id = row['id'] as String;
 
-    if (resolved['isActive'] == true) {
-      final active = await _db
-          .customSelect(
-            'SELECT id, updated_at, device_id FROM regimes '
-            'WHERE is_active = 1 AND deleted_at IS NULL AND id != ?',
-            variables: [Variable<String>(id)],
-          )
-          .get();
-      if (active.isNotEmpty) {
-        final other = active.first;
-        final remoteWins = remoteKeepsActive(
-          // Two *different* rows contesting one flag, so the discriminator of
-          // last resort is the id: already unique, and the same on both phones.
-          local: (
-            updatedAt: other.read<int>('updated_at'),
-            deviceId: other.read<String>('device_id'),
-            fingerprint: other.read<String>('id'),
-          ),
-          remote: (
-            updatedAt: resolved['updatedAt'] as int,
-            deviceId: resolved['deviceId'] as String,
-            fingerprint: resolved['id'] as String,
-          ),
-        );
-        // **Neither side of this mints a new version, and that is the whole
-        // point.** Which regime is active is *derived*: both phones compute it
-        // from the same two stamps and reach the same answer without being
-        // told. Stamping it would make a merge's own bookkeeping outrank a real
-        // edit — the two-device fuzz found precisely that, as a programme one
-        // phone had deleted and the other silently brought back, because the
-        // deactivation that a merge wrote a millisecond later won the
-        // last-write-wins against the delete.
-        if (remoteWins) {
-          // Both programmes survive; one of them is simply not the one being
-          // trained.
-          await _write(_byName['regimes']!, other.read<String>('id'), {
-            'is_active': 0,
-          });
-        } else {
-          resolved = {...resolved, 'isActive': false};
-        }
-      }
-    }
+    // **The flag is never taken from the wire.** Which regime is active is a
+    // singleton across the account, so it is decided for all of them at once by
+    // [_reconcileActiveRegime] once the batch has landed — not row by row on
+    // the way in, which is what made two phones reach opposite answers and stay
+    // there. `activatedAt` rides along untouched, and it is the whole of what
+    // the decision reads.
+    //
+    // Landing every row inactive is also what keeps `idx_regimes_single_active`
+    // satisfied at every intermediate statement: a row arriving active while a
+    // local row still holds the flag is refused, and the reconcile that would
+    // have made room has not run yet.
+    resolved = {...resolved, 'isActive': false};
 
     // Every live regime, this row's own copy included: the slot it is standing
     // on right now is not free either, until the row itself has been written.

@@ -285,6 +285,60 @@ void main() {
       expect(await devices.rowsOf(b), await devices.rowsOf(a));
     });
 
+    test('one phone activates while the other deletes: the flag still settles',
+        () async {
+      // **The active flag is one answer spread across every row.** Activating a
+      // regime deactivates another, which is two rows moving for one decision,
+      // and last-write-wins is defined on one row at a time. Resolving it
+      // pairwise — each arriving row against whatever was active locally when
+      // it landed — made the answer depend on arrival order, and two phones
+      // pulling in different orders settled on opposite regimes. Nothing then
+      // corrected them: the losing side's deactivation minted no version on
+      // purpose, so both phones held one version of the row and two values of
+      // the flag, and each looked up to date to the other forever.
+      //
+      // `sync_fuzz_test` seeds 41, 146, 335 and 531, all shrinking to this
+      // shape: an activation on one phone against a delete on the other, which
+      // promotes a successor and perturbs the order just enough.
+      await bothInStep();
+
+      await devices.as('device-a', () async {
+        await createRegimeFromTemplate(
+          a,
+          regimeTemplates.firstWhere((t) => t.key == 'blank'),
+          name: 'A side',
+          activate: false,
+        );
+      });
+      await devices.converge();
+
+      final spare = await (a.select(a.regimes)
+            ..where((t) => t.name.equals('A side')))
+          .getSingle();
+      await devices.as('device-a', () => RegimeRepository(a).setActiveRegime(spare.id));
+
+      final onB = await (b.select(b.regimes)
+            ..where((t) => t.deletedAt.isNull() & t.isActive.equals(true))
+            ..limit(1))
+          .getSingle();
+      await devices.as('device-b', () => RegimeRepository(b).deleteRegime(onB.id));
+
+      await devices.converge();
+
+      // Convergence is the assertion — `rowsOf` compares every column of every
+      // row, so a flag that disagrees fails here whatever else is true.
+      expect(await devices.rowsOf(b), await devices.rowsOf(a));
+
+      for (final db in [a, b]) {
+        final live =
+            await (db.select(db.regimes)..where((t) => t.deletedAt.isNull()))
+                .get();
+        expect(live.where((r) => r.isActive).length, 1,
+            reason: 'exactly one live regime is being trained');
+        expect(await invariantViolations(db), isEmpty);
+      }
+    });
+
     test('§ 12 row 6 — both log today\'s bodyweight: LWW, loser tombstoned',
         () async {
       await bothInStep();

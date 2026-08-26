@@ -144,6 +144,16 @@ const _rules = <String, String>{
       AND (SELECT COUNT(*) FROM regimes
            WHERE is_active = 1 AND deleted_at IS NULL) > 1
   ''',
+  // **The flag is derived from the stamp, so the stamp has to be there.**
+  // `is_active` is local and recomputed; `activated_at` is what the other phone
+  // reads and what both derive the flag from. An active regime with no stamp is
+  // a regime the other phone has no candidate for, so it shows no active
+  // programme at all — which is how a second writer of `is_active` (the
+  // template path, which set the flag and not the fact) got caught.
+  'an active regime carries no activation stamp': '''
+    SELECT id AS detail FROM regimes
+    WHERE is_active = 1 AND deleted_at IS NULL AND activated_at IS NULL
+  ''',
   'two live regimes wear one identity': '''
     SELECT CAST(identity_index AS TEXT) AS detail FROM regimes
     WHERE deleted_at IS NULL

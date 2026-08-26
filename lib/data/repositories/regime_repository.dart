@@ -115,6 +115,10 @@ class RegimeRepository {
               name: name,
               isActive: Value(activate),
               identityIndex: Value(slot),
+              // The flag is local; this is what the other phone reads. A regime
+              // created inactive has never been activated, so it stays null and
+              // is not a candidate — see [resolveActiveRegime].
+              activatedAt: Value(activate ? nowMs() : null),
             ),
           );
     });
@@ -187,11 +191,16 @@ class RegimeRepository {
   Future<void> setActiveRegime(String regimeId) async {
     await db.transaction(() async {
       await _deactivateAll();
+      final stamp = nowMs();
       await (db.update(db.regimes)..where((t) => t.id.equals(regimeId))).write(
         RegimesCompanion(
           isActive: const Value(true),
+          // The activation, as a fact about this row rather than as the absence
+          // of one on every other row. It is what the other phone merges and
+          // what both phones then derive the flag from.
+          activatedAt: Value(stamp),
           deviceId: Value(currentDeviceId),
-          updatedAt: Value(nowMs()),
+          updatedAt: Value(stamp),
           dirty: const Value(true),
         ),
       );
@@ -250,12 +259,18 @@ class RegimeRepository {
           .getSingleOrNull();
       if (fallback == null) return;
 
+      final promoted = nowMs();
       await (db.update(db.regimes)..where((t) => t.id.equals(fallback.id)))
           .write(
         RegimesCompanion(
           isActive: const Value(true),
+          // Deliberate, so it is stamped: the successor is this phone's choice,
+          // not something the other one can be left to infer. Without it the
+          // other phone sees only a tombstone, finds no candidate and shows no
+          // active programme at all.
+          activatedAt: Value(promoted),
           deviceId: Value(currentDeviceId),
-          updatedAt: Value(nowMs()),
+          updatedAt: Value(promoted),
           dirty: const Value(true),
         ),
       );

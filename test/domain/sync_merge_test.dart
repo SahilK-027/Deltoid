@@ -162,15 +162,51 @@ void main() {
     });
   });
 
-  test('the active flag is last write wins, and the loser survives', () {
-    expect(
-      remoteKeepsActive(local: stamp(1000), remote: stamp(2000)),
-      isTrue,
-    );
-    expect(
-      remoteKeepsActive(local: stamp(2000), remote: stamp(1000)),
-      isFalse,
-    );
+  group('the active regime', () {
+    ({String id, int? activatedAt, String deviceId}) r(
+      String id,
+      int? at, [
+      String device = 'device-a',
+    ]) =>
+        (id: id, activatedAt: at, deviceId: device);
+
+    test('is the live regime activated most recently', () {
+      expect(
+        resolveActiveRegime([r('aaa', 1000), r('bbb', 2000), r('ccc', 1500)]),
+        'bbb',
+      );
+    });
+
+    test('does not depend on the order the rows arrive in', () {
+      final rows = [r('aaa', 1000), r('bbb', 2000), r('ccc', 1500)];
+      // The whole property the pairwise rule did not have: two phones pulling
+      // the same rows in different orders have to reach the same answer, or
+      // they disagree permanently.
+      expect(
+        resolveActiveRegime(rows.reversed),
+        resolveActiveRegime(rows),
+      );
+    });
+
+    test('a regime nobody activated is not a candidate', () {
+      expect(resolveActiveRegime([r('aaa', null), r('bbb', null)]), isNull,
+          reason: 'deleting the only regime ever activated leaves none active '
+              'rather than promoting one the user never chose');
+      expect(resolveActiveRegime([r('aaa', null), r('bbb', 1)]), 'bbb');
+      expect(resolveActiveRegime([]), isNull);
+    });
+
+    test('two activations in one millisecond settle on the device, then the id',
+        () {
+      expect(
+        resolveActiveRegime([r('aaa', 1000, 'device-b'), r('bbb', 1000, 'device-a')]),
+        'aaa',
+      );
+      expect(
+        resolveActiveRegime([r('aaa', 1000, 'device-a'), r('bbb', 1000, 'device-a')]),
+        'bbb',
+      );
+    });
   });
 
   group('identity slots', () {

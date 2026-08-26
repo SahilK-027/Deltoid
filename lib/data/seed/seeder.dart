@@ -83,6 +83,12 @@ Future<String> createRegimeFromTemplate(
             name: proposed,
             isActive: Value(activate),
             identityIndex: Value(slot),
+            // The flag is local and derived; this is the fact both phones read
+            // it from. A template is a regime like any other, and the second
+            // writer of `is_active` is exactly where this was forgotten once —
+            // the other phone found no candidate and showed no active
+            // programme at all.
+            activatedAt: Value(activate ? nowMs() : null),
           ),
         );
 

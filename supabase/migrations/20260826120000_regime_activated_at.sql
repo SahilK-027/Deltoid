@@ -1,0 +1,21 @@
+-- When a regime was last made the active one.
+--
+-- `is_active` is one answer spread across every row — activating a regime
+-- deactivates another — so it is the one column a row-by-row merge cannot
+-- decide. Two phones resolving it pairwise, each arriving row against whatever
+-- was active locally at that moment, reached opposite answers and stayed there:
+-- the losing side's deactivation minted no new version, so both copies carried
+-- one version and two values and neither could ever overwrite the other.
+--
+-- `activated_at` is a fact about its own row, so it merges like every other
+-- column, and both phones derive the flag from it and agree. See
+-- `resolveActiveRegime` in `lib/domain/sync_merge.dart`.
+--
+-- Nullable: null means never activated, which is not the same as activated at
+-- the epoch, and a regime nobody ever chose must not become the active one.
+--
+-- A separate rung rather than an edit to `20260816095036_sync_tables.sql`,
+-- which has already been applied — `create table if not exists` would skip the
+-- new column on the project that is live.
+alter table public.regimes
+  add column if not exists activated_at bigint;

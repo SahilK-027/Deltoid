@@ -174,6 +174,28 @@ class Regimes extends Table with SyncColumns {
   /// one hands the slot back.
   IntColumn get identityIndex => integer().withDefault(const Constant(0))();
 
+  /// When this regime was last made the active one, or null if it never was.
+  ///
+  /// **`is_active` is the answer; this is the fact.** The flag is a singleton
+  /// across the whole account — activating one regime deactivates another — so
+  /// it is the one column that cannot be merged row by row. Two phones that
+  /// each activated something derived the flag pairwise, against whatever
+  /// happened to be active locally when the row arrived, and could reach
+  /// opposite answers; because the derived deactivation deliberately minted no
+  /// new version, both copies then looked up to date to the other side and the
+  /// disagreement was permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
+  ///
+  /// A stamp is a fact about *this row*, so it merges like any other column and
+  /// is never rewritten by the merge. Both phones then compute the same winner
+  /// — the live regime holding the highest one — from data they agree on, which
+  /// is what makes the flag converge without anything having to be stamped on
+  /// its behalf. See `resolveActiveRegime` in `domain/sync_merge.dart`.
+  ///
+  /// Nullable, and null is not zero: it means *never activated*, and a regime
+  /// nobody has ever activated must not become active just because everything
+  /// else was deleted.
+  IntColumn get activatedAt => integer().nullable()();
+
   IntColumn get createdAt => integer().clientDefault(nowMs)();
 
   /// The deload figures are the ones worth constraining hardest, because they

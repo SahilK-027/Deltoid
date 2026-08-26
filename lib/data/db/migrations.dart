@@ -26,6 +26,30 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // `tables.dart` so a fresh install gets them from `createAll`, and created
   // here for a database that already exists.
   if (from < 2) await createIndexesIfMissing(db, (name) => name.endsWith('_dirty'));
+
+  // 2 → 3 · When a regime was made active, so two phones can agree which is.
+  //
+  // The flag itself could not be merged — it is one answer spread across every
+  // row, and resolving it row by row let two phones settle on opposite ones
+  // permanently. `regimes.activated_at` is the fact the flag is derived from;
+  // see [Regimes.activatedAt] and `resolveActiveRegime`.
+  //
+  // **Backfilled onto the regime that is active right now**, because the app
+  // already knows the answer and the honest default is only honest for a row
+  // nobody has been asked about. Leaving every row null on an existing phone
+  // would give the derivation no candidate at all, and the first sync would
+  // deactivate the programme the user is in the middle of training.
+  //
+  // `updated_at` rather than the clock: the row was last written when it was
+  // activated or edited, which is nearer the truth than "now", and it keeps the
+  // step giving the same answer whenever it happens to run.
+  if (from < 3) {
+    await addColumnIfMissing(db, m, db.regimes, db.regimes.activatedAt);
+    await db.customStatement(
+      'UPDATE regimes SET activated_at = updated_at '
+      'WHERE is_active = 1 AND deleted_at IS NULL AND activated_at IS NULL',
+    );
+  }
 }
 
 /// `CREATE INDEX IF NOT EXISTS` for every generated index whose name [where]

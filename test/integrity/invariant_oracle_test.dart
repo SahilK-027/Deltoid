@@ -383,6 +383,17 @@ void main() {
       expect(await broken(), contains('two regimes are active at once'));
     });
 
+    test('an active regime carries no activation stamp', () async {
+      final live = await activeRegime();
+      await db.customStatement(
+        'UPDATE regimes SET activated_at = NULL WHERE id = ?',
+        [live.id],
+      );
+
+      expect(await broken(),
+          contains('an active regime carries no activation stamp'));
+    });
+
     test('two live regimes wear one identity', () async {
       await db.customStatement('DROP INDEX idx_regimes_identity_live');
       final live = await activeRegime();
@@ -542,6 +553,7 @@ void main() {
         'a regime holds two open cycles',
         'two workouts are in progress at once',
         'two regimes are active at once',
+        'an active regime carries no activation stamp',
         'two live regimes wear one identity',
         'two live cycles share an index',
         'a day carries two bodyweights',
