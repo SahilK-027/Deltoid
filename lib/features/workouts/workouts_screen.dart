@@ -492,6 +492,9 @@ class WorkoutsScreen extends ConsumerWidget {
         (_, _, final r?, true) => _NoSessionsState(
           regime: r,
           last: today!.lastCompleted,
+          heatmap: today.heatmap,
+          hasHistory: today.hasHistory,
+          volume: volume!,
         ),
         // The masthead and the one action are a single band, and the record
         // scrolls under it. See [_WorkoutsHeader] for why the hero is not a card:
@@ -838,28 +841,83 @@ class _NoRegimeState extends ConsumerWidget {
 /// "start from scratch". Starting a workout is impossible until this is fixed,
 /// so the fix is the only thing offered.
 class _NoSessionsState extends ConsumerWidget {
-  const _NoSessionsState({required this.regime, required this.last});
+  const _NoSessionsState({
+    required this.regime,
+    required this.last,
+    required this.heatmap,
+    required this.hasHistory,
+    required this.volume,
+  });
 
   final Regime regime;
   final ({Workout workout, String? sessionName})? last;
+  final HeatmapData heatmap;
+  final bool hasHistory;
+  final WeeklyVolume volume;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // **The same page it will be once the regime has days in it**, which is the
+    // rule the sibling state above already follows and this one used to break:
+    // a lone centred card, with Consistency, This week and Last session gone.
+    // Those sections are not about the regime — a heatmap and a week's volume
+    // are read off logged work, and a regime with no sessions yet says nothing
+    // about whether there is any. Dropping them made adding the first session
+    // look like it built three cards, when all it did was fill one.
+    //
+    // Titled `Your split` rather than `Today's session` to match
+    // [_NoRegimeState]: both are the same sentence at different depths — there
+    // is no split yet, and there is a split with no days in it — and the action
+    // in each builds the split rather than starting a workout.
     return Column(
       children: [
         // No backfill action: there is nothing to log a past session against.
         _WorkoutsHeader(last: last),
         Expanded(
-          child: EmptyState(
-            icon: Icons.playlist_add_rounded,
-            title: 'No sessions in ${regime.name}',
-            message:
-                'Add the training days that make up one cycle, then fill '
-                'each one with exercises in the Regimes tab.',
-            action: PrimaryButton(
-              label: 'Add a session',
-              onPressed: () => addSessionPrompt(context, ref, regime.id),
-            ),
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: Space.huge),
+            children: [
+              _SurfaceBlock(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader('Your split'),
+                    Text(
+                      'No sessions in ${regime.name} yet. Add the training '
+                      'days that make up one cycle, then fill each one with '
+                      'exercises in the Regimes tab.',
+                      style: context.t.bodyMedium,
+                    ),
+                    const SizedBox(height: Space.lg),
+                    PrimaryButton(
+                      label: 'Add a session',
+                      onPressed: () => addSessionPrompt(context, ref, regime.id),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.gutter,
+                  Space.section,
+                  Space.gutter,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AccountRecoveryNote(hasHistory: hasHistory),
+                    _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
+                    const SizedBox(height: Space.section),
+                    _VolumeCard(volume: volume),
+                    if (last != null) ...[
+                      const SizedBox(height: Space.section),
+                      _LastSessionCard(last: last!),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ],

@@ -194,6 +194,32 @@ void main() {
     expect(find.byTooltip('Settings'), findsNothing);
   });
 
+  testWidgets('a regime with no sessions keeps the page it will have',
+      (tester) async {
+    // THEME: a thing with no data still has a page, and it is the page it will
+    // have once there is some. This state used to be a lone centred card —
+    // Consistency, Weekly volume and the masthead's count all gone — so adding
+    // the first session looked like it built three sections when all it did was
+    // fill one.
+    await createRegimeFromTemplate(
+      db,
+      regimeTemplates.firstWhere((t) => t.key == 'blank'),
+    );
+    await pumpWorkouts(tester);
+    final seen = await frames(tester);
+
+    expect(seen.last, contains('Add a session'));
+
+    // The sections are read off logged work, not off the regime, so a split
+    // with no days in it says nothing about whether they should be here.
+    expect(find.text('Consistency'), findsOneWidget);
+    expect(find.byType(ConsistencyHeatmap), findsOneWidget);
+    expect(find.text('Weekly volume'), findsOneWidget);
+
+    // Same masthead as every other state on this screen.
+    expect(find.text('Nothing logged'), findsOneWidget);
+  });
+
   group('this week', () {
     /// A finished session with every set of the first exercise ticked.
     Future<void> logSession(String regimeId) async {
