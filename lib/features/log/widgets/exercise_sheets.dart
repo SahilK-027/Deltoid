@@ -508,18 +508,33 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     // up it wanted 115% of the screen. This is the one sheet that opens with a
     // field focused, so it was the one where that always happened.
     //
-    // The `SafeArea` is here because this sheet builds its own column instead
-    // of using `AppSheet`, and so never inherited one: with the keyboard down,
-    // the last exercise in the list sat under the system navigation bar.
+    // **Reserved in one number, the way `AppSheet` does it**, because this
+    // sheet builds its own column and has to answer the same question itself.
+    //
+    // It used to reserve the keyboard in the padding and leave the gesture bar
+    // to an inner `SafeArea`. Split like that, neither half is reliable: the
+    // height was computed against `viewInsets` alone, so the box asked for more
+    // room than there was above the bar, and the `SafeArea` could only inset
+    // content *within* a box already too tall — on a phone reporting no
+    // `viewPadding` to the sheet's own `MediaQuery` it inset nothing, and the
+    // list ran under the navigation bar.
+    //
+    // `viewInsets.bottom + padding.bottom` is the right sum for the reason
+    // `AppSheet` gives: the two never overlap, because `padding` is what the
+    // system chrome covers that the keyboard does not, so with the keyboard up
+    // the gesture bar is already excluded from it.
     final media = MediaQuery.of(context);
-    final available =
-        media.size.height - media.viewInsets.bottom - media.padding.top;
+    final reserved = media.viewInsets.bottom + media.padding.bottom;
+    final available = media.size.height - reserved - media.padding.top;
     return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: reserved),
       child: SizedBox(
         height: math.min(media.size.height * 0.8, available),
         child: SafeArea(
           top: false,
+          // Sides only. The bottom is reserved above, and letting `SafeArea`
+          // add it again double-pads the sheet.
+          bottom: false,
           child: Column(
             children: [
               const SheetHeader(title: 'Exercises'),
