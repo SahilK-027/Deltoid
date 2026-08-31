@@ -276,10 +276,19 @@ ThemeData buildTheme(Brightness brightness) {
       thumbColor: c.accent,
       overlayColor: c.accent.withValues(alpha: 0.10),
     ),
+    // **A circular spinner has no track, and that is the point of it.**
+    // Material 3 paints `circularTrackColor` as a full ring behind the sweeping
+    // arc. On a bar that track is the shape of the job — `surfaceHighest` is
+    // the *empty bar* track, and an empty row should still be a row. On a
+    // spinner there is no job to outline: the ring is the same circle whatever
+    // is happening, so the only part that moves is a 2px arc inside it, and at
+    // `RowSpinner`'s 16px the whole thing reads as a static circle. THEME says
+    // busy must not look disabled, and `RowSpinner` says only a moving thing
+    // tells the user it is still happening — a permanent ring is what those two
+    // rules are both against.
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: c.accent,
       linearTrackColor: c.surfaceHighest,
-      circularTrackColor: c.surfaceHighest,
       linearMinHeight: 3,
     ),
     tabBarTheme: TabBarThemeData(
