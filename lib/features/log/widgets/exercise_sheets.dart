@@ -525,12 +525,27 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     // the gesture bar is already excluded from it.
     final media = MediaQuery.of(context);
     final reserved = media.viewInsets.bottom + media.padding.bottom;
-    final available = media.size.height - reserved - media.padding.top;
+
+    // **`viewPadding`, not `padding`, for the status bar.** A modal route has
+    // already consumed the top inset, so `padding.top` inside this sheet is
+    // *zero* — and a height computed from that reserves nothing at the top. The
+    // sheet then takes every pixel the keyboard is not using, its own top lands
+    // at y = 0, and `Exercises` is drawn across the clock and the battery.
+    // `viewPadding` is the inset the system actually has, consumed or not,
+    // which is the number this needs.
+    //
+    // The emulator hid it: on a shorter keyboard, `0.8 * height` was the
+    // binding constraint and the sheet never grew far enough to reach the top.
+    // It only appears where the keyboard is tall enough that `available` wins.
+    final topInset = math.max(media.padding.top, media.viewPadding.top);
+    final available = media.size.height - reserved - topInset;
     return Padding(
       padding: EdgeInsets.only(bottom: reserved),
       child: SizedBox(
         height: math.min(media.size.height * 0.8, available),
         child: SafeArea(
+          // Sides only: the top is held by the height above and the bottom by
+          // `reserved`. Letting `SafeArea` add either again double-pads it.
           top: false,
           // Sides only. The bottom is reserved above, and letting `SafeArea`
           // add it again double-pads the sheet.
