@@ -719,6 +719,9 @@ Future<void> logBodyweightPrompt(
   final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
   final result = await showModalBottomSheet<_BodyweightResult>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     showDragHandle: false,

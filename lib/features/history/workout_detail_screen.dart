@@ -169,6 +169,9 @@ class WorkoutDetailScreen extends ConsumerWidget {
   ) async {
     final hasNote = detail.workout.notes?.isNotEmpty == true;
     final action = await showModalBottomSheet<String>(
+      // The route holds the system bars: a sheet that sizes itself can
+      // otherwise run under the status bar. See [pickExercise].
+      useSafeArea: true,
       context: context,
       isScrollControlled: true,
       // `AppSheet` draws its own grab handle, tighter than the framework's.

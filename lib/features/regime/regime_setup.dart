@@ -37,6 +37,9 @@ Future<String?> createRegimeFlow(
   if (!context.mounted) return null;
 
   final template = await showModalBottomSheet<RegimeTemplate>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `SheetHeader` draws its own grab handle, tighter than the framework's.

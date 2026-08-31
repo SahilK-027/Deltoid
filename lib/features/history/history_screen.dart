@@ -416,6 +416,9 @@ class _FeedFilterBar extends ConsumerWidget {
     HistoryFilter filter,
   ) async {
     final chosen = await showModalBottomSheet<String>(
+      // The route holds the system bars: a sheet that sizes itself can
+      // otherwise run under the status bar. See [pickExercise].
+      useSafeArea: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: false,

@@ -20,6 +20,9 @@ Future<AdoptionChoice?> showAdoptionSheet(
   AdoptionSurvey survey,
 ) {
   return showModalBottomSheet<AdoptionChoice>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // Two histories and one of them is about to go. Not something to lose by

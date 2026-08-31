@@ -23,6 +23,9 @@ Future<void> showRegimeSettings(
   Regime regime,
 ) {
   return showModalBottomSheet<void>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
@@ -113,6 +116,9 @@ Future<void> showDeloadSettings(
   String regimeId,
 ) {
   return showModalBottomSheet<void>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     showDragHandle: false,

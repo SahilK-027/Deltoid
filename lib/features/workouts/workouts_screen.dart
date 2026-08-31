@@ -151,6 +151,9 @@ Future<void> _trainAnotherSession(
   required CycleStatus status,
 }) async {
   final chosen = await showModalBottomSheet<Session>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -210,6 +213,9 @@ Future<void> _logPastSession(
   }
 
   final picked = await showModalBottomSheet<_BackfillResult>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -353,6 +359,9 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   Future<bool?> _confirmTrainedDay(DateTime day, HeatDay logged) {
     final count = logged.workouts;
     return showModalBottomSheet<bool>(
+      // The route holds the system bars: a sheet that sizes itself can
+      // otherwise run under the status bar. See [pickExercise].
+      useSafeArea: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: false,

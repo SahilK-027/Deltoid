@@ -356,6 +356,9 @@ class TrendRangeBar extends StatelessWidget {
 
   Future<void> _pickGranularity(BuildContext context) async {
     final picked = await showModalBottomSheet<Object>(
+      // The route holds the system bars: a sheet that sizes itself can
+      // otherwise run under the status bar. See [pickExercise].
+      useSafeArea: true,
       context: context,
       showDragHandle: false,
       builder: (sheet) => AppSheet(

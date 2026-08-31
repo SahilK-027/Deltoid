@@ -49,6 +49,9 @@ Future<void> showExerciseInfo(
   final bar = exercise.barKind;
 
   await showModalBottomSheet<void>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -165,6 +168,9 @@ Future<void> showExerciseMenu(
   final repo = ref.read(trainingRepositoryProvider);
 
   await showModalBottomSheet<void>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -342,6 +348,9 @@ Future<void> showSetActions(
   final repo = ref.read(trainingRepositoryProvider);
 
   await showModalBottomSheet<void>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -423,6 +432,9 @@ Future<SkipReason?> _pickSkipReason(BuildContext context) {
   final reasons =
       SkipReason.values.where((r) => r != SkipReason.none).toList();
   return showModalBottomSheet<SkipReason>(
+    // The route holds the system bars: a sheet that sizes itself can
+    // otherwise run under the status bar. See [pickExercise].
+    useSafeArea: true,
     context: context,
     isScrollControlled: true,
     // `AppSheet` draws its own grab handle, tighter than the framework's.
@@ -464,6 +476,18 @@ Future<Exercise?> pickExercise(
   return showModalBottomSheet<Exercise>(
     context: context,
     isScrollControlled: true,
+    // **The route holds the system bars, not the sheet.** `useSafeArea`
+    // defaults to false, and with `isScrollControlled` that lets the sheet take
+    // the whole screen — the status bar included, which is where `Exercises`
+    // ended up drawn across the clock and the battery.
+    //
+    // It could not be fixed inside the sheet, and that was three attempts
+    // finding out. A modal route reports **both** `padding` and `viewPadding`
+    // as zero to its own child — measured on a phone, not assumed:
+    // `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` with the keyboard up. So
+    // every arithmetic version of this was reading `max(0, 0)` and reserving
+    // nothing. The inset is the route's to know.
+    useSafeArea: true,
     showDragHandle: false,
     builder: (_) => _ExercisePicker(alreadyIn: alreadyIn),
   );
@@ -526,19 +550,11 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     final media = MediaQuery.of(context);
     final reserved = media.viewInsets.bottom + media.padding.bottom;
 
-    // **`viewPadding`, not `padding`, for the status bar.** A modal route has
-    // already consumed the top inset, so `padding.top` inside this sheet is
-    // *zero* — and a height computed from that reserves nothing at the top. The
-    // sheet then takes every pixel the keyboard is not using, its own top lands
-    // at y = 0, and `Exercises` is drawn across the clock and the battery.
-    // `viewPadding` is the inset the system actually has, consumed or not,
-    // which is the number this needs.
-    //
-    // The emulator hid it: on a shorter keyboard, `0.8 * height` was the
-    // binding constraint and the sheet never grew far enough to reach the top.
-    // It only appears where the keyboard is tall enough that `available` wins.
-    final topInset = math.max(media.padding.top, media.viewPadding.top);
-    final available = media.size.height - reserved - topInset;
+    // No top term. Both `padding.top` and `viewPadding.top` read zero inside a
+    // modal route, so there is nothing here to subtract — `useSafeArea` on the
+    // route is what keeps this sheet off the status bar, and it is the only
+    // thing that can.
+    final available = media.size.height - reserved;
     return Padding(
       padding: EdgeInsets.only(bottom: reserved),
       child: SizedBox(

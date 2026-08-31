@@ -157,6 +157,9 @@ class SettingsScreen extends ConsumerWidget {
     final box = context.findRenderObject() as RenderBox?;
 
     final destination = await showModalBottomSheet<_ExportTo>(
+      // The route holds the system bars: a sheet that sizes itself can
+      // otherwise run under the status bar. See [pickExercise].
+      useSafeArea: true,
       context: context,
       isScrollControlled: true,
       // `SheetHeader` draws its own grab handle, tighter than the framework's.
