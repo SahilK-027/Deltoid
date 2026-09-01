@@ -4,6 +4,7 @@
 #
 #   tool/posters/build.sh                 # every poster in posters.json
 #   tool/posters/build.sh 01-log.png      # only entries whose `out` matches
+#   tool/posters/build.sh --wide          # the 1920x1080 landscape poster
 #
 # Screenshots live in tool/posters/shots/, under the names posters.json
 # expects. Capture them from a device or emulator with:
@@ -29,6 +30,23 @@ fi
 
 mkdir -p "$out_dir"
 filter="${1:-}"
+
+# The landscape poster is one fixed layout rather than an entry in posters.json,
+# so it renders on its own and returns.
+if [[ "$filter" == "--wide" ]]; then
+  "$chrome" \
+    --headless \
+    --disable-gpu \
+    --hide-scrollbars \
+    --allow-file-access-from-files \
+    --force-device-scale-factor=1 \
+    --virtual-time-budget=4000 \
+    --window-size=1920,1080 \
+    --screenshot="$out_dir/wide.png" \
+    "file://$here/wide.html" > /dev/null 2>&1
+  echo "wrote build/posters/wide.png"
+  exit 0
+fi
 
 urlencode() {
   python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"

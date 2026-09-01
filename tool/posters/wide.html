@@ -1,0 +1,265 @@
+<!doctype html>
+<!--
+  The landscape poster: 1920x1080, for a README banner, a GitHub social
+  preview, or a link unfurl in a chat client.
+    - copy on the left, three phones fanned on the right.
+
+  Same design language as poster.html — the app's typeface, one accent colour,
+  a wash of it behind the devices — but laid out for a wide frame rather than a
+  store listing.
+
+  Rendered by tool/posters/build.sh --wide. Open it directly in a browser to
+  iterate on the design; unlike poster.html it takes no query parameters,
+  because there is only ever one of it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deltoid — landscape poster</title>
+    <style>
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-ExtraBold.ttf') format('truetype');
+        font-weight: 800;
+      }
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-SemiBold.ttf') format('truetype');
+        font-weight: 600;
+      }
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-Medium.ttf') format('truetype');
+        font-weight: 500;
+      }
+
+      :root {
+        --accent: #5b8cff;
+        --ink: #ffffff;
+        --muted: #8b8f96;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body { background: #08090b; }
+
+      .poster {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: 'Inter', sans-serif;
+        background:
+          radial-gradient(110% 80% at 6% 10%, #1b1e24 0%, #0d0f12 48%, #08090b 100%);
+      }
+
+      .glow {
+        position: absolute;
+        right: -8%;
+        top: -18%;
+        width: 1200px;
+        height: 1200px;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.12;
+        filter: blur(170px);
+      }
+
+      /* Copy -------------------------------------------------------------- */
+
+      .copy {
+        position: absolute;
+        left: 104px;
+        top: 190px;
+        width: 880px;
+        z-index: 2;
+      }
+
+      .wordmark {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-weight: 600;
+        font-size: 28px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--ink);
+        margin-bottom: 48px;
+      }
+
+      h1 {
+        font-weight: 800;
+        /* Sized so the longest line clears the devices: the fan starts at
+           x=920, and anything wider than this runs underneath the back
+           phone. */
+        font-size: 78px;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        color: var(--ink);
+      }
+
+      .rule {
+        width: 120px;
+        height: 7px;
+        border-radius: 4px;
+        background: var(--accent);
+        margin: 40px 0 34px;
+      }
+
+      .note {
+        font-weight: 500;
+        font-size: 30px;
+        line-height: 1.5;
+        color: var(--muted);
+        max-width: 700px;
+      }
+
+      /* The three claims that fit on one line each. */
+      .points {
+        display: flex;
+        gap: 44px;
+        margin-top: 54px;
+        font-weight: 600;
+        font-size: 25px;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .points span { display: flex; align-items: center; gap: 12px; }
+      .points i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: block;
+      }
+
+      /* Devices ----------------------------------------------------------- */
+
+      /* Three phones fanned from behind the leftmost, so the near one reads
+         first and the others say "there is more here" without competing. */
+      .stage {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 1000px;
+        height: 1080px;
+        z-index: 1;
+      }
+
+      .phone {
+        position: absolute;
+        border-radius: 58px;
+        padding: 11px;
+        background: linear-gradient(155deg, #7c8085 0%, #303338 34%, #17181b 64%, #5e6165 100%);
+        box-shadow: 0 50px 110px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      .phone .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 48px;
+        overflow: hidden;
+        background: #0b0b0c;
+      }
+
+      .phone img {
+        display: block;
+        width: 100%;
+        object-fit: cover;
+        object-position: top center;
+      }
+
+      .notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 190px;
+        height: 24px;
+        background: #000;
+        border-radius: 0 0 16px 16px;
+      }
+
+      /* Back, middle, front. The back two are dimmed so the front one holds
+         the eye. */
+      .back {
+        left: 4px;
+        top: 210px;
+        width: 420px;
+        height: 830px;
+        transform: rotate(-9deg);
+        filter: brightness(0.62);
+      }
+
+      .middle {
+        left: 258px;
+        top: 150px;
+        width: 440px;
+        height: 880px;
+        transform: rotate(-5deg);
+        filter: brightness(0.8);
+      }
+
+      .front {
+        left: 512px;
+        top: 96px;
+        width: 470px;
+        height: 940px;
+        transform: rotate(-2deg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="poster">
+      <div class="glow"></div>
+
+      <div class="copy">
+        <div class="wordmark">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+            <path d="M12 4 L20 19 L4 19 Z" />
+          </svg>
+          Deltoid
+        </div>
+
+        <h1>Every session<br>has its own history</h1>
+
+        <div class="rule"></div>
+
+        <div class="note">
+          The same movement on two training days progresses at two different
+          rates. Deltoid tracks them separately, and charts every lift over
+          years, so you can see exactly where you stalled.
+        </div>
+
+        <div class="points">
+          <span><i></i>Free</span>
+          <span><i></i>Fully offline</span>
+          <span><i></i>No account</span>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="phone back">
+          <div class="screen">
+            <img src="shots/history.png" alt="">
+            <div class="notch"></div>
+          </div>
+        </div>
+        <div class="phone middle">
+          <div class="screen">
+            <img src="shots/trend.png" alt="">
+            <div class="notch"></div>
+          </div>
+        </div>
+        <div class="phone front">
+          <div class="screen">
+            <img src="shots/log.png" alt="">
+            <div class="notch"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
