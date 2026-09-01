@@ -1,0 +1,255 @@
+<!doctype html>
+<!--
+  One store poster: a kicker, a two-line headline, a supporting line, and the
+  phone holding a screenshot.
+
+  The layout is deliberately asymmetric — text anchored left, phone tilted and
+  bleeding off the right edge — so the set reads as one designed series rather
+  than as a screenshot with a caption above it.
+
+  Rendered by tool/posters/build.sh through headless Chrome, one PNG per entry
+  in posters.json. Everything is driven by the query string, so the file can be
+  opened directly in a browser while iterating on the design:
+
+    open "tool/posters/poster.html?title=Every+set,+in+its+own+lane&shot=shots/log.png"
+
+  Query parameters:
+    title     the headline. `|` forces a line break, otherwise the text wraps
+    kicker    the small tracked label above the headline
+    note      the supporting line under the headline
+    shot      path to the screenshot, relative to this file
+    accent    hex colour for the kicker, the rule, and the background glow
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deltoid poster</title>
+    <style>
+      /* The app's own typeface, so the poster and the screen inside it agree. */
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-ExtraBold.ttf') format('truetype');
+        font-weight: 800;
+      }
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-SemiBold.ttf') format('truetype');
+        font-weight: 600;
+      }
+      @font-face {
+        font-family: 'Inter';
+        src: url('../../assets/fonts/Inter-Medium.ttf') format('truetype');
+        font-weight: 500;
+      }
+
+      :root {
+        /* The size the Play Store asks for. */
+        --w: 1242px;
+        --h: 2208px;
+        --accent: #5b8cff;
+        --ink: #ffffff;
+        --muted: #8b8f96;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body { background: #08090b; }
+
+      .poster {
+        position: relative;
+        width: var(--w);
+        height: var(--h);
+        overflow: hidden;
+        font-family: 'Inter', sans-serif;
+        /* Not flat black: a low ramp from the top-left keeps the phone from
+           looking pasted onto a void. */
+        background:
+          radial-gradient(120% 70% at 8% 4%, #1b1e24 0%, #0d0f12 46%, #08090b 100%);
+      }
+
+      /* A wash of the accent behind the phone, which is the only place the
+         identity colour appears at any size. */
+      .glow {
+        position: absolute;
+        right: -22%;
+        top: 26%;
+        width: 1100px;
+        height: 1100px;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.13;
+        filter: blur(150px);
+      }
+
+      /* Text -------------------------------------------------------------- */
+
+      .copy {
+        position: absolute;
+        left: 96px;
+        top: 150px;
+        width: 940px;
+        z-index: 2;
+      }
+
+      .kicker {
+        font-weight: 600;
+        font-size: 30px;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 34px;
+      }
+
+      h1 {
+        font-weight: 800;
+        font-size: 112px;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        color: var(--ink);
+      }
+
+      /* Stepped down by the longest line, so every poster in the set keeps
+         its headline to two lines and the phone starts at the same height. */
+      h1.long { font-size: 94px; }
+      h1.xlong { font-size: 80px; }
+      h1.short { font-size: 130px; }
+
+      .rule {
+        width: 132px;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--accent);
+        margin: 44px 0 32px;
+      }
+
+      .note {
+        font-weight: 500;
+        font-size: 34px;
+        line-height: 1.45;
+        color: var(--muted);
+        max-width: 760px;
+      }
+
+      /* Phone ------------------------------------------------------------- */
+
+      .phone {
+        position: absolute;
+        /* Tilted and pushed off two edges. The screenshot is a specimen, not
+           the subject, and cropping it says so. */
+        left: 232px;
+        top: 880px;
+        width: 880px;
+        height: 1560px;
+        transform: rotate(-4.5deg);
+        border-radius: 84px;
+        padding: 15px;
+        background: linear-gradient(155deg, #7c8085 0%, #303338 34%, #17181b 64%, #5e6165 100%);
+        box-shadow:
+          0 60px 130px rgba(0, 0, 0, 0.75),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+        z-index: 1;
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 70px;
+        overflow: hidden;
+        background: #0b0b0c;
+      }
+
+      .screen img {
+        display: block;
+        width: 100%;
+        /* Top-anchored: a screen is interesting at the top, and the phone is
+           cropped at the bottom anyway. */
+        object-fit: cover;
+        object-position: top center;
+      }
+
+      .notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px;
+        height: 36px;
+        background: #000;
+        border-radius: 0 0 24px 24px;
+      }
+
+      /* Wordmark ---------------------------------------------------------- */
+
+      .brand {
+        position: absolute;
+        right: 96px;
+        top: 150px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-weight: 600;
+        font-size: 30px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.42);
+        z-index: 2;
+      }
+
+      .brand svg { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="poster" id="poster">
+      <div class="glow"></div>
+
+      <div class="copy">
+        <div class="kicker" id="kicker"></div>
+        <h1 id="title"></h1>
+        <div class="rule"></div>
+        <div class="note" id="note"></div>
+      </div>
+
+      <div class="phone">
+        <div class="screen">
+          <img id="shot" alt="" />
+          <div class="notch"></div>
+        </div>
+      </div>
+
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <path d="M12 4 L20 19 L4 19 Z" />
+        </svg>
+        Deltoid
+      </div>
+    </div>
+
+    <script>
+      const q = new URLSearchParams(location.search);
+      const poster = document.getElementById('poster');
+
+      if (q.get('accent')) poster.style.setProperty('--accent', q.get('accent'));
+
+      document.getElementById('kicker').textContent = q.get('kicker') || 'Deltoid';
+      document.getElementById('note').textContent = q.get('note') || '';
+
+      // `|` is an explicit line break; without one the browser wraps.
+      const title = q.get('title') || 'Every set, in its own lane';
+      const lines = title.split('|').map((l) => l.trim());
+      const h1 = document.getElementById('title');
+      h1.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
+
+      const longest = Math.max(...lines.map((l) => l.length));
+      if (longest > 19) h1.classList.add('xlong');
+      else if (longest > 14) h1.classList.add('long');
+      else if (longest <= 11) h1.classList.add('short');
+
+      const shot = document.getElementById('shot');
+      shot.src = q.get('shot') || 'shots/log.png';
+      shot.addEventListener('load', () => (document.body.dataset.ready = '1'));
+      shot.addEventListener('error', () => (document.body.dataset.ready = 'error'));
+    </script>
+  </body>
+</html>

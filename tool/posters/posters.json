@@ -1,0 +1,50 @@
+[
+  {
+    "out": "01-log.png",
+    "kicker": "Logging",
+    "title": "Last time,|already filled in",
+    "note": "Open a session and the fields are waiting: the weights and reps you hit on this day last time, one tap from being confirmed.",
+    "shot": "shots/log.png",
+    "accent": "#5b8cff"
+  },
+  {
+    "out": "02-sessions.png",
+    "kicker": "The one rule",
+    "title": "Two sessions,|two histories",
+    "note": "The same movement in Push 1 and Push 2 progresses at different rates. Every other tracker averages them into one number.",
+    "shot": "shots/trend.png",
+    "accent": "#4dd6c1"
+  },
+  {
+    "out": "03-history.png",
+    "kicker": "History",
+    "title": "Twenty years,|still one tap deep",
+    "note": "Every session you have ever logged, paged instantly and searchable by movement.",
+    "shot": "shots/history.png",
+    "accent": "#a78bfa"
+  },
+  {
+    "out": "04-workouts.png",
+    "kicker": "Today",
+    "title": "Know what|you are training",
+    "note": "The next session, the cycle you are in, and how far the deload still is — before you put the phone down.",
+    "shot": "shots/workouts.png",
+    "accent": "#ff7a4d"
+  },
+  {
+    "out": "05-volume.png",
+    "kicker": "Volume",
+    "title": "Every set,|counted by muscle",
+    "note": "Six regions, totalled weekly from what you actually logged, normalised to your own biggest number.",
+    "shot": "shots/volume.png",
+    "accent": "#6ee7a8"
+  },
+  {
+    "out": "06-regime.png",
+    "kicker": "Your split",
+    "title": "Build it once,|edit it forever",
+    "note": "Any number of sessions, in any order. Editing the plan never rewrites what you have already done.",
+    "shot": "shots/regime.png",
+    "accent": "#fbbf50"
+  }
+]
