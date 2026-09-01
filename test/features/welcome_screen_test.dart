@@ -41,12 +41,17 @@ void main() {
     }
   }
 
-  Future<void> pump(WidgetTester tester, {SyncAuth? auth}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    SyncAuth? auth,
+    bool configured = true,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
           syncAuthProvider.overrideWithValue(auth ?? _FakeAuth()),
+          syncConfiguredProvider.overrideWithValue(configured),
         ],
         child: MaterialApp(
           theme: buildTheme(Brightness.dark),
@@ -56,6 +61,49 @@ void main() {
     );
     await tester.pump();
   }
+
+  group('a build with no account to reach does not offer one', () {
+    testWidgets('the sign-in button is absent', (tester) async {
+      await pump(tester, configured: false);
+      await beats(tester);
+
+      expect(find.text('Continue with Google'), findsNothing,
+          reason: 'the control can only produce "this build cannot sign in", '
+              'which is a feature being claimed and then withdrawn');
+      expect(find.textContaining('Sign in with Google to back up'), findsNothing,
+          reason: 'the paragraph explains a button that is not there');
+    });
+
+    testWidgets('the local answer becomes the only one, and is filled',
+        (tester) async {
+      await pump(tester, configured: false);
+      await beats(tester);
+
+      expect(find.text('Start training'), findsOneWidget);
+      expect(find.text('Continue on this phone'), findsNothing,
+          reason: 'it is not an alternative to anything when it stands alone');
+    });
+
+    testWidgets('answering it still seeds and records', (tester) async {
+      await pump(tester, configured: false);
+      await beats(tester);
+
+      await tester.tap(find.text('Start training'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(await catalogSize(), greaterThan(0));
+      expect(await welcomeAnswered(db), isTrue);
+    });
+
+    testWidgets('a configured build still offers both', (tester) async {
+      await pump(tester);
+      await beats(tester);
+
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue on this phone'), findsOneWidget);
+    });
+  });
 
   group('the seed waits for the answer', () {
     test('a launch before the welcome is answered seeds nothing', () async {

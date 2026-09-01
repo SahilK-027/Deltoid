@@ -115,6 +115,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    // A build with no configuration cannot reach an account, so it does not ask
+    // where the history should live — there is only one answer available, and
+    // offering the other would be a button that can only fail.
+    final canSignIn = ref.watch(syncConfiguredProvider);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final mark = dark
         ? 'assets/brand/mark_white.png'
@@ -213,23 +217,25 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
               ),
               const SizedBox(height: Space.huge),
 
-              _Arrive(
-                step: _step(3),
-                child: _ThresholdButton(
-                  label: _signingIn ? 'Signing in' : 'Continue with Google',
-                  icon: const GoogleMark(),
-                  busy: _signingIn,
-                  // Disabled while Google's sheet is up, so a second tap cannot
-                  // open a second one behind the first.
-                  onTap: _signingIn ? null : _signIn,
+              if (canSignIn) ...[
+                _Arrive(
+                  step: _step(3),
+                  child: _ThresholdButton(
+                    label: _signingIn ? 'Signing in' : 'Continue with Google',
+                    icon: const GoogleMark(),
+                    busy: _signingIn,
+                    // Disabled while Google's sheet is up, so a second tap
+                    // cannot open a second one behind the first.
+                    onTap: _signingIn ? null : _signIn,
+                  ),
                 ),
-              ),
-              const SizedBox(height: Space.lg),
-              // The two answers are alternatives, not a sequence, and the rule
-              // with a word in it is what says so — without it a second pill
-              // under the first reads as the next step.
-              _Arrive(step: _step(4), child: const _OrDivider()),
-              const SizedBox(height: Space.lg),
+                const SizedBox(height: Space.lg),
+                // The two answers are alternatives, not a sequence, and the
+                // rule with a word in it is what says so — without it a second
+                // pill under the first reads as the next step.
+                _Arrive(step: _step(4), child: const _OrDivider()),
+                const SizedBox(height: Space.lg),
+              ],
               // **Equal standing**, which on this screen means a button of the
               // same size and shape rather than a text link. Declining is a real
               // answer: Settings offers the same connection later, and nothing
@@ -238,12 +244,18 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
               _Arrive(
                 step: _step(5),
                 child: _ThresholdButton(
-                  label: 'Continue on this phone',
-                  filled: false,
+                  // The only answer left when there is no account to offer, so
+                  // it becomes the filled one rather than the alternative to
+                  // something that is not on screen.
+                  label: canSignIn ? 'Continue on this phone' : 'Start training',
+                  filled: !canSignIn,
                   icon: Icon(
                     Icons.smartphone_rounded,
                     size: Sizes.glyph,
-                    color: c.textPrimary,
+                    // The label picks its own colour from `filled`; the glyph
+                    // is passed in, so it has to follow the same fill or it
+                    // disappears into the accent.
+                    color: canSignIn ? c.textPrimary : c.onAccent,
                   ),
                   onTap: _signingIn ? null : _decline,
                 ),
@@ -254,10 +266,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                 child: Text(
                   // Both outcomes, in the order the buttons are in, each in terms
                   // of what happens to the *training* rather than to the data.
-                  'Sign in with Google to back up your training data, '
-                  'so that a lost phone doesn\'t mean lost progress. '
-                  'The app works fully offline regardless, and you can '
-                  'connect to Google at any time from Settings.',
+                  canSignIn
+                      ? 'Sign in with Google to back up your training data, '
+                            'so that a lost phone doesn\'t mean lost progress. '
+                            'The app works fully offline regardless, and you '
+                            'can connect to Google at any time from Settings.'
+                      : 'Everything you log stays on this phone. Back it up '
+                            'whenever you like from Settings, and keep the '
+                            'file wherever you keep your own files.',
                   textAlign: TextAlign.center,
                   style: context.t.bodySmall?.copyWith(
                     color: c.textTertiary,

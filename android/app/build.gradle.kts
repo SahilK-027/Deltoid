@@ -47,6 +47,27 @@ android {
         multiDexEnabled = true
     }
 
+    // Two apps, so both can sit on one phone at once.
+    //
+    // The offline flavour is the build handed to other people: no sync
+    // configuration, a different application id so it installs alongside the
+    // real one, and a name on the launcher that says which is which. The
+    // application id is what Android keys an install on — a label alone would
+    // still replace the app already there.
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("full") {
+            dimension = "distribution"
+            manifestPlaceholders["appName"] = "Deltoid"
+        }
+        create("offline") {
+            dimension = "distribution"
+            applicationIdSuffix = ".offline"
+            manifestPlaceholders["appName"] = "Deltoid Offline"
+        }
+    }
+
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {

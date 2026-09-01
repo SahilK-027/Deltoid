@@ -71,6 +71,21 @@ Future<void> answerWelcome(
       );
 }
 
+/// Whether this build was given an account to reach at all.
+///
+/// Read this rather than `syncBackendProvider` when the question is what to
+/// *draw*. The backend is a `FutureProvider` and is null while it starts, so a
+/// control hidden on that would flicker into existence on every launch of a
+/// configured build; this answers the same question from a compile-time
+/// constant and never changes.
+///
+/// **A build that cannot sign in must not offer to.** An unconfigured build
+/// has no account feature, and a control that produces only an error message
+/// is claiming one it does not have.
+final syncConfiguredProvider = Provider<bool>(
+  (ref) => SyncConfig.fromEnvironment.isConfigured,
+);
+
 /// The client, started once per process, or null when this build carries no
 /// configuration.
 ///
