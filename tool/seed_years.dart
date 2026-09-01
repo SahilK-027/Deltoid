@@ -229,6 +229,10 @@ class _Generator {
       ..._sync(at),
       'name': template.name,
       'isActive': true,
+      // `isActive` is derived from this stamp, not merged on its own, and a
+      // live regime without one breaks an invariant the importer refuses a
+      // file over. See RULES § 2.
+      'activatedAt': at,
       'deloadEnabled': true,
       'deloadAfterCycles': 6,
       'deloadSetDelta': -1,
