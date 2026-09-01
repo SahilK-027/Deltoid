@@ -65,32 +65,88 @@ flutter run
 `build_runner` generates `lib/data/db/database.g.dart` and must be re-run after
 any change to `lib/data/db/tables.dart`.
 
-To put a release build on a phone rather than running it from a laptop:
-
-```bash
-flutter build apk --release
-adb install build/app/outputs/flutter-apk/app-release.apk
-```
-
 **Android is the only platform that is built and tested.** An `ios/` directory
 exists and almost all of the code is platform-neutral Dart, but no iOS build has
 ever been produced or verified. See [Running on iOS](#running-on-ios).
 
-## Enabling sync
+## The two builds
 
-Sync is off until you configure it, and everything except cross-device backup
-works without it. Turning it on requires your own Supabase project and Google
-OAuth client:
+The app ships in two flavours, and both can be installed on the same phone at
+once because they carry different application IDs.
 
-1. Create a Supabase project and apply the schema with `supabase db push`.
-2. Copy `deltoid.env.example.json` to `deltoid.env.json` and fill in your
-   project URL, publishable key, and Google web client ID.
-3. Run with `flutter run --dart-define-from-file=deltoid.env.json`.
+| | Offline | Full |
+| --- | --- | --- |
+| Launcher name | Deltoid Offline | Deltoid |
+| Application ID | `com.deltoid.deltoid.offline` | `com.deltoid.deltoid` |
+| Sync | Not compiled in | Available once configured |
+| Sign-in | Not offered | Google |
+| Needs a server | No | A Supabase project of your own |
 
-`deltoid.env.json` is ignored by git. None of the three values in it is a secret
-— all three ship inside any release APK and can be extracted from it — which is
+**The offline build is the one to share.** It has no account configuration
+compiled into it, so there is nothing for it to sign in to and nothing it can
+reach. The welcome screen offers only "Start training", and everything logged
+stays on the device.
+
+```bash
+flutter build apk --release --flavor offline --split-per-abi
+```
+
+**The full build is for someone who has set up their own server.** It is
+identical apart from being handed a configuration at build time:
+
+```bash
+flutter build apk --release --flavor full --split-per-abi \
+  --dart-define-from-file=deltoid.env.json
+```
+
+Both commands write to `build/app/outputs/flutter-apk/`. `--split-per-abi`
+produces one APK per CPU architecture, at roughly 26 MB each, rather than a
+single 68 MB file carrying all three. Install the `arm64-v8a` one on any phone
+made in the last several years:
+
+```bash
+adb install build/app/outputs/flutter-apk/app-arm64-v8a-offline-release.apk
+```
+
+To run either flavour from a laptop, pass the same `--flavor` to
+`flutter run`.
+
+## Setting up sync
+
+Sync stays off until you give the full build something to talk to, and
+everything except cross-device backup works without it. Turning it on means
+running your own infrastructure — a Supabase project for the data and a Google
+Cloud project for sign-in — so that nothing routes through anybody else's
+account.
+
+In outline:
+
+1. Create a Supabase project, then apply this repository's schema to it with
+   `supabase db push`.
+2. Generate a release keystore, because Google identifies your app by the
+   fingerprint of the key it is signed with.
+3. Create a Google OAuth consent screen, one Web client, and two Android
+   clients — one for your release fingerprint and one for your debug one.
+4. Enable Google in Supabase's auth settings, and list your Web client ID under
+   **Authorized Client IDs**.
+5. Copy `deltoid.env.example.json` to `deltoid.env.json`, fill in the project
+   URL, publishable key, and Web client ID, and build with
+   `--flavor full --dart-define-from-file=deltoid.env.json`.
+
+**[SETUP-SYNC.md](SETUP-SYNC.md) walks through all of it with the exact
+commands**, including reading SHA-1 fingerprints, what belongs in
+`android/key.properties`, and what each failure message actually means. Expect
+it to take about an hour the first time.
+
+`deltoid.env.json` is gitignored. None of the three values in it is a secret —
+all three ship inside any release APK and can be extracted from it — which is
 why row-level security, rather than key secrecy, is what protects the data. See
 [SYNC § 3](SYNC.md#3-identity).
+
+Anyone running a build configured against your project can sign in and create
+an account on it. Row-level security keeps their data and yours separate, but
+the project, its quota, and the responsibility remain yours. Share the offline
+build instead.
 
 ## Status
 
@@ -113,11 +169,11 @@ Inter fonts remain under the SIL Open Font License, included at
 
 | Command                                                | Purpose                                                     |
 | ------------------------------------------------------ | ----------------------------------------------------------- |
-| `flutter run`                                          | Run on a connected device or emulator, with sync disabled   |
-| `flutter run --dart-define-from-file=deltoid.env.json` | Run with an account configured                              |
+| `flutter run --flavor offline`                         | Run the offline build on a connected device or emulator     |
+| `flutter run --flavor full --dart-define-from-file=deltoid.env.json` | Run the full build against your own server    |
 | `flutter analyze && flutter test`                      | The gate. Both must pass before any change is considered done |
 | `dart run build_runner build`                          | Regenerate database code after a schema change              |
-| `flutter build apk --release`                          | Produce a release build                                     |
+| `flutter build apk --release --flavor offline --split-per-abi` | Produce the release APKs to share                   |
 | `flutter test tool/test/`                              | Tests for the seed generator, which `flutter test` skips    |
 | `supabase db push`                                     | Apply `supabase/migrations` to the linked project           |
 | `supabase test db`                                     | Run the row-level-security suite against a local stack (requires Docker) |
@@ -330,7 +386,8 @@ them.
 | **[THEME.md](THEME.md)**  | The app screen by screen, and the design language it is drawn in                       |
 | **[SYNC.md](SYNC.md)**    | The sync design: what syncs, how conflicts resolve, and what sync must never do        |
 | **[TODO.md](TODO.md)**    | A single list of what is done and what is left. Status is recorded here and nowhere else |
-| [CLAUDE.md](CLAUDE.md)    | Orientation for AI coding sessions. It points at the five documents above and contains no facts of its own |
+| [SETUP-SYNC.md](SETUP-SYNC.md) | Step-by-step setup for the full build: Supabase, Google OAuth, keystore, and env file |
+| [CLAUDE.md](CLAUDE.md)    | Orientation for AI coding sessions. It points at the documents above and contains no facts of its own |
 
 Because this is a personal tool, scope discipline is a requirement rather than a
 preference. [RULES § 6](RULES.md#6-scope) lists what is deliberately excluded,
