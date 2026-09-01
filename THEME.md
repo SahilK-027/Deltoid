@@ -33,7 +33,7 @@ For any decision not covered below.
 
 1. **Chrome is monochrome; colour is data.** Buttons, chips, nav, headers and
    selection states are white, black and grey. Hue is reserved for things that
-   *mean* something — a chart series, a deload, a muscle region, a destructive
+   _mean_ something — a chart series, a deload, a muscle region, a destructive
    action. A blue button beside a blue chart line makes the button look like
    data and the data look tappable.
 2. **Depth is surface colour.** Two greys and a hairline. No card borders,
@@ -48,12 +48,12 @@ For any decision not covered below.
    twice, one is **deleted** — not shrunk, not moved somewhere quieter.
    - The screen's subject is named once. A card inside Workouts does not say
      "today".
-   - A number gets one representation: a bar *or* a count. Where a graphic and a
+   - A number gets one representation: a bar _or_ a count. Where a graphic and a
      figure say the same thing, the graphic stays only if it says it faster.
-   - A control states its action once — not a chevron *and* an "Edit" label
-     *and* a tap hint.
-   - Repetition *down* a list is a column, not duplication. Repetition *across
-     levels* is — a total in the header and again in the last row.
+   - A control states its action once — not a chevron _and_ an "Edit" label
+     _and_ a tap hint.
+   - Repetition _down_ a list is a column, not duplication. Repetition _across
+     levels_ is — a total in the header and again in the last row.
 
    Not tidiness: every duplicated element is one more thing to read before the
    screen answers what it was opened for.
@@ -67,19 +67,19 @@ Pure neutrals, no blue tint in the greys. That choice is most of what separates
 
 ### Neutral ramp — dark
 
-| Token | Hex | Use |
-| --- | --- | --- |
-| `bg` | `#131313` | Page background |
-| `surface` | `#1F1F1F` | Cards, app bar, nav bar, sheets, header bands |
-| `surfaceHigh` | `#2B2B2B` | Chips, secondary buttons, circular icon buttons, input fills |
-| `surfaceHighest` | `#3A3A3A` | Focused input fill, pressed chip, keypad utility keys, empty bar track |
-| `surfaceSunken` | `#0E0E0E` | Keypad bed, wells under a scrolling list |
-| `border` | `#2E2E2E` | Inset dividers inside a card, outlined empty-state boxes. **Never** a card outline |
-| `textPrimary` | `#FFFFFF` | Titles, values, active labels |
-| `textSecondary` | `#9A9A9A` | Subtitles, captions, units, inactive nav |
-| `textTertiary` | `#6E6E6E` | Chevrons, disabled, placeholder |
-| `accent` | `#FFFFFF` | Primary action fill, selected chip fill, active tab underline |
-| `onAccent` | `#121212` | Label on `accent` |
+| Token            | Hex       | Use                                                                                |
+| ---------------- | --------- | ---------------------------------------------------------------------------------- |
+| `bg`             | `#131313` | Page background                                                                    |
+| `surface`        | `#1F1F1F` | Cards, app bar, nav bar, sheets, header bands                                      |
+| `surfaceHigh`    | `#2B2B2B` | Chips, secondary buttons, circular icon buttons, input fills                       |
+| `surfaceHighest` | `#3A3A3A` | Focused input fill, pressed chip, keypad utility keys, empty bar track             |
+| `surfaceSunken`  | `#0E0E0E` | Keypad bed, wells under a scrolling list                                           |
+| `border`         | `#2E2E2E` | Inset dividers inside a card, outlined empty-state boxes. **Never** a card outline |
+| `textPrimary`    | `#FFFFFF` | Titles, values, active labels                                                      |
+| `textSecondary`  | `#9A9A9A` | Subtitles, captions, units, inactive nav                                           |
+| `textTertiary`   | `#6E6E6E` | Chevrons, disabled, placeholder                                                    |
+| `accent`         | `#FFFFFF` | Primary action fill, selected chip fill, active tab underline                      |
+| `onAccent`       | `#121212` | Label on `accent`                                                                  |
 
 ### Neutral ramp — light
 
@@ -113,25 +113,25 @@ shout where the six may not.
 
 ### Semantic assignments
 
-| Token | Hue | Means |
-| --- | --- | --- |
-| `seriesPrimary` | cyan | First chart line, sparklines |
-| `positive` | green | Success, completed, beat last time |
-| `deload` | orange | A light week, wherever it appears |
-| `warning` | yellow | A stated limit or consequence |
-| `negative` | red | Destructive fill, delete panel |
-| `seriesSecondary` | blue | Second chart line, heat ramp, session marks |
-| `series[]` | cyan · blue · yellow · green · lavender | Categorical, in order |
-| `identity[]` | the six, in order | One per programme |
-| `heatOn` | blue | A day trained |
-| `heatEmpty` | `surfaceHighest` | A day not trained, and an untrained muscle |
+| Token             | Hue                                     | Means                                       |
+| ----------------- | --------------------------------------- | ------------------------------------------- |
+| `seriesPrimary`   | cyan                                    | First chart line, sparklines                |
+| `positive`        | green                                   | Success, completed, beat last time          |
+| `deload`          | orange                                  | A light week, wherever it appears           |
+| `warning`         | yellow                                  | A stated limit or consequence               |
+| `negative`        | red                                     | Destructive fill, delete panel              |
+| `seriesSecondary` | blue                                    | Second chart line, heat ramp, session marks |
+| `series[]`        | cyan · blue · yellow · green · lavender | Categorical, in order                       |
+| `identity[]`      | the six, in order                       | One per programme                           |
+| `heatOn`          | blue                                    | A day trained                               |
+| `heatEmpty`       | `surfaceHighest`                        | A day not trained, and an untrained muscle  |
 
 Two rules stop those colliding:
 
 - **A closed set may be reused only where the two never share a screen.** The
   six serve both programme identity and muscle regions, and no screen shows both.
 - **Identity marks appear only where they separate programmes** — the regime
-  library. Elsewhere a mark means *what kind of day this was*: `heatOn` for a
+  library. Elsewhere a mark means _what kind of day this was_: `heatOn` for a
   session, `deload` for a light week. That is what a feed of trained days is
   scanned for, and a programme hue in the same slot hides it.
 
@@ -145,12 +145,12 @@ pair clears it both ways round.
 Four pairs sit below, all of them a grey on a raised fill, all of them label
 text that never carries a fact on its own:
 
-| Pair | Dark | Light |
-| --- | --- | --- |
-| `textSecondary` on `surfaceHighest` | 4.04 | 4.84 |
-| `textTertiary` on `surfaceSunken` | 3.81 | 2.74 |
-| `textTertiary` on `surfaceHigh` | 2.78 | 2.87 |
-| `textTertiary` on `surfaceHighest` | 2.23 | 2.55 |
+| Pair                                | Dark | Light |
+| ----------------------------------- | ---- | ----- |
+| `textSecondary` on `surfaceHighest` | 4.04 | 4.84  |
+| `textTertiary` on `surfaceSunken`   | 3.81 | 2.74  |
+| `textTertiary` on `surfaceHigh`     | 2.78 | 2.87  |
+| `textTertiary` on `surfaceHighest`  | 2.23 | 2.55  |
 
 They are accepted rather than unnoticed, and pinned at those numbers so the ramp
 cannot slide further without the suite saying so. A hue on a card is a mark
@@ -180,22 +180,22 @@ One family, nine roles. **Minimum 11sp, maximum 30sp** — nothing larger than a
 page title or smaller than a nav label.
 
 **One exception, a clock.** The hold pad's timer runs at 44sp: the only number
-read from the floor with your chin on your hands. The cap stops a *heading*
+read from the floor with your chin on your hands. The cap stops a _heading_
 competing with a page title; a running clock is not a heading, and shrinking it
 would obey the rule at the cost of the moment the screen exists for. If a second
 thing ever needs this, it becomes a role in the table.
 
-| Role | Size / line | Weight | Case | Colour | Used for |
-| --- | --- | --- | --- | --- | --- |
-| `pageTitle` | 30 / 36 | 800 | Sentence, tracking −0.5 | primary | The one title in a destination's header band |
-| `pageEyebrow` | 13 / 16 | 600 | UPPERCASE, tracking +1.2 | secondary | The line above a page title |
-| `section` | 20 / 26 | 700 | Sentence | primary | Section headings on the page background |
-| `title` | 16 / 22 | 600 | Sentence | primary | Card titles, row titles, exercise names, pushed-screen app-bar titles |
-| `body` | 14 / 20 | 400 | Sentence | secondary | Subtitles, descriptions, captions |
-| `value` | 22 / 26 | 700 | — tabular | primary | The number a card is about |
-| `valueSm` | 16 / 20 | 600 | — tabular | primary | Table fields, inline stats |
-| `label` | 13 / 16 | 500 | Sentence | secondary | Table headers, chip labels, axis labels |
-| `micro` | 11 / 14 | 600 | Sentence | secondary | Nav labels, units, badge text |
+| Role          | Size / line | Weight | Case                     | Colour    | Used for                                                              |
+| ------------- | ----------- | ------ | ------------------------ | --------- | --------------------------------------------------------------------- |
+| `pageTitle`   | 30 / 36     | 800    | Sentence, tracking −0.5  | primary   | The one title in a destination's header band                          |
+| `pageEyebrow` | 13 / 16     | 600    | UPPERCASE, tracking +1.2 | secondary | The line above a page title                                           |
+| `section`     | 20 / 26     | 700    | Sentence                 | primary   | Section headings on the page background                               |
+| `title`       | 16 / 22     | 600    | Sentence                 | primary   | Card titles, row titles, exercise names, pushed-screen app-bar titles |
+| `body`        | 14 / 20     | 400    | Sentence                 | secondary | Subtitles, descriptions, captions                                     |
+| `value`       | 22 / 26     | 700    | — tabular                | primary   | The number a card is about                                            |
+| `valueSm`     | 16 / 20     | 600    | — tabular                | primary   | Table fields, inline stats                                            |
+| `label`       | 13 / 16     | 500    | Sentence                 | secondary | Table headers, chip labels, axis labels                               |
+| `micro`       | 11 / 14     | 600    | Sentence                 | secondary | Nav labels, units, badge text                                         |
 
 - **Tabular figures on every number that can change** — weights, counts, timers,
   dates. A column that shifts as it updates is unreadable.
@@ -218,7 +218,7 @@ Every string the user reads is a sentence, or a fragment that could start one.
   `82.5 kg est. 1RM`, `since 6:12 pm`. One phrase, not two.
 - **Two facts are two sentences, not one dash.** An em dash bolting a
   consequence onto a clause reads as a footnote — write the second half as its
-  own sentence or join it with a real conjunction. Prose *about* the app, in
+  own sentence or join it with a real conjunction. Prose _about_ the app, in
   comments and these documents, keeps the dash; the app does not.
 - **A one-clause subtitle takes no full stop**; two sentences take both.
 - **Length is the space, not the sentiment.** A row subtitle is one clause, a
@@ -232,14 +232,14 @@ Every string the user reads is a sentence, or a fragment that could start one.
 
 **Spacing** is a 4pt scale: `2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40`.
 
-| Where | Value |
-| --- | --- |
-| Page gutter | 16 |
-| Card padding | 16 (dense rows 12) |
-| Section header → its content | 12 |
-| Section → section | 28 |
-| Row height | 56, or 72 with a subtitle |
-| Above a page title | 12 when something small sits on top of it, 24 when it is the first line under the status bar |
+| Where                        | Value                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| Page gutter                  | 16                                                                                           |
+| Card padding                 | 16 (dense rows 12)                                                                           |
+| Section header → its content | 12                                                                                           |
+| Section → section            | 28                                                                                           |
+| Row height                   | 56, or 72 with a subtitle                                                                    |
+| Above a page title           | 12 when something small sits on top of it, 24 when it is the first line under the status bar |
 
 That last matters: at 12, thirty points of title sit hard against the notch and
 the band reads as part of the system bar.
@@ -284,7 +284,7 @@ the ripple asked for explicitly, white at 10%.
   filled shape held while the finger is down, and on anything not already a
   bounded row it draws an edge nobody asked for.
 - **No highlight under a splash** — a second shape doing the same job. A row is
-  the exception, and only because a row *is* a rectangle.
+  the exception, and only because a row _is_ a rectangle.
 - The ripple is `InkSparkle`, bounded to what you pressed, and **plays to
   completion** after the finger leaves, so changing tab does not cut its own
   feedback short.
@@ -319,15 +319,15 @@ The vocabulary. Everything on every screen is one of these.
 
 ### Buttons
 
-| Kind | Spec |
-| --- | --- |
-| **Primary** | Full-width, height 54, radius 14, `accent` fill, `onAccent` label at `title` weight. One per screen. Pinned to the bottom when it ends a flow. |
-| **Secondary** | Same metrics, `surfaceHigh` fill, primary label, no border. |
-| **Destructive** | `negative` fill, white label. Only inside a confirmation, never on a page. |
-| **Text link** | `title` size, primary colour, **no underline**, followed by an 18dp chevron. The "See all / Collapse" affordance. |
-| **Circular icon** | 40dp `surfaceHigh` circle, white glyph at 18. Add, close, refresh. **Its label is required** — a glyph alone cannot say what it does, so the name is what has to be written for the code to compile, and it carries `Semantics` as well as a tooltip (a tooltip needs a long press, which is not a gesture made mid-set). |
-| **Compact pill** | Height 36, radius 999, `surfaceHigh`, `label` text. "Edit", "Change". |
-| **Primary, compact** | The same fill and label at height 46, sized to its own words. The floating form: *one more of something* — "New exercise" — resting over the list at the bottom right. |
+| Kind                 | Spec                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Primary**          | Full-width, height 54, radius 14, `accent` fill, `onAccent` label at `title` weight. One per screen. Pinned to the bottom when it ends a flow.                                                                                                                                                                            |
+| **Secondary**        | Same metrics, `surfaceHigh` fill, primary label, no border.                                                                                                                                                                                                                                                               |
+| **Destructive**      | `negative` fill, white label. Only inside a confirmation, never on a page.                                                                                                                                                                                                                                                |
+| **Text link**        | `title` size, primary colour, **no underline**, followed by an 18dp chevron. The "See all / Collapse" affordance.                                                                                                                                                                                                         |
+| **Circular icon**    | 40dp `surfaceHigh` circle, white glyph at 18. Add, close, refresh. **Its label is required** — a glyph alone cannot say what it does, so the name is what has to be written for the code to compile, and it carries `Semantics` as well as a tooltip (a tooltip needs a long press, which is not a gesture made mid-set). |
+| **Compact pill**     | Height 36, radius 999, `surfaceHigh`, `label` text. "Edit", "Change".                                                                                                                                                                                                                                                     |
+| **Primary, compact** | The same fill and label at height 46, sized to its own words. The floating form: _one more of something_ — "New exercise" — resting over the list at the bottom right.                                                                                                                                                    |
 
 Disabled is a `surfaceHigh` fill with a `textTertiary` label — never a faded
 accent, never an enabled button that errors when tapped.
@@ -335,8 +335,8 @@ accent, never an enabled button that errors when tapped.
 **When a surface ends in two actions, stack them**: secondary above, primary
 below, both full width. Never side by side.
 
-**Full width is a commitment, not a default.** It says *this is what the screen
-is for*: finish the session, save the exercise, confirm the delete — and an
+**Full width is a commitment, not a default.** It says _this is what the screen
+is for_: finish the session, save the exercise, confirm the delete — and an
 empty state's one button, which is the whole point of a page with nothing on it.
 
 **An action that adds one more row to a list you are browsing floats instead.**
@@ -355,7 +355,7 @@ trailing caret means it opens a picker; without one it is a toggle. Chip rows
 scroll horizontally and bleed off the right edge — the clipped chip is the
 scroll affordance.
 
-**A dense chip (26 tall)** sits *inside* a list row, on the subtitle line. A
+**A dense chip (26 tall)** sits _inside_ a list row, on the subtitle line. A
 full-height chip there makes the row 90 tall and reads as the row's control
 rather than as one word in its description.
 
@@ -383,18 +383,18 @@ start at the text rather than the card edge, none under the last row.
 ```
 
 A leading icon is a **bare white glyph**. A coloured rounded-square tile is
-reserved for an *identity* — a programme, a saved thing — never decoration. The
+reserved for an _identity_ — a programme, a saved thing — never decoration. The
 trailing chevron is `textTertiary` at 18.
 
 **Full-bleed rows** — no card, edge-to-edge dividers — are for a screen that is
-*nothing but* rows under headings. Never one section of a mixed page: a card's
+_nothing but_ rows under headings. Never one section of a mixed page: a card's
 edge lands 12 under its heading and full-bleed text lands 28 under it, so the
 two together give a page sections starting at different heights.
 
 ### Section headers
 
 `section` type on the page background: no card, no uppercase, one line. An
-optional trailing **text link** *or* one small figure, vertically centred with
+optional trailing **text link** _or_ one small figure, vertically centred with
 the title. 12 below, 28 between sections.
 
 One exception, a list: an exercise's history is a `ListView.separated` whose
@@ -407,7 +407,7 @@ otherwise find one of them and not the other.
 heading needing something other than a link on its right gets a trailing slot —
 it does not get rebuilt.
 
-**A heading has no subtitle.** The sentence goes *inside* the card, under the
+**A heading has no subtitle.** The sentence goes _inside_ the card, under the
 thing it describes, which is where it is read. A figure belonging to the heading
 goes in the trailing slot, on the title's line.
 
@@ -440,7 +440,7 @@ full-width hairline under it. Then rows.
   one of the choices; on the left it reads as the first item in the list. It
   sits on the **title's line**, never centred against a two-line header.
 - **The subtitle identifies, or it is not there.** One short `body` line naming
-  *which* thing is being edited, never wrapping. Not the place to state scope or
+  _which_ thing is being edited, never wrapping. Not the place to state scope or
   explain the sheet. A sheet whose title already names the thing goes without
   one, as does a sheet opened from a screen already about that thing.
 - Rows are **full-bleed, never in a card** — a card inside a sheet is a panel
@@ -452,13 +452,13 @@ full-width hairline under it. Then rows.
 - **A red row is the last row.** Anything tinted `negative` sits at the foot of
   its list or card with nothing plain after it: red is where a list ends, and an
   ordinary row underneath reads as an afterthought. Where a row's tint depends
-  on state, its *position* moves with the tint.
+  on state, its _position_ moves with the tint.
 - **Cap the height at two thirds of the screen.** A taller sheet has no distance
   to travel, so its entrance and exit read as a cut.
 - **Text entry lives in a sheet, not a dialog** — header, one `surfaceSunken`
   field, one white Save, riding above the keyboard. A centred alert lands
   mid-screen while the row that summoned it sits at the bottom, and fights the
-  keyboard for the same space. Dialogs are for *names*: one line, nothing to lose.
+  keyboard for the same space. Dialogs are for _names_: one line, nothing to lose.
 
 ### Dialogs — confirmations
 
@@ -547,7 +547,7 @@ glyph over a `section` title, a `body` message and one primary button.
 Dashes are for a card that has a reason to exist and one missing figure.
 
 **"Not here" and "not yet" are different sentences.** An index built from what
-you have *done* — History's exercises, the days in a filter — must not answer a
+you have _done_ — History's exercises, the days in a filter — must not answer a
 search with "no such thing" about something you own and have not used. At rest it
 lists what happened; searched, it falls through to the catalog and lists the rest
 **below** the matches, under one heading, each saying it has never been logged.
@@ -596,7 +596,7 @@ comes back with a different range control, no edge suppression and no
 calendar-aware ticks. A chart is a language, not a per-screen widget.
 
 **Every chart is driven by the same row**: `1W 1M 3M 6M 1Y All`, then the year
-picker, then the averaging chip. A screen may offer *fewer* chips than that — a
+picker, then the averaging chip. A screen may offer _fewer_ chips than that — a
 week of weekly bars is one bar, so volume starts at `1M` — but never different
 ones, never in a different order, and never a second control of its own
 somewhere else on the page.
@@ -604,7 +604,7 @@ somewhere else on the page.
 **No chart ever plots raw rows.** Fifty years of daily entries is eighteen
 thousand marks across a phone — a texture, not a chart. Every chart folds into
 buckets (daily, weekly, monthly, yearly) and draws one mark each, keeping the
-count under about sixty at *any* range. `Auto` picks the **finest** level under
+count under about sixty at _any_ range. `Auto` picks the **finest** level under
 that ceiling rather than the coarsest that fits, which is what makes a week open
 on days and fifty years open on years without either being a special case. The
 chip always names the level in force: a silently smoothed chart lies about its
@@ -685,7 +685,7 @@ resolution.
   the same absence a rest day is on the heatmap. A skipped week that closes up
   is a skipped week you cannot see.
 - **A gridline is `border` on `surface` only.** Over a lighter fill —
-  `heatEmpty`, `surfaceHighest` — `border` is *darker* than what it crosses and
+  `heatEmpty`, `surfaceHighest` — `border` is _darker_ than what it crosses and
   reads as a scratch. Use `textTertiary` there, or drop the line: a figure under
   the chart usually says it better.
 - **A chart read by touch names the value in its caption, not a tooltip.** On a
@@ -701,7 +701,7 @@ resolution.
   5s, 10s — with the maximum at or above the peak so the tallest bar sits under
   the top gridline. The opposite of the trend chart's rule, for the opposite
   reason: there zero is not in the data and anchoring flattens a year of
-  bodyweight; here a week you skipped *is* zero and sits on the baseline.
+  bodyweight; here a week you skipped _is_ zero and sits on the baseline.
 - **Scrub, don't tap, once the bars are thin.** A year is 52 bars across a
   phone; nothing that narrow is a target. One horizontal drag moves the readout,
   and it stays out of the list's way because a drag must clear `kTouchSlop`.
@@ -715,7 +715,7 @@ resolution.
 - **An empty range is an empty chart, not a box where the chart was.** Same
   height, same gridlines, same right-hand gutter, and the **time axis of the
   window you asked for**, so the chips still mean something with nothing under
-  them. The value axis keeps the scale of the *whole* history, so an untrained
+  them. The value axis keeps the scale of the _whole_ history, so an untrained
   month reads as an empty stretch of the same chart; with no history at all it
   falls back to a zero-to-round-number band in the unit counted — the one place
   the trend chart anchors at zero, since the rule against it exists to stop a
@@ -733,7 +733,7 @@ resolution.
 ### Bar list
 
 The chart that is a list: one row per category, name left, horizontal bar,
-figure right. No axis, gridlines or legend — a bar list whose longest bar *is*
+figure right. No axis, gridlines or legend — a bar list whose longest bar _is_
 the maximum needs none, and they are what turn six rows into a chart nobody
 reads.
 
@@ -760,14 +760,14 @@ shares a vertical with everything else. Value columns are equal-width and
 expanding: a fixed narrow column beside an expanding one makes one field twice
 the other for no reason a reader can see.
 
-| Element | Spec |
-| --- | --- |
-| **Index chip** | A circle filling the index column, `valueSm`. A row of a special kind is marked by **a letter *and* a colour**, the hue **blended into `surfaceHigh` rather than laid over it at low alpha** — a translucent tint picks up whatever is behind it and comes out different on different grounds. |
-| **Value field** | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: **transparent fill plus a 2px `accent` outline** — focus is an outline on nothing, because a fill *and* a border is two signals for one state. |
-| **Ghost value** | A suggestion sits **inside** the field as `textTertiary` — no dot, no italic — because you compare against it while deciding, and a separate column costs the width the value needs. No synthesised italic anywhere: with no italic face bundled, the renderer shears the upright glyphs. |
-| **Completed row** | Values dim to `textSecondary`, fields drop from `surfaceHigh` to `surface`, checkbox goes solid. Dull, not black — at `surfaceSunken` a finished row reads as a hole cut in the table. Never struck through or recoloured. |
-| **Split cell** | A value that is really two numbers is **two boxes with one seam** — square on the shared side, rounded away from it, 2px apart — not one box holding an expression. `13+1` asks the eye to do arithmetic at arm's length to find a number that is not even the sum. The halves are **50-50**: both are what the record is made of, and a sliver beside a wide box reads as an afterthought. The second half **only exists once there is something in it**: a number on the row, a number the ghost carries from last time, or the pad asking for one. The pad's toggle is plain — `P` opens the half, `F` closes it — and an empty half never outlives the toggle that opened it. It slides out from the right over `Motion.fast` rather than snapping, because the first half halves in width. Empty reads as a dim `–`, never `0`. **Both halves take focus on their own tap** — a field you can see and cannot type into is broken — but **a tap never closes the half**: only `F` does, or moving to another cell, since tapping the first half to correct it would take away the box the second number was opened for. The heading names the column once, not the halves, which are not always there. |
-| **Delete** | **Swipe the row left** to uncover a `negative` button, then tap it. The **whole** row travels and the button is **carried in by the row** — parked one panel past the edge and clipped until the swipe brings it in, never a static panel uncovered underneath. The swipe reveals; it never deletes on release. A tap anywhere else, or a swipe on another row, closes it. |
+| Element           | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Index chip**    | A circle filling the index column, `valueSm`. A row of a special kind is marked by **a letter _and_ a colour**, the hue **blended into `surfaceHigh` rather than laid over it at low alpha** — a translucent tint picks up whatever is behind it and comes out different on different grounds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Value field**   | `surfaceHigh` fill, radius 12, height 48, centred `valueSm`. Focused: **transparent fill plus a 2px `accent` outline** — focus is an outline on nothing, because a fill _and_ a border is two signals for one state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Ghost value**   | A suggestion sits **inside** the field as `textTertiary` — no dot, no italic — because you compare against it while deciding, and a separate column costs the width the value needs. No synthesised italic anywhere: with no italic face bundled, the renderer shears the upright glyphs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Completed row** | Values dim to `textSecondary`, fields drop from `surfaceHigh` to `surface`, checkbox goes solid. Dull, not black — at `surfaceSunken` a finished row reads as a hole cut in the table. Never struck through or recoloured.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Split cell**    | A value that is really two numbers is **two boxes with one seam** — square on the shared side, rounded away from it, 2px apart — not one box holding an expression. `13+1` asks the eye to do arithmetic at arm's length to find a number that is not even the sum. The halves are **50-50**: both are what the record is made of, and a sliver beside a wide box reads as an afterthought. The second half **only exists once there is something in it**: a number on the row, a number the ghost carries from last time, or the pad asking for one. The pad's toggle is plain — `P` opens the half, `F` closes it — and an empty half never outlives the toggle that opened it. It slides out from the right over `Motion.fast` rather than snapping, because the first half halves in width. Empty reads as a dim `–`, never `0`. **Both halves take focus on their own tap** — a field you can see and cannot type into is broken — but **a tap never closes the half**: only `F` does, or moving to another cell, since tapping the first half to correct it would take away the box the second number was opened for. The heading names the column once, not the halves, which are not always there. |
+| **Delete**        | **Swipe the row left** to uncover a `negative` button, then tap it. The **whole** row travels and the button is **carried in by the row** — parked one panel past the edge and clipped until the swipe brings it in, never a static panel uncovered underneath. The swipe reveals; it never deletes on release. A tap anywhere else, or a swipe on another row, closes it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### The numeric keypad
 
@@ -802,7 +802,7 @@ as pressed. A pad that captions itself covers what it is captioning.
   would report a mode change nobody made. Both halves stay lit so the state is
   readable without looking at the table. It appears only where partials exist —
   a count, never a load, never a hold — and takes the slot the decimal point
-  sits in on a load. It is for changing your mind mid-entry; the way *in* is
+  sits in on a load. It is for changing your mind mid-entry; the way _in_ is
   tapping the half of the count cell you meant.
 
 ### The stopwatch pad
@@ -853,12 +853,12 @@ top gap rather than printing a number nothing measured.
 
 **Everything pushed wears the app bar**: back arrow left, small centred `title`,
 actions right. A detail screen in a 30sp masthead reads as somewhere you
-navigated *to* rather than *into*, and there is then no way back up.
+navigated _to_ rather than _into_, and there is then no way back up.
 
 **The band does not scroll and holds only the masthead** — name, eyebrow, at
 most one quiet line of state. Anything the centred title has no room for goes in
 a `surface` block directly under the bar, sharing its colour so the two read as
-one header. A block *inside* the band has no boundary of its own, which is how a
+one header. A block _inside_ the band has no boundary of its own, which is how a
 header ends up running half the screen with the first section starting somewhere
 in the middle, unmarked.
 
@@ -889,7 +889,7 @@ page. Three shapes for one noun — a read-only view, an edit sheet, a create
 sheet — means editing something looks nothing like looking at it.
 
 **Editing is rows that open one question at a time, not a form.** No dropdowns:
-a menu dropped over the page has no room to say what an option *means*.
+a menu dropped over the page has no room to say what an option _means_.
 
 - **An existing thing saves as you go. A new one holds a draft** behind one
   create button, so a half-filled thing abandoned by a back-swipe never lands in
@@ -901,7 +901,7 @@ a menu dropped over the page has no room to say what an option *means*.
   otherwise. It shows that value rather than `Choose`, because a required
   question answered the same way ninety-nine times in a hundred is ceremony.
 - **Changing a field on something that already exists asks first**, and a field
-  that changes how existing records are *read* asks the harder version, counting
+  that changes how existing records are _read_ asks the harder version, counting
   what it is about to reinterpret.
 
 **Creation is a sheet, or one screen. Never a wizard.** No illustrated intro, no
@@ -909,7 +909,7 @@ progress bar, no "we will build you a plan" — the user is the planner. One
 question per sheet; a second genuinely required question is a second sheet.
 
 **The welcome screen is the one illustrated page, and it is not a wizard.** The
-rule above bans an illustrated intro in front of *creating something*, where a
+rule above bans an illustrated intro in front of _creating something_, where a
 drawing stands between the user and what they came to build. This is one screen,
 one question, asked once, with the answer that skips it given equal standing. It
 stays inside the rule while all of this holds:
@@ -949,14 +949,14 @@ it holds no data, it is seen once, and it is the only place the app asks the
 user for something rather than showing them what they did. Every one of them
 would be wrong on a screen with a set on it.
 
-| Allowed here | The rule it stands outside | Why |
-| --- | --- | --- |
-| **Two equal buttons**, one `accent` and one `surfaceHigh` | *One primary action per screen* | There are two answers and neither is the recommendation. A primary with a text link under it is a screen that has already decided, and the decline has to have equal standing. Equal is the size, the shape and the type; the fill differs only so two full-width pills do not read as one control repeated |
-| **`Radii.pill`** on those buttons | Buttons wear `Radii.control` | A pill is the shape of a choice; the control radius is the shape of the app. Nothing else on this screen is a control, so there is nothing for them to disagree with |
-| **The wordmark**, mark plus name | The app never says its own name | Once, at the top of the one screen a person can arrive at without knowing what they opened |
-| **A hue on the drawing**, one fixed `lavender` | *Chrome is monochrome; colour is data* | Nothing on this screen is data for it to be confused with: no regime exists yet, no series, no deload. It is **one** colour and it does not move — a hue that cycles is motion performing, and the drawing is not reporting a change |
-| **An entrance**: the page arrives in parts, 620ms, once | *Motion confirms a change; it never performs* | There is nothing on screen to confirm yet. It is the first frame of the app anyone sees, and a page that assembles itself reads as something being made for you rather than a form being presented to you. One shot, never replayed |
-| **Google's four colours** on the Google button | *Chrome is monochrome; colour is data* | Not our hue and not our palette: somebody else's identity, on the one control that opens their sheet, and what a user's eye actually looks for. The official asset, never redrawn — an arc a few degrees out reads as a knock-off and no test can tell you it is wrong |
+| Allowed here                                              | The rule it stands outside                    | Why                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Two equal buttons**, one `accent` and one `surfaceHigh` | _One primary action per screen_               | There are two answers and neither is the recommendation. A primary with a text link under it is a screen that has already decided, and the decline has to have equal standing. Equal is the size, the shape and the type; the fill differs only so two full-width pills do not read as one control repeated |
+| **`Radii.pill`** on those buttons                         | Buttons wear `Radii.control`                  | A pill is the shape of a choice; the control radius is the shape of the app. Nothing else on this screen is a control, so there is nothing for them to disagree with                                                                                                                                        |
+| **The wordmark**, mark plus name                          | The app never says its own name               | Once, at the top of the one screen a person can arrive at without knowing what they opened                                                                                                                                                                                                                  |
+| **A hue on the drawing**, one fixed `lavender`            | _Chrome is monochrome; colour is data_        | Nothing on this screen is data for it to be confused with: no regime exists yet, no series, no deload. It is **one** colour and it does not move — a hue that cycles is motion performing, and the drawing is not reporting a change                                                                        |
+| **An entrance**: the page arrives in parts, 620ms, once   | _Motion confirms a change; it never performs_ | There is nothing on screen to confirm yet. It is the first frame of the app anyone sees, and a page that assembles itself reads as something being made for you rather than a form being presented to you. One shot, never replayed                                                                         |
+| **Google's four colours** on the Google button            | _Chrome is monochrome; colour is data_        | Not our hue and not our palette: somebody else's identity, on the one control that opens their sheet, and what a user's eye actually looks for. The official asset, never redrawn — an arc a few degrees out reads as a knock-off and no test can tell you it is wrong                                      |
 
 What the four have in common: none of them puts a **meaning-bearing** colour or
 a **second primary** anywhere a number is read. A hue here cannot be confused
@@ -980,7 +980,7 @@ or a suffix and nothing else. Seven fields each carrying their own copy is how
 one search box ends up with no focused outline and a different glyph than the
 identical box on the next screen.
 
-*Decoration* is what that rule is about. What a field **does** — its keyboard,
+_Decoration_ is what that rule is about. What a field **does** — its keyboard,
 its input formatters, its action key — and the type role its text is set at are
 the call site's, because they are facts about the value being typed rather than
 about how a field looks. A number field asks for a number keypad and carries
@@ -989,11 +989,11 @@ theme can know that for it.
 
 Two standing exceptions, both narrow, both here rather than argued in a comment:
 
-* **The reps cell on the exercise screen** overrides the theme's insets. It is a
+- **The reps cell on the exercise screen** overrides the theme's insets. It is a
   centred cell two or three digits wide inside a table, and 16 either side
   leaves no room for the number. It is the one field that touches
   `contentPadding`.
-* **The weigh-in field's suffix** is set at `labelSmall` in `textSecondary`, so
+- **The weigh-in field's suffix** is set at `labelSmall` in `textSecondary`, so
   `kg` sits beside a number entered at `labelLarge` without competing with it.
   The theme has no suffix style because this is the only suffix in the app.
 
@@ -1004,17 +1004,17 @@ text is rendered, counted in `label`, turning `negative` on the last character.
 
 ## 9. Where the language lives in code
 
-| Part | File |
-| --- | --- |
-| Colour tokens, the hues, `IconTile.glyphOn` | `lib/core/theme/tokens.dart` |
-| Type roles, input theme, control themes | `lib/core/theme/theme.dart` |
-| Components — cards, rows, chips, sheets, dialogs, radios, pills | `lib/core/widgets/primitives.dart` |
-| The one chart | `lib/core/widgets/trend_chart.dart` |
-| The day picker | `lib/core/widgets/calendar.dart` |
-| The re-order sheet | `lib/core/widgets/reorder_sheet.dart` |
-| Scroll physics | `lib/core/widgets/scroll.dart` |
-| Table, keypad, stopwatch pad | `lib/features/log/widgets/` |
-| Bar list | `lib/features/workouts/widgets/volume_bars.dart` |
+| Part                                                            | File                                             |
+| --------------------------------------------------------------- | ------------------------------------------------ |
+| Colour tokens, the hues, `IconTile.glyphOn`                     | `lib/core/theme/tokens.dart`                     |
+| Type roles, input theme, control themes                         | `lib/core/theme/theme.dart`                      |
+| Components — cards, rows, chips, sheets, dialogs, radios, pills | `lib/core/widgets/primitives.dart`               |
+| The one chart                                                   | `lib/core/widgets/trend_chart.dart`              |
+| The day picker                                                  | `lib/core/widgets/calendar.dart`                 |
+| The re-order sheet                                              | `lib/core/widgets/reorder_sheet.dart`            |
+| Scroll physics                                                  | `lib/core/widgets/scroll.dart`                   |
+| Table, keypad, stopwatch pad                                    | `lib/features/log/widgets/`                      |
+| Bar list                                                        | `lib/features/workouts/widgets/volume_bars.dart` |
 
 Feature code composes these; it does not restyle them. **A component nothing
 calls is deleted**, not left for later — it is a second answer to a question

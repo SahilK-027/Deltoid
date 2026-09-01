@@ -1,78 +1,86 @@
 # Deltoid — read this first
 
-Deltoid is a personal, offline-first training log built with Flutter, Riverpod
-and drift over SQLite. It runs on Android only and serves one user.
+Deltoid is a personal, offline-first training log built with Flutter, Riverpod,
+and drift over SQLite. It targets Android and serves a single user.
 
-**It now pushes to a server, and no screen has noticed.** Offline-first is the
-finished half and stays the architecture: every screen reads local disk, and
-nothing waits on a server — a build with no configuration, which is every clone
-of this repo and every `flutter test`, cannot sync at all and works exactly as
-it did. Sync is an additive layer over the columns every syncable row already
-carries: a drain of `dirty`, a pull that merges, and one question at the first
-sign-in when both sides have been trained on. See
-[RULES.md § 6](RULES.md#6-scope) for what that decision does and does not open,
-and [TODO.md](TODO.md) for what is left.
+The app is complete and in daily use, and sync is finished. Offline-first is the
+architecture and remains so: every screen reads from local storage, and nothing
+waits on a server. A build with no configuration — which includes every clone of
+this repository and every `flutter test` run — cannot sync at all and behaves
+exactly as it did before sync existed. Sync is an additive layer over columns
+that every syncable row already carries: an upload of locally changed rows, a
+download that merges, and one question at first sign-in if both sides already
+contain training data. [RULES § 6](RULES.md#6-scope) explains what that decision
+does and does not permit, and [TODO.md](TODO.md) lists the one task still open.
 
-## The docs, and which one you want
+The repository is public and MIT-licensed. Nothing personal belongs in it. Do
+not commit a real Supabase project reference, key, or OAuth client ID
+(`deltoid.env.json` is git-ignored, and `deltoid.env.example.json` shows the
+expected shape), and do not put personal numbers, coaching cues, or links into
+`seed_data.dart`.
 
-| File                       | When                                                                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[RULES.md](RULES.md)**   | **Before changing anything.** Every invariant, the migration protocol, the traps already hit, and what is out of scope                                  |
-| **[THEME.md](THEME.md)**   | Before touching anything visual. The app screen by screen, and the language it is drawn in — don't invent a card, row, button or sheet that isn't in it |
-| **[SYNC.md](SYNC.md)**     | Before touching cloud backup. § 1–16 is the design — what syncs, what never does, how a conflict resolves, the ten things sync may never do. § 17–20 is the build — the architecture, the seven phases, and what has to exist outside the repo |
-| **[README.md](README.md)** | Setup, commands, project layout, how the layers fit                                                                                                     |
-| **[TODO.md](TODO.md)**     | What is done and what is left. Status lives there and nowhere else                                                                                      |
+## The documents, and which one you need
 
-This file holds no facts of its own. If anything here contradicts one of those
-five documents, the other document is the correct one.
+| File                       | When to read it                                                                                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[RULES.md](RULES.md)**   | Before changing anything. Every invariant, the migration protocol, the traps already encountered, and what is out of scope                                 |
+| **[THEME.md](THEME.md)**   | Before changing anything visual. The app screen by screen, and the design language it is drawn in. Do not invent a card, row, button, or sheet it does not describe |
+| **[SYNC.md](SYNC.md)**     | Before changing cloud backup. Sections 1–16 are the design: what syncs, what never syncs, how a conflict resolves, and the ten things sync must never do. Sections 17–20 are the implementation: architecture, the seven phases, and what must exist outside the repository |
+| **[README.md](README.md)** | Setup, commands, project layout, and how the layers fit together                                                                                          |
+| **[TODO.md](TODO.md)**     | What is done and what is left. Status is recorded there and nowhere else                                                                                  |
+
+This file contains no facts of its own. If anything here contradicts one of
+those five documents, the other document is correct.
 
 ## The rules most easily broken
 
-These are the ten that cost the most when they are missed. All of them are
-explained properly in [RULES.md](RULES.md).
+These ten cause the most damage when they are missed. All of them are explained
+in full in [RULES.md](RULES.md).
 
 1. **Prefill is scoped to the session, not the exercise.** Push 1 and Push 2
-   keep separate progressions for the same movement. This is the entire reason
-   the app exists. Never "simplify" `resolvePrefill`.
-2. **`WorkoutExercise` / `SetLog` are snapshots**, not pointers. Editing a
-   programme must never rewrite past logs.
-3. **`LoadMode` decides what the weight means; `MeasureMode` decides what the
-   count means.** A hold's seconds live in `reps`, and a hold has no e1RM and no
-   session volume.
-4. **The log screen owns the horizontal axis** — a `PageView`, one exercise per
-   page. Only the set row may claim a horizontal gesture, to uncover its delete.
+   maintain separate progressions for the same movement. This is the entire
+   reason the app exists. Never "simplify" `resolvePrefill`.
+2. **`WorkoutExercise` and `SetLog` are snapshots, not pointers.** Editing a
+   programme must never rewrite a past log.
+3. **`LoadMode` determines what the weight means; `MeasureMode` determines what
+   the count means.** The seconds of a hold are stored in `reps`, and a hold has
+   no estimated 1RM and contributes nothing to session volume.
+4. **The log screen owns the horizontal axis.** It is a `PageView` with one
+   exercise per page. Only the set row may claim a horizontal gesture, and only
+   to reveal its delete action.
 5. **Never watch a constant query.** `customSelect('SELECT 1', readsFrom: …)`
-   fires once and goes silent forever, with no error. Use `db.watchQuery(...)`.
-6. **History paging is keyset, not offset**, and filters belong in the query.
-7. **Pure logic lives in `lib/domain/`** and is tested without a database.
-   Extend those tests when behaviour changes.
-8. **The migration ladder is running, and every rung is idempotent.** A schema
-   change is `tables.dart`, a regenerate (`dart run build_runner build`), a
-   default in `data/db/table_spec.dart`, and a rung in `upgradeSchema` —
-   `addColumnIfMissing` and `CREATE INDEX IF NOT EXISTS`, never the bare form,
-   which throws at launch on a device that already has the column. See
-   [RULES.md § 3](RULES.md#3-schema-and-migrations).
-9. **No programme is hardcoded**, and no personal numbers, cues or links go in
-   `seed_data.dart`.
-10. **Never copy the project to keep an old version around.** No `old-*/`, no
-    `*.bak`, no second checkout, no worktree "for reference". Read history with
-    `git show <commit>:<path>`.
+   emits once and then goes silent forever, without raising an error. Use
+   `db.watchQuery(...)` instead.
+6. **History paging is keyset-based, not offset-based**, and filters belong in
+   the query rather than applied to the loaded page.
+7. **Pure logic belongs in `lib/domain/`** and is tested without a database.
+   Extend those tests whenever behaviour changes.
+8. **The migration ladder is live, and every step is idempotent.** A schema
+   change consists of an edit to `tables.dart`, a regeneration
+   (`dart run build_runner build`), a default in `data/db/table_spec.dart`, and
+   a step in `upgradeSchema` that uses `addColumnIfMissing` and
+   `CREATE INDEX IF NOT EXISTS`. The unguarded forms throw at launch on a device
+   that already has the column. See
+   [RULES § 3](RULES.md#3-schema-and-migrations).
+9. **No training programme is hardcoded**, and no personal numbers, cues, or
+   links belong in `seed_data.dart`.
+10. **Never copy the project to preserve an old version.** No `old-*/`
+    directories, no `*.bak` files, no second checkout, and no worktree kept "for
+    reference". Read history with `git show <commit>:<path>`.
 
-A load-bearing rule gets a mechanism rather than a comment — an assert, a schema
-constraint, a test. [RULES § 7](RULES.md#7-working-on-it) lists where each one is
-checked today; add to that table rather than writing a paragraph nothing runs.
+A load-bearing rule should be enforced by a mechanism rather than a comment: an
+assertion, a schema constraint, or a test.
+[RULES § 7](RULES.md#7-working-on-it) records where each rule is checked today.
+Add to that table rather than writing a paragraph that nothing executes.
 
-## Working here
+## Working on the project
 
-Run both of these before calling any change done, and make sure both come back
-clean:
+Run both of the following before considering any change complete, and make sure
+both finish cleanly:
 
 ```bash
 flutter analyze && flutter test
 ```
 
-The device belongs to the user. They drive the app on real hardware themselves,
-so never launch an emulator on their behalf unless they explicitly permit you to do so.
-
-Check [RULES.md § Scope](RULES.md#6-scope) before adding a feature, because the
-answer is usually no.
+The device belongs to the user, who tests the app on real hardware. Do not
+launch an emulator on their behalf unless they explicitly ask you to.

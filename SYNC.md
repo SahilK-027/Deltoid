@@ -55,7 +55,7 @@ catches up when it is opened, when it reconnects, or shortly after it writes.
 That line is deliberate. Keep and Notion hold a socket open because two people
 edit one document at once; this is one person with a phone in their hand between
 sets. Building for seconds-level liveness would cost a held connection and a
-battery budget to serve a case that does not occur — while the *correctness* it
+battery budget to serve a case that does not occur — while the _correctness_ it
 is often confused with is built either way, and is built here.
 
 **Not collaboration, and not a feature.** One person, their own devices. No
@@ -71,11 +71,11 @@ is fully usable with the radio off, forever, whether or not anyone signs in.
 
 ## 2. The three states
 
-| State | Means | How you can tell |
-| --- | --- | --- |
-| **Local** | Never connected, or declined at first launch | Settings offers `Back up to your Google account` |
-| **Synced** | Signed in, nothing owed | Settings shows when it last ran |
-| **Pending** | Signed in, rows owed — offline, or a push that failed | Settings says how many and why |
+| State       | Means                                                 | How you can tell                                 |
+| ----------- | ----------------------------------------------------- | ------------------------------------------------ |
+| **Local**   | Never connected, or declined at first launch          | Settings offers `Back up to your Google account` |
+| **Synced**  | Signed in, nothing owed                               | Settings shows when it last ran                  |
+| **Pending** | Signed in, rows owed — offline, or a push that failed | Settings says how many and why                   |
 
 **Pending is normal, not an error.** A session logged in a basement gym is
 pending for an hour and that is the design working. The only thing that makes it
@@ -229,7 +229,7 @@ same constraints, the same transaction discipline and the same repairs as a
 restored one. A second write path is a second set of bugs, and it is the path
 with no screen watching it.
 
-This said *through the repositories* until the code was read, and that is not a
+This said _through the repositories_ until the code was read, and that is not a
 thing that can be done. The repositories are shaped like intentions — `addSet`,
 `renameSession`, `completeWorkout` — and there is no `upsertSession(row)`
 anywhere, nor should there be: a repository that took a whole row would be a
@@ -262,8 +262,8 @@ reach the same answer rather than each keeping its own.
 disagreement does not average out: a device running ten minutes fast wins every
 conflict it is ever in, forever, and the other device's edits vanish silently.
 
-`nowMs` was made monotonic *within* a run during the audit, which is the half of
-the problem that is local. Agreement *between* devices is a server's job, and
+`nowMs` was made monotonic _within_ a run during the audit, which is the half of
+the problem that is local. Agreement _between_ devices is a server's job, and
 `server_updated_at` is that answer. The client's `updatedAt` keeps doing its own
 job — ordering the offline queue on the device that made it.
 
@@ -318,7 +318,7 @@ always discards an edit made seconds ago on the phone in your hand, and keeping
 the local always lets a device offline for a month overwrite every newer row on
 reconnect, which [§ 12](#12-every-edge-case-and-what-it-does) row 10 forbids.
 
-The blast radius is one comparison. A *clean* local row is a copy of what the
+The blast radius is one comparison. A _clean_ local row is a copy of what the
 account already holds — every local write sets `dirty` — so it is taken from the
 server without weighing anything, which is what almost every pulled row does.
 And an unpushed edit that wins stays dirty, is pushed immediately behind the
@@ -362,7 +362,7 @@ a case this app does not produce.
 ## 9. Collision — two rows, one slot
 
 The case row-level last-write-wins **cannot** resolve, because the conflict is
-not between two versions of one row. It is between two *different* rows that
+not between two versions of one row. It is between two _different_ rows that
 both claim a slot the database allows only one of.
 
 The hardening that preceded this added **twelve** unique indexes. Every one is
@@ -382,23 +382,23 @@ cycle are both things a person does without thinking about it.
 Every resolution is deterministic and symmetric, so two devices reach the same
 state without negotiating.
 
-| Index | Two phones doing something ordinary | Resolution |
-| --- | --- | --- |
-| `set_logs_position_live` | both add a set to one exercise | Both live. Loser takes the next free `setIndex`, ordered by `id` — UUID v7, so creation order, and both devices compute the same answer |
-| `workout_exercises_position_live` | both add a movement to one workout | as above, on `orderIndex` |
-| `session_exercises_position_live` | both add an exercise to one day | as above |
-| `sessions_position_live` | both reorder the training days | as above |
-| `sessions_name_live` | both rename a day to the same thing | Both live. Loser keeps its name with a disambiguating suffix; the user renames it |
-| `workouts_single_open` | both have a session in progress | Newer stays open. Older is **completed**, never discarded — its sets are real work |
-| `regimes_single_active` | A activates PPL, B activates Upper/Lower | The *flag* is not merged at all — see [§ 8](#the-one-column-last-write-wins-cannot-decide). Both regimes survive; each phone derives which is active from `activated_at` |
-| `bodyweight_day_live` | both log today's weight | Genuinely the same measurement. LWW, tombstone the loser |
-| `cycles_regime_index_live` | both advance the cycle → two "cycle 7" | Both are real cycles. Loser renumbers to the next free index |
-| `regimes_identity_live` | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. **A shelf with no free slot cannot wrap** — see below |
-| `cycles_regime_open_live` | both advance a regime's cycle → two open cycles | Newer stays open, older is **completed** — the same answer as `workouts_single_open`, and `healDuplicateOpenCycles` already writes it |
+| Index                             | Two phones doing something ordinary               | Resolution                                                                                                                                                               |
+| --------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `set_logs_position_live`          | both add a set to one exercise                    | Both live. Loser takes the next free `setIndex`, ordered by `id` — UUID v7, so creation order, and both devices compute the same answer                                  |
+| `workout_exercises_position_live` | both add a movement to one workout                | as above, on `orderIndex`                                                                                                                                                |
+| `session_exercises_position_live` | both add an exercise to one day                   | as above                                                                                                                                                                 |
+| `sessions_position_live`          | both reorder the training days                    | as above                                                                                                                                                                 |
+| `sessions_name_live`              | both rename a day to the same thing               | Both live. Loser keeps its name with a disambiguating suffix; the user renames it                                                                                        |
+| `workouts_single_open`            | both have a session in progress                   | Newer stays open. Older is **completed**, never discarded — its sets are real work                                                                                       |
+| `regimes_single_active`           | A activates PPL, B activates Upper/Lower          | The _flag_ is not merged at all — see [§ 8](#the-one-column-last-write-wins-cannot-decide). Both regimes survive; each phone derives which is active from `activated_at` |
+| `bodyweight_day_live`             | both log today's weight                           | Genuinely the same measurement. LWW, tombstone the loser                                                                                                                 |
+| `cycles_regime_index_live`        | both advance the cycle → two "cycle 7"            | Both are real cycles. Loser renumbers to the next free index                                                                                                             |
+| `regimes_identity_live`           | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. **A shelf with no free slot cannot wrap** — see below                                                        |
+| `cycles_regime_open_live`         | both advance a regime's cycle → two open cycles   | Newer stays open, older is **completed** — the same answer as `workouts_single_open`, and `healDuplicateOpenCycles` already writes it                                    |
 
 **The seventh regime.** This section said a full shelf wraps and two programmes
 share a colour, and the schema says otherwise: `identity_index` carries a
-`CHECK (0..5)` *and* a unique index over live rows, so **six live regimes is the
+`CHECK (0..5)` _and_ a unique index over live rows, so **six live regimes is the
 ceiling**. Five live plus two devices each creating one offline is seven rows
 for six slots, and no re-slotting makes that fit — it is reachable by ordinary
 use, not only by a merge.
@@ -423,7 +423,7 @@ Resolution happens in the pull applier, using `nextPosition` and `renumber` from
 slot is chosen the same way whether the row came from a tap or from a server.
 
 **A reorder is not one of these collisions, and answering it as though it were
-destroys the order.** The table above is about two devices *appending*, where
+destroys the order.** The table above is about two devices _appending_, where
 the loser taking the next free slot is right. A permutation arriving row by row
 looks identical to the applier and is not: every row of it lands on a position
 another row of the same batch still holds, and shunting each one to the end in
@@ -457,7 +457,7 @@ history split across both. That last part is not cosmetic; it breaks the one
 thing the app exists for, because per-session progression is keyed to an
 exercise id.
 
-Deferring it removes the problem from the path where sign-in comes *before* use.
+Deferring it removes the problem from the path where sign-in comes _before_ use.
 Sign in and pull and the catalog arrives from the account, already carrying the
 user's own notes and edits. Decline, or find the account empty, and it is seeded
 then.
@@ -474,11 +474,11 @@ arrives by push or by merge. Rows the user created themselves carry no
 
 ### The three shapes
 
-| Local | Cloud | What happens |
-| --- | --- | --- |
-| nothing | data | **Pull.** New phone. Nothing to lose. |
-| training | empty | **Push.** First sign-in on the phone you have been using. |
-| training | training | **Ask.** Below. |
+| Local    | Cloud    | What happens                                              |
+| -------- | -------- | --------------------------------------------------------- |
+| nothing  | data     | **Pull.** New phone. Nothing to lose.                     |
+| training | empty    | **Push.** First sign-in on the phone you have been using. |
+| training | training | **Ask.** Below.                                           |
 
 ### The third shape
 
@@ -527,8 +527,8 @@ any of them:
 
 The dedup is [`catalog_merge.dart`](lib/domain/catalog_merge.dart) and is pure:
 among the live rows sharing a `starterKey`, the smallest id survives and every
-reference moves to it. *Deterministic* is the load-bearing half rather than
-*oldest*, because both phones run it over the same union without asking each
+reference moves to it. _Deterministic_ is the load-bearing half rather than
+_oldest_, because both phones run it over the same union without asking each
 other — a rule that disagreed with itself across two devices would tombstone
 both survivors and empty the catalog. **`workout_exercises.muscle` never moves.**
 It is a snapshot of what the movement trained the day it was logged, and only
@@ -561,38 +561,38 @@ missing from it is something not yet thought of, not something known to be
 safe** — and every row here becomes a test, so a later change that breaks one
 fails a build rather than a history.
 
-| # | Situation | What happens |
-| --- | --- | --- |
-| 1 | Two devices edit **different** rows | Union. Both survive. The overwhelming majority of all sync. |
-| 2 | Two devices edit the **same** row | Row LWW on `server_updated_at`, tie on `deviceId`. [§ 8](#8-conflict--two-versions-of-one-row) |
-| 3 | Two rows claim one slot | [§ 9](#9-collision--two-rows-one-slot). Nothing deleted. |
-| 4 | Both start a session | Newer stays open, older completed with its sets intact. |
-| 5 | Both activate a different regime | Both regimes survive. The flag is derived from `activated_at`, not merged. |
-| 6 | Both log today's bodyweight | Same measurement. LWW, loser tombstoned. |
-| 7 | Both append a set, exercise or day | Both survive; loser takes the next free position. |
-| 8 | A deletes a workout, B adds a set to it | The set arrives under a tombstoned parent, and `healOrphanedSnapshots` tombstones it at the end of every pull. It had to grow a second half for this: a delete takes the whole tree, so the set's *snapshot* is already tombstoned and the original pass — which looks for live snapshots under dead workouts — could not see it. |
-| 9 | Both delete, or one deletes and one restores | `deletedAt` is a column like any other. LWW. |
-| 10 | A device offline for months reconnects | Its old edits lose to newer server rows; rows it *created* are new and survive. Correct in both directions. |
-| 11 | Both train on the same day | Legal — no constraint, and training twice in a day is real. Two sessions appear; the user deletes one if it was a mistake. |
-| 12 | Killed mid-push | `dirty` stays set, upserts are idempotent, the retry is free. |
-| 13 | Killed mid-pull | The batch transaction rolls back and `last_pull_at` never moved. Re-pulled next time. |
-| 14 | Devices with skewed clocks | Ordering is `server_updated_at`, so a fast phone wins nothing. [§ 8](#8-conflict--two-versions-of-one-row) |
-| 15 | Merge pushes past six regimes | Six live regimes is the schema's ceiling, so the seventh lands **tombstoned** and is reported — everything logged under it arrives and is kept. [§ 9](#9-collision--two-rows-one-slot) |
-| 16 | A pulled row fails a local CHECK | Skipped, named through the failure channel, batch continues. [§ 13](#13-when-it-fails) |
-| 17 | Sign out mid-sync | Nothing shared. The queue stays on the device and resumes if the same account signs back in. |
-| 18 | Account holds rows from a newer build | [§ 14](#14-two-builds-one-account). Unknown columns ignored, missing ones defaulted. |
+| #   | Situation                                    | What happens                                                                                                                                                                                                                                                                                                                      |
+| --- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Two devices edit **different** rows          | Union. Both survive. The overwhelming majority of all sync.                                                                                                                                                                                                                                                                       |
+| 2   | Two devices edit the **same** row            | Row LWW on `server_updated_at`, tie on `deviceId`. [§ 8](#8-conflict--two-versions-of-one-row)                                                                                                                                                                                                                                    |
+| 3   | Two rows claim one slot                      | [§ 9](#9-collision--two-rows-one-slot). Nothing deleted.                                                                                                                                                                                                                                                                          |
+| 4   | Both start a session                         | Newer stays open, older completed with its sets intact.                                                                                                                                                                                                                                                                           |
+| 5   | Both activate a different regime             | Both regimes survive. The flag is derived from `activated_at`, not merged.                                                                                                                                                                                                                                                        |
+| 6   | Both log today's bodyweight                  | Same measurement. LWW, loser tombstoned.                                                                                                                                                                                                                                                                                          |
+| 7   | Both append a set, exercise or day           | Both survive; loser takes the next free position.                                                                                                                                                                                                                                                                                 |
+| 8   | A deletes a workout, B adds a set to it      | The set arrives under a tombstoned parent, and `healOrphanedSnapshots` tombstones it at the end of every pull. It had to grow a second half for this: a delete takes the whole tree, so the set's _snapshot_ is already tombstoned and the original pass — which looks for live snapshots under dead workouts — could not see it. |
+| 9   | Both delete, or one deletes and one restores | `deletedAt` is a column like any other. LWW.                                                                                                                                                                                                                                                                                      |
+| 10  | A device offline for months reconnects       | Its old edits lose to newer server rows; rows it _created_ are new and survive. Correct in both directions.                                                                                                                                                                                                                       |
+| 11  | Both train on the same day                   | Legal — no constraint, and training twice in a day is real. Two sessions appear; the user deletes one if it was a mistake.                                                                                                                                                                                                        |
+| 12  | Killed mid-push                              | `dirty` stays set, upserts are idempotent, the retry is free.                                                                                                                                                                                                                                                                     |
+| 13  | Killed mid-pull                              | The batch transaction rolls back and `last_pull_at` never moved. Re-pulled next time.                                                                                                                                                                                                                                             |
+| 14  | Devices with skewed clocks                   | Ordering is `server_updated_at`, so a fast phone wins nothing. [§ 8](#8-conflict--two-versions-of-one-row)                                                                                                                                                                                                                        |
+| 15  | Merge pushes past six regimes                | Six live regimes is the schema's ceiling, so the seventh lands **tombstoned** and is reported — everything logged under it arrives and is kept. [§ 9](#9-collision--two-rows-one-slot)                                                                                                                                            |
+| 16  | A pulled row fails a local CHECK             | Skipped, named through the failure channel, batch continues. [§ 13](#13-when-it-fails)                                                                                                                                                                                                                                            |
+| 17  | Sign out mid-sync                            | Nothing shared. The queue stays on the device and resumes if the same account signs back in.                                                                                                                                                                                                                                      |
+| 18  | Account holds rows from a newer build        | [§ 14](#14-two-builds-one-account). Unknown columns ignored, missing ones defaulted.                                                                                                                                                                                                                                              |
 
 ---
 
 ## 13. When it fails
 
-| Failure | What happens | What the user sees |
-| --- | --- | --- |
-| No network | Rows stay dirty, retry later | Nothing, until it has been a while |
-| Auth expired, refresh failed | Queue keeps filling, no data lost | Settings asks for a sign-in; the app keeps working |
-| Push rejected — RLS, constraint | `dirty` stays set, backed off, reported | The failure channel says it once |
-| Partial push | Upserts are idempotent; retry | Nothing |
-| Server row fails a local CHECK | Row skipped and reported, batch continues | The failure channel; the rest still lands |
+| Failure                         | What happens                              | What the user sees                                 |
+| ------------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| No network                      | Rows stay dirty, retry later              | Nothing, until it has been a while                 |
+| Auth expired, refresh failed    | Queue keeps filling, no data lost         | Settings asks for a sign-in; the app keeps working |
+| Push rejected — RLS, constraint | `dirty` stays set, backed off, reported   | The failure channel says it once                   |
+| Partial push                    | Upserts are idempotent; retry             | Nothing                                            |
+| Server row fails a local CHECK  | Row skipped and reported, batch continues | The failure channel; the rest still lands          |
 
 That last one matters more than it looks. The local database now refuses rows
 that cannot mean anything, and a pull is exactly the writer those constraints
@@ -602,7 +602,7 @@ and the other twenty thousand still arrive.
 Everything reportable goes through `core/failure.dart`, which already exists and
 already surfaces. Sync gets no error channel of its own.
 
-**A sentence said once is not an answer to *why is this still pending*.** A
+**A sentence said once is not an answer to _why is this still pending_.** A
 toast is gone in four seconds and a phone can be offline for a week, so the
 engine also carries a standing `SyncTrouble` — `offline` or `refused`, cleared
 by the first drain that lands — and Settings reads it under the account row. It
@@ -673,12 +673,12 @@ consequence of it. See [RULES.md § 3](RULES.md#3-schema-and-migrations).
 
 ### Settled, and where
 
-| Was open | Now | Why |
-| --- | --- | --- |
-| `journal_mode` | **WAL**, in the first phase | `delete` serialises a sync reader against a UI writer completely, and `busy_timeout = 5000` turns that into a screen waiting on a background job. WAL lets them overlap for a little durability. Decided early on purpose: every later test then runs on the mode the phone runs on |
-| The client library | **`supabase_flutter`**, realtime never opened | Google sign-in, a persisted session and silent refresh are the parts worth not hand-rolling. Wrapped behind our own interface so nothing under `features/` imports it, and no socket is ever held — [§ 1](#1-what-this-is-and-is-not) rules that out |
-| Where the server schema lives | **`supabase/migrations/*.sql`, in this repo** | The RLS policies are the whole of the security, and a policy that exists only in a browser has no diff, no review and no way to be rebuilt onto a fresh project |
-| How the keys reach the app | **`--dart-define`** | The anon key is extractable from any APK and RLS is what protects the data ([§ 3](#3-identity)), so this is hygiene rather than secrecy — it keeps a live project reference out of the tree |
+| Was open                      | Now                                           | Why                                                                                                                                                                                                                                                                                 |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `journal_mode`                | **WAL**, in the first phase                   | `delete` serialises a sync reader against a UI writer completely, and `busy_timeout = 5000` turns that into a screen waiting on a background job. WAL lets them overlap for a little durability. Decided early on purpose: every later test then runs on the mode the phone runs on |
+| The client library            | **`supabase_flutter`**, realtime never opened | Google sign-in, a persisted session and silent refresh are the parts worth not hand-rolling. Wrapped behind our own interface so nothing under `features/` imports it, and no socket is ever held — [§ 1](#1-what-this-is-and-is-not) rules that out                                |
+| Where the server schema lives | **`supabase/migrations/*.sql`, in this repo** | The RLS policies are the whole of the security, and a policy that exists only in a browser has no diff, no review and no way to be rebuilt onto a fresh project                                                                                                                     |
+| How the keys reach the app    | **`--dart-define`**                           | The anon key is extractable from any APK and RLS is what protects the data ([§ 3](#3-identity)), so this is hygiene rather than secrecy — it keeps a live project reference out of the tree                                                                                         |
 
 **Email sign-in** stays out for now. Google only to start, and adding a second
 provider changes nothing below [§ 3](#3-identity).
@@ -751,8 +751,8 @@ document had been stating twice in prose.
 
 Four methods: upsert a batch, read everything since a cursor, count the rows on
 the account, and read the largest value of one column. The last two exist only
-so [§ 10](#10-adoption)'s prompt can say *214 sessions, most recently 3 March*
-rather than *some*. The column is named by the caller because the date the
+so [§ 10](#10-adoption)'s prompt can say _214 sessions, most recently 3 March_
+rather than _some_. The column is named by the caller because the date the
 prompt wants is `workouts.started_at` — when the user trained — and not
 `updated_at`, which would report a decade-old session as today's the moment a
 merge restamped it.
@@ -777,8 +777,8 @@ upsert that is idempotent anyway.
 ### The wire
 
 Drift's generated `fromJson` reads the keys it knows and ignores the rest, so
-half of [§ 14](#14-two-builds-one-account) — *a column the reader has never heard
-of is ignored* — is already true and costs a test rather than a mechanism. The
+half of [§ 14](#14-two-builds-one-account) — _a column the reader has never heard
+of is ignored_ — is already true and costs a test rather than a mechanism. The
 other half is the default map, which the registry above already carries.
 
 Two mismatches between what drift writes and what Postgres wants, both quiet:
@@ -791,7 +791,7 @@ Two mismatches between what drift writes and what Postgres wants, both quiet:
   to type a column into silence.
 - **`exercises.form_video_urls` is `text` server-side, not `jsonb`.**
   `StringListConverter` is a `JsonTypeConverter<List<String>, String>`, so the
-  JSON form of that column is a string *containing* JSON rather than an array. A
+  JSON form of that column is a string _containing_ JSON rather than an array. A
   `jsonb` column would round-trip it into a JSON string of a string. `text`, and
   the converter carries on doing its own decoding — it already never throws, so
   a malformed list from a server reads as no links instead of blanking the
@@ -840,7 +840,7 @@ already does.
 `Local`, `Synced` and `Pending` are derived: count the rows still owed, read
 `last_pull_at`, and that is the whole of it. Nothing to keep in step, because
 there is no second copy of the answer — which is the same reason
-[§ 2](#2-the-three-states) has no state for *syncing right now*.
+[§ 2](#2-the-three-states) has no state for _syncing right now_.
 
 Counting what is owed needs an index, though. `COUNT(*) WHERE dirty` across a
 `set_logs` holding 168k rows is a scan, re-run every time a set is ticked; a
@@ -872,7 +872,7 @@ doc comment since the columns were written; the symbol never existed.
 Seven, each ending in something that can be driven on a phone. The order is not
 arbitrary: **the ladder is a prerequisite of sync rather than a consequence of
 it** ([RULES § 3](RULES.md#3-schema-and-migrations)), because sync is precisely
-what lets two devices running *different builds* exchange rows.
+what lets two devices running _different builds_ exchange rows.
 
 ### 0 · The ground
 
@@ -899,7 +899,7 @@ Local, testable today, and blocking everything after it.
   no network at all, and every request fails with a `SocketException` that reads
   like a broken server.
 
-*Done when* the upgrade test passes over a fully populated database, the journal
+_Done when_ the upgrade test passes over a fully populated database, the journal
 mode reads `wal` off a file, and a reinstall has stopped being the upgrade path.
 
 ### 1 · The server
@@ -915,7 +915,7 @@ clock conflicts are decided on is the server's and a client cannot forge it.
 `app_settings` is not created server-side. It never syncs, `device_id` least of
 all.
 
-*Done when* a reset rebuilds the schema from the migration alone, and a test
+_Done when_ a reset rebuilds the schema from the migration alone, and a test
 proves RLS refuses a row belonging to somebody else.
 
 ### 2 · Identity
@@ -940,7 +940,7 @@ a table that is not empty.
 
 Settings gains the account section.
 
-*Done when* a sign-in survives a force-stop, and declining is final, repairable
+_Done when_ a sign-in survives a force-stop, and declining is final, repairable
 from Settings, and never asked again.
 
 ### 3 · Push
@@ -958,7 +958,7 @@ The lifecycle hook is new. There is exactly one `WidgetsBindingObserver` in the
 app and it belongs to the log screen, which is already carrying the rest alarm;
 sync mounts its own at the root.
 
-*Done when* a session logged in a basement reads `Pending`, arrives when the
+_Done when_ a session logged in a basement reads `Pending`, arrives when the
 signal does, and the server's row count matches the phone's.
 
 ### 4 · Pull
@@ -969,7 +969,7 @@ advanced only after it commits. Tombstones arrive as rows and stay tombstones. A
 row that fails a local `CHECK` is skipped, named, and the batch carries on.
 `repairDatabase` after each one.
 
-*Done when* every row of [§ 12](#12-every-edge-case-and-what-it-does) is a
+_Done when_ every row of [§ 12](#12-every-edge-case-and-what-it-does) is a
 passing test and the two-device fuzz converges.
 
 ### 5 · Adoption
@@ -979,7 +979,7 @@ The losing side written to a backup file first, automatically, before anything
 is overwritten.
 
 Not a rare path: installing with no signal, training for a month and signing in
-afterwards is the *likely* order, and it seeds a catalog locally before ever
+afterwards is the _likely_ order, and it seeds a catalog locally before ever
 meeting the account's.
 
 ### 6 · The states, and the failures
@@ -1005,8 +1005,8 @@ shrinking. Two devices, random operations on both, syncing at random points, and
 after every step the oracle on both databases plus **a convergence check**: once
 both sides are quiet and have synced twice, they hold the same rows. That is the
 only thing that can find a collision this document merely anticipated.
-`invariant_oracle.dart` was written for it — its header already names *"after
-SYNC.md a row another device pushed"* as the third case a schema constraint
+`invariant_oracle.dart` was written for it — its header already names _"after
+SYNC.md a row another device pushed"_ as the third case a schema constraint
 cannot speak to.
 
 ---
@@ -1016,7 +1016,7 @@ cannot speak to.
 The ones this feature can hit that are specific to this codebase.
 [RULES § 4](RULES.md#4-code) holds the rest and they all still apply.
 
-- **Never watch a constant query.** Sync wants *is anything owed*, which is
+- **Never watch a constant query.** Sync wants _is anything owed_, which is
   exactly the shape that tempts a `customSelect('SELECT 1', readsFrom: …)` — and
   that fires once and goes silent forever with no error anywhere. `watchQuery`,
   which was already hardened for a pull landing a batch of rows in the middle of
@@ -1035,7 +1035,7 @@ The ones this feature can hit that are specific to this codebase.
 - **Catalog dedup repoints `workout_exercises.exercise_id`**, and that is
   correct: both rows are the same seeded movement, and leaving them split is the
   bug, because prefill is keyed on the exercise id. It must not touch `muscle`,
-  which is a snapshot of what the set trained and is *entitled* to disagree with
+  which is a snapshot of what the set trained and is _entitled_ to disagree with
   the catalog — that is the whole reason the column exists.
 - **WAL leaves `-wal` and `-shm` files beside the database.** Nothing copies the
   database file today — a backup writes JSON — so this is safe, and it stops
