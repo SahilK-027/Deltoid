@@ -46,7 +46,11 @@ Future<void> showExerciseInfo(
   final exercise = entry.exercise;
   final videos = exercise.formVideoUrls;
   final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-  final bar = exercise.barKind;
+  // The bar this session is on, rather than whatever the catalog names today.
+  // A day can override it and the logged row snapshots what was used, and the
+  // keypad below this sheet already draws its plates off that — a catalog
+  // answer here would state one fact twice on one screen, differently (rule 6).
+  final bar = entry.workoutExercise.barKind ?? exercise.barKind;
 
   await showModalBottomSheet<void>(
     // The route holds the system bars: a sheet that sizes itself can

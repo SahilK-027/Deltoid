@@ -211,9 +211,10 @@ void main() {
 /// **This is the schema as it stood when the backup format was fixed**, and
 /// every column added since is absent from it on purpose — each one carries a
 /// default in `tableSpecs` instead, spread under the row so an older one lands
-/// anyway. `barKind`, `measureMode`, `identityIndex`, `muscle`, `partialReps`
-/// and `tzOffsetMinutes` are the six, and the last is derived from the row
-/// rather than constant.
+/// anyway. `barKind` — on the catalog row, and since schema 4 on the day's slot
+/// and the logged row as well — `measureMode`, `identityIndex`, `muscle`,
+/// `partialReps` and `tzOffsetMinutes` are the ones, and the last is derived
+/// from the row rather than constant.
 ///
 /// Adding a name here is a claim that no row anywhere lacks the column. That is
 /// only ever true of a column that predates the first export, which is why this

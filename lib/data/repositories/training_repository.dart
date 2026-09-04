@@ -968,16 +968,38 @@ class TrainingRepository {
         .getSingleOrNull();
     final sessionId = workout?.sessionId;
     if (sessionId != null) {
-      final slot = await (db.select(db.sessionExercises)
-            ..where((t) =>
-                t.sessionId.equals(sessionId) &
-                t.exerciseId.equals(exerciseId) &
-                t.deletedAt.isNull()))
-          .getSingleOrNull();
+      final slot = await _slotFor(sessionId: sessionId, exerciseId: exerciseId);
       final own = slot?.barKind;
       if (own != null) return own;
     }
     return (await _catalogBarsOf([exerciseId]))[exerciseId] ?? BarKind.none;
+  }
+
+  /// The template slot for one movement in one day.
+  ///
+  /// **Ordered and limited rather than asked for as a single row**, because a
+  /// day is allowed to hold the same movement twice — squats early and again
+  /// as a burnout — and the picker says so in as many words: it *marks* an
+  /// exercise already in the session rather than refusing it. `getSingleOrNull`
+  /// throws on two rows, and it throws inside a tap handler, so the symptom of
+  /// a supported thing to do was a menu that would not open at all. A merge or
+  /// a restore can deliver the same shape without anyone having chosen it.
+  ///
+  /// The first occurrence in the day wins, so every reader agrees on which slot
+  /// answers for the movement rather than each getting whichever row SQLite
+  /// happened to return.
+  Future<SessionExercise?> _slotFor({
+    required String sessionId,
+    required String exerciseId,
+  }) {
+    return (db.select(db.sessionExercises)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.exerciseId.equals(exerciseId) &
+              t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)])
+          ..limit(1))
+        .getSingleOrNull();
   }
 
   /// The template slot a logged exercise came from, or null when there is
@@ -992,12 +1014,7 @@ class TrainingRepository {
     required String exerciseId,
   }) async {
     if (sessionId == null) return null;
-    final slot = await (db.select(db.sessionExercises)
-          ..where((t) =>
-              t.sessionId.equals(sessionId) &
-              t.exerciseId.equals(exerciseId) &
-              t.deletedAt.isNull()))
-        .getSingleOrNull();
+    final slot = await _slotFor(sessionId: sessionId, exerciseId: exerciseId);
     return slot?.id;
   }
 
@@ -2424,12 +2441,7 @@ class TrainingRepository {
     required String? sessionId,
   }) async {
     if (sessionId != null) {
-      final slot = await (db.select(db.sessionExercises)
-            ..where((t) =>
-                t.sessionId.equals(sessionId) &
-                t.exerciseId.equals(exerciseId) &
-                t.deletedAt.isNull()))
-          .getSingleOrNull();
+      final slot = await _slotFor(sessionId: sessionId, exerciseId: exerciseId);
       final target = slot?.restSeconds;
       // Clamped rather than trusted: the column accepts 1–3600 so that a
       // restore or a merge can always be written back, and this is the one

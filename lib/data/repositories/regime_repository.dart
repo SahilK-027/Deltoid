@@ -650,9 +650,22 @@ class RegimeRepository {
   /// they hold what was actually used, which is the whole reason the snapshot
   /// column exists ([WorkoutExercises.barKind]).
   ///
-  /// The open workout is matched on its session rather than on the slot: a
-  /// `workout_exercises` row points at the exercise and the workout, never at
-  /// the template row it was copied from.
+  /// The open workout is matched on its session and its exercise rather than on
+  /// the slot: a `workout_exercises` row points at the exercise and the
+  /// workout, never at the template row it was copied from.
+  ///
+  /// **One limit falls out of that, and there is no column to fix it with.** A
+  /// day may run the same movement twice — the picker marks a repeat rather
+  /// than refusing it — and those two slots can hold two different bars. Today's
+  /// rows cannot be told apart by slot, so naming a bar on either occurrence
+  /// writes it to both of today's rows. The slots themselves keep their own
+  /// answers, so next week opens correctly; it is only the session already in
+  /// progress that cannot distinguish them.
+  ///
+  /// "In progress" is also literal rather than "today": a session of this day
+  /// left open from a previous week is still open, and is patched with it. That
+  /// is the right answer — it has not been recorded as anything yet — but it is
+  /// worth knowing it is the rule being applied.
   Future<void> setSessionExerciseBarKind(
     String slotId,
     BarKind? barKind,

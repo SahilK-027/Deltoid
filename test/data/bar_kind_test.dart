@@ -62,18 +62,24 @@ void main() {
             ..where((t) =>
                 t.sessionId.equals(sessionId) &
                 t.exerciseId.equals(exerciseId) &
-                t.deletedAt.isNull()))
+                t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)])
+            ..limit(1))
           .getSingle();
 
-  /// The bar a workout actually recorded for one movement.
+  /// The bar a workout actually recorded for one movement — its first
+  /// occurrence, since a day may run the same movement twice and a workout
+  /// then carries a row per slot.
   Future<BarKind?> loggedBar(String workoutId, String exerciseId) async =>
       (await (db.select(db.workoutExercises)
                 ..where((t) =>
                     t.workoutId.equals(workoutId) &
                     t.exerciseId.equals(exerciseId) &
-                    t.deletedAt.isNull()))
-              .getSingle())
-          .barKind;
+                    t.deletedAt.isNull())
+                ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)])
+                ..limit(1))
+              .getSingleOrNull())
+          ?.barKind;
 
   test('a workout records the bar it was trained on', () async {
     final regime = await activeRegime();
@@ -219,6 +225,51 @@ void main() {
         displaced.workoutExercise.id, curl.id);
 
     expect(await loggedBar(id, curl.id), curl.barKind);
+  });
+
+  test('a day may hold one movement twice, and nothing throws', () async {
+    // The picker *marks* an exercise already in the session rather than
+    // refusing it — squats early and again as a burnout is a real thing to do,
+    // and `pickExercise` says so in as many words. Every read that resolves a
+    // movement to its slot therefore has to survive two rows. `getSingleOrNull`
+    // does not: it throws, inside a tap handler, so the symptom was a ⋯ menu
+    // that would not open. A merge or a restore can deliver the same shape
+    // without anyone having chosen it.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final exercise = await shared();
+
+    final second = await regimes.addExerciseToSession(push1.id, exercise.id);
+    final slots = await (db.select(db.sessionExercises)
+          ..where((t) =>
+              t.sessionId.equals(push1.id) &
+              t.exerciseId.equals(exercise.id) &
+              t.deletedAt.isNull()))
+        .get();
+    expect(slots, hasLength(2), reason: 'the day now runs it twice');
+
+    // The first occurrence answers, so every reader agrees which slot speaks
+    // for the movement.
+    final first = slots.reduce((a, b) => a.orderIndex <= b.orderIndex ? a : b);
+    expect(
+      await repo.slotIdFor(sessionId: push1.id, exerciseId: exercise.id),
+      first.id,
+    );
+    expect(second, isNot(first.id));
+
+    // And the reads that used to throw all answer instead.
+    expect(
+      await repo.restTargetFor(
+          exerciseId: exercise.id, sessionId: push1.id),
+      120,
+    );
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    expect(await loggedBar(id, exercise.id), isNotNull);
+
+    await repo.replaceExerciseInWorkout(
+      (await repo.workoutDetail(id))!.entries.first.workoutExercise.id,
+      exercise.id,
+    );
   });
 
   test('a completed workout is untouched by a later change to its day',
