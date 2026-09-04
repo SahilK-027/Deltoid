@@ -21,6 +21,7 @@ import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/prefill.dart';
+import '../../domain/rest.dart';
 import '../../domain/units.dart';
 import 'log_providers.dart';
 import 'session_summary_screen.dart';
@@ -116,7 +117,55 @@ class _LogScreenState extends ConsumerState<LogScreen>
   final _openSwipe = ValueNotifier<String?>(null);
   Timer? _clock;
   DateTime? _restStartedAt;
-  int _restTargetSeconds = 120;
+  int _restTargetSeconds = kDefaultRestSeconds;
+
+  /// **Who owns the end of this rest.**
+  ///
+  /// True while the OS holds an exact alarm for it and this screen has not
+  /// taken the job back. The alarm is armed the moment the rest starts rather
+  /// than when the app is backgrounded, which is the fix for a rest that never
+  /// made a sound: backgrounding is not the only way this process stops
+  /// running, and every other way left nothing scheduled at all — so the tone
+  /// arrived when the phone was picked back up, or not at all.
+  ///
+  /// A beat before it is due, [_takeBackRestAlert] cancels the alarm and hands
+  /// the moment to [_fireAt], so a phone you are looking at buzzes without
+  /// throwing a notification across the screen. If this process is asleep, the
+  /// hand-back never runs and the alarm rings on time.
+  bool _alarmArmed = false;
+
+  /// Cancels the OS alarm just before it would fire. [_fireAt] then does it
+  /// in-app, on the second.
+  Timer? _preFire;
+  Timer? _fireAt;
+
+  /// How early the alert is taken back from the OS. Long enough for the cancel
+  /// to reach the alarm manager, short enough that losing the window costs a
+  /// rest alert only if the process is suspended inside it.
+  static const _handover = Duration(milliseconds: 400);
+
+  /// A hair past the end of the rest rather than exactly on it.
+  ///
+  /// [_checkRestElapsed] reads whole seconds off `DateTime.difference`, which
+  /// truncates: a timer that lands a millisecond early sees one second still
+  /// on the clock, declines to fire, and leaves the tone to the one-second
+  /// clock — which is the imprecision the timer exists to avoid.
+  static const _fireMargin = Duration(milliseconds: 50);
+
+  /// Where this process is, as of the last callback.
+  ///
+  /// The alert is only ever taken back from the OS while this is `resumed`.
+  /// Backgrounded, the timers may keep running for a while yet — Android does
+  /// not suspend a process the instant it stops being visible — and taking the
+  /// alert back there would cancel a working alarm in favour of playing audio
+  /// from a process that is on its way to being frozen. That is the bug this
+  /// whole file exists to stop, arrived at from the other direction.
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+
+  /// Whether the rest now running is the gap between two exercises rather than
+  /// between two sets of one. The ± writes itself down against the exercise on
+  /// screen, and that number is not the exercise's — see [_adjustRest].
+  bool _restIsBetweenExercises = false;
 
   /// The target belonging to the exercise now on screen, held back while a
   /// rest started under the previous exercise is still running. Turning the
@@ -197,6 +246,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // A workout you have left holds no row on the lock screen, and no alarm.
     WorkoutNotifications.instance.clear().ignore();
     _clock?.cancel();
+    _preFire?.cancel();
+    _fireAt?.cancel();
     _restBarHide?.cancel();
     _buffer.dispose();
     _openSwipe.dispose();
@@ -208,19 +259,27 @@ class _LogScreenState extends ConsumerState<LogScreen>
     super.dispose();
   }
 
-  /// Hands the rest over to the OS when the app stops running, and takes it
-  /// back when it starts again.
+  /// Re-arms the rest alert around a process that may be about to stop, or has
+  /// just started, running.
   ///
   /// Everything on this screen that counts — the bar, the buzz — is driven by
   /// a Dart `Timer`, and Android freezes those the moment the process is
-  /// suspended. Put the phone face down between sets and the tone did not play
-  /// at the end of the rest; it played when the phone was picked back up,
-  /// which is late enough to be worse than nothing. So on the way out the end
-  /// of the rest is scheduled as a real alarm, and on the way back in that
-  /// alarm is cancelled because the in-app one can do the job again.
+  /// suspended. The alarm that covers that is now armed at the *start* of
+  /// every rest ([_armRestAlert]) rather than here, because this method used
+  /// to be the only thing that armed it: a process suspended without a clean
+  /// `paused` — or one whose timers were simply throttled behind a screen that
+  /// stayed on — had nothing scheduled, and the tone played when the phone was
+  /// picked back up, or never.
+  ///
+  /// What is left here are the two edges. On the way out, an alert this screen
+  /// had already taken back for itself is handed to the OS again, so the
+  /// 400 ms hand-over window cannot swallow it. On the way back in, the alarm
+  /// and the hand-over are both re-scheduled against the wall clock, which
+  /// moved while the timers did not.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    _lifecycle = state;
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
@@ -233,21 +292,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // number the debounce exists to avoid writing eight times, lost for the
         // one reason it must not be.
         _flushWrite();
-        final startedAt = _restStartedAt;
-        if (startedAt != null && !_restAlerted) {
-          WorkoutNotifications.instance
-              .scheduleRestDone(
-                startedAt.add(Duration(seconds: _restTargetSeconds)),
-                body: _detail?.session?.name,
-              )
-              .ignore();
-        }
+        if (_restStartedAt != null && !_restAlerted) _armRestAlert();
       case AppLifecycleState.resumed:
-        WorkoutNotifications.instance.cancelRest().ignore();
         // The clock kept running in the world while it was stopped in here, so
         // a rest that ended while the phone was away is settled on sight
         // rather than up to a second later.
         _checkRestElapsed();
+        if (_restStartedAt != null && !_restAlerted) _armRestAlert();
       case AppLifecycleState.inactive:
         // A shade pulled halfway down, a call coming in. Nothing has stopped.
         break;
@@ -277,6 +328,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
           restEndsAt: resting
               ? startedAt.add(Duration(seconds: _restTargetSeconds))
               : null,
+          // What the line should say once that countdown is spent. Handed over
+          // with it, because at that moment this process may not be running to
+          // say anything at all — which is how the lock screen ended up
+          // counting down past zero into a negative number.
+          afterRestBody: '$done of $total sets',
         )
         .ignore();
   }
@@ -298,7 +354,18 @@ class _LogScreenState extends ConsumerState<LogScreen>
     }
     if (_restAlerted) return;
     _restAlerted = true;
-    RestAlert.instance.fire();
+    _preFire?.cancel();
+    _fireAt?.cancel();
+    if (_alarmArmed) {
+      // The OS still holds this one, which means it has already rung — or is
+      // about to, within the second. This is the path a phone left face down
+      // comes back on, and firing here as well is what used to make the tone
+      // play a second time when it was picked up. Nothing to do but record
+      // that the rest is over.
+      _alarmArmed = false;
+    } else {
+      _fireInAppAlert();
+    }
     // The countdown on the lock screen is over too, and nothing else rebuilds
     // this screen for another five seconds.
     _postSessionNotification();
@@ -359,30 +426,187 @@ class _LogScreenState extends ConsumerState<LogScreen>
     return DateTime.now().difference(startedAt).inSeconds < _restTargetSeconds;
   }
 
-  void _startRest() {
+  /// Everything Settings decides about rest. Read rather than watched: this
+  /// screen does not redraw for a preference, it consults it at the moment a
+  /// rest starts or ends.
+  RestPrefs get _restPrefs =>
+      ref.read(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
+
+  /// How long the rest after [setId] should run and whether it is the gap
+  /// between two exercises, or null when there is nothing left to rest for.
+  ///
+  /// Two durations, because they are two different pauses. Another set of the
+  /// same movement is the exercise's own rest. The last set of an exercise is
+  /// the walk to the next machine, which has one number for the whole app —
+  /// [RestPrefs.betweenExercises] — because it is a property of the gym rather
+  /// than of the lift.
+  ///
+  /// [setId] is excluded by id rather than by its flag: the write marking it
+  /// done is still in flight, so it is still open in the snapshot this reads.
+  (int, bool)? _restDurationAfter(String setId) {
+    final detail = _detail;
+    if (detail == null) return null;
+
+    var openHere = false;
+    var openElsewhere = false;
+    for (final entry in detail.entries) {
+      if (entry.workoutExercise.skipReason != SkipReason.none) continue;
+      final holdsIt = entry.sets.any((s) => s.id == setId);
+      for (final set in entry.sets) {
+        if (set.id == setId || set.isDone) continue;
+        if (holdsIt) {
+          openHere = true;
+        } else {
+          openElsewhere = true;
+        }
+      }
+    }
+
+    // A target held back by a page turn is the newest word on this exercise —
+    // see [_pendingRestTarget].
+    if (openHere) return (_pendingRestTarget ?? _restTargetSeconds, false);
+    if (openElsewhere) return (_restPrefs.betweenExercises, true);
+    return null;
+  }
+
+  void _startRest((int, bool) rest) {
+    final (seconds, betweenExercises) = rest;
     _restBarHide?.cancel();
     setState(() {
-      final pending = _pendingRestTarget;
-      if (pending != null) {
-        _restTargetSeconds = pending;
-        _pendingRestTarget = null;
-      }
+      _restTargetSeconds = seconds;
+      _restIsBetweenExercises = betweenExercises;
+      _pendingRestTarget = null;
       _restStartedAt = DateTime.now();
       _restAlerted = false;
       _showRestBar = true;
     });
+    _armRestAlert();
+  }
+
+  /// Hands the end of this rest to the OS, and books the moment to take it
+  /// back.
+  ///
+  /// The alarm is the reliable half: `AlarmManager` fires whether or not this
+  /// process is running, and it is armed here — at the start of the rest —
+  /// precisely because there is no later moment this screen can count on
+  /// reaching. [_preFire] then cancels it a blink before it is due, so a phone
+  /// you are holding gets the in-app tone rather than a notification thrown
+  /// across the log; if the process is asleep by then, that cancel never runs
+  /// and the alarm rings on time.
+  ///
+  /// Safe to call again at any point in a rest: both the alarm and the timers
+  /// are replaced rather than added to.
+  void _armRestAlert() {
+    final startedAt = _restStartedAt;
+    if (startedAt == null || _restAlerted) return;
+    final endsAt = startedAt.add(Duration(seconds: _restTargetSeconds));
+
+    _alarmArmed = true;
+    WorkoutNotifications.instance
+        .scheduleRestDone(
+          endsAt,
+          body: _detail?.session?.name,
+          sound: _restPrefs.sound,
+        )
+        .ignore();
+
+    _preFire?.cancel();
+    _fireAt?.cancel();
+    _preFire = Timer(_untilNow(endsAt.subtract(_handover)), _takeBackRestAlert);
+  }
+
+  /// Takes the alert back from the OS and fires it here instead, on the second.
+  ///
+  /// Refused unless this process is on screen. A backgrounded app still runs
+  /// its timers for a while, so without this the alert would be taken off a
+  /// working alarm and handed to audio playback from a process the system is
+  /// about to freeze — silence at 0:00, which is the whole complaint. The
+  /// alarm simply stays armed and rings; a later resume re-books the hand-over
+  /// if there is still rest left to run.
+  void _takeBackRestAlert() {
+    final startedAt = _restStartedAt;
+    if (!mounted || !_alarmArmed || _restAlerted || startedAt == null) return;
+    if (_lifecycle != AppLifecycleState.resumed) return;
+    _alarmArmed = false;
+    WorkoutNotifications.instance.cancelRest().ignore();
+
+    // Not left to the one-second clock: it is not aligned to the end of the
+    // rest, so the tone would land up to a second after 0:00.
+    final endsAt = startedAt.add(Duration(seconds: _restTargetSeconds));
+    _fireAt?.cancel();
+    _fireAt = Timer(_untilNow(endsAt.add(_fireMargin)), () {
+      if (mounted) _checkRestElapsed();
+    });
+  }
+
+  /// The in-app half of the alert, with the OS behind it.
+  ///
+  /// This runs only where the alarm has already been cancelled, so if the tone
+  /// will not play there is nothing else left to make a sound — and a rest
+  /// that ends in silence is the bug being fixed, not an acceptable outcome.
+  /// So a refusal is answered by posting the alert that was taken back.
+  void _fireInAppAlert() {
+    final sound = _restPrefs.sound;
+    final name = _detail?.session?.name;
+    RestAlert.instance.fire(sound: sound).then((played) {
+      // `sound` is checked again rather than leaned on: `fire` reports a silent
+      // rest as discharged, so this is unreachable with the switch off — and a
+      // fallback that could make a noise the switch forbids is not something
+      // to leave resting on that.
+      if (played || !sound) return;
+      WorkoutNotifications.instance.showRestDoneNow(body: name).ignore();
+    }).ignore();
+  }
+
+  /// A delay that is never negative — a `Timer` built from one fires late
+  /// rather than immediately on some platforms, and every caller here means
+  /// "now" by it.
+  static Duration _untilNow(DateTime at) {
+    final delay = at.difference(DateTime.now());
+    return delay.isNegative ? Duration.zero : delay;
+  }
+
+  /// Drops a pending alert without ending the rest. The next [_armRestAlert]
+  /// or [_checkRestElapsed] decides what happens instead.
+  void _cancelRestAlert() {
+    _preFire?.cancel();
+    _fireAt?.cancel();
+    if (!_alarmArmed) return;
+    _alarmArmed = false;
+    WorkoutNotifications.instance.cancelRest().ignore();
   }
 
   /// Nudging the timer sets the target for this exercise, for good: next week
   /// opens on the number you settled on.
   Future<void> _adjustRest(WorkoutDetail detail, int delta) async {
-    final seconds = (_restTargetSeconds + delta).clamp(15, 900).toInt();
+    final seconds = clampRest(_restTargetSeconds + delta);
     // A hand on the ± is the latest word on the target, so a value held back
     // by a page turn does not get to overwrite it at the next set.
+    final startedAt = _restStartedAt;
+    final stillRunning = startedAt != null &&
+        DateTime.now().difference(startedAt).inSeconds < seconds;
     setState(() {
       _restTargetSeconds = seconds;
       _pendingRestTarget = null;
+      // An extended target puts rest back on the clock, and the alert with it.
+      if (stillRunning) _restAlerted = false;
     });
+    // The alert is booked against an end time, and the end time just moved.
+    _cancelRestAlert();
+    if (stillRunning) {
+      _armRestAlert();
+    } else {
+      _checkRestElapsed();
+    }
+
+    // **A nudge on this bar is not always about the exercise on screen.**
+    // The gap between two exercises has one number for the whole app and it
+    // lives in Settings; the ± writes itself down against the slot the page is
+    // showing, which during that gap is the exercise you have just finished or
+    // the one you are walking to. Writing there would quietly give a movement
+    // a rest that was never about it. Today only, then, and the lasting
+    // number stays a Settings decision.
+    if (_restIsBetweenExercises) return;
 
     if (detail.entries.isEmpty) return;
     final page = math.max(0, math.min(detail.entries.length - 1, _page));
@@ -432,6 +656,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // Everything below the database speaks the display unit; everything at or
     // below the repository speaks kilograms.
     _unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+    // Watched, though nothing on this screen draws it: [_restPrefs] reads it
+    // at the moment a set is ticked, and a provider nobody has subscribed to
+    // has not run its query yet — so the first rest of the session would have
+    // used the shipped defaults rather than the numbers in Settings.
+    ref.watch(restPrefsProvider);
 
     // The first page's rest target isn't known until the workout loads.
     if (detail != null && !_restTargetLoaded) {
@@ -1008,7 +1237,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Not after the last one. The rest bar has nothing to count towards
         // with the work over, and it sits directly under the button asking you
         // to finish — the tick path already knew this and this one did not.
-        if (_hasOpenSetsBesides(from.setId)) _startRest();
+        final nextRest = _restDurationAfter(from.setId);
+        if (nextRest != null) _startRest(nextRest);
       } else {
         // Nothing to complete the set with: keep the field, keep the keypad.
         return;
@@ -1074,7 +1304,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     if (!done) return;
     HapticFeedback.mediumImpact();
 
-    if (_hasOpenSetsBesides(set.id)) _startRest();
+    final nextRest = _restDurationAfter(set.id);
+    if (nextRest != null) _startRest(nextRest);
     _followTick(set.id);
   }
 
@@ -1121,21 +1352,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
       if (!set.isDone) return set;
     }
     return null;
-  }
-
-  /// Whether any set other than [setId] is still open.
-  ///
-  /// Rest is the gap before the next set. Tick the last one in the session and
-  /// there is no next set to rest for. The set being completed is excluded by
-  /// id rather than by its flag: the write marking it done is still in flight,
-  /// so it is still open in the snapshot this reads.
-  bool _hasOpenSetsBesides(String setId) {
-    final detail = _detail;
-    if (detail == null) return false;
-    return detail.entries
-        .where((e) => e.workoutExercise.skipReason == SkipReason.none)
-        .expand((e) => e.sets)
-        .any((s) => s.id != setId && !s.isDone);
   }
 
   /// The field standing between this set and being logged, if any.

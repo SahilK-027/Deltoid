@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**886 tests and nine pgTAP tests, analyzer clean.**
+**899 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -25,7 +25,11 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] One exercise per page: typed sets, set types, drop groups, delete, swap, skip, move, add mid-session, notes at three levels, force-stop recovery.
 - [x] Docked keypad, stepped by the plate increment, last time's value one tap away.
 - [x] Plate view inside the keypad, for a movement that knows its bar.
-- [x] Rest timer with tone, wakelock, an OS exact alarm in the background and an ongoing notification.
+- [x] Rest timer with tone, wakelock, an OS exact alarm and an ongoing notification.
+- [x] Rest is three numbers: per exercise in a day, a default in Settings, and one for the walk between exercises. The old fourth reading — the last rest a set happened to take — is gone.
+- [x] The alarm is armed as the rest starts, not as the app leaves; the app takes it back 400 ms early so exactly one alert lands, whichever half rings it.
+- [x] The lock-screen countdown stops itself at 0:00: a chronometer-less copy of the line is queued with the OS, because nothing here is awake to post one.
+- [x] The rest tone can be turned off in Settings. The buzz is not part of the switch.
 - [x] Ticking advances the keypad to the next open set, across pages, and closes on the last.
 - [x] Partial reps logged apart from full ones, shown as `8+3`, out of volume, e1RM and `beatsPrevious`.
 - [x] Isometric holds through `MeasureMode`, with a stopwatch in place of the keypad.

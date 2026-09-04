@@ -6,6 +6,7 @@ import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/muscle_volume.dart';
 import '../../domain/prefill.dart';
+import '../../domain/rest.dart';
 import '../../domain/session_diff.dart';
 import '../../domain/units.dart';
 import '../db/database.dart';
@@ -2335,9 +2336,10 @@ class TrainingRepository {
 
   /// The rest target for one exercise in one session, in seconds.
   ///
-  /// Falls back to the last rest actually taken on that exercise, then to two
-  /// minutes. The timer's doc comment always claimed rest was "captured without
-  /// asking for a single extra tap"; until now nothing wrote it down.
+  /// Two readings, in order: the slot's own number if it has been given one,
+  /// otherwise the default from Settings. Nothing else — see
+  /// [rest.dart](../../domain/rest.dart) for why the third reading, the last
+  /// rest actually taken on the movement, was taken out.
   Future<int> restTargetFor({
     required String exerciseId,
     required String? sessionId,
@@ -2350,36 +2352,23 @@ class TrainingRepository {
                 t.deletedAt.isNull()))
           .getSingleOrNull();
       final target = slot?.restSeconds;
-      if (target != null) return target;
+      // Clamped rather than trusted: the column accepts 1–3600 so that a
+      // restore or a merge can always be written back, and this is the one
+      // place that turns a stored number into a timer.
+      if (target != null) return clampRest(target);
     }
+    return restDefaultSeconds();
+  }
 
-    // Every tombstone on the way up, not only the set's own.
-    //
-    // This filtered `set_logs.deleted_at` alone, which made it the one read in
-    // the app that could see an orphan — a live set under a slot or a workout
-    // that had been deleted out from under it. No write path
-    // leaves that shape any more, but a restore or a merge can still deliver
-    // one, and a rest taken in a session that was deleted is not a rest this
-    // movement ever took.
-    final last = await (db.select(db.setLogs).join([
-      innerJoin(db.workoutExercises,
-          db.workoutExercises.id.equalsExp(db.setLogs.workoutExerciseId)),
-      innerJoin(
-          db.workouts, db.workouts.id.equalsExp(db.workoutExercises.workoutId)),
-    ])
-          ..where(db.workoutExercises.exerciseId.equals(exerciseId) &
-              db.setLogs.restSeconds.isNotNull() &
-              db.setLogs.deletedAt.isNull() &
-              db.workoutExercises.deletedAt.isNull() &
-              db.workouts.deletedAt.isNull())
-          ..orderBy([
-            OrderingTerm(
-                expression: db.setLogs.completedAt, mode: OrderingMode.desc)
-          ])
-          ..limit(1))
+  /// The rest an exercise with no number of its own opens on.
+  ///
+  /// The between-exercises number is not here: nothing below the widget layer
+  /// reads it, and `restPrefsProvider` is its one reader.
+  Future<int> restDefaultSeconds() async {
+    final row = await (db.select(db.appSettings)
+          ..where((t) => t.key.equals(restDefaultKey)))
         .getSingleOrNull();
-
-    return last?.readTable(db.setLogs).restSeconds ?? 120;
+    return parseRestSeconds(row?.value);
   }
 
   /// Remembers a rest target against the session slot, so next week opens with

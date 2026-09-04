@@ -18,7 +18,9 @@ import '../../data/backup/downloads.dart';
 import '../../data/sync/forget.dart';
 import '../../data/sync/sync_engine.dart';
 import '../../data/sync/sync_state.dart';
+import '../../domain/rest.dart';
 import '../account/sign_in_flow.dart';
+import '../regime/regime_settings.dart' show StepperRow;
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
@@ -125,6 +127,9 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(height: Space.section),
+        const SectionHeader('Rest'),
+        const _RestSection(),
         const SizedBox(height: Space.section),
         const SectionHeader('Units'),
         const _UnitPicker(),
@@ -644,6 +649,73 @@ String _since(DateTime at) {
       local.month == now.month &&
       local.day == now.day;
   return DateFormat(sameDay ? 'HH:mm' : 'd MMM').format(local);
+}
+
+/// **The three numbers rest runs on.**
+///
+/// The first two are defaults, not the whole story: an exercise inside a
+/// training day can carry its own rest, set on that exercise's own screen, and
+/// it outranks the default here. This section is what an exercise falls back
+/// to and what the walk to the next machine is worth.
+class _RestSection extends ConsumerWidget {
+  const _RestSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
+    final db = ref.read(databaseProvider);
+
+    return ListCard(
+      inset: Space.lg,
+      children: [
+        StepperRow(
+          label: 'Default rest',
+          helper: 'For an exercise that has not been given its own',
+          value: formatRestClock(prefs.defaultSeconds),
+          onDecrement: prefs.defaultSeconds > kMinRestSeconds
+              ? () => setRestDefaultSeconds(
+                    db,
+                    prefs.defaultSeconds - kRestStepSeconds,
+                  )
+              : null,
+          onIncrement: prefs.defaultSeconds < kMaxRestSeconds
+              ? () => setRestDefaultSeconds(
+                    db,
+                    prefs.defaultSeconds + kRestStepSeconds,
+                  )
+              : null,
+        ),
+        StepperRow(
+          label: 'Between exercises',
+          helper: 'After the last set of one, before the first of the next',
+          value: formatRestClock(prefs.betweenExercises),
+          onDecrement: prefs.betweenExercises > kMinRestSeconds
+              ? () => setRestBetweenExercisesSeconds(
+                    db,
+                    prefs.betweenExercises - kRestStepSeconds,
+                  )
+              : null,
+          onIncrement: prefs.betweenExercises < kMaxRestSeconds
+              ? () => setRestBetweenExercisesSeconds(
+                    db,
+                    prefs.betweenExercises + kRestStepSeconds,
+                  )
+              : null,
+        ),
+        AppRow(
+          title: 'Rest sound',
+          // The buzz is deliberately not part of this switch: it is the half
+          // that works with the phone face down on a bench, which is where it
+          // spends the rest.
+          subtitle: 'The tone at 0:00. The phone still buzzes either way.',
+          trailing: Switch(
+            value: prefs.sound,
+            onChanged: (on) => setRestSound(db, on),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Rows with radios, not a segmented pill: a pill fits the labels and nothing

@@ -4,6 +4,7 @@ import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
+import 'package:deltoid/domain/rest.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:deltoid/features/settings/bodyweight_screen.dart';
 import 'package:deltoid/features/settings/settings_screen.dart';
@@ -114,6 +115,14 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pump();
 
+      expect(find.text('Rest'), findsOneWidget);
+      expect(find.text('Default rest'), findsOneWidget);
+      expect(find.text('Between exercises'), findsOneWidget);
+      expect(find.text('Rest sound'), findsOneWidget);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
+
       expect(find.text('Units'), findsOneWidget);
       expect(find.text('Kilograms'), findsOneWidget);
       expect(find.text('Pounds'), findsOneWidget);
@@ -128,10 +137,92 @@ void main() {
       expect(find.text('About'), findsOneWidget);
     });
 
+    testWidgets('rest ships at two minutes, and the steps are quarter-minutes',
+        (tester) async {
+      await pump(tester, const SettingsScreen());
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
+
+      // Both numbers, before anything has been stored: the shipped default.
+      expect(find.text('2:00'), findsNWidgets(2));
+
+      // The + belonging to `Default rest` — the first stepper in the section.
+      final plus = find.descendant(
+        of: find.ancestor(
+          of: find.text('Default rest'),
+          matching: find.byType(Row),
+        ),
+        matching: find.byIcon(Icons.add_rounded),
+      );
+      await tester.tap(plus.first);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(find.text('2:15'), findsOneWidget);
+      final rows = await (db.select(db.appSettings)
+            ..where((t) => t.key.equals(restDefaultKey)))
+          .get();
+      expect(rows.single.value, '135');
+    });
+
+    testWidgets('the tone can be turned off; the buzz is not part of it',
+        (tester) async {
+      await pump(tester, const SettingsScreen());
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
+
+      expect(
+        find.text('The tone at 0:00. The phone still buzzes either way.'),
+        findsOneWidget,
+      );
+
+      // The switch belonging to `Rest sound`, not "whatever switch is last".
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Rest sound'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byType(Switch),
+        ).first,
+      );
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      final rows = await (db.select(db.appSettings)
+            ..where((t) => t.key.equals(restSoundKey)))
+          .get();
+      expect(rows.single.value, 'off');
+      final prefs = container.read(restPrefsProvider).valueOrNull;
+      expect(
+        prefs?.sound,
+        isFalse,
+        reason: 'the log screen reads this at the moment a rest ends',
+      );
+      // And the switch is about the tone alone: the two durations are
+      // untouched, and the between-exercises one still reads through the
+      // provider that is its only reader.
+      expect(prefs?.defaultSeconds, 120);
+      expect(prefs?.betweenExercises, 120);
+
+      await setRestBetweenExercisesSeconds(db, 210);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final moved = container.read(restPrefsProvider).valueOrNull;
+      expect(moved?.betweenExercises, 210);
+      expect(moved?.defaultSeconds, 120);
+    });
+
     testWidgets('the unit asks before it restates every number in the app', (
       tester,
     ) async {
       await pump(tester, const SettingsScreen());
+      // Two drags: Rest sits between Data and Units.
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pump();
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pump();
 

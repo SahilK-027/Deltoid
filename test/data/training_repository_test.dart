@@ -6,6 +6,7 @@ import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/prefill.dart';
+import 'package:deltoid/domain/rest.dart';
 import 'package:deltoid/domain/session_diff.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -1399,26 +1400,28 @@ void main() {
     );
   });
 
-  test('rest comes from the slot, then the last set, then 120', () async {
-    // The three tiers of `restTargetFor`, in order, each pinned by the number
-    // it must produce. Tiers 1 and 3 were already asserted above; the middle
-    // one — the last rest actually taken on that movement — was not, and it is
-    // the tier that makes the timer remember anything across sessions.
+  test('rest comes from the slot, then the default in Settings', () async {
+    // Two readings, and no third. There used to be one between them — the last
+    // rest actually taken on the movement, read off `set_logs` — and it is
+    // gone: a number arrived at by measuring how long someone took to pick
+    // their phone back up is not a target, and it made the timer open on a
+    // different number every week with nothing on screen to say why.
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
-    final first = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final first =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
     final detail = await repo.workoutDetail(first);
     final incline = detail!.entries.first;
 
-    // Tier 3, with nothing logged and no slot target.
+    // Nothing decided anywhere: the number the app ships with.
     expect(
       await repo.restTargetFor(
           exerciseId: incline.exercise.id, sessionId: push1.id),
       120,
     );
 
-    // Two rested sets, the older one first, so the tier-2 answer is the one
-    // that has to be picked by `completed_at` rather than by row order.
+    // A rest actually taken is still recorded against the set — it is a
+    // measurement, and history keeps it — but it no longer decides anything.
     await repo.updateSet(incline.sets.first.id,
         weight: const Value(22.5),
         reps: const Value(8),
@@ -1431,25 +1434,31 @@ void main() {
         restSeconds: const Value(150));
     await repo.completeWorkout(first);
 
-    // Tier 2: the newest rest actually taken, not the first one found.
     expect(
       await repo.restTargetFor(
           exerciseId: incline.exercise.id, sessionId: push1.id),
-      150,
-      reason: 'the rest you settled on last is the one to open on',
+      120,
+      reason: 'a logged rest is a measurement, not a decision',
     );
 
-    // Tier 2 is also what an exercise with no session at all must reach —
-    // `setRestTarget` returns false for those, so the floor would be the only
-    // other answer.
+    // The default is one number in Settings, and it is what an exercise with
+    // no rest of its own opens on — including one asked about outside any
+    // session at all.
+    await db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(key: restDefaultKey, value: '90'));
+    expect(await repo.restDefaultSeconds(), 90);
+    expect(
+      await repo.restTargetFor(
+          exerciseId: incline.exercise.id, sessionId: push1.id),
+      90,
+    );
     expect(
       await repo.restTargetFor(
           exerciseId: incline.exercise.id, sessionId: null),
-      150,
+      90,
     );
 
-    // Tier 1 outranks it: a slot target is a decision, a logged rest is a
-    // measurement.
+    // The slot outranks it: a slot target is a decision.
     await repo.setRestTarget(
         exerciseId: incline.exercise.id, sessionId: push1.id, seconds: 180);
     expect(
@@ -1459,91 +1468,29 @@ void main() {
     );
   });
 
-  test('Push 2 does not open on Push 1\'s rest target', () async {
-    // RULES § 1 in a smaller place. Incline press is in both push days on
-    // purpose, and each keeps its own progression — the rest target is part of
-    // that, so tier 1 has to be scoped by session and not only by exercise.
+  test('a stored rest outside the dialable range still opens a timer',
+      () async {
+    // The column accepts 1–3600 because a restore or a merge has to be able to
+    // write anything back. What a person may dial is narrower, and the reader
+    // is the one place that turns a stored number into a countdown — so it
+    // clamps rather than handing the timer a 55-minute rest.
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
-    final push2 = await sessionNamed('Push 2');
-
-    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
-    final detail = await repo.workoutDetail(id);
-    final incline = detail!.entries.first;
-    expect(incline.exercise.starterKey, 'incline_db_press',
-        reason: 'this test is about the movement that appears in both');
-
-    await repo.setRestTarget(
-        exerciseId: incline.exercise.id, sessionId: push1.id, seconds: 180);
-
-    expect(
-      await repo.restTargetFor(
-          exerciseId: incline.exercise.id, sessionId: push2.id),
-      120,
-      reason: 'Push 2 has its own slot for the same movement, and nothing has '
-          'been decided about it yet',
-    );
-  });
-
-  test('a tombstoned slot\'s sets are not the rest fallback', () async {
-    // The tier-2 query joins `workout_exercises` and filters
-    // only `set_logs.deleted_at`, so a live set under a tombstoned slot is
-    // visible to it. Every write path in the app now tombstones a slot's sets
-    // with the slot, so the only thing that can deliver this
-    // shape is a restore — or, after 5b, a merge. Written the way those
-    // deliver it: straight into the tables.
-    final regime = await activeRegime();
-    final push1 = await sessionNamed('Push 1');
-    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final id =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
     final detail = await repo.workoutDetail(id);
     final incline = detail!.entries.first;
 
-    await repo.updateSet(incline.sets.first.id,
-        weight: const Value(22.5),
-        reps: const Value(8),
-        isDone: const Value(true),
-        restSeconds: const Value(240));
-
-    // The slot goes; its set is left standing, which is what a hand-edited or
-    // merged file can carry in.
-    await (db.update(db.workoutExercises)
-          ..where((t) => t.id.equals(incline.workoutExercise.id)))
-        .write(WorkoutExercisesCompanion(deletedAt: Value(nowMs())));
+    await (db.update(db.sessionExercises)
+          ..where((t) =>
+              t.sessionId.equals(push1.id) &
+              t.exerciseId.equals(incline.exercise.id)))
+        .write(const SessionExercisesCompanion(restSeconds: Value(3600)));
 
     expect(
       await repo.restTargetFor(
-          exerciseId: incline.exercise.id, sessionId: null),
-      120,
-      reason: 'a rest taken in a slot that no longer exists is not a rest this '
-          'movement ever took',
-    );
-  });
-
-  test('a tombstoned workout\'s sets are not the rest fallback', () async {
-    // The same shape one level up, and it arrives the same way. The tier-2
-    // query does not join `workouts` at all, so a deleted workout's rest is
-    // still readable if its slots and sets are left live — which is exactly
-    // what a file that was short of a cascade carries.
-    final regime = await activeRegime();
-    final push1 = await sessionNamed('Push 1');
-    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
-    final detail = await repo.workoutDetail(id);
-    final incline = detail!.entries.first;
-
-    await repo.updateSet(incline.sets.first.id,
-        weight: const Value(22.5),
-        reps: const Value(8),
-        isDone: const Value(true),
-        restSeconds: const Value(240));
-
-    await (db.update(db.workouts)..where((t) => t.id.equals(id)))
-        .write(WorkoutsCompanion(deletedAt: Value(nowMs())));
-
-    expect(
-      await repo.restTargetFor(
-          exerciseId: incline.exercise.id, sessionId: null),
-      120,
-      reason: 'a deleted session did not happen, and its rests did not either',
+          exerciseId: incline.exercise.id, sessionId: push1.id),
+      kMaxRestSeconds,
     );
   });
 

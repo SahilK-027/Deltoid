@@ -318,10 +318,24 @@ rather than looks:
 - **A rest that has to ring on time is an OS alarm, not a `Timer`.** Android
   freezes Dart timers the moment the process is suspended, so a phone put down
   between sets buzzed when it was picked back up rather than when the rest was
-  up. The log screen schedules the end of the rest with
-  `WorkoutNotifications.scheduleRestDone` as it goes to the background and
-  cancels it on resume, so exactly one alert fires either way. The same rule
-  covers anything else that must happen at a wall-clock moment.
+  up. `_armRestAlert` hands the end of every rest to
+  `WorkoutNotifications.scheduleRestDone` **as the rest starts**, and
+  `_preFire` cancels it 400 ms before it is due so a phone you are holding
+  gets the in-app tone instead — exactly one alert fires either way. The same
+  rule covers anything else that must happen at a wall-clock moment.
+
+  **Arming it on the way to the background is not enough**, which is what this
+  used to do. Backgrounding is one of several ways a process stops running and
+  the only one that gets a callback, so every other way left nothing scheduled
+  at all: the alert went off when the phone was picked back up, or never, and
+  which of the two it was looked random from the gym floor.
+- **Anything the system draws for you, the system has to be told to stop.** The
+  ongoing notification's countdown is an Android chronometer, which is the only
+  reason it can be trusted while this process is asleep — and the reason it
+  keeps counting past zero into `-1:23` unless something replaces it. Nothing
+  in this app is awake at that moment by definition, so `showSession` queues a
+  second, chronometer-less copy of the line under the same id, timed to land as
+  the rest ends.
 - **Loading and empty are different states.** A screen with more than one query
   either tells them apart or is rebuilt around a single query. Collapsing them
   renders "nothing here" at data that is merely late.
@@ -412,8 +426,10 @@ command will pass.
 
 **The device belongs to the user.** Screens are driven on real hardware by the
 person who owns the phone, and are never launched from a session on their
-behalf. Five things still need hardware before they can be trusted: the rest
-tone, the haptics, the wakelock, audio ducking and the share sheet.
+behalf. Six things still need hardware before they can be trusted: the rest
+tone, the haptics, the wakelock, audio ducking, the share sheet, and the two
+halves of the rest alert — that the OS alarm rings on time with the phone
+asleep, and that the hand-back leaves exactly one sound behind.
 
 **Make one commit per coherent change**, and put the reasoning in the body. Say
 why the change was made rather than what it changed, because the diff already
@@ -453,6 +469,7 @@ rather than shape. Where the checks live now:
 | The merge order never runs out of discriminators                                        | `test/domain/sync_merge_test.dart` — two versions on one stamp and one device id still pick one winner, swapped                                                                                                                                                                                                                                                                                                                                                                                    |
 | The connection opens on the pragmas the durability claim rests on                       | `test/data/connection_pragmas_test.dart` — read off a real file, because in-memory sqlite is always `journal_mode = memory`                                                                                                                                                                                                                                                                                                                                                                        |
 | A backup file is never half a file                                                      | `test/data/backup_service_test.dart` — the rows go to a `.part` and the backup arrives by rename                                                                                                                                                                                                                                                                                                                                                                                                   |
+| A rest duration is decided by a slot then by Settings, and by nothing else               | `test/domain/rest_test.dart` and `test/data/training_repository_test.dart` — including a stored value from outside the dialable range, which the column has to accept and the timer must not                                                                                                                                                                                                                                                                                                       |
 | A stamp handed out is never handed out again, across a restart                          | `test/data/stamp_floor_test.dart` — the mark is seeded from `app_settings` at open, leased ahead of the clock, and written down at close                                                                                                                                                                                                                                                                                                                                                           |
 | Every merge rule is deterministic **and symmetric**                                     | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Two devices converge                                                                    | `TwoDevices.converge` in `test/data/sync/two_devices.dart`, used by every collision test                                                                                                                                                                                                                                                                                                                                                                                                           |

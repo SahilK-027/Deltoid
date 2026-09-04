@@ -612,6 +612,11 @@ class RegimeRepository {
     Value<int?> targetRepLow = const Value.absent(),
     Value<int?> targetRepHigh = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    /// Null means "use the default from Settings". A rest is per slot because
+    /// a heavy compound wants three minutes and a cable fly wants sixty
+    /// seconds, and re-dialling that on every exercise is the kind of friction
+    /// that gets an app closed mid-session.
+    Value<int?> restSeconds = const Value.absent(),
     /// Null means "follow the regime". An exercise that is already light does
     /// not need the same cut as a heavy compound, and the columns carried that
     /// distinction long before anything could set them.
@@ -624,6 +629,7 @@ class RegimeRepository {
         targetRepLow: targetRepLow,
         targetRepHigh: targetRepHigh,
         notes: notes,
+        restSeconds: restSeconds,
         deloadSetDelta: deloadSetDelta,
         deloadWeightPct: deloadWeightPct,
         deviceId: Value(currentDeviceId),

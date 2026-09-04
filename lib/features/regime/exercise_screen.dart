@@ -10,6 +10,7 @@ import '../../core/widgets/primitives.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/rest.dart';
 import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import '../history/exercise_history_screen.dart';
@@ -247,6 +248,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                     onTap: () => showTargetEditor(
                         context, ref, entry.slot, entry.exercise),
                   ),
+                  _RestRow(slot: entry.slot),
                   _DeloadSetsRow(slot: entry.slot, regime: regime),
                   _DeloadWeightRow(slot: entry.slot, regime: regime),
                   AppRow(
@@ -829,6 +831,64 @@ class _PickedValue extends StatelessWidget {
         const SizedBox(width: Space.sm),
         Icon(Icons.chevron_right_rounded,
             size: 18, color: context.c.textTertiary),
+      ],
+    );
+  }
+}
+
+/// The rest this exercise gets in this day.
+///
+/// The same shape as the deload rows below, and for the same reason: a null
+/// column means "use the default", the steps start from whatever that default
+/// is, and one row clears the override again. Three minutes for a heavy
+/// compound and sixty seconds for a cable fly is the whole point — it was only
+/// ever settable by nudging the ± on a timer that was already running, which
+/// meant it could not be decided while planning the day.
+///
+/// The default itself is in Settings, not here: a number that is true of every
+/// exercise does not belong on one exercise's screen.
+class _RestRow extends ConsumerWidget {
+  const _RestRow({required this.slot});
+
+  final SessionExercise slot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fallback =
+        (ref.watch(restPrefsProvider).valueOrNull ?? restPrefsDefaults)
+            .defaultSeconds;
+    final own = slot.restSeconds;
+    final live = clampRest(own ?? fallback);
+    final repo = ref.read(regimeRepositoryProvider);
+
+    void set(int? v) => repo.updateSessionExercise(
+          slot.id,
+          restSeconds: Value(v),
+        );
+
+    return Column(
+      children: [
+        StepperRow(
+          label: 'Rest',
+          helper: own == null ? 'Using the default' : 'This exercise only',
+          value: formatRestClock(live),
+          // Clamped on the way in as well as on the way out: a stored value
+          // off the 15-second grid — which a merge or an older ± can leave —
+          // would otherwise step straight past the floor and be written under
+          // it, to be silently clamped back on every read afterwards.
+          onDecrement: live > kMinRestSeconds
+              ? () => set(clampRest(live - kRestStepSeconds))
+              : null,
+          onIncrement: live < kMaxRestSeconds
+              ? () => set(clampRest(live + kRestStepSeconds))
+              : null,
+        ),
+        if (own != null)
+          AppRow(
+            title: 'Use the default again',
+            subtitle: 'Back to ${formatRestClock(fallback)}',
+            onTap: () => set(null),
+          ),
       ],
     );
   }

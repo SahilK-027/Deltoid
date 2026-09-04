@@ -7,6 +7,7 @@ import '../data/db/database.dart';
 import '../data/repositories/repairs.dart';
 import '../data/repositories/training_repository.dart';
 import '../domain/cycle_engine.dart';
+import '../domain/rest.dart';
 import '../domain/units.dart';
 import 'sync_providers.dart';
 
@@ -146,6 +147,68 @@ final weightUnitProvider = StreamProvider<WeightUnit>((ref) {
 Future<void> setWeightUnit(AppDatabase db, WeightUnit unit) {
   return db.into(db.appSettings).insertOnConflictUpdate(
         AppSettingsCompanion.insert(key: unitsKey, value: unit.name),
+      );
+}
+
+/// Everything Settings decides about rest, read as one row.
+///
+/// The keys are in `domain/rest.dart` with the parsing, because the repository
+/// reads two of them without Riverpod. They sit in `app_settings` with the
+/// theme and the units, which is to say local and never synced: how long you
+/// rest and whether your phone makes a noise about it are properties of a
+/// phone in a gym, not of an account.
+///
+/// One provider rather than three: the log screen wants all of it at once, and
+/// three `StreamProvider`s over the same table would be three watches on one
+/// query for the sake of looking tidy.
+typedef RestPrefs = ({int defaultSeconds, int betweenExercises, bool sound});
+
+const restPrefsDefaults = (
+  defaultSeconds: kDefaultRestSeconds,
+  betweenExercises: kDefaultRestSeconds,
+  sound: true,
+);
+
+final restPrefsProvider = StreamProvider<RestPrefs>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.appSettings)
+    ..where(
+      (t) => t.key.isIn([restDefaultKey, restBetweenExercisesKey, restSoundKey]),
+    );
+  return query.watch().map((rows) {
+    final byKey = {for (final row in rows) row.key: row.value};
+    return (
+      defaultSeconds: parseRestSeconds(byKey[restDefaultKey]),
+      betweenExercises: parseRestSeconds(byKey[restBetweenExercisesKey]),
+      sound: parseRestSound(byKey[restSoundKey]),
+    );
+  });
+});
+
+Future<void> setRestDefaultSeconds(AppDatabase db, int seconds) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: restDefaultKey,
+          value: '${clampRest(seconds)}',
+        ),
+      );
+}
+
+Future<void> setRestBetweenExercisesSeconds(AppDatabase db, int seconds) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: restBetweenExercisesKey,
+          value: '${clampRest(seconds)}',
+        ),
+      );
+}
+
+Future<void> setRestSound(AppDatabase db, bool on) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: restSoundKey,
+          value: on ? 'on' : 'off',
+        ),
       );
 }
 

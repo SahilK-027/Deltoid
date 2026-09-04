@@ -116,6 +116,53 @@ void main() {
     expect(feed.single.sessionName, 'Push 1');
   });
 
+  test('an exercise carries its own rest, and can be handed back the default',
+      () async {
+    // The column has existed since the first migration and could only be set
+    // by nudging the ± on a timer that was already running — which meant the
+    // one thing it is for, deciding that a heavy compound gets three minutes,
+    // could not be done while planning the day.
+    final regimeId = await repo.createRegime('PPL');
+    final sessionId = await repo.addSession(regimeId, 'Push 1');
+    final exercise = await (db.select(db.exercises)..limit(1)).getSingle();
+    final slotId = await repo.addExerciseToSession(sessionId, exercise.id);
+
+    Future<int?> stored() async => (await (db.select(db.sessionExercises)
+              ..where((t) => t.id.equals(slotId)))
+            .getSingle())
+        .restSeconds;
+
+    // Null is not "no rest": it is "use the default", which is what
+    // `restTargetFor` reads when it finds nothing here.
+    expect(await stored(), isNull);
+    expect(
+      await training.restTargetFor(
+          exerciseId: exercise.id, sessionId: sessionId),
+      120,
+    );
+
+    await repo.updateSessionExercise(slotId, restSeconds: const Value(180));
+    expect(await stored(), 180);
+    expect(
+      await training.restTargetFor(
+          exerciseId: exercise.id, sessionId: sessionId),
+      180,
+    );
+
+    await repo.updateSessionExercise(slotId, restSeconds: const Value(null));
+    expect(await stored(), isNull);
+    expect(
+      await training.restTargetFor(
+          exerciseId: exercise.id, sessionId: sessionId),
+      120,
+    );
+
+    // A write that says nothing about rest leaves it alone.
+    await repo.updateSessionExercise(slotId, restSeconds: const Value(150));
+    await repo.updateSessionExercise(slotId, targetSets: const Value(4));
+    expect(await stored(), 150);
+  });
+
   test('a removed exercise slot can be put back with its numbers intact',
       () async {
     final regimeId = await repo.createRegime('PPL');

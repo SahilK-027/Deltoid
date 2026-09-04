@@ -70,7 +70,18 @@ class RestAlert {
 
   /// Fires the alert. Haptics first — they are the half that works with the
   /// phone in a pocket, on silent, and with headphones in someone else's ears.
-  Future<void> fire() async {
+  ///
+  /// [sound] is the Settings switch. It silences the tone and nothing else:
+  /// the two pulses still fire, so a muted rest is still felt by a phone lying
+  /// on a bench next to you.
+  ///
+  /// **Returns whether the alert is fully discharged** — the tone played, or
+  /// none was owed. False means the haptics fired and the tone did not, which
+  /// the caller answers by handing the alert back to the OS rather than
+  /// letting a rest end in silence. Every failure here is a real one seen in a
+  /// gym: audio focus refused during a call, a player that would not build, a
+  /// process the system has stopped giving audio to.
+  Future<bool> fire({bool sound = true}) async {
     unawaited(HapticFeedback.heavyImpact());
     // A second pulse a beat later: one is easy to miss mid-set. Deliberately
     // not awaited — the alert must not hold the caller for 220ms.
@@ -81,20 +92,26 @@ class RestAlert {
       ),
     );
 
-    if (_unsupported) return;
+    // Nothing owed: the switch is off, or this platform has no audio to play
+    // through. Neither is a failure, and neither wants a notification thrown
+    // at it as a substitute.
+    if (!sound || _unsupported) return true;
     try {
       await warmUp();
       final player = _player;
-      if (player == null) return;
+      if (player == null) return false;
       // Rewind rather than re-load: rest can end twice in quick succession
       // when the target is nudged down.
       await player.stop();
       await player.resume();
+      return true;
     } on MissingPluginException {
       _unsupported = true;
+      return true;
     } catch (_) {
       // A refused audio focus, a device busy on a call. The haptics above
-      // already fired, and the next rest gets another go.
+      // already fired, and the caller still has the OS to fall back on.
+      return false;
     }
   }
 
