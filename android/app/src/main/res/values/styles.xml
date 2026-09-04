@@ -24,5 +24,14 @@
          frame or a resize can't flash white. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@color/splash_background</item>
+        <!-- Load-bearing, not decoration. Removing the platform splash applies
+             this theme to the window, and that application overwrites the bar
+             appearance Flutter had already set: without these the status bar
+             kept white icons over the light theme's white background, and read
+             as blank. Stated per mode so what the splash restores is right in
+             both. `_ReadyState._reassertOverlay` covers the rest — the theme
+             follows the system's night setting, the app's does not have to. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

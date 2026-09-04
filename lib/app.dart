@@ -136,14 +136,7 @@ class _Boot extends ConsumerWidget {
     // whatever the launch window left behind, which is white: correct on dark
     // and invisible on light, where the whole bottom strip read as a black
     // band under a white screen.
-    final overlay = SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: _iconsFor(context),
-      statusBarBrightness: Theme.of(context).brightness,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: _iconsFor(context),
-      systemNavigationBarDividerColor: Colors.transparent,
-    );
+    final overlay = _overlayFor(context);
 
     final init = ref.watch(appInitProvider);
     // Whether the one question has been put. Unanswered, the shell is not what
@@ -153,27 +146,29 @@ class _Boot extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlay,
-      child: init.when(
-        data: (_) => switch (answered) {
-          null => const _Holding(),
-          false => const _Ready(child: WelcomeScreen()),
-          // Waiting on Today here rather than inside the shell keeps the tab
-          // bar from sliding in over an empty page. It is one local query
-          // behind the seeder, so this costs a frame or two, not a visible
-          // wait. Watched inside this arm so the welcome screen does not wait
-          // on a snapshot of a database that has not been seeded yet.
-          true => _ShellWhenReady(),
-        },
-        loading: () => const _Holding(),
-        error: (e, st) => _Ready(
-          child: Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(Space.xxxl),
-                child: Text(
-                  'Could not open the database.\n\n$e',
-                  textAlign: TextAlign.center,
-                  style: context.t.bodyMedium,
+      child: _SystemBars(
+        child: init.when(
+          data: (_) => switch (answered) {
+            null => const _Holding(),
+            false => const _Ready(child: WelcomeScreen()),
+            // Waiting on Today here rather than inside the shell keeps the tab
+            // bar from sliding in over an empty page. It is one local query
+            // behind the seeder, so this costs a frame or two, not a visible
+            // wait. Watched inside this arm so the welcome screen does not
+            // wait on a snapshot of a database that has not been seeded yet.
+            true => _ShellWhenReady(),
+          },
+          loading: () => const _Holding(),
+          error: (e, st) => _Ready(
+            child: Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(Space.xxxl),
+                  child: Text(
+                    'Could not open the database.\n\n$e',
+                    textAlign: TextAlign.center,
+                    style: context.t.bodyMedium,
+                  ),
                 ),
               ),
             ),
@@ -182,13 +177,70 @@ class _Boot extends ConsumerWidget {
       ),
     );
   }
-
-  /// Bar icons are the opposite of what they sit on.
-  static Brightness _iconsFor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-          ? Brightness.light
-          : Brightness.dark;
 }
+
+/// Tells the Android side which way round the app is, and says it again
+/// whenever that changes.
+///
+/// [AnnotatedRegion] alone is not enough on this platform. Removing the launch
+/// window applies the activity's theme, and on at least one Android 12 skin
+/// that application is the last word on the system bars: the appearance
+/// Flutter had set is overwritten, and the light theme keeps the launch
+/// window's white icons on a white background, where they cannot be seen.
+/// `MainActivity` re-asserts what it is told here, on signals that arrive
+/// after the splash is gone.
+///
+/// Said on every change rather than once at boot. The stored theme resolves a
+/// frame or two after the first screen mounts, so a single message sent when
+/// the app first draws carries whatever the preference happened to be before
+/// it had loaded — which is how a cold launch into the light theme ended up
+/// asking for white icons.
+class _SystemBars extends StatefulWidget {
+  const _SystemBars({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SystemBars> createState() => _SystemBarsState();
+}
+
+class _SystemBarsState extends State<_SystemBars> {
+  bool? _sent;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (kIsWeb || !Platform.isAndroid) return;
+    final light = Theme.of(context).brightness == Brightness.light;
+    if (light == _sent) return;
+    _sent = light;
+    // A missing handler means the activity is gone or this is a test harness.
+    _bootChannel
+        .invokeMethod<void>('systemBars', {'lightBars': light})
+        .catchError((_) {});
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// The system bars' appearance for the app's current theme.
+///
+/// Top-level because two places need it: the [AnnotatedRegion] that declares
+/// it, and [_ReadyState], which re-asserts it once the launch window lifts.
+SystemUiOverlayStyle _overlayFor(BuildContext context) => SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: _iconsFor(context),
+  statusBarBrightness: Theme.of(context).brightness,
+  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarIconBrightness: _iconsFor(context),
+  systemNavigationBarDividerColor: Colors.transparent,
+);
+
+Brightness _iconsFor(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? Brightness.light
+        : Brightness.dark;
 
 /// The shell, once Today has its data.
 ///

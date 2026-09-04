@@ -9,6 +9,7 @@ import java.io.File
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -38,6 +39,13 @@ class MainActivity : FlutterActivity() {
         splash.setOnExitAnimationListener { provider ->
             provider.remove()
             ViewCompat.requestApplyInsets(window.decorView)
+            // Removing the splash applies the activity's theme, and that
+            // application is the last word on the system bars' appearance: it
+            // overwrites whatever Flutter set from Dart. So say it again, on
+            // the next frame rather than inside the removal. Belt and braces —
+            // this listener is not called on every skin, which is why
+            // `bootComplete` re-asserts on a spread of frames as well.
+            window.decorView.post { applyBarAppearance() }
         }
 
         super.onCreate(savedInstanceState)
@@ -56,6 +64,29 @@ class MainActivity : FlutterActivity() {
         Handler(Looper.getMainLooper()).postDelayed({ bootComplete = true }, BOOT_TIMEOUT_MS)
     }
 
+    /**
+     * Whether the app is drawing light backgrounds, and so wants dark icons.
+     *
+     * Sent from Dart over `systemBars`, and said again on every change: the
+     * app's theme is a setting of its own and need not agree with the system's
+     * night mode, which is all `values-night/styles.xml` can follow. Null
+     * until Dart has spoken — an appearance is never guessed at.
+     */
+    private var lightBars: Boolean? = null
+
+    private fun applyBarAppearance() {
+        val light = lightBars ?: return
+        WindowInsetsControllerCompat(window, window.decorView).run {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applyBarAppearance()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
@@ -63,6 +94,20 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "bootComplete" -> {
                         bootComplete = true
+                        // The splash is what overwrites the bars' appearance,
+                        // so this is the moment to say it again. Over several
+                        // frames: the theme is applied somewhere inside the
+                        // removal, and the exit listener does not fire on
+                        // every skin.
+                        applyBarAppearance()
+                        for (delay in BAR_REASSERTS) {
+                            window.decorView.postDelayed({ applyBarAppearance() }, delay)
+                        }
+                        result.success(null)
+                    }
+                    "systemBars" -> {
+                        lightBars = call.argument<Boolean>("lightBars")
+                        applyBarAppearance()
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -173,5 +218,18 @@ class MainActivity : FlutterActivity() {
         private const val BOOT_TIMEOUT_MS = 5_000L
         private const val PICK_BACKUP = 0x0DEC
         private const val COPY_BUFFER = 64 * 1024
+
+        /**
+         * When to say the bars' appearance again, in milliseconds after the
+         * launch window is told to lift.
+         *
+         * A spread rather than a single delay. Removing the splash applies the
+         * activity's theme, and that application is what overwrites the
+         * appearance; it does not land on a frame this side can name, and
+         * `setOnExitAnimationListener` is not called at all on every skin —
+         * OxygenOS 12 does not call it, which is what made the first attempt at
+         * this dead code.
+         */
+        private val BAR_REASSERTS = longArrayOf(16, 100, 300, 800, 1600)
     }
 }
