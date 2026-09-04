@@ -13,11 +13,18 @@ download that merges, and one question at first sign-in if both sides already
 contain training data. [RULES § 6](RULES.md#6-scope) explains what that decision
 does and does not permit, and [TODO.md](TODO.md) lists the one task still open.
 
-The repository is public and MIT-licensed. Nothing personal belongs in it. Do
-not commit a real Supabase project reference, key, or OAuth client ID
-(`deltoid.env.json` is git-ignored, and `deltoid.env.example.json` shows the
-expected shape), and do not put personal numbers, coaching cues, or links into
-`seed_data.dart`.
+The repository is private and MIT-licensed, and the app is a personal tool
+rather than a product. Nothing personal belongs in the repository even so.
+Privacy is not the reason for that rule: `seed_data.dart` is starter data for
+an empty install, so putting personal numbers, coaching cues, or links there
+hardcodes one training programme into an app whose whole design refuses to
+assume one. That is rule 9 below, and it holds regardless of who can read the
+code. Do not commit a real Supabase project reference, key, or OAuth client ID
+either (`deltoid.env.json` is git-ignored, and `deltoid.env.example.json`
+shows the expected shape). Those three values are not secrets — they ship
+inside any release APK and are extractable from it — but they are the live
+project's, and row-level security, not their obscurity, is what protects the
+data behind them.
 
 ## The documents, and which one you need
 
