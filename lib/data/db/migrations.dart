@@ -50,6 +50,27 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
       'WHERE is_active = 1 AND deleted_at IS NULL AND activated_at IS NULL',
     );
   }
+
+  // 3 → 4 · Which bar, per training day, and which bar it actually was.
+  //
+  // Two columns for one idea. `session_exercises.bar_kind` is the decision —
+  // this movement is loaded on that bar *in this day* — and
+  // `workout_exercises.bar_kind` is the snapshot of what was used, so a bar
+  // changed today does not redraw the plates of a session logged in March.
+  //
+  // **Both left null, and deliberately not backfilled.** Null reads as "follow
+  // the catalog", which is exactly what every existing row meant when it was
+  // written: no slot had an override, and every logged set drew its plates off
+  // `exercises.bar_kind`. Copying the catalog's answer onto them would freeze
+  // today's guess as though it had been a decision at the time, and would do it
+  // to rows whose exercise may have been recategorised since. See
+  // [WorkoutExercises.barKind] for why null is not `none`.
+  if (from < 4) {
+    await addColumnIfMissing(
+        db, m, db.sessionExercises, db.sessionExercises.barKind);
+    await addColumnIfMissing(
+        db, m, db.workoutExercises, db.workoutExercises.barKind);
+  }
 }
 
 /// `CREATE INDEX IF NOT EXISTS` for every generated index whose name [where]

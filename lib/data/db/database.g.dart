@@ -2405,6 +2405,15 @@ class $SessionExercisesTable extends SessionExercises
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<BarKind?, String> barKind =
+      GeneratedColumn<String>(
+        'bar_kind',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<BarKind?>($SessionExercisesTable.$converterbarKindn);
   static const VerificationMeta _deloadSetDeltaMeta = const VerificationMeta(
     'deloadSetDelta',
   );
@@ -2442,6 +2451,7 @@ class $SessionExercisesTable extends SessionExercises
     targetRepHigh,
     notes,
     restSeconds,
+    barKind,
     deloadSetDelta,
     deloadWeightPct,
   ];
@@ -2626,6 +2636,12 @@ class $SessionExercisesTable extends SessionExercises
         DriftSqlType.int,
         data['${effectivePrefix}rest_seconds'],
       ),
+      barKind: $SessionExercisesTable.$converterbarKindn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}bar_kind'],
+        ),
+      ),
       deloadSetDelta: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}deload_set_delta'],
@@ -2641,6 +2657,11 @@ class $SessionExercisesTable extends SessionExercises
   $SessionExercisesTable createAlias(String alias) {
     return $SessionExercisesTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<BarKind, String, String> $converterbarKind =
+      const EnumNameConverter<BarKind>(BarKind.values);
+  static JsonTypeConverter2<BarKind?, String?, String?> $converterbarKindn =
+      JsonTypeConverter2.asNullable($converterbarKind);
 }
 
 class SessionExercise extends DataClass implements Insertable<SessionExercise> {
@@ -2664,6 +2685,20 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
   /// kind of friction that gets an app closed mid-session.
   final int? restSeconds;
 
+  /// The bar this movement is loaded on **in this day**, when it is not the
+  /// one on the catalog row.
+  ///
+  /// Per slot for the same reason as the rest above: the same movement is not
+  /// trained the same way in two days. Back squat off the rack on one day and
+  /// off a women's bar on another is two different empty weights, and the
+  /// plate diagram is wrong on one of them if the catalog is the only answer.
+  ///
+  /// **Null means "follow the catalog"** — not [BarKind.none], which is a
+  /// decision that this movement sits on no bar at all. The distinction is the
+  /// whole point of the column: an override that could not be cleared would
+  /// leave every slot permanently answering for a bar nobody chose.
+  final BarKind? barKind;
+
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   final int? deloadSetDelta;
   final int? deloadWeightPct;
@@ -2681,6 +2716,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     this.targetRepHigh,
     this.notes,
     this.restSeconds,
+    this.barKind,
     this.deloadSetDelta,
     this.deloadWeightPct,
   });
@@ -2709,6 +2745,11 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     }
     if (!nullToAbsent || restSeconds != null) {
       map['rest_seconds'] = Variable<int>(restSeconds);
+    }
+    if (!nullToAbsent || barKind != null) {
+      map['bar_kind'] = Variable<String>(
+        $SessionExercisesTable.$converterbarKindn.toSql(barKind),
+      );
     }
     if (!nullToAbsent || deloadSetDelta != null) {
       map['deload_set_delta'] = Variable<int>(deloadSetDelta);
@@ -2744,6 +2785,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       restSeconds: restSeconds == null && nullToAbsent
           ? const Value.absent()
           : Value(restSeconds),
+      barKind: barKind == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barKind),
       deloadSetDelta: deloadSetDelta == null && nullToAbsent
           ? const Value.absent()
           : Value(deloadSetDelta),
@@ -2772,6 +2816,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       targetRepHigh: serializer.fromJson<int?>(json['targetRepHigh']),
       notes: serializer.fromJson<String?>(json['notes']),
       restSeconds: serializer.fromJson<int?>(json['restSeconds']),
+      barKind: $SessionExercisesTable.$converterbarKindn.fromJson(
+        serializer.fromJson<String?>(json['barKind']),
+      ),
       deloadSetDelta: serializer.fromJson<int?>(json['deloadSetDelta']),
       deloadWeightPct: serializer.fromJson<int?>(json['deloadWeightPct']),
     );
@@ -2793,6 +2840,9 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       'targetRepHigh': serializer.toJson<int?>(targetRepHigh),
       'notes': serializer.toJson<String?>(notes),
       'restSeconds': serializer.toJson<int?>(restSeconds),
+      'barKind': serializer.toJson<String?>(
+        $SessionExercisesTable.$converterbarKindn.toJson(barKind),
+      ),
       'deloadSetDelta': serializer.toJson<int?>(deloadSetDelta),
       'deloadWeightPct': serializer.toJson<int?>(deloadWeightPct),
     };
@@ -2812,6 +2862,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     Value<int?> targetRepHigh = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     Value<int?> restSeconds = const Value.absent(),
+    Value<BarKind?> barKind = const Value.absent(),
     Value<int?> deloadSetDelta = const Value.absent(),
     Value<int?> deloadWeightPct = const Value.absent(),
   }) => SessionExercise(
@@ -2830,6 +2881,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
         : this.targetRepHigh,
     notes: notes.present ? notes.value : this.notes,
     restSeconds: restSeconds.present ? restSeconds.value : this.restSeconds,
+    barKind: barKind.present ? barKind.value : this.barKind,
     deloadSetDelta: deloadSetDelta.present
         ? deloadSetDelta.value
         : this.deloadSetDelta,
@@ -2864,6 +2916,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
       restSeconds: data.restSeconds.present
           ? data.restSeconds.value
           : this.restSeconds,
+      barKind: data.barKind.present ? data.barKind.value : this.barKind,
       deloadSetDelta: data.deloadSetDelta.present
           ? data.deloadSetDelta.value
           : this.deloadSetDelta,
@@ -2889,6 +2942,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
           ..write('targetRepHigh: $targetRepHigh, ')
           ..write('notes: $notes, ')
           ..write('restSeconds: $restSeconds, ')
+          ..write('barKind: $barKind, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct')
           ..write(')'))
@@ -2910,6 +2964,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
     targetRepHigh,
     notes,
     restSeconds,
+    barKind,
     deloadSetDelta,
     deloadWeightPct,
   );
@@ -2930,6 +2985,7 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
           other.targetRepHigh == this.targetRepHigh &&
           other.notes == this.notes &&
           other.restSeconds == this.restSeconds &&
+          other.barKind == this.barKind &&
           other.deloadSetDelta == this.deloadSetDelta &&
           other.deloadWeightPct == this.deloadWeightPct);
 }
@@ -2948,6 +3004,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
   final Value<int?> targetRepHigh;
   final Value<String?> notes;
   final Value<int?> restSeconds;
+  final Value<BarKind?> barKind;
   final Value<int?> deloadSetDelta;
   final Value<int?> deloadWeightPct;
   final Value<int> rowid;
@@ -2965,6 +3022,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     this.targetRepHigh = const Value.absent(),
     this.notes = const Value.absent(),
     this.restSeconds = const Value.absent(),
+    this.barKind = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2983,6 +3041,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     this.targetRepHigh = const Value.absent(),
     this.notes = const Value.absent(),
     this.restSeconds = const Value.absent(),
+    this.barKind = const Value.absent(),
     this.deloadSetDelta = const Value.absent(),
     this.deloadWeightPct = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -3003,6 +3062,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     Expression<int>? targetRepHigh,
     Expression<String>? notes,
     Expression<int>? restSeconds,
+    Expression<String>? barKind,
     Expression<int>? deloadSetDelta,
     Expression<int>? deloadWeightPct,
     Expression<int>? rowid,
@@ -3021,6 +3081,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
       if (targetRepHigh != null) 'target_rep_high': targetRepHigh,
       if (notes != null) 'notes': notes,
       if (restSeconds != null) 'rest_seconds': restSeconds,
+      if (barKind != null) 'bar_kind': barKind,
       if (deloadSetDelta != null) 'deload_set_delta': deloadSetDelta,
       if (deloadWeightPct != null) 'deload_weight_pct': deloadWeightPct,
       if (rowid != null) 'rowid': rowid,
@@ -3041,6 +3102,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     Value<int?>? targetRepHigh,
     Value<String?>? notes,
     Value<int?>? restSeconds,
+    Value<BarKind?>? barKind,
     Value<int?>? deloadSetDelta,
     Value<int?>? deloadWeightPct,
     Value<int>? rowid,
@@ -3059,6 +3121,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
       targetRepHigh: targetRepHigh ?? this.targetRepHigh,
       notes: notes ?? this.notes,
       restSeconds: restSeconds ?? this.restSeconds,
+      barKind: barKind ?? this.barKind,
       deloadSetDelta: deloadSetDelta ?? this.deloadSetDelta,
       deloadWeightPct: deloadWeightPct ?? this.deloadWeightPct,
       rowid: rowid ?? this.rowid,
@@ -3107,6 +3170,11 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
     if (restSeconds.present) {
       map['rest_seconds'] = Variable<int>(restSeconds.value);
     }
+    if (barKind.present) {
+      map['bar_kind'] = Variable<String>(
+        $SessionExercisesTable.$converterbarKindn.toSql(barKind.value),
+      );
+    }
     if (deloadSetDelta.present) {
       map['deload_set_delta'] = Variable<int>(deloadSetDelta.value);
     }
@@ -3135,6 +3203,7 @@ class SessionExercisesCompanion extends UpdateCompanion<SessionExercise> {
           ..write('targetRepHigh: $targetRepHigh, ')
           ..write('notes: $notes, ')
           ..write('restSeconds: $restSeconds, ')
+          ..write('barKind: $barKind, ')
           ..write('deloadSetDelta: $deloadSetDelta, ')
           ..write('deloadWeightPct: $deloadWeightPct, ')
           ..write('rowid: $rowid')
@@ -4777,6 +4846,15 @@ class $WorkoutExercisesTable extends WorkoutExercises
         requiredDuringInsert: false,
       ).withConverter<MuscleGroup?>($WorkoutExercisesTable.$convertermusclen);
   @override
+  late final GeneratedColumnWithTypeConverter<BarKind?, String> barKind =
+      GeneratedColumn<String>(
+        'bar_kind',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<BarKind?>($WorkoutExercisesTable.$converterbarKindn);
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     updatedAt,
@@ -4790,6 +4868,7 @@ class $WorkoutExercisesTable extends WorkoutExercises
     notes,
     skipReason,
     muscle,
+    barKind,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4927,6 +5006,12 @@ class $WorkoutExercisesTable extends WorkoutExercises
           data['${effectivePrefix}muscle'],
         ),
       ),
+      barKind: $WorkoutExercisesTable.$converterbarKindn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}bar_kind'],
+        ),
+      ),
     );
   }
 
@@ -4941,6 +5026,10 @@ class $WorkoutExercisesTable extends WorkoutExercises
       const EnumNameConverter<MuscleGroup>(MuscleGroup.values);
   static JsonTypeConverter2<MuscleGroup?, String?, String?> $convertermusclen =
       JsonTypeConverter2.asNullable($convertermuscle);
+  static JsonTypeConverter2<BarKind, String, String> $converterbarKind =
+      const EnumNameConverter<BarKind>(BarKind.values);
+  static JsonTypeConverter2<BarKind?, String?, String?> $converterbarKindn =
+      JsonTypeConverter2.asNullable($converterbarKind);
 }
 
 class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
@@ -4972,6 +5061,21 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
   /// instead would have been a value the app invented, and `other` belongs to
   /// no region — every pre-existing set would have quietly left the chart.
   final MuscleGroup? muscle;
+
+  /// The bar this movement was loaded on, copied at the moment it was logged.
+  ///
+  /// The same rule as [muscle] above, applied to the one thing that still read
+  /// live: the plate diagram asked `exercises.bar_kind` every time it drew, so
+  /// changing a bar in the catalog — or, now, in one training day — silently
+  /// re-read every session ever logged. What you put on the bar in March is a
+  /// fact about March.
+  ///
+  /// **Nullable, and null is not [BarKind.none].** Null means the row predates
+  /// this column and the catalog is the best answer available; readers fall
+  /// back to it for exactly those rows. `none` is a decision — that this
+  /// movement sits on no bar — and defaulting to it would have taken the plate
+  /// diagram away from every barbell set already logged.
+  final BarKind? barKind;
   const WorkoutExercise({
     required this.id,
     required this.updatedAt,
@@ -4985,6 +5089,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     this.notes,
     required this.skipReason,
     this.muscle,
+    this.barKind,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5013,6 +5118,11 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
         $WorkoutExercisesTable.$convertermusclen.toSql(muscle),
       );
     }
+    if (!nullToAbsent || barKind != null) {
+      map['bar_kind'] = Variable<String>(
+        $WorkoutExercisesTable.$converterbarKindn.toSql(barKind),
+      );
+    }
     return map;
   }
 
@@ -5036,6 +5146,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       muscle: muscle == null && nullToAbsent
           ? const Value.absent()
           : Value(muscle),
+      barKind: barKind == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barKind),
     );
   }
 
@@ -5061,6 +5174,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       muscle: $WorkoutExercisesTable.$convertermusclen.fromJson(
         serializer.fromJson<String?>(json['muscle']),
       ),
+      barKind: $WorkoutExercisesTable.$converterbarKindn.fromJson(
+        serializer.fromJson<String?>(json['barKind']),
+      ),
     );
   }
   @override
@@ -5083,6 +5199,9 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
       'muscle': serializer.toJson<String?>(
         $WorkoutExercisesTable.$convertermusclen.toJson(muscle),
       ),
+      'barKind': serializer.toJson<String?>(
+        $WorkoutExercisesTable.$converterbarKindn.toJson(barKind),
+      ),
     };
   }
 
@@ -5099,6 +5218,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     Value<String?> notes = const Value.absent(),
     SkipReason? skipReason,
     Value<MuscleGroup?> muscle = const Value.absent(),
+    Value<BarKind?> barKind = const Value.absent(),
   }) => WorkoutExercise(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -5112,6 +5232,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     notes: notes.present ? notes.value : this.notes,
     skipReason: skipReason ?? this.skipReason,
     muscle: muscle.present ? muscle.value : this.muscle,
+    barKind: barKind.present ? barKind.value : this.barKind,
   );
   WorkoutExercise copyWithCompanion(WorkoutExercisesCompanion data) {
     return WorkoutExercise(
@@ -5135,6 +5256,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           ? data.skipReason.value
           : this.skipReason,
       muscle: data.muscle.present ? data.muscle.value : this.muscle,
+      barKind: data.barKind.present ? data.barKind.value : this.barKind,
     );
   }
 
@@ -5152,7 +5274,8 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           ..write('targetSets: $targetSets, ')
           ..write('notes: $notes, ')
           ..write('skipReason: $skipReason, ')
-          ..write('muscle: $muscle')
+          ..write('muscle: $muscle, ')
+          ..write('barKind: $barKind')
           ..write(')'))
         .toString();
   }
@@ -5171,6 +5294,7 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
     notes,
     skipReason,
     muscle,
+    barKind,
   );
   @override
   bool operator ==(Object other) =>
@@ -5187,7 +5311,8 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
           other.targetSets == this.targetSets &&
           other.notes == this.notes &&
           other.skipReason == this.skipReason &&
-          other.muscle == this.muscle);
+          other.muscle == this.muscle &&
+          other.barKind == this.barKind);
 }
 
 class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
@@ -5203,6 +5328,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
   final Value<String?> notes;
   final Value<SkipReason> skipReason;
   final Value<MuscleGroup?> muscle;
+  final Value<BarKind?> barKind;
   final Value<int> rowid;
   const WorkoutExercisesCompanion({
     this.id = const Value.absent(),
@@ -5217,6 +5343,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     this.notes = const Value.absent(),
     this.skipReason = const Value.absent(),
     this.muscle = const Value.absent(),
+    this.barKind = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WorkoutExercisesCompanion.insert({
@@ -5232,6 +5359,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     this.notes = const Value.absent(),
     this.skipReason = const Value.absent(),
     this.muscle = const Value.absent(),
+    this.barKind = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : workoutId = Value(workoutId),
        exerciseId = Value(exerciseId),
@@ -5249,6 +5377,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     Expression<String>? notes,
     Expression<String>? skipReason,
     Expression<String>? muscle,
+    Expression<String>? barKind,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5264,6 +5393,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
       if (notes != null) 'notes': notes,
       if (skipReason != null) 'skip_reason': skipReason,
       if (muscle != null) 'muscle': muscle,
+      if (barKind != null) 'bar_kind': barKind,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5281,6 +5411,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
     Value<String?>? notes,
     Value<SkipReason>? skipReason,
     Value<MuscleGroup?>? muscle,
+    Value<BarKind?>? barKind,
     Value<int>? rowid,
   }) {
     return WorkoutExercisesCompanion(
@@ -5296,6 +5427,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
       notes: notes ?? this.notes,
       skipReason: skipReason ?? this.skipReason,
       muscle: muscle ?? this.muscle,
+      barKind: barKind ?? this.barKind,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5343,6 +5475,11 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
         $WorkoutExercisesTable.$convertermusclen.toSql(muscle.value),
       );
     }
+    if (barKind.present) {
+      map['bar_kind'] = Variable<String>(
+        $WorkoutExercisesTable.$converterbarKindn.toSql(barKind.value),
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5364,6 +5501,7 @@ class WorkoutExercisesCompanion extends UpdateCompanion<WorkoutExercise> {
           ..write('notes: $notes, ')
           ..write('skipReason: $skipReason, ')
           ..write('muscle: $muscle, ')
+          ..write('barKind: $barKind, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9123,6 +9261,7 @@ typedef $$SessionExercisesTableCreateCompanionBuilder =
       Value<int?> targetRepHigh,
       Value<String?> notes,
       Value<int?> restSeconds,
+      Value<BarKind?> barKind,
       Value<int?> deloadSetDelta,
       Value<int?> deloadWeightPct,
       Value<int> rowid,
@@ -9142,6 +9281,7 @@ typedef $$SessionExercisesTableUpdateCompanionBuilder =
       Value<int?> targetRepHigh,
       Value<String?> notes,
       Value<int?> restSeconds,
+      Value<BarKind?> barKind,
       Value<int?> deloadSetDelta,
       Value<int?> deloadWeightPct,
       Value<int> rowid,
@@ -9254,6 +9394,12 @@ class $$SessionExercisesTableFilterComposer
     column: $table.restSeconds,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnWithTypeConverterFilters<BarKind?, BarKind, String> get barKind =>
+      $composableBuilder(
+        column: $table.barKind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<int> get deloadSetDelta => $composableBuilder(
     column: $table.deloadSetDelta,
@@ -9376,6 +9522,11 @@ class $$SessionExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barKind => $composableBuilder(
+    column: $table.barKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get deloadSetDelta => $composableBuilder(
     column: $table.deloadSetDelta,
     builder: (column) => ColumnOrderings(column),
@@ -9485,6 +9636,9 @@ class $$SessionExercisesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumnWithTypeConverter<BarKind?, String> get barKind =>
+      $composableBuilder(column: $table.barKind, builder: (column) => column);
+
   GeneratedColumn<int> get deloadSetDelta => $composableBuilder(
     column: $table.deloadSetDelta,
     builder: (column) => column,
@@ -9585,6 +9739,7 @@ class $$SessionExercisesTableTableManager
                 Value<int?> targetRepHigh = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
+                Value<BarKind?> barKind = const Value.absent(),
                 Value<int?> deloadSetDelta = const Value.absent(),
                 Value<int?> deloadWeightPct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9602,6 +9757,7 @@ class $$SessionExercisesTableTableManager
                 targetRepHigh: targetRepHigh,
                 notes: notes,
                 restSeconds: restSeconds,
+                barKind: barKind,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 rowid: rowid,
@@ -9621,6 +9777,7 @@ class $$SessionExercisesTableTableManager
                 Value<int?> targetRepHigh = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> restSeconds = const Value.absent(),
+                Value<BarKind?> barKind = const Value.absent(),
                 Value<int?> deloadSetDelta = const Value.absent(),
                 Value<int?> deloadWeightPct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9638,6 +9795,7 @@ class $$SessionExercisesTableTableManager
                 targetRepHigh: targetRepHigh,
                 notes: notes,
                 restSeconds: restSeconds,
+                barKind: barKind,
                 deloadSetDelta: deloadSetDelta,
                 deloadWeightPct: deloadWeightPct,
                 rowid: rowid,
@@ -11027,6 +11185,7 @@ typedef $$WorkoutExercisesTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<SkipReason> skipReason,
       Value<MuscleGroup?> muscle,
+      Value<BarKind?> barKind,
       Value<int> rowid,
     });
 typedef $$WorkoutExercisesTableUpdateCompanionBuilder =
@@ -11043,6 +11202,7 @@ typedef $$WorkoutExercisesTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<SkipReason> skipReason,
       Value<MuscleGroup?> muscle,
+      Value<BarKind?> barKind,
       Value<int> rowid,
     });
 
@@ -11168,6 +11328,12 @@ class $$WorkoutExercisesTableFilterComposer
     column: $table.muscle,
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
+
+  ColumnWithTypeConverterFilters<BarKind?, BarKind, String> get barKind =>
+      $composableBuilder(
+        column: $table.barKind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   $$WorkoutsTableFilterComposer get workoutId {
     final $$WorkoutsTableFilterComposer composer = $composerBuilder(
@@ -11300,6 +11466,11 @@ class $$WorkoutExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barKind => $composableBuilder(
+    column: $table.barKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$WorkoutsTableOrderingComposer get workoutId {
     final $$WorkoutsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -11392,6 +11563,9 @@ class $$WorkoutExercisesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<MuscleGroup?, String> get muscle =>
       $composableBuilder(column: $table.muscle, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<BarKind?, String> get barKind =>
+      $composableBuilder(column: $table.barKind, builder: (column) => column);
 
   $$WorkoutsTableAnnotationComposer get workoutId {
     final $$WorkoutsTableAnnotationComposer composer = $composerBuilder(
@@ -11511,6 +11685,7 @@ class $$WorkoutExercisesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<SkipReason> skipReason = const Value.absent(),
                 Value<MuscleGroup?> muscle = const Value.absent(),
+                Value<BarKind?> barKind = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutExercisesCompanion(
                 id: id,
@@ -11525,6 +11700,7 @@ class $$WorkoutExercisesTableTableManager
                 notes: notes,
                 skipReason: skipReason,
                 muscle: muscle,
+                barKind: barKind,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11541,6 +11717,7 @@ class $$WorkoutExercisesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<SkipReason> skipReason = const Value.absent(),
                 Value<MuscleGroup?> muscle = const Value.absent(),
+                Value<BarKind?> barKind = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutExercisesCompanion.insert(
                 id: id,
@@ -11555,6 +11732,7 @@ class $$WorkoutExercisesTableTableManager
                 notes: notes,
                 skipReason: skipReason,
                 muscle: muscle,
+                barKind: barKind,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

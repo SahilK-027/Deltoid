@@ -107,14 +107,21 @@ Drift code has to be regenerated after any edit to `lib/data/db/tables.dart`:
 dart run build_runner build
 ```
 
-**The ladder is running.** `schemaVersion` is 3 and `MigrationStrategy` has an
+**The ladder is running.** `schemaVersion` is 4 and `MigrationStrategy` has an
 `onUpgrade`, in `lib/data/db/migrations.dart`. So a schema change is:
 
 1. the column or `@TableIndex` in `tables.dart`,
 2. `dart run build_runner build`,
 3. **a default in `lib/data/db/table_spec.dart`** for that table,
 4. **a rung**: `schemaVersion` up one, and a step in `upgradeSchema` guarded by
-   the version it was added at.
+   the version it was added at,
+5. and, for a **syncable** table, a rung in `supabase/migrations` as well. A
+   push sends every key of the row, so a column the server has not heard of is
+   a rejected batch on the machine holding the only cloud copy of a history.
+   `test/data/server_schema_test.dart` reads both schemas and fails on a
+   mismatch, which is what makes this a gate rather than something remembered
+   before a release. **The server rung is applied first, and the build that
+   needs it second.**
 
 **Every step is idempotent.** `addColumnIfMissing`, `createIndexesIfMissing`,
 never a bare `m.addColumn` or `m.createIndex`: a device given an earlier build
@@ -170,6 +177,12 @@ backfilled it onto whichever regime was active at the time. That backfill is the
 rule above doing its job — the honest default for this column is null, meaning
 _never activated_, and null on every row of an existing phone would leave the
 derivation with no candidate and deactivate the programme the user is training.
+
+**3 → 4** added `session_exercises.bar_kind` and `workout_exercises.bar_kind`,
+and backfilled neither — the same rule reaching the opposite answer. Null here
+means _no answer, follow the catalog_, which is precisely what every existing
+row meant when it was written; copying today's catalog value onto them would
+freeze a guess as though it had been a decision at the time.
 
 ---
 
@@ -469,6 +482,7 @@ rather than shape. Where the checks live now:
 | The merge order never runs out of discriminators                                        | `test/domain/sync_merge_test.dart` — two versions on one stamp and one device id still pick one winner, swapped                                                                                                                                                                                                                                                                                                                                                                                    |
 | The connection opens on the pragmas the durability claim rests on                       | `test/data/connection_pragmas_test.dart` — read off a real file, because in-memory sqlite is always `journal_mode = memory`                                                                                                                                                                                                                                                                                                                                                                        |
 | A backup file is never half a file                                                      | `test/data/backup_service_test.dart` — the rows go to a `.part` and the backup arrives by rename                                                                                                                                                                                                                                                                                                                                                                                                   |
+| A logged set keeps the bar it was trained on                                             | `test/data/bar_kind_test.dart` — the day's bar changes, the finished session does not; and the two push days holding one movement keep separate answers                                                                                                                                                                                                                                                                                                           |
 | A rest duration is decided by a slot then by Settings, and by nothing else               | `test/domain/rest_test.dart` and `test/data/training_repository_test.dart` — including a stored value from outside the dialable range, which the column has to accept and the timer must not                                                                                                                                                                                                                                                                                                       |
 | A stamp handed out is never handed out again, across a restart                          | `test/data/stamp_floor_test.dart` — the mark is seeded from `app_settings` at open, leased ahead of the clock, and written down at close                                                                                                                                                                                                                                                                                                                                                           |
 | Every merge rule is deterministic **and symmetric**                                     | `test/domain/sync_merge_test.dart` — each two-row rule is asserted with the arguments swapped                                                                                                                                                                                                                                                                                                                                                                                                      |

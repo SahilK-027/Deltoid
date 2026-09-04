@@ -933,6 +933,74 @@ class TrainingRepository {
     };
   }
 
+  /// The bar each of these exercises names on its catalog row.
+  Future<Map<String, BarKind>> _catalogBarsOf(
+    Iterable<String> exerciseIds,
+  ) async {
+    final ids = exerciseIds.toSet().toList();
+    if (ids.isEmpty) return const {};
+    final rows = await (db.selectOnly(db.exercises)
+          ..addColumns([db.exercises.id, db.exercises.barKind])
+          ..where(db.exercises.id.isIn(ids)))
+        .get();
+    return {
+      for (final r in rows)
+        r.read(db.exercises.id)!: r.readWithConverter(db.exercises.barKind)!,
+    };
+  }
+
+  /// The bar a movement is actually loaded on in one training day: the day's
+  /// override if it has been given one, otherwise the catalog's answer.
+  ///
+  /// This is the value snapshotted onto every `workout_exercises` row as it is
+  /// created, which is what makes a bar changed today leave March alone.
+  ///
+  /// [sessionId] is null for a workout that came from no template — and for an
+  /// exercise added mid-session, which has no slot to carry an override. Both
+  /// fall through to the catalog, which is the only answer that exists for
+  /// them.
+  Future<BarKind> _barForWorkout({
+    required String workoutId,
+    required String exerciseId,
+  }) async {
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId)))
+        .getSingleOrNull();
+    final sessionId = workout?.sessionId;
+    if (sessionId != null) {
+      final slot = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(sessionId) &
+                t.exerciseId.equals(exerciseId) &
+                t.deletedAt.isNull()))
+          .getSingleOrNull();
+      final own = slot?.barKind;
+      if (own != null) return own;
+    }
+    return (await _catalogBarsOf([exerciseId]))[exerciseId] ?? BarKind.none;
+  }
+
+  /// The template slot a logged exercise came from, or null when there is
+  /// none.
+  ///
+  /// Null is an ordinary answer rather than a failure: an exercise added
+  /// mid-session is not in the template, and neither is any exercise in a
+  /// workout that came from no session at all. The caller uses it to decide
+  /// whether there are per-day overrides to offer.
+  Future<String?> slotIdFor({
+    required String? sessionId,
+    required String exerciseId,
+  }) async {
+    if (sessionId == null) return null;
+    final slot = await (db.select(db.sessionExercises)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.exerciseId.equals(exerciseId) &
+              t.deletedAt.isNull()))
+        .getSingleOrNull();
+    return slot?.id;
+  }
+
   /// The muscle a logged set counts toward: the snapshot on the row, falling
   /// back to the catalog for rows written before that column existed.
   ///
@@ -2188,6 +2256,10 @@ class TrainingRepository {
     // the tap that opens the log, where six round trips to the database isolate
     // are six frames.
     final muscles = await _musclesOf([for (final s in slots) s.exerciseId]);
+    // The catalog's bars, resolved once for the whole session. The day's own
+    // override wins over them per slot, just below.
+    final catalogBars =
+        await _catalogBarsOf([for (final s in slots) s.exerciseId]);
     final workoutId = newId();
     // A backdated session keeps the current clock time: the date is what was
     // forgotten, the hour is unknowable and unimportant.
@@ -2271,6 +2343,13 @@ class TrainingRepository {
                 orderIndex: i,
                 targetSets: Value(targetSets),
                 muscle: Value(muscles[slot.exerciseId]),
+                // What is actually on the bar today, snapshotted like the
+                // muscle beside it: the day's override if it has one, the
+                // catalog otherwise. Changing either later leaves this row —
+                // and its plate diagram — exactly as it was.
+                barKind: Value(
+                  slot.barKind ?? catalogBars[slot.exerciseId] ?? BarKind.none,
+                ),
               ),
             );
 
@@ -2981,6 +3060,10 @@ class TrainingRepository {
       targetSets: targetSets,
     );
     final muscle = (await _musclesOf([exerciseId]))[exerciseId];
+    final bar = await _barForWorkout(
+      workoutId: workoutId,
+      exerciseId: exerciseId,
+    );
 
     final id = newId();
     await db.transaction(() async {
@@ -3001,6 +3084,7 @@ class TrainingRepository {
               orderIndex: next,
               targetSets: Value(targetSets),
               muscle: Value(muscle),
+              barKind: Value(bar),
             ),
           );
       for (var k = 0; k < shape.length; k++) {
@@ -3044,6 +3128,12 @@ class TrainingRepository {
     // to a row is a different muscle trained, and the slot it inherits is a
     // position rather than a category.
     final muscle = (await _musclesOf([newExerciseId]))[newExerciseId];
+    // And the replacement's bar, for the same reason: the slot it inherits is
+    // a position, not an answer about how the new movement is loaded.
+    final bar = await _barForWorkout(
+      workoutId: old.workoutId,
+      exerciseId: newExerciseId,
+    );
 
     final id = newId();
     final stamp = nowMs();
@@ -3073,6 +3163,7 @@ class TrainingRepository {
               orderIndex: old.orderIndex,
               targetSets: Value(old.targetSets),
               muscle: Value(muscle),
+              barKind: Value(bar),
             ),
           );
 

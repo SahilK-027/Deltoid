@@ -249,6 +249,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                         context, ref, entry.slot, entry.exercise),
                   ),
                   _RestRow(slot: entry.slot),
+                  if (entry.exercise.loadMode == LoadMode.total)
+                    _BarRow(slot: entry.slot, exercise: entry.exercise),
                   _DeloadSetsRow(slot: entry.slot, regime: regime),
                   _DeloadWeightRow(slot: entry.slot, regime: regime),
                   AppRow(
@@ -888,6 +890,71 @@ class _RestRow extends ConsumerWidget {
             title: 'Use the default again',
             subtitle: 'Back to ${formatRestClock(fallback)}',
             onTap: () => set(null),
+          ),
+      ],
+    );
+  }
+}
+
+/// Which bar this movement is loaded on in this day.
+///
+/// Only for a total load, like the catalog's own `Bar` row below: the plate
+/// view breaks a barbell total into plates, and there is nothing to break down
+/// when the number means one dumbbell or what hangs off a belt.
+///
+/// **The one override that reaches today.** Every other row here changes the
+/// template and leaves the session you are in alone, because a logged set is a
+/// snapshot. The bar is different: it is not something the log recorded and
+/// then had reinterpreted, it is a fact about the bar in your hands right now,
+/// and you are most likely to notice it is wrong while standing over it. So the
+/// slot takes the decision for every future run of this day, and a workout that
+/// is open on this day takes it as well — see [setSessionExerciseBarKind].
+/// Finished workouts keep what they were logged with, always.
+class _BarRow extends ConsumerWidget {
+  const _BarRow({required this.slot, required this.exercise});
+
+  final SessionExercise slot;
+  final Exercise exercise;
+
+  static String _label(BarKind bar) => bar == BarKind.none
+      ? bar.label
+      : '${bar.label} · ${formatInUnit(bar.kg!, WeightUnit.kg)} kg';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final own = slot.barKind;
+    final live = own ?? exercise.barKind;
+    final repo = ref.read(regimeRepositoryProvider);
+
+    return Column(
+      children: [
+        AppRow(
+          title: 'Bar',
+          subtitle: own == null
+              ? 'Following the exercise'
+              : 'This day only. Other days keep theirs.',
+          trailing: _PickedValue(_label(live)),
+          onTap: () async {
+            final picked = await _pick<BarKind>(
+              context,
+              title: 'Bar for this day',
+              values: BarKind.values,
+              current: live,
+              labelOf: _label,
+            );
+            // No confirmation, unlike the catalog's `Bar` row. That one asks
+            // because it reinterprets every set ever logged against the
+            // movement; this one changes the plate diagram of one day, going
+            // forward, and nothing already written.
+            if (picked == null || picked == live) return;
+            await repo.setSessionExerciseBarKind(slot.id, picked);
+          },
+        ),
+        if (own != null)
+          AppRow(
+            title: 'Follow the exercise again',
+            subtitle: 'Back to ${_label(exercise.barKind)}',
+            onTap: () => repo.setSessionExerciseBarKind(slot.id, null),
           ),
       ],
     );

@@ -164,8 +164,28 @@ Future<void> showExerciseMenu(
   required int index,
   required int total,
   required VoidCallback onReorder,
+  required Workout workout,
 }) async {
   final repo = ref.read(trainingRepositoryProvider);
+
+  // **The way into this exercise's settings without leaving the session.**
+  //
+  // The template is safe to edit mid-workout — `WorkoutExercise` and `SetLog`
+  // are snapshots rather than pointers (RULES § Data), which is exactly what
+  // `live_workout_vs_editing_test.dart` proves — so nothing here was ever
+  // blocked. There was simply no door: the exercise's own screen, and with it
+  // the day's rest, bar, targets and deload, could only be reached from the
+  // Regime tab, which means walking out of the session you are standing in.
+  //
+  // Resolved before the sheet is built, because the row's presence depends on
+  // it: an exercise added mid-session is not in the template and has no slot,
+  // and a row that opened onto an empty Overrides section would be a promise
+  // the screen cannot keep.
+  final slotId = await repo.slotIdFor(
+    sessionId: workout.sessionId,
+    exerciseId: entry.exercise.id,
+  );
+  if (!context.mounted) return;
 
   await showModalBottomSheet<void>(
     // The route holds the system bars: a sheet that sizes itself can
@@ -211,6 +231,22 @@ Future<void> showExerciseMenu(
             await repo.setWorkoutExerciseNotes(entry.workoutExercise.id, note);
           },
         ),
+        if (slotId != null)
+          AppRow(
+            icon: Icons.tune_rounded,
+            title: 'Exercise settings',
+            subtitle: 'Rest, bar, targets — for this day, from next time on',
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              openExercise(
+                context,
+                exerciseId: entry.exercise.id,
+                regimeId: workout.regimeId,
+                sessionId: workout.sessionId,
+                slotId: slotId,
+              );
+            },
+          ),
         AppRow(
           icon: Icons.swap_horiz,
           title: 'Swap exercise',

@@ -799,6 +799,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
                           onToggleDone: _toggleDone,
                           onNextExercise: () => _goToPage(index + 1),
                           onReorder: () => _reorderExercises(detail),
+                          workout: detail.workout,
                         );
                       },
                     ),
@@ -1070,8 +1071,12 @@ class _LogScreenState extends ConsumerState<LogScreen>
       // dumbbell, and on bodyweight-plus it is what hangs off a belt — neither
       // is a barbell total, so neither gets a plate diagram even if somebody
       // has named a bar on the exercise.
+      // The bar this set was logged on, not the bar the catalog names today.
+      // A snapshot, like the muscle: null only on a row written before the
+      // column existed, and those fall back to the catalog because it is the
+      // only answer they ever had.
       barKg: entry.exercise.loadMode == LoadMode.total
-          ? entry.exercise.barKind.kg
+          ? (entry.workoutExercise.barKind ?? entry.exercise.barKind).kg
           : null,
       // The key says whether the partial box is **open**, not which box the
       // digits are in. Tapping the reps half to correct them is not leaving
@@ -1923,11 +1928,17 @@ class _ExercisePage extends ConsumerWidget {
     required this.onToggleDone,
     required this.onNextExercise,
     required this.onReorder,
+    required this.workout,
   });
 
   final int index;
   final int total;
   final ExerciseEntry entry;
+
+  /// The session being trained, so the menu can open the day this exercise
+  /// came from. Its `sessionId` is null for a workout that came from no
+  /// template, and the menu shows one row fewer.
+  final Workout workout;
   final String? nextName;
   final PrefillResult? prefill;
 
@@ -2025,6 +2036,7 @@ class _ExercisePage extends ConsumerWidget {
                 index: index,
                 total: total,
                 onReorder: onReorder,
+                workout: workout,
               ),
             ),
           ],

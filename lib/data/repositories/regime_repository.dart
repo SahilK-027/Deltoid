@@ -639,6 +639,73 @@ class RegimeRepository {
     );
   }
 
+  /// Which bar this movement is loaded on **in this day**.
+  ///
+  /// Null clears the override and hands the answer back to the catalog row.
+  ///
+  /// **It also patches the session that is open right now**, and only that one.
+  /// The slot carries the decision to every future run of this day; a workout
+  /// already in progress is the run you are standing in, and the bar you have
+  /// just named is the bar in your hands. Completed workouts are not touched —
+  /// they hold what was actually used, which is the whole reason the snapshot
+  /// column exists ([WorkoutExercises.barKind]).
+  ///
+  /// The open workout is matched on its session rather than on the slot: a
+  /// `workout_exercises` row points at the exercise and the workout, never at
+  /// the template row it was copied from.
+  Future<void> setSessionExerciseBarKind(
+    String slotId,
+    BarKind? barKind,
+  ) async {
+    final slot = await (db.select(db.sessionExercises)
+          ..where((t) => t.id.equals(slotId)))
+        .getSingleOrNull();
+    if (slot == null) return;
+
+    await db.transaction(() async {
+      await (db.update(db.sessionExercises)..where((t) => t.id.equals(slotId)))
+          .write(
+        SessionExercisesCompanion(
+          barKind: Value(barKind),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+
+      // Cleared rather than set: with no override the day follows the catalog,
+      // and today's row should say the same thing the day now says.
+      final effective = barKind ??
+          (await (db.select(db.exercises)
+                    ..where((t) => t.id.equals(slot.exerciseId)))
+                  .getSingleOrNull())
+              ?.barKind;
+      if (effective == null) return;
+
+      final open = await (db.select(db.workouts)
+            ..where((t) =>
+                t.sessionId.equals(slot.sessionId) &
+                t.status.equalsValue(WorkoutStatus.inProgress) &
+                t.deletedAt.isNull()))
+          .get();
+      if (open.isEmpty) return;
+
+      await (db.update(db.workoutExercises)
+            ..where((t) =>
+                t.workoutId.isIn([for (final w in open) w.id]) &
+                t.exerciseId.equals(slot.exerciseId) &
+                t.deletedAt.isNull()))
+          .write(
+        WorkoutExercisesCompanion(
+          barKind: Value(effective),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
+  }
+
   /// Two passes through free ground, for the reason [reorderSessions] gives.
   Future<void> reorderSessionExercises(List<String> orderedIds) async {
     if (orderedIds.isEmpty) return;

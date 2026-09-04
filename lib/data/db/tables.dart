@@ -298,6 +298,20 @@ class SessionExercises extends Table with SyncColumns {
   /// kind of friction that gets an app closed mid-session.
   IntColumn get restSeconds => integer().nullable()();
 
+  /// The bar this movement is loaded on **in this day**, when it is not the
+  /// one on the catalog row.
+  ///
+  /// Per slot for the same reason as the rest above: the same movement is not
+  /// trained the same way in two days. Back squat off the rack on one day and
+  /// off a women's bar on another is two different empty weights, and the
+  /// plate diagram is wrong on one of them if the catalog is the only answer.
+  ///
+  /// **Null means "follow the catalog"** — not [BarKind.none], which is a
+  /// decision that this movement sits on no bar at all. The distinction is the
+  /// whole point of the column: an override that could not be cleared would
+  /// leave every slot permanently answering for a bar nobody chose.
+  TextColumn get barKind => textEnum<BarKind>().nullable()();
+
   /// Per-exercise deload overrides. Schema only for now — no v1 UI.
   IntColumn get deloadSetDelta => integer().nullable()();
   IntColumn get deloadWeightPct => integer().nullable()();
@@ -316,6 +330,11 @@ class SessionExercises extends Table with SyncColumns {
         'CHECK (target_rep_low IS NULL OR target_rep_high IS NULL '
             'OR target_rep_low <= target_rep_high)',
         'CHECK (rest_seconds IS NULL OR rest_seconds BETWEEN 1 AND 3600)',
+        // `textEnum` throws on a value it does not know, and it throws for the
+        // whole result set rather than the one row — so an unparseable string
+        // here would take the day's editor down rather than one slot.
+        "CHECK (bar_kind IS NULL OR bar_kind IN ('none', 'olympic', "
+            "'womens', 'ez', 'trap'))",
         'CHECK (deload_set_delta IS NULL '
             'OR deload_set_delta BETWEEN -20 AND 0)',
         'CHECK (deload_weight_pct IS NULL '
@@ -529,12 +548,31 @@ class WorkoutExercises extends Table with SyncColumns {
   /// no region — every pre-existing set would have quietly left the chart.
   TextColumn get muscle => textEnum<MuscleGroup>().nullable()();
 
+  /// The bar this movement was loaded on, copied at the moment it was logged.
+  ///
+  /// The same rule as [muscle] above, applied to the one thing that still read
+  /// live: the plate diagram asked `exercises.bar_kind` every time it drew, so
+  /// changing a bar in the catalog — or, now, in one training day — silently
+  /// re-read every session ever logged. What you put on the bar in March is a
+  /// fact about March.
+  ///
+  /// **Nullable, and null is not [BarKind.none].** Null means the row predates
+  /// this column and the catalog is the best answer available; readers fall
+  /// back to it for exactly those rows. `none` is a decision — that this
+  /// movement sits on no bar — and defaulting to it would have taken the plate
+  /// diagram away from every barbell set already logged.
+  TextColumn get barKind => textEnum<BarKind>().nullable()();
+
   @override
   List<String> get customConstraints => [
         _liveOrTombstoned,
         'CHECK (order_index >= 0)',
         'CHECK (target_sets BETWEEN 1 AND 99)',
         'CHECK (notes IS NULL OR length(notes) <= 4000)',
+        // As `SessionExercises.bar_kind`, and for the same reason: one
+        // unparseable string would take down the log rather than one row.
+        "CHECK (bar_kind IS NULL OR bar_kind IN ('none', 'olympic', "
+            "'womens', 'ez', 'trap'))",
         "CHECK (skip_reason IN ('none', 'failed', 'equipmentBusy', "
             "'shortOnTime', 'injury', 'other'))",
         // Same reasoning as `Exercises.muscle`: `textEnum` throws on a value it

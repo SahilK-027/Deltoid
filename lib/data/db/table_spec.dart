@@ -105,7 +105,11 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
       TableSpec(
         name: 'session_exercises',
         table: db.sessionExercises,
-        parse: SessionExercise.fromJson,
+        // A row written before the day's bar override existed has no key for
+        // it, and null is the honest value: no bar was chosen for this day, so
+        // readers follow the catalog. See `SessionExercises.barKind` for why
+        // that is not the same as `none`.
+        parse: (row) => SessionExercise.fromJson({'barKind': null, ...row}),
         syncs: true,
       ),
       TableSpec(
@@ -129,10 +133,12 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
       TableSpec(
         name: 'workout_exercises',
         table: db.workoutExercises,
-        // A row written before the muscle snapshot existed has no key for it,
-        // and null is the honest value: the row predates the column, so readers
-        // fall back to the catalog rather than being told it was `other`.
-        parse: (row) => WorkoutExercise.fromJson({'muscle': null, ...row}),
+        // A row written before the muscle or bar snapshots existed has no key
+        // for them, and null is the honest value in both: the row predates the
+        // column, so readers fall back to the catalog rather than being told it
+        // was `other`, or that it sat on no bar.
+        parse: (row) => WorkoutExercise.fromJson(
+            {'muscle': null, 'barKind': null, ...row}),
         syncs: true,
       ),
       TableSpec(

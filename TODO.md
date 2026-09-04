@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**899 tests and nine pgTAP tests, analyzer clean.**
+**906 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -30,6 +30,8 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The alarm is armed as the rest starts, not as the app leaves; the app takes it back 400 ms early so exactly one alert lands, whichever half rings it.
 - [x] The lock-screen countdown stops itself at 0:00: a chronometer-less copy of the line is queued with the OS, because nothing here is awake to post one.
 - [x] The rest tone can be turned off in Settings. The buzz is not part of the switch.
+- [x] The exercise's own screen opens from the log's ⋯ menu, so a day's rest, bar and targets are editable without leaving the session.
+- [x] The bar is per training day, and the bar a set was logged on is snapshotted onto the row — the plate diagram stopped reading the catalog live. Schema 3 → 4, server rung included.
 - [x] Ticking advances the keypad to the next open set, across pages, and closes on the last.
 - [x] Partial reps logged apart from full ones, shown as `8+3`, out of volume, e1RM and `beatsPrevious`.
 - [x] Isometric holds through `MeasureMode`, with a stopwatch in place of the keypad.
