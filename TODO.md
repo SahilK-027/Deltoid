@@ -59,6 +59,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Settings: units, three themes drawn as miniatures, adaptive launcher icon.
 - [x] One day picker for backfill, bodyweight and re-dating, ringing the days already logged.
 - [x] Backfill asks for the day first and keeps it on screen.
+- [x] The system bars take their appearance from the app's own theme, said again once the launch window lifts — in the light theme the status bar had been white on white.
 
 ### Sync
 
@@ -79,7 +80,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 5 · The Regime cluster.
 - [x] 6 · Settings, bodyweight log, all-time heatmap.
 - [x] Feel — ink, folds, damped scrolling, no spinner over existing content.
-- [ ] 7 · Reconciliation — light theme checked on five **empty** screens only. Unchecked, and all of it needs a populated log: chart lines, heatmap ramp, volume bars, a second regime's identity mark, deload orange, the log itself, and motion in either theme.
+- [ ] 7 · Reconciliation — light theme checked on five **empty** screens only, plus the system bars, which are fixed. Unchecked, and all of it needs a populated log: chart lines, heatmap ramp, volume bars, a second regime's identity mark, deload orange, the log itself, and motion in either theme.
 
 ### Hardening
 
@@ -112,8 +113,8 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 ## Left
 
 **Rebrand 7 · Reconciliation**, above, and nothing else. The light theme has
-been checked on five empty screens; everything that needs a populated log is
-still unchecked.
+been checked on five empty screens, and its status bar is no longer white on
+white; everything that needs a populated log is still unchecked.
 
 Sync is built and its design is settled. Two numbers in `sync_engine.dart` — a
 20-minute backstop and a 4-second debounce — are placeholders by design rather
