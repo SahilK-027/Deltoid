@@ -97,7 +97,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// key would look like it had done nothing.
   String? _partialClosedFor;
 
-
   /// What was in the buffer the last time the F/P key was pressed, one for
   /// each side. Both cleared on every focus change.
   String? _fullStash;
@@ -230,7 +229,14 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // This is left running only to catch the moment rest reaches zero, which
     // has to fire even with the keypad covering the bar.
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) _checkRestElapsed();
+      if (!mounted) return;
+      _checkRestElapsed();
+      // The bar on the lock screen is drained a second at a time from here.
+      // Only while a rest is on the clock: between sets that line says a set
+      // count, and a set count does not change once a second.
+      if (_restStartedAt != null && _showRestBar && !_restAlerted) {
+        _postSessionNotification();
+      }
     });
     // The whole point of this screen is to be put down between sets, so the
     // screen must not lock while a workout is open.
@@ -308,10 +314,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Keeps the ongoing lock-screen line in step with the session.
   ///
-  /// Posted with the same id every time, so it updates a single row rather
-  /// than stacking one up per set. The rest countdown on it is drawn by the
-  /// system from an end time — this app does not, and cannot, tick it while
-  /// suspended.
+  /// Posted under one id every time, so it updates a single row rather than
+  /// stacking one up per set. While a rest runs this is called once a second,
+  /// from the clock in [initState]: the bar on that line is drained by the
+  /// value posted to it and by nothing else, and the time left is written into
+  /// the body beside it for the same reason.
   void _postSessionNotification() {
     final detail = _detail;
     if (detail == null) return;
@@ -319,22 +326,44 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final resting = startedAt != null && _showRestBar && !_restAlerted;
     final done = _doneSets(detail);
     final total = _totalSets(detail);
+    // The movement in front of you, which is the one thing the count could
+    // never say. Glanced at from a bench, "1:47 · Incline press" says how long
+    // and what is next; "3 of 12 sets" says where the session is, and that
+    // belongs in the header line rather than in place of it.
+    final exercise = _currentExerciseName(detail);
+    final left = resting
+        ? _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds
+        : null;
     WorkoutNotifications.instance
         .showSession(
           title: detail.session?.name ?? 'Workout',
-          body: resting
-              ? 'Resting · $done of $total sets'
-              : '$done of $total sets',
-          restEndsAt: resting
-              ? startedAt.add(Duration(seconds: _restTargetSeconds))
-              : null,
-          // What the line should say once that countdown is spent. Handed over
-          // with it, because at that moment this process may not be running to
-          // say anything at all — which is how the lock screen ended up
-          // counting down past zero into a negative number.
-          afterRestBody: '$done of $total sets',
+          body: left != null
+              ? [formatRestClock(left), ?exercise].join(' · ')
+              : exercise ?? '$done of $total sets',
+          done: done,
+          total: total,
+          restSecondsLeft: left,
+          restTargetSeconds: resting ? _restTargetSeconds : null,
         )
         .ignore();
+  }
+
+  /// What the rest alert says under "Rest done": the movement it is a rest
+  /// from, falling back to the session when the workout is still empty. The
+  /// session's name was all it ever said, which on a phone in a pocket is the
+  /// one thing you already know.
+  String? _restAlertBody() {
+    final detail = _detail;
+    if (detail == null) return null;
+    return _currentExerciseName(detail) ?? detail.session?.name;
+  }
+
+  /// The exercise the log is open on, or null for a workout with nothing in it
+  /// yet.
+  String? _currentExerciseName(WorkoutDetail detail) {
+    if (detail.entries.isEmpty) return null;
+    final page = math.max(0, math.min(detail.entries.length - 1, _page));
+    return detail.entries[page].exercise.name;
   }
 
   /// Buzzes once when rest reaches zero. Without this the timer only ever
@@ -505,7 +534,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     WorkoutNotifications.instance
         .scheduleRestDone(
           endsAt,
-          body: _detail?.session?.name,
+          body: _restAlertBody(),
           sound: _restPrefs.sound,
         )
         .ignore();
@@ -547,7 +576,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// So a refusal is answered by posting the alert that was taken back.
   void _fireInAppAlert() {
     final sound = _restPrefs.sound;
-    final name = _detail?.session?.name;
+    final name = _restAlertBody();
     RestAlert.instance.fire(sound: sound).then((played) {
       // `sound` is checked again rather than leaned on: `fire` reports a silent
       // rest as discharged, so this is unreachable with the switch off — and a
@@ -583,7 +612,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // A hand on the ± is the latest word on the target, so a value held back
     // by a page turn does not get to overwrite it at the next set.
     final startedAt = _restStartedAt;
-    final stillRunning = startedAt != null &&
+    final stillRunning =
+        startedAt != null &&
         DateTime.now().difference(startedAt).inSeconds < seconds;
     setState(() {
       _restTargetSeconds = seconds;
@@ -649,8 +679,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // two later — last week's numbers appearing under a finger already on its
     // way to the keypad. There are two queries here, so the screen has to tell
     // loading from empty (RULES § Interface) and it waits for both below.
-    final prefill =
-        ref.watch(workoutPrefillProvider(widget.workoutId)).valueOrNull;
+    final prefill = ref
+        .watch(workoutPrefillProvider(widget.workoutId))
+        .valueOrNull;
     _prefill = prefill ?? const {};
     _detail = detail;
     // Everything below the database speaks the display unit; everything at or
@@ -693,6 +724,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // exactly what it said a moment ago.
     final signature = [
       detail.session?.name,
+      // A page turn changes what the line says, and nothing else in this list
+      // moves when it does.
+      _currentExerciseName(detail),
       _doneSets(detail),
       _totalSets(detail),
       _showRestBar,
@@ -742,8 +776,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
             if (detail.entries.isNotEmpty)
               ExerciseRail(
                 entries: detail.entries,
-                current:
-                    math.max(0, math.min(detail.entries.length - 1, _page)),
+                current: math.max(
+                  0,
+                  math.min(detail.entries.length - 1, _page),
+                ),
                 onSelect: _goToPage,
                 onAdd: () => _addExercise(detail),
                 onReorder: (ids) {
@@ -874,7 +910,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
   void _focus(SetLog set, SetField field) {
     _flushWrite();
     final located = _detail == null ? null : _locate(_detail!, set.id);
-    final isTime = field == SetField.reps &&
+    final isTime =
+        field == SetField.reps &&
         (located?.$1.exercise.measureMode.isHold ?? false);
     // Tapping the reps half of a split cell lands here. The digits follow the
     // tap — that is what tapping a field means — but the partial box stays
@@ -901,9 +938,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
       _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
         SetField.added => _fmtLoadIn(set.addedWeight),
-        SetField.reps => isTime
-            ? digitsFromSeconds(set.reps ?? 0)
-            : set.reps?.toString() ?? '',
+        SetField.reps =>
+          isTime
+              ? digitsFromSeconds(set.reps ?? 0)
+              : set.reps?.toString() ?? '',
       };
     });
     _revealRow(set.id);
@@ -1014,11 +1052,12 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final hint = switch (target.field) {
       SetField.weight => _fmtLoadIn(ghost?.weight),
       SetField.added => _fmtLoadIn(ghost?.addedWeight),
-      SetField.reps => ghost?.reps == null
-          ? ''
-          : entry.exercise.measureMode.isHold
-              ? digitsFromSeconds(ghost!.reps!)
-              : '${ghost!.reps}',
+      SetField.reps =>
+        ghost?.reps == null
+            ? ''
+            : entry.exercise.measureMode.isHold
+            ? digitsFromSeconds(ghost!.reps!)
+            : '${ghost!.reps}',
     };
 
     // A hold is timed, not typed: the count field on an isometric movement
@@ -1558,9 +1597,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
       }
     }
 
-    final byId = {
-      for (final e in detail.entries) e.workoutExercise.id: e,
-    };
+    final byId = {for (final e in detail.entries) e.workoutExercise.id: e};
     final ordered = [for (final id in pending) ?byId[id]];
     // An exercise added, swapped or removed under the move invalidates it.
     if (ordered.length != detail.entries.length) {
@@ -2122,8 +2159,11 @@ class _ExercisePage extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.sticky_note_2_outlined,
-                    size: 16, color: c.textTertiary),
+                Icon(
+                  Icons.sticky_note_2_outlined,
+                  size: 16,
+                  color: c.textTertiary,
+                ),
                 const SizedBox(width: Space.sm),
                 Expanded(
                   child: Text(
@@ -2508,8 +2548,10 @@ class _IndexCell extends StatelessWidget {
     // reached half a chip above the `D` and ended in a rounded shoulder with
     // nothing under it — the same at the foot, around the `+`. Inset by the
     // gap between the two and the cap circumscribes the circle exactly.
-    final inset =
-        math.max(0.0, math.min(height / 2, (height - SetRow.indexColumn) / 2));
+    final inset = math.max(
+      0.0,
+      math.min(height / 2, (height - SetRow.indexColumn) / 2),
+    );
 
     return SizedBox(
       width: SetRow.indexColumn,
@@ -2646,8 +2688,9 @@ class _InfoButton extends StatelessWidget {
       children: [
         CircleIconButton(
           icon: Icons.info_outline_rounded,
-          tooltip:
-              flagged ? 'Borrowed from another session' : 'About this exercise',
+          tooltip: flagged
+              ? 'Borrowed from another session'
+              : 'About this exercise',
           onTap: onTap,
         ),
         if (flagged)

@@ -28,7 +28,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Rest timer with tone, wakelock, an OS exact alarm and an ongoing notification.
 - [x] Rest is three numbers: per exercise in a day, a default in Settings, and one for the walk between exercises. The old fourth reading — the last rest a set happened to take — is gone.
 - [x] The alarm is armed as the rest starts, not as the app leaves; the app takes it back 400 ms early so exactly one alert lands, whichever half rings it.
-- [x] The lock-screen countdown stops itself at 0:00: a chronometer-less copy of the line is queued with the OS, because nothing here is awake to post one.
+- [x] The session line is a foreground service, so the rest bar on it can drain a second at a time — a progress bar holds the last value posted to it, and a frozen app posts nothing. The chronometer went with it: the system draws that in the header's far corner, and the time left belongs beside the bar. Between sets there is no bar at all.
 - [x] The rest tone can be turned off in Settings. The buzz is not part of the switch.
 - [x] The exercise's own screen opens from the log's ⋯ menu, so a day's rest, bar and targets are editable without leaving the session.
 - [x] The bar is per training day, and the bar a set was logged on is snapshotted onto the row — the plate diagram stopped reading the catalog live. Schema 3 → 4, server rung included.

@@ -25,6 +25,17 @@
     <!-- So a rest scheduled before a reboot is put back afterwards. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- The session line is a foreground service for exactly one reason: a
+         progress bar has no clock of its own. It shows whatever value was last
+         posted, and Android freezes an ordinary app within seconds of the
+         screen going off — so a rest bar draining towards zero would stop
+         where it was and sit there while the rest ran out underneath it. A
+         foreground service is not frozen, so the second it counts is a second
+         this app is awake to draw. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <!-- Cloud backup, and nothing else — see SYNC.md. Declared here rather than
          relied on, because the only other declaration is in the *debug*
          manifest, which Flutter injects for hot reload and the tooling's own
@@ -64,6 +75,24 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- The service behind the session line. `specialUse` rather than
+             `health`: the semantically correct type demands ACTIVITY_RECOGNITION
+             or BODY_SENSORS be granted at runtime, and this reads no sensor —
+             it counts a rest. The justification `specialUse` asks for is a Play
+             requirement, and this app is not distributed there.
+
+             Stopped with the task on purpose: a workout swiped out of recents
+             is one nobody is in, and the line it left behind used to be
+             undismissable, because `clear` never runs down that path. -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Counting the rest between sets of a workout the user is in" />
+        </service>
         <!-- The plugin's own receivers. Without these a scheduled rest alert
              is accepted and then never shown. -->
         <receiver

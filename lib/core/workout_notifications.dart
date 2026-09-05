@@ -8,9 +8,13 @@ import 'package:timezone/timezone.dart' as tz;
 ///
 /// Two notifications, and they answer two different questions.
 ///
-/// * **The session** is ongoing and silent: what you are training, how far
-///   through it you are, and — while a rest is running — a live countdown the
-///   *system* draws, so it keeps ticking with the app asleep behind it.
+/// * **The session** is a silent foreground service: what you are training,
+///   how far through it you are, and — while a rest is running — the rest
+///   itself, as a bar draining towards zero with the time left written beside
+///   it. It is a service because a progress bar has no clock. It holds the
+///   last value posted to it, and an ordinary app is frozen within seconds of
+///   the screen going off, so a bar drained from in here would stop where it
+///   was and stay there. A foreground service is not frozen.
 /// * **The rest alert** is scheduled with the OS rather than fired by the app.
 ///   This is the whole point of this file: a Dart `Timer` is frozen the moment
 ///   Android suspends the process, so a phone put face down on a bench did not
@@ -46,14 +50,27 @@ class WorkoutNotifications {
   static const _restChannel = 'rest_done';
   static const _restSilentChannel = 'rest_done_silent';
 
+  /// The status bar draws a small icon from its **alpha channel alone**, every
+  /// opaque pixel painted one flat colour by the system. The launcher icon is
+  /// a full square of opaque pixels, so handing that over — which is what the
+  /// Flutter template does — draws a featureless white blob. This is the mark
+  /// on its own: transparent everywhere it is not the shape.
+  static const _smallIcon = '@drawable/ic_stat_deltoid';
+
   bool _ready = false;
   bool _unsupported = false;
 
-  /// Whether a replacement for the session line is sitting in the OS alarm
-  /// queue. Tracked so the cancel that clears it — which would also take the
-  /// *visible* session line down, since both carry [_sessionId] — is only paid
-  /// for when there is something to clear.
-  bool _sessionUpdatePending = false;
+  /// Whether the session's foreground service is up, so [clear] only asks for
+  /// it to be torn down when there is something to tear down.
+  bool _serviceRunning = false;
+
+  /// The Android half of the plugin, or null off Android — where a foreground
+  /// service is neither available nor meaningful, and the session line falls
+  /// back to an ordinary posted notification.
+  AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
 
   /// Builds the plugin and asks for the notification permission, once.
   ///
@@ -66,7 +83,8 @@ class WorkoutNotifications {
       tzdata.initializeTimeZones();
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          // The mark, flat and alpha-only — see `_smallIcon`.
+          android: AndroidInitializationSettings(_smallIcon),
         ),
       );
       final android = _plugin
@@ -89,54 +107,56 @@ class WorkoutNotifications {
 
   /// Posts, or updates, the ongoing line for the session.
   ///
-  /// [restEndsAt] draws the system's own countdown chronometer next to the
-  /// text. It is drawn by the notification shade, not by this app, so it keeps
-  /// counting with the process suspended — which is the only reason the number
-  /// on the lock screen can be trusted.
+  /// [restSecondsLeft] and [restTargetSeconds] are the rest now running, and
+  /// they are what the bar is drawn from — full at the start of the rest,
+  /// empty at zero. The caller re-posts this once a second while a rest is on
+  /// the clock; between sets nothing changes but the set count, so nothing is
+  /// posted but a set count.
+  ///
+  /// Updating is the same call: `startForegroundService` with the same id
+  /// replaces the notification the service is holding up.
   Future<void> showSession({
     required String title,
     required String body,
-    DateTime? restEndsAt,
-    String? afterRestBody,
+    required int done,
+    required int total,
+    int? restSecondsLeft,
+    int? restTargetSeconds,
   }) async {
     if (!await init()) return;
+    final details = _sessionDetails(
+      done: done,
+      total: total,
+      restSecondsLeft: restSecondsLeft,
+      restTargetSeconds: restTargetSeconds,
+    );
     try {
-      final replacing = restEndsAt != null && afterRestBody != null;
-      // Any replacement queued for the previous rest is now describing a rest
-      // that has been dismissed, extended or superseded. It carries the same
-      // id, so leaving it there would let the OS overwrite this line with a
-      // stale one minutes from now.
-      //
-      // Only when nothing is about to take its place: a `zonedSchedule` under
-      // the same id replaces the pending alarm by itself, and cancelling first
-      // would take the *visible* line down and put it back on every set.
-      if (_sessionUpdatePending && !replacing) {
-        _sessionUpdatePending = false;
-        await _plugin.cancel(id: _sessionId);
+      final android = _android;
+      if (android == null) {
+        // Not Android. Nothing here needs a service to be correct — only to
+        // be current while the process is asleep, which is not a state the
+        // other platforms this builds for are in.
+        await _plugin.show(
+          id: _sessionId,
+          title: title,
+          body: body,
+          notificationDetails: details,
+        );
+        return;
       }
-      await _plugin.show(
+      await android.startForegroundService(
         id: _sessionId,
         title: title,
         body: body,
-        notificationDetails: _sessionDetails(restEndsAt: restEndsAt),
+        notificationDetails: details.android,
+        // Restarted by the system if it is ever killed under memory pressure,
+        // because the workout it is counting is still open behind it.
+        startType: AndroidServiceStartType.startSticky,
+        foregroundServiceTypes: const {
+          AndroidServiceForegroundType.foregroundServiceTypeSpecialUse,
+        },
       );
-
-      // **The countdown has to be stopped by something that is awake.**
-      //
-      // The chronometer above is drawn by the system, which is the only reason
-      // it can be trusted while this process is suspended — and also the
-      // reason it does not stop at zero. Nothing was re-posting the line at
-      // the end of the rest, so a phone left face down went on counting into
-      // `-1:23`. The fix is the same trick as the alert itself: hand the OS a
-      // second, chronometer-less copy of this line, timed to land the instant
-      // the rest is up. Same id, so it replaces rather than stacks.
-      if (replacing) {
-        await _scheduleSessionAfterRest(
-          at: restEndsAt,
-          title: title,
-          body: afterRestBody,
-        );
-      }
+      _serviceRunning = true;
     } on MissingPluginException {
       _unsupported = true;
     } catch (error) {
@@ -146,14 +166,41 @@ class WorkoutNotifications {
   }
 
   NotificationDetails _sessionDetails({
-    DateTime? restEndsAt,
-    bool ongoing = true,
+    required int done,
+    required int total,
+    int? restSecondsLeft,
+    int? restTargetSeconds,
   }) {
+    final resting =
+        restSecondsLeft != null &&
+        restTargetSeconds != null &&
+        restTargetSeconds > 0;
     return NotificationDetails(
       android: AndroidNotificationDetails(
         _sessionChannel,
         'Session in progress',
         channelDescription: 'The session you are training, and the rest clock.',
+        icon: _smallIcon,
+        // The header's small grey line, next to the app name: where the
+        // session stands, which is the one number that is true whether or not
+        // a rest is running.
+        subText: total > 0 ? '$done of $total sets' : null,
+        // **The bar is the rest, and nothing else is ever drawn in it.**
+        //
+        // A notification's progress bar holds whatever value was last posted
+        // to it — it has no clock, and there is no way to hand it one. The
+        // seconds it counts down are therefore posted, one a second, by the
+        // service holding this line up; that is what the service is for.
+        //
+        // It had a second job for one build: the session's own fraction,
+        // between sets. One bar meaning two things has to jump when the
+        // meaning changes, and what that looked like was a rest draining to
+        // empty and then immediately growing back as something else. So there
+        // is no bar at all when no rest is running, and the set count lives in
+        // the header, which never animates.
+        showProgress: resting,
+        maxProgress: resting ? restTargetSeconds : 0,
+        progress: resting ? restSecondsLeft.clamp(0, restTargetSeconds) : 0,
         // Low and silent, deliberately: this line is a place to look, not
         // an interruption. Every buzz this app makes is the rest alert.
         importance: Importance.low,
@@ -162,40 +209,17 @@ class WorkoutNotifications {
         playSound: false,
         enableVibration: false,
         onlyAlertOnce: true,
-        ongoing: ongoing,
-        autoCancel: !ongoing,
+        ongoing: true,
+        autoCancel: false,
         category: AndroidNotificationCategory.workout,
-        showWhen: restEndsAt != null,
-        when: restEndsAt?.millisecondsSinceEpoch,
-        usesChronometer: restEndsAt != null,
-        chronometerCountDown: restEndsAt != null,
+        // No chronometer. The system draws that in the header's top corner and
+        // nowhere else, which puts the number that matters furthest from the
+        // bar it belongs to. The time left is written into the body instead,
+        // on the line above the bar, by the same second-by-second post that
+        // moves the bar.
+        showWhen: false,
       ),
     );
-  }
-
-  /// Queues the post-rest version of the session line. Exact, like the alert:
-  /// a countdown that stops "some minutes after" zero is the bug, not the fix.
-  Future<void> _scheduleSessionAfterRest({
-    required DateTime at,
-    required String title,
-    required String body,
-  }) async {
-    if (!at.isAfter(DateTime.now().add(const Duration(seconds: 1)))) return;
-    // Worst case a failure here leaves the line holding a countdown it should
-    // have dropped. The rest alert itself is a separate id and is unaffected.
-    final queued = await _schedule(
-      id: _sessionId,
-      title: title,
-      body: body,
-      at: at,
-      // Dismissible, unlike the line it replaces. This one is posted by the
-      // OS at a moment this app may not exist any more — swipe the workout
-      // away mid-rest and `clear` never runs — and an ongoing notification
-      // for a session nobody is in cannot be got rid of by hand.
-      details: _sessionDetails(ongoing: false),
-      what: 'session line after rest',
-    );
-    if (queued) _sessionUpdatePending = true;
   }
 
   /// Hands one notification to the OS clock, and **degrades rather than going
@@ -291,6 +315,7 @@ class WorkoutNotifications {
         sound ? _restChannel : _restSilentChannel,
         sound ? 'Rest finished' : 'Rest finished (silent)',
         channelDescription: 'Fires when a rest period is up.',
+        icon: _smallIcon,
         importance: Importance.max,
         priority: Priority.high,
         category: AndroidNotificationCategory.alarm,
@@ -354,8 +379,13 @@ class WorkoutNotifications {
     if (!_ready || _unsupported) return;
     try {
       await _plugin.cancel(id: _restId);
-      // Takes the queued post-rest copy with it — same id, one cancel.
-      _sessionUpdatePending = false;
+      // Stopping the service takes its notification with it. The plain cancel
+      // still runs behind it, for the platforms that never had a service and
+      // for a line left over from a build that did not use one.
+      if (_serviceRunning) {
+        _serviceRunning = false;
+        await _android?.stopForegroundService();
+      }
       await _plugin.cancel(id: _sessionId);
     } catch (_) {
       // The session is being torn down anyway.
