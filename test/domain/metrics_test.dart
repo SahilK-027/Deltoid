@@ -310,10 +310,47 @@ void main() {
       );
     });
 
-    test('heavier for fewer reps is a trade-off, not a win', () {
+    test('heavier for fewer reps is a wash when the estimate says so', () {
+      // 45 * 1.4 = 63.0 against 50 * (1 + 8/30) = 63.3. Half a percent apart:
+      // the same set, as far as a formula can tell, and the strict rule was
+      // written to keep exactly this unlit.
+      expect(estimated1RM(load: 45, reps: 12), closeTo(63, 1e-9));
+      expect(estimated1RM(load: 50, reps: 8), closeTo(63.333, 1e-3));
       expect(
         beatsPrevious(load: 50, reps: 8, previousLoad: 45, previousReps: 12),
         isFalse,
+      );
+    });
+
+    test('heavier for fewer reps is a win when the estimate is clear', () {
+      // 72 * 1.4 = 100.8 against 100 * (1 + 8/30) = 126.7 — a quarter better.
+      // Four reps were given up and it is still unambiguously the better set.
+      expect(
+        beatsPrevious(load: 100, reps: 8, previousLoad: 72, previousReps: 12),
+        isTrue,
+      );
+    });
+
+    test('the gain has to clear the margin, not merely exist', () {
+      // 2.4% up: inside the noise, and not lit.
+      expect(
+        beatsPrevious(
+          load: 46.05,
+          reps: 12,
+          previousLoad: 45,
+          previousReps: 13,
+        ),
+        isFalse,
+      );
+      // 2.7% up, same shape of set: lit.
+      expect(
+        beatsPrevious(
+          load: 46.2,
+          reps: 12,
+          previousLoad: 45,
+          previousReps: 13,
+        ),
+        isTrue,
       );
     });
 
@@ -324,6 +361,11 @@ void main() {
       );
       expect(
         beatsPrevious(load: 40, reps: 12, previousLoad: 45, previousReps: 12),
+        isFalse,
+      );
+      // Lighter and fewer reps: neither rule has anything to say for it.
+      expect(
+        beatsPrevious(load: 40, reps: 8, previousLoad: 45, previousReps: 12),
         isFalse,
       );
     });

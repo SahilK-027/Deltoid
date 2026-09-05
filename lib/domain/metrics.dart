@@ -43,27 +43,48 @@ double? estimated1RM({double? load, int? reps}) {
 
 /// Whether a set beats the same slot last time.
 ///
-/// Deliberately not [estimated1RM]: that caps reps at 12 so high-rep work can't
-/// masquerade as strength, which also makes 12 → 13 reps invisible — exactly
-/// the improvement most worth celebrating on a hypertrophy set.
+/// **Two rules, because one of them cannot see what the other can.**
 ///
-/// The rule is strict on purpose. More load at no cost in reps, or more reps at
-/// the same load, is unambiguously better. Heavier for fewer reps is a
-/// trade-off, not a win, and lighting it up green would make the highlight
-/// meaningless.
+/// The first is strict dominance: more load at no cost in reps, or more reps
+/// at the same load. It is the only rule that can see 12 → 13 reps, since
+/// [estimated1RM] caps at twelve so that high-rep work cannot masquerade as
+/// strength — and 12 → 13 is exactly the improvement most worth showing on a
+/// hypertrophy set.
+///
+/// The second is the estimate, and it exists because dominance alone called
+/// 72kg × 12 → 100kg × 8 a trade-off. Strictly it is one: four reps were given
+/// up. But that is 100.8 against 126.7 by Epley, a quarter better, and a rule
+/// that cannot say so is not being careful, it is being wrong.
+///
+/// [_meaningfulGain] is what keeps the second rule from swallowing the first's
+/// judgement. 45 × 12 → 50 × 8 scores 63.0 against 63.3 — a wash inside a
+/// formula, and the sort of near-tie the strict rule was written to keep
+/// unlit. Only a gain clear of that noise counts.
 bool beatsPrevious({
   double? load,
   int? reps,
   double? previousLoad,
   int? previousReps,
 }) {
-  if (load == null || reps == null || previousLoad == null || previousReps == null) {
+  if (load == null ||
+      reps == null ||
+      previousLoad == null ||
+      previousReps == null) {
     return false;
   }
   if (load > previousLoad && reps >= previousReps) return true;
   if (load == previousLoad && reps > previousReps) return true;
-  return false;
+
+  final now = estimated1RM(load: load, reps: reps);
+  final before = estimated1RM(load: previousLoad, reps: previousReps);
+  if (now == null || before == null || before <= 0) return false;
+  return now >= before * (1 + _meaningfulGain);
 }
+
+/// How much better an estimated 1RM has to be before a set that gave up reps
+/// is called a win: 2.5%, about one small plate on a moderate lift. Below it
+/// the two sets are the same set as far as anything can tell.
+const _meaningfulGain = 0.025;
 
 /// One completed set, reduced to what the progress maths needs.
 class ScoredSet {
@@ -199,7 +220,7 @@ PerformanceScore scorePerformance({
 /// this number is not the place it gets counted — the weekly set count is.
 double sessionVolume({
   required List<({LoadMode mode, MeasureMode measure, List<ScoredSet> sets})>
-      exercises,
+  exercises,
   double? bodyweightKg,
 }) {
   var total = 0.0;
