@@ -345,7 +345,12 @@ Future<void> showExerciseMenu(
 /// and arrive from a template, but nothing types them by hand mid-session.
 String _typeBlurb(SetType type) => switch (type) {
       SetType.working => 'Counts toward the top set and e1RM',
-      SetType.warmup => 'Ignored by progression and by last-time',
+      // Half of what this used to say was untrue. A warm-up is out of the
+      // progression maths — no top set, no e1RM, no volume — and it is *not*
+      // out of last-time: the ramp is mirrored into next week's rows and
+      // ghosted like any other set, which is the whole reason it is worth
+      // typing one in.
+      SetType.warmup => 'Out of progression, filled from last time',
       SetType.drop => 'Continues the set above it, lighter',
       _ => '',
     };

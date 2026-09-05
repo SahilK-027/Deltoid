@@ -633,6 +633,54 @@ void main() {
     expect(added.sets.length, prefill.sets.length);
   });
 
+  test('a warm-up is last time too', () async {
+    // A warm-up is out of the progression maths — it is not a top set, it is
+    // not volume, it is not an e1RM. That is not the same as being forgotten:
+    // the ramp up to a working weight is part of the movement, and opening
+    // next week with a blank first row means working it out again every time.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final first = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+    );
+    final entry = (await repo.workoutDetail(first))!.entries.first;
+    // The first row is the ramp, the rest are the work.
+    for (var i = 0; i < entry.sets.length; i++) {
+      final warm = i == 0;
+      await repo.updateSet(
+        entry.sets[i].id,
+        weight: Value(warm ? 40 : 80),
+        reps: Value(warm ? 10 : 6),
+        setType: Value(warm ? SetType.warmup : SetType.working),
+        isDone: const Value(true),
+      );
+    }
+    await repo.completeWorkout(first);
+
+    final second = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+    );
+    final prefill = await repo.prefillForWorkout(
+      workoutId: second,
+      exerciseId: entry.exercise.id,
+    );
+    expect(prefill.source, PrefillSource.sameSession);
+    expect(prefill.sets.first.type, SetType.warmup);
+    expect(prefill.sets.first.weight, 40);
+    expect(prefill.sets.first.reps, 10);
+
+    // And the day opens with a row for it to land on, ahead of the work.
+    final rows = (await repo.workoutDetail(second))!
+        .entries
+        .firstWhere((e) => e.exercise.id == entry.exercise.id)
+        .sets;
+    expect(rows.first.setType, SetType.warmup);
+    expect(rows.where((s) => s.setType == SetType.warmup).length, 1);
+  });
+
   test('a logged day can be moved to the date it was actually trained',
       () async {
     final regime = await activeRegime();
