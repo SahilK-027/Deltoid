@@ -81,7 +81,8 @@ class WorkoutNotifications {
     } on MissingPluginException {
       _unsupported = true;
       return false;
-    } catch (_) {
+    } catch (error) {
+      _log('starting up', error);
       return false;
     }
   }
@@ -138,8 +139,9 @@ class WorkoutNotifications {
       }
     } on MissingPluginException {
       _unsupported = true;
-    } catch (_) {
+    } catch (error) {
       // Nothing here is worth failing a set over.
+      _log('posting the session line', error);
     }
   }
 
@@ -179,26 +181,82 @@ class WorkoutNotifications {
     required String body,
   }) async {
     if (!at.isAfter(DateTime.now().add(const Duration(seconds: 1)))) return;
-    try {
-      await _plugin.zonedSchedule(
-        id: _sessionId,
-        title: title,
-        body: body,
-        scheduledDate: tz.TZDateTime.from(at.toUtc(), tz.UTC),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        // Dismissible, unlike the line it replaces. This one is posted by the
-        // OS at a moment this app may not exist any more — swipe the workout
-        // away mid-rest and `clear` never runs — and an ongoing notification
-        // for a session nobody is in cannot be got rid of by hand.
-        notificationDetails: _sessionDetails(ongoing: false),
-      );
-      _sessionUpdatePending = true;
-    } on MissingPluginException {
-      _unsupported = true;
-    } catch (_) {
-      // Worst case the line keeps a countdown it should have dropped. The
-      // rest alert itself is a separate id and is unaffected.
+    // Worst case a failure here leaves the line holding a countdown it should
+    // have dropped. The rest alert itself is a separate id and is unaffected.
+    final queued = await _schedule(
+      id: _sessionId,
+      title: title,
+      body: body,
+      at: at,
+      // Dismissible, unlike the line it replaces. This one is posted by the
+      // OS at a moment this app may not exist any more — swipe the workout
+      // away mid-rest and `clear` never runs — and an ongoing notification
+      // for a session nobody is in cannot be got rid of by hand.
+      details: _sessionDetails(ongoing: false),
+      what: 'session line after rest',
+    );
+    if (queued) _sessionUpdatePending = true;
+  }
+
+  /// Hands one notification to the OS clock, and **degrades rather than going
+  /// silent** when it will not take an exact one.
+  ///
+  /// Exact is what is wanted: Doze batches ordinary alarms into windows
+  /// minutes wide, and a rest alert that lands two minutes late has told you
+  /// nothing you didn't know. But exact alarms are a permission, and a
+  /// permission can be absent — revoked by hand on Android 14, or, the case
+  /// that sent this whole file silent for a year, an Android 12 phone where
+  /// `USE_EXACT_ALARM` is a string the OS has never heard of. The plugin
+  /// answers that by throwing, and a rest that ends in silence is worse than
+  /// one that rings a minute late.
+  ///
+  /// Returns whether anything is now queued.
+  Future<bool> _schedule({
+    required int id,
+    required String title,
+    required String? body,
+    required DateTime at,
+    required NotificationDetails details,
+    required String what,
+  }) async {
+    // UTC, not the device's zone. The instant is what is being scheduled and
+    // it is minutes away, so naming a zone would buy nothing but a dependency
+    // on looking one up.
+    final when = tz.TZDateTime.from(at.toUtc(), tz.UTC);
+    for (final mode in const [
+      AndroidScheduleMode.exactAllowWhileIdle,
+      AndroidScheduleMode.inexactAllowWhileIdle,
+    ]) {
+      try {
+        await _plugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: when,
+          androidScheduleMode: mode,
+          notificationDetails: details,
+        );
+        return true;
+      } on MissingPluginException {
+        _unsupported = true;
+        return false;
+      } catch (error) {
+        // Not a fallback worth taking twice, and the second mode asks for no
+        // permission at all — if that fails too, the platform is the problem.
+        _log('scheduling $what as $mode failed', error);
+      }
     }
+    return false;
+  }
+
+  /// Says what went wrong, in debug builds only.
+  ///
+  /// Every failure in this file is swallowed on purpose — a missing
+  /// notification must never take a logged set down with it — but swallowed
+  /// silently is how a rest alert that had never once been scheduled looked
+  /// exactly like one that was scheduled and ignored.
+  void _log(String what, Object error) {
+    if (kDebugMode) debugPrint('WorkoutNotifications: $what — $error');
   }
 
   /// Hands the end of this rest to the OS alarm clock.
@@ -217,24 +275,14 @@ class WorkoutNotifications {
     // caller — a lifecycle handler — cannot always know which side of zero the
     // clock is on.
     if (!at.isAfter(DateTime.now().add(const Duration(seconds: 1)))) return;
-    try {
-      await _plugin.zonedSchedule(
-        id: _restId,
-        title: 'Rest done',
-        body: body,
-        // UTC, not the device's zone. The instant is what is being scheduled
-        // and it is minutes away, so naming a zone would buy nothing but a
-        // dependency on looking one up.
-        scheduledDate: tz.TZDateTime.from(at.toUtc(), tz.UTC),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        notificationDetails: _restDetails(sound: sound),
-      );
-    } on MissingPluginException {
-      _unsupported = true;
-    } catch (_) {
-      // A refused exact-alarm permission, most likely. The in-app buzz still
-      // covers the case where the phone is awake in front of you.
-    }
+    await _schedule(
+      id: _restId,
+      title: 'Rest done',
+      body: body,
+      at: at,
+      details: _restDetails(sound: sound),
+      what: 'rest alert',
+    );
   }
 
   NotificationDetails _restDetails({required bool sound}) {
@@ -280,8 +328,9 @@ class WorkoutNotifications {
       );
     } on MissingPluginException {
       _unsupported = true;
-    } catch (_) {
+    } catch (error) {
       // Out of fallbacks. The haptics fired.
+      _log('posting the rest alert', error);
     }
   }
 

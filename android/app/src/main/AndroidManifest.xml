@@ -9,11 +9,19 @@
 
     <!-- The rest alert is an alarm handed to the OS, not a timer inside the
          app: a Dart timer is frozen the moment Android suspends the process,
-         so the tone only played when the phone was picked back up. USE_EXACT_ALARM
-         rather than SCHEDULE_EXACT_ALARM — this is an alarm-clock use, and the
-         other one makes the user grant a permission through a settings screen
-         before a rest can ever ring on time. -->
+         so the tone only played when the phone was picked back up. Both spellings
+         of the permission are declared: this is an alarm-clock use, so from
+         API 33 USE_EXACT_ALARM is granted without sending anyone to a settings
+         screen, and below that it is the only one the OS recognises. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- USE_EXACT_ALARM above was added in API 33. On Android 12 the OS has
+         never heard of it, so an app declaring only that one is refused exact
+         alarms outright — `canScheduleExactAlarms()` is false, the plugin
+         throws, and the rest alert is never scheduled at all. This is the
+         same permission for API 31 and 32, where it is granted at install. -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
     <!-- So a rest scheduled before a reboot is put back afterwards. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
