@@ -223,7 +223,7 @@ Future<void> showExerciseMenu(
               title: entry.exercise.name,
               subtitle: 'Note for today',
               initial: entry.workoutExercise.notes ?? '',
-              hint: 'Shoulder felt off, bench was the wide one',
+              hint: 'Shoulder felt off, so I kept it light',
             );
             navigator.pop();
             if (note == null) return;
@@ -432,14 +432,14 @@ Future<void> showSetActions(
         AppRow(
           icon: Icons.sticky_note_2_outlined,
           title: set.note == null ? 'Add a note' : 'Edit note',
-          subtitle: set.note ?? 'Felt heavy, elbow tucked, …',
+          subtitle: set.note ?? 'Felt heavy, and the elbow drifted',
           onTap: () async {
             final navigator = Navigator.of(sheetContext);
             final note = await promptForNote(
               context,
               title: 'Set note',
               initial: set.note ?? '',
-              hint: 'Felt heavy, elbow tucked, …',
+              hint: 'Felt heavy, and the elbow drifted',
               // Shorter than a session's: this one is rendered under a set row
               // in the log and under a set line in history, where anything
               // longer than a phrase pushes the table apart.

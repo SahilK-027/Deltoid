@@ -486,7 +486,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
       title: entry.exercise.name,
       subtitle: 'Note for this day',
       initial: entry.workoutExercise.notes ?? '',
-      hint: 'Shoulder felt off, bench was the wide one',
+      hint: 'Shoulder felt off, so I kept it light',
     );
     if (text == null) return;
     await ref

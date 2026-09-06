@@ -4,13 +4,13 @@ Every user-facing string in `lib/` measured against
 [CLAUDE.md rule 11](CLAUDE.md#the-rules-most-easily-broken) and
 [THEME § 4 "The words"](THEME.md#the-words).
 
-**Status.** Sections 1, 2 and 3 have been applied — every string in them now
-reads as the "Pick" or "Suggested" column, and the tests that asserted the old
+**Status.** Sections 1 to 4 have been applied — every string in them now reads
+as the "Pick" or "Suggested" column, and the tests that asserted the old
 wording were updated with them. One row of section 3 is deliberately left: the
 `Deltoid_Backup` folder name, which cannot be renamed without stranding the
-files already in the old one. Sections 4 and 5 are outstanding: the
-placeholders, and the commit and release-note conventions. The tables in the
-applied sections are kept as the record of what changed.
+files already in the old one. Section 5 is outstanding: the commit and
+release-note conventions. The tables in the applied sections are kept as the
+record of what changed.
 
 The app's copy is, on the whole, deliberate and better than most. It is
 sentence-cased throughout, it states consequences rather than asking "are you
@@ -95,7 +95,7 @@ Findings are graded:
 
 ---
 
-## 4. Placeholder text · outstanding
+## 4. Placeholder text · **applied**
 
 Hint text is not exempt: it is read more often than most labels, because it is
 what an empty field shows. These are written as diary entries.
@@ -111,7 +111,7 @@ what an empty field shows. These are written as diary entries.
 | [exercise_screen.dart:421](lib/features/regime/exercise_screen.dart:421) | `Elbows tucked, pause on the chest` |
 
 An exemplar is a legitimate pattern for a free-text field, and these do teach
-what the field is for. Three problems remain:
+what the field is for. Three problems were fixed:
 
 1. **Two of them trail into `…`** while the others do not, so the same field
    type is punctuated two ways.
@@ -120,6 +120,12 @@ what the field is for. Three problems remain:
 3. **Six distinct exemplars for four fields that all take the same kind of
    note.** A placeholder is not the place to be inventive; one per field
    *kind* — a session note and an exercise note — is enough.
+
+There are four kinds of note in the app — a session note, an exercise note for
+one logged day, an exercise note attached to a programme day, and a permanent
+cue — and each now has exactly one exemplar. `Shoulder felt off, bench was the
+wide one` also went: "bench was the wide one" is a note to oneself rather than
+an example of one.
 
 Note that `Third set from the pins, no belt` and `Elbows tucked, pause on the
 chest` sit close to rule 9's line: they are technique cues specific to one

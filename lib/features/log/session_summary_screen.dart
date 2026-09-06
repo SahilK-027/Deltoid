@@ -493,7 +493,7 @@ class _NoteBox extends StatelessWidget {
           borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Text(
-          text ?? 'Slept badly, everything felt heavy, the rack was busy…',
+          text ?? 'Slept badly, everything felt heavy',
           style: text == null
               ? context.t.bodyLarge?.copyWith(color: c.textTertiary)
               : context.t.bodyLarge,
@@ -590,7 +590,7 @@ class _ExerciseEntryRow extends ConsumerWidget {
       title: entry.exercise.name,
       subtitle: 'Note for today',
       initial: entry.workoutExercise.notes ?? '',
-      hint: 'Shoulder felt off, bench was the wide one',
+      hint: 'Shoulder felt off, so I kept it light',
     );
     if (text == null) return;
     await ref
