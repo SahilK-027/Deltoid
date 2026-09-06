@@ -1012,21 +1012,16 @@ class _AboutCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text('Deltoid', style: context.t.titleMedium),
-              const Spacer(),
-              // Absent rather than a placeholder while it is being read: a
-              // dash here would be rule 4's dash, which means a measurement
-              // that should exist and does not, and this one is simply late.
-              if (version != null)
-                Text(
-                  version,
-                  style: context.t.labelLarge?.copyWith(color: c.textSecondary),
-                ),
-            ],
+          // Name and version are one phrase, not a row with the version
+          // pushed to the far edge — "Deltoid" on the left and "1.3.1" hard
+          // right read as a label and an unrelated figure, the shape a stat
+          // row has. The version is absent rather than a placeholder while it
+          // is being read: a dash would be rule 4's dash, which means a
+          // measurement that should exist and does not, and this one is
+          // simply late.
+          Text(
+            version == null ? 'Deltoid' : 'Deltoid v$version',
+            style: context.t.titleMedium,
           ),
           const SizedBox(height: Space.sm),
           Text(

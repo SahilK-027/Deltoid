@@ -221,9 +221,18 @@ class StepperRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return AppRow(
+    // The helper runs the full width **under** the row, never in the
+    // subtitle slot.
+    //
+    // A stepper is 36 + 76 + 36 of controls plus its gaps, so a subtitle
+    // beside one gets about 130pt — nine or ten words over two lines, and
+    // every helper here is longer than that. They were all being cut mid
+    // sentence: "For an exercise that has not been given its own…". Moving
+    // the rows into a sheet did not fix it, because the stepper takes the
+    // same width wherever the row is drawn; only taking the sentence off
+    // that line does.
+    final row = AppRow(
       title: label,
-      subtitle: helper,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -251,6 +260,20 @@ class StepperRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (helper == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        Padding(
+          // Aligned with the title above it, and carrying the row's bottom
+          // padding now that the row itself has none to give.
+          padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
+          child: Text(helper!, style: context.t.bodyMedium),
+        ),
+      ],
     );
   }
 }
