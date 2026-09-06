@@ -34,10 +34,13 @@ will not install over the one already on the phone.
 - **A set that is stronger by estimated 1RM now reads as a win** even when it
   traded reps for weight. 72 kg × 12 followed by 100 kg × 8 is progress, and it
   was being marked as a trade-off.
-- **Warm-up sets appear in the last-time reference again.** The set sheet said
-  they would, and the reference had been ignoring them.
-- The log no longer scrolls sideways to reveal a set row that is already on
-  screen.
+- **The set sheet no longer claims warm-ups are ignored by last-time.** They
+  never were: a warm-up is mirrored into next week's rows and carries its own
+  reference like any other set. Only the description of it was wrong, and it
+  was wrong for long enough to be believed.
+- The log no longer scrolls to reveal a set row that is already on screen.
+  Tapping a cell moved the page under your thumb even when every set was in
+  view.
 - The launcher icon's mark no longer runs to the edge of its own tile.
 
 ## 1.2.1 — 2026-09-04
