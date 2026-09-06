@@ -26,7 +26,7 @@ void main() {
       );
     });
 
-    test('says × 2 for a pair of dumbbells, because two are moving', () {
+    test('says each for a pair of dumbbells, because two are moving', () {
       expect(
         loadLabel(
           loadMode: LoadMode.perSide,
@@ -34,7 +34,7 @@ void main() {
           addedWeight: null,
           unit: WeightUnit.kg,
         ),
-        '22.5 kg × 2',
+        '22.5 kg each',
       );
     });
 
@@ -111,7 +111,7 @@ void main() {
         addedWeight: null,
         unit: WeightUnit.kg,
       ),
-      '20 kg × 2',
+      '20 kg each',
     );
     // Off where the load mode is stated beside the list. The suffix would
     // repeat it, using an `×` that means reps in the format next to it.
@@ -139,6 +139,25 @@ void main() {
   });
 
   group('loadWithCount', () {
+    test('one multiplication sign, and it means reps', () {
+      // `20 kg × 2 × 10` is what this printed for a pair of dumbbells: two
+      // multiplication signs in one string, the first meaning "a pair" and the
+      // second "for ten reps", with nothing to tell them apart. `×` means reps
+      // here, on the exercise's history, and in the compressed form, so the
+      // pair says itself in words instead.
+      final line = loadWithCount(
+        loadMode: LoadMode.perSide,
+        measureMode: MeasureMode.reps,
+        weight: 20,
+        addedWeight: null,
+        reps: 10,
+        unit: WeightUnit.kg,
+      );
+      expect(line, '20 kg each × 10');
+      expect('×'.allMatches(line).length, 1);
+    });
+
+
     test('appends what was done against the load', () {
       expect(
         loadWithCount(

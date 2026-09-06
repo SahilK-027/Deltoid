@@ -82,7 +82,11 @@ class WorkoutDetailScreen extends ConsumerWidget {
             width: double.infinity,
             color: c.surface,
             padding: const EdgeInsets.fromLTRB(
-                Space.gutter, 0, Space.gutter, Space.lg),
+              Space.gutter,
+              0,
+              Space.gutter,
+              Space.lg,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -105,16 +109,16 @@ class WorkoutDetailScreen extends ConsumerWidget {
                 // block the exercises use for theirs, so the page has one way
                 // of showing a note rather than two.
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: Space.gutter),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SectionHeader(
                         'Session note',
                         actionLabel: hasNote ? 'Edit' : null,
-                        onAction:
-                            hasNote ? () => _editNotes(context, ref, detail) : null,
+                        onAction: hasNote
+                            ? () => _editNotes(context, ref, detail)
+                            : null,
                       ),
                       _NoteBlock(
                         note: workout.notes?.isEmpty == true
@@ -132,7 +136,8 @@ class WorkoutDetailScreen extends ConsumerWidget {
                     padding: EdgeInsets.symmetric(horizontal: Space.gutter),
                     child: EmptyBox(
                       icon: Icons.inbox_outlined,
-                      message: 'This workout was finished without anything '
+                      message:
+                          'This workout was finished without anything '
                           'logged in it.',
                     ),
                   )
@@ -141,7 +146,8 @@ class WorkoutDetailScreen extends ConsumerWidget {
                   // word does on its own.
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: Space.gutter),
+                      horizontal: Space.gutter,
+                    ),
                     child: SectionHeader(
                       '${detail.entries.length} exercise'
                       '${detail.entries.length == 1 ? '' : 's'}',
@@ -179,8 +185,9 @@ class WorkoutDetailScreen extends ConsumerWidget {
       showDragHandle: false,
       builder: (sheet) => AppSheet(
         title: detail.session?.name ?? unplannedSessionName,
-        subtitle: DateFormat('d MMMM yyyy')
-            .format(dateFromDayKey(detail.workout.dayKey)),
+        subtitle: DateFormat(
+          'd MMMM yyyy',
+        ).format(dateFromDayKey(detail.workout.dayKey)),
         // Full-bleed rows, no card. The rows had been sitting on a card inside
         // a sheet — a panel in a panel — and the sheet's gutter then inset them
         // a second time on top of the padding `AppRow` already carries, so the
@@ -268,16 +275,19 @@ class WorkoutDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     WorkoutDetail detail,
   ) async {
-    final sets =
-        detail.entries.expand((e) => e.sets).where((s) => s.isDone).length;
-    final date = DateFormat('d MMMM yyyy').format(
-      dateFromDayKey(detail.workout.dayKey),
-    );
+    final sets = detail.entries
+        .expand((e) => e.sets)
+        .where((s) => s.isDone)
+        .length;
+    final date = DateFormat(
+      'd MMMM yyyy',
+    ).format(dateFromDayKey(detail.workout.dayKey));
 
     final ok = await confirmAction(
       context,
       title: 'Delete this session?',
-      message: '${detail.session?.name ?? unplannedSessionName} · $date\n\n'
+      message:
+          '${detail.session?.name ?? unplannedSessionName} · $date\n\n'
           '$sets logged set${sets == 1 ? '' : 's'} will be removed from '
           'history, the heatmap and every last-time suggestion. If it closed a '
           'cycle, the cycle reopens.\n\nThis cannot be undone.',
@@ -298,8 +308,9 @@ class WorkoutDetailScreen extends ConsumerWidget {
         .where((s) => s.isDone)
         .length;
     final ended = detail.workout.endedAt;
-    final minutes =
-        ended == null ? null : (ended - detail.workout.startedAt) ~/ 60000;
+    final minutes = ended == null
+        ? null
+        : (ended - detail.workout.startedAt) ~/ 60000;
 
     return [
       '${detail.entries.length} exercise'
@@ -359,7 +370,9 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
               : () => setState(() => _open = !_open),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: Space.gutter, vertical: Space.md),
+              horizontal: Space.gutter,
+              vertical: Space.md,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -388,8 +401,11 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.sticky_note_2_outlined,
-                                size: 14, color: c.textTertiary),
+                            Icon(
+                              Icons.sticky_note_2_outlined,
+                              size: 14,
+                              color: c.textTertiary,
+                            ),
                             const SizedBox(width: Space.xs),
                             Expanded(
                               child: Text(note, style: context.t.bodySmall),
@@ -402,8 +418,10 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                 ),
                 if (skipped) ...[
                   const SizedBox(width: Space.sm),
-                  Pill(entry.workoutExercise.skipReason.label,
-                      color: c.negative),
+                  Pill(
+                    entry.workoutExercise.skipReason.label,
+                    color: c.negative,
+                  ),
                 ],
                 if (done.isNotEmpty) ...[
                   const SizedBox(width: Space.sm),
@@ -411,8 +429,11 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                     turns: _open ? 0.25 : 0,
                     duration: Motion.base,
                     curve: Motion.curve,
-                    child: Icon(Icons.chevron_right_rounded,
-                        size: 20, color: c.textTertiary),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: c.textTertiary,
+                    ),
                   ),
                 ],
               ],
@@ -445,8 +466,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                 // that navigates looks like a link.
                 const SizedBox(height: Space.md),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: Space.gutter),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
                   child: _NoteBlock(
                     note: note,
                     placeholder: 'Add a note for this day',
@@ -462,8 +482,9 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                       'All ${entry.exercise.name} history',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              ExerciseHistoryScreen(exerciseId: entry.exercise.id),
+                          builder: (_) => ExerciseHistoryScreen(
+                            exerciseId: entry.exercise.id,
+                          ),
                         ),
                       ),
                     ),
@@ -496,7 +517,11 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
 
   /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
   /// are excluded — a 20 kg warm-up is not what the day was about.
-  static String _topLoad(List<SetLog> done, Exercise exercise, WeightUnit unit) {
+  static String _topLoad(
+    List<SetLog> done,
+    Exercise exercise,
+    WeightUnit unit,
+  ) {
     final i = heaviestLogged(
       sets: [
         for (final s in done)
@@ -614,7 +639,9 @@ class _SetLine extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: Space.gutter, vertical: Space.sm),
+        horizontal: Space.gutter,
+        vertical: Space.sm,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -637,8 +664,19 @@ class _SetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${loadLabel(loadMode: exercise.loadMode, weight: set.weight, addedWeight: set.addedWeight, unit: unit)} × '
-                  '${formatCount(set.reps, exercise.measureMode, partial: set.partialReps)}',
+                  // `loadWithCount`, not a load and a count joined here: this
+                  // line was that function written a second time, and the two
+                  // spellings are exactly how one screen ends up disagreeing
+                  // with another about the same set.
+                  loadWithCount(
+                    loadMode: exercise.loadMode,
+                    measureMode: exercise.measureMode,
+                    weight: set.weight,
+                    addedWeight: set.addedWeight,
+                    reps: set.reps,
+                    partialReps: set.partialReps,
+                    unit: unit,
+                  ),
                   style: context.t.labelLarge,
                 ),
                 if (set.note != null && set.note!.isNotEmpty)
@@ -650,5 +688,4 @@ class _SetLine extends StatelessWidget {
       ),
     );
   }
-
 }

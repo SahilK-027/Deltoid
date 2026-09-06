@@ -17,8 +17,13 @@ import 'enums.dart';
 import 'metrics.dart';
 import 'units.dart';
 
-/// One set's load, spelled out: `82.5 kg`, `82.5 kg × 2` for a pair of
+/// One set's load, spelled out: `82.5 kg`, `22.5 kg each` for a pair of
 /// dumbbells, `Bodyweight`, `BW + 10 kg`, or a dash when nothing was recorded.
+///
+/// **`×` is not used here, and that is the point.** It reads as "for this many
+/// reps" everywhere else this app prints a set, so spending it on a pair of
+/// dumbbells produced `20 kg × 2 × 10` — one string, two multiplication signs,
+/// two different meanings, and nothing to say which was which.
 ///
 /// The dash is rule 4: a set with no weight against it is a gap, not a zero.
 String loadLabel({
@@ -27,7 +32,7 @@ String loadLabel({
   required double? addedWeight,
   required WeightUnit unit,
 
-  /// Whether a pair of dumbbells is spelled out as `× 2`.
+  /// Whether a pair of dumbbells is spelled out as `each`.
   ///
   /// On by default, because a bare `20 kg` against a per-hand movement is
   /// ambiguous about the only thing that matters — whether that is what you
@@ -47,12 +52,17 @@ String loadLabel({
         : 'BW + ${formatWeight(addedWeight, unit)} ${unit.label}';
   }
   if (weight == null) return '—';
-  final perSide = pair && loadMode == LoadMode.perSide ? ' × 2' : '';
+  final perSide = pair && loadMode == LoadMode.perSide ? ' each' : '';
   return '${formatWeight(weight, unit)} ${unit.label}$perSide';
 }
 
-/// The same load with what was done against it: `82.5 kg × 8`, `Bodyweight × 12`,
-/// `1:30` for a hold that carried no load.
+/// The same load with what was done against it: `82.5 kg × 8`,
+/// `22.5 kg each × 8`, `Bodyweight × 12`, `1:30` for a hold that carried no
+/// load.
+///
+/// **One `×`, and it means reps.** Built on [loadLabel] rather than repeating
+/// it, so the load reads the same here as it does anywhere else the app prints
+/// one.
 String loadWithCount({
   required LoadMode? loadMode,
   required MeasureMode measureMode,
@@ -63,15 +73,16 @@ String loadWithCount({
   required WeightUnit unit,
 }) {
   final count = formatCount(reps, measureMode, partial: partialReps);
-  if (loadMode == LoadMode.bodyweight) return 'Bodyweight × $count';
-  if (loadMode == LoadMode.bodyweightPlus) {
-    return addedWeight == null || addedWeight == 0
-        ? 'Bodyweight × $count'
-        : 'BW + ${formatWeight(addedWeight, unit)} ${unit.label} × $count';
-  }
-  if (weight == null) return measureMode.isHold ? count : '$count reps';
-  final perSide = loadMode == LoadMode.perSide ? ' × 2' : '';
-  return '${formatWeight(weight, unit)} ${unit.label}$perSide × $count';
+  final load = loadLabel(
+    loadMode: loadMode,
+    weight: weight,
+    addedWeight: addedWeight,
+    unit: unit,
+  );
+  // Nothing was on the bar: the count is the whole story, and a dash with a
+  // count hung off it says less than the count alone.
+  if (load == '—') return measureMode.isHold ? count : '$count reps';
+  return '$load × $count';
 }
 
 /// Compressed, for a dense row that has one line for the whole set: `82.5×8`,
