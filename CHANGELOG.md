@@ -10,6 +10,53 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.4.0 — 2026-09-06
+
+### Added
+
+- **Vibration, the session notification and keeping the screen on are now
+  choices.** All three used to happen whether you wanted them or not. The buzz
+  at the end of a rest is its own switch rather than half of the tone's — the
+  tone is what carries over a gym, and the buzz is what a phone lying face down
+  on a bench still reports.
+- Turning the session notification off stops the ongoing line entirely, because
+  Android will not run the background service behind it without one. The
+  end-of-rest alert is a scheduled alarm rather than part of that service, so it
+  still arrives; what is lost is the clock counting down while the screen is
+  off. The row says so.
+
+### Changed
+
+- **Settings is rebuilt.** It was six sections and thirteen rows, several of
+  them explaining themselves in a column too narrow to finish a sentence. Rows
+  now state their answer — `Rest time & alert`, `Weight units · Kilograms` —
+  and the explanation lives in the sheet the row opens, where it has the width
+  to be a whole sentence. Account and backup are one section, rest and units
+  another.
+- **Signing out is one row that opens both ways out**, each with room to say
+  what it does. Side by side they read as the same action twice: both titles
+  began "Sign out", and the difference between them was whether years of
+  training stayed on the phone.
+- **About names the version.** It read a paragraph set smaller than everything
+  around it, with no version anywhere — which is the one thing an About section
+  exists to answer.
+- A set logged on a pair of dumbbells reads `20 kg each × 10`. `×` used to mean
+  both "a pair" and "for this many reps", and printed both at once as
+  `20 kg × 2 × 10`. Worse, the compressed form on an exercise's own history
+  never carried the pair, so the same set looked like half the load on one
+  screen and twice it on another.
+
+### Fixed
+
+- **Every rest helper was being cut mid-sentence.** A stepper's ± controls and
+  its readout take the width the description was sharing, so "The default for an
+  exercise that has not been given…" is all that ever fit. The sentence now runs
+  the full width beneath the row, here and in a regime's deload settings.
+- The bodyweight chart keeps the range you picked. Choosing 1M and coming back
+  to the screen later drew 3M again.
+- The automatic backup row says whether it has ever run, rather than only
+  describing when it would.
+
 ## 1.3.1 — 2026-09-06
 
 ### Fixed
