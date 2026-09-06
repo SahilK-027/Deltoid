@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources this app names at runtime, from Dart, and nowhere else.
+
+  The release build runs Android's resource shrinker, which keeps a resource
+  only when it can see a reference to it from Java or from XML. A name that
+  exists solely as a string handed to a plugin — `@drawable/ic_stat_deltoid`
+  for the notification's small icon, `rest_done` for the alert tone — looks
+  like a resource nobody wants, and it is deleted.
+
+  What that cost: every release build ever made shipped without the rest tone,
+  so the alert that ends a rest was silent on a phone in a pocket while the
+  in-app tone — a Flutter asset, which the shrinker never sees — played
+  perfectly with the app open. The icon joined it in 1.3.0, and a notification
+  whose icon resource does not exist cannot be posted at all, which took the
+  whole session line down with it.
+
+  Anything added here must also be added to the list in
+  `test/tools/kept_resources_test.dart`, which reads this file and the Dart
+  that names them, and fails when the two disagree.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_deltoid,@raw/rest_done" />
