@@ -42,7 +42,7 @@ void main() {
       expect(result.reference!.sessionName, 'Push 1');
     });
 
-    test('falls back to another session and flags where it came from', () {
+    test('another session is named, and never filled in', () {
       final result = resolvePrefill(
         candidates: [
           perf('push2', 'Push 2', 20260720, [working(20, 12)]),
@@ -50,9 +50,27 @@ void main() {
         sessionId: 'push1',
       );
 
+      // Where it was last done is worth knowing.
       expect(result.source, PrefillSource.otherSession);
       expect(result.reference!.sessionName, 'Push 2');
-      expect(result.sets.single.weight, 20);
+      // What was lifted there is not this session's business. No sets means no
+      // ghosts, no mirrored shape, nothing to adopt on a tick — a first time
+      // in Push 1 opens exactly as blank as a movement never trained at all.
+      expect(result.sets, isEmpty);
+      expect(result.hasSuggestion, isFalse);
+    });
+
+    test('a deload week does not scale numbers it was never given', () {
+      final result = resolvePrefill(
+        candidates: [
+          perf('push2', 'Push 2', 20260720, [working(100, 8)]),
+        ],
+        sessionId: 'push1',
+        targetIsDeload: true,
+      );
+
+      expect(result.sets, isEmpty);
+      expect(result.deloadApplied, isFalse);
     });
 
     test('skips deload performances of the same session when a normal one exists',

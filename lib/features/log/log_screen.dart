@@ -2053,13 +2053,15 @@ class _ExercisePage extends ConsumerWidget {
                 ],
               ),
             ),
-            // Where today's numbers came from lives behind here now, in one
-            // sentence with the rest of the exercise's facts. The dot is on
-            // when they were borrowed from another session — that is the one
-            // case you must not miss, because the ghosts in the table are then
-            // somebody else's day.
+            // Where today's numbers came from lives behind here, in one
+            // sentence with the rest of the exercise's facts.
+            //
+            // It wore an amber dot while a session with no history of its own
+            // was filled from another one: the ghosts in the table were
+            // somebody else's day, and that is not something to leave a person
+            // to notice. Nothing is borrowed now — a first time here opens
+            // blank — so there is no warning left to carry.
             _InfoButton(
-              flagged: prefill?.source == PrefillSource.otherSession,
               onTap: () => showExerciseInfo(context, ref, entry, prefill),
             ),
             const SizedBox(width: Space.sm),
@@ -2675,41 +2677,16 @@ String _formatElapsed(int startedAtMs) {
 /// session are the one case where ignoring where they came from means chasing
 /// somebody else's day, so the button wears a dot and the sheet spells it out.
 class _InfoButton extends StatelessWidget {
-  const _InfoButton({required this.flagged, required this.onTap});
+  const _InfoButton({required this.onTap});
 
-  final bool flagged;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CircleIconButton(
-          icon: Icons.info_outline_rounded,
-          tooltip: flagged
-              ? 'Borrowed from another session'
-              : 'About this exercise',
-          onTap: onTap,
-        ),
-        if (flagged)
-          Positioned(
-            right: 1,
-            top: 1,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: c.deload,
-                shape: BoxShape.circle,
-                // Ringed in the button's own fill, so it reads as a badge on
-                // the control rather than as part of the glyph.
-                border: Border.all(color: c.surfaceHigh, width: 2),
-              ),
-            ),
-          ),
-      ],
+    return CircleIconButton(
+      icon: Icons.info_outline_rounded,
+      tooltip: 'About this exercise',
+      onTap: onTap,
     );
   }
 }

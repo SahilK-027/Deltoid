@@ -67,32 +67,25 @@ Future<void> showExerciseInfo(
         if (exercise.notes != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.md, Space.lg, Space.sm),
+              Space.lg,
+              Space.md,
+              Space.lg,
+              Space.sm,
+            ),
             child: Text(exercise.notes!, style: sheetContext.t.bodyMedium),
           ),
-        // Borrowed is a warning, not a fact, and it is the reason the ⓘ wears
-        // a dot — so this row wears the same dot in the same amber. The colour
-        // carries meaning here (rule 1: hue is data), and the meaning is "these
-        // numbers are not this session's".
+        // Nothing is borrowed any more, so nothing here is a warning. The
+        // movement has been done, just not on this day, and that is worth
+        // saying plainly: it tells you the ⓘ is not hiding a suggestion, and
+        // it tells you where to look if you want the number yourself.
         if (prefill?.source == PrefillSource.otherSession)
-          // One row, one sentence. The explanation was a second paragraph
-          // hanging under it on its own insets, in its own size, saying in
-          // three lines what the row can say in one.
           AppRow(
             icon: Icons.call_split_rounded,
-            title: 'Borrowed from ${prefill!.reference!.sessionName}',
-            subtitle: 'First time here. Showing '
+            title: 'First time in this session',
+            subtitle:
+                'Last done in ${prefill!.reference!.sessionName} · '
                 '${DateFormat('d MMM').format(dateFromDayKey(prefill.reference!.dayKey))}'
-                "'s numbers until you log your own",
-            tint: sheetContext.c.deload,
-            trailing: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: sheetContext.c.deload,
-                shape: BoxShape.circle,
-              ),
-            ),
+                '. This day starts blank',
           )
         else
           AppRow(
@@ -143,16 +136,17 @@ String _prefillBlurb(PrefillResult? prefill) {
     return 'First time here, with nothing to suggest from';
   }
   final reference = p.reference!;
-  final date = DateFormat('d MMM yyyy')
-      .format(dateFromDayKey(reference.dayKey));
+  final date = DateFormat(
+    'd MMM yyyy',
+  ).format(dateFromDayKey(reference.dayKey));
   final scaled = p.deloadApplied ? ', scaled for the deload' : '';
   return switch (p.source) {
     PrefillSource.sameSession => '${reference.sessionName} · $date$scaled',
     PrefillSource.sameSessionDeload =>
       '${reference.sessionName} · $date · deload week$scaled',
-    // The borrowed case has its own row, in amber, above.
-    PrefillSource.otherSession =>
-      '${reference.sessionName} · $date$scaled',
+    // Unreachable: an other-session result carries no sets, so `hasSuggestion`
+    // is false and this returns above — and it has its own row anyway.
+    PrefillSource.otherSession => '${reference.sessionName} · $date$scaled',
     PrefillSource.none => 'First time here, with nothing to suggest from',
   };
 }
@@ -219,7 +213,8 @@ Future<void> showExerciseMenu(
           title: entry.workoutExercise.notes == null
               ? 'Add a note for today'
               : "Edit today's note",
-          subtitle: entry.workoutExercise.notes ??
+          subtitle:
+              entry.workoutExercise.notes ??
               'This session only. The exercise keeps its cue.',
           onTap: () async {
             final navigator = Navigator.of(sheetContext);
@@ -279,7 +274,9 @@ Future<void> showExerciseMenu(
             final navigator = Navigator.of(sheetContext);
             if (entry.workoutExercise.skipReason != SkipReason.none) {
               await repo.setSkipReason(
-                  entry.workoutExercise.id, SkipReason.none);
+                entry.workoutExercise.id,
+                SkipReason.none,
+              );
               navigator.pop();
               return;
             }
@@ -344,16 +341,16 @@ Future<void> showExerciseMenu(
 /// offered in the set sheet: backoff, rest-pause and AMRAP exist in the data
 /// and arrive from a template, but nothing types them by hand mid-session.
 String _typeBlurb(SetType type) => switch (type) {
-      SetType.working => 'Counts toward the top set and e1RM',
-      // Half of what this used to say was untrue. A warm-up is out of the
-      // progression maths — no top set, no e1RM, no volume — and it is *not*
-      // out of last-time: the ramp is mirrored into next week's rows and
-      // ghosted like any other set, which is the whole reason it is worth
-      // typing one in.
-      SetType.warmup => 'Out of progression, filled from last time',
-      SetType.drop => 'Continues the set above it, lighter',
-      _ => '',
-    };
+  SetType.working => 'Counts toward the top set and e1RM',
+  // Half of what this used to say was untrue. A warm-up is out of the
+  // progression maths — no top set, no e1RM, no volume — and it is *not*
+  // out of last-time: the ramp is mirrored into next week's rows and
+  // ghosted like any other set, which is the whole reason it is worth
+  // typing one in.
+  SetType.warmup => 'Out of progression, filled from last time',
+  SetType.drop => 'Continues the set above it, lighter',
+  _ => '',
+};
 
 /// What the set sheet calls itself.
 ///
@@ -374,6 +371,7 @@ Future<void> showSetActions(
   BuildContext context,
   WidgetRef ref,
   SetLog set, {
+
   /// The working-set number the row's chip prints. Not the raw position: the
   /// sheet used to head itself "Set 4" for the row marked `2` whenever
   /// warm-ups or drop legs sat above it, because it counted rows.
@@ -430,7 +428,7 @@ Future<void> showSetActions(
               navigator.pop();
             },
           ),
-          ],
+        ],
         AppRow(
           icon: Icons.sticky_note_2_outlined,
           title: set.note == null ? 'Add a note' : 'Edit note',
@@ -474,8 +472,7 @@ Future<void> showSetActions(
 }
 
 Future<SkipReason?> _pickSkipReason(BuildContext context) {
-  final reasons =
-      SkipReason.values.where((r) => r != SkipReason.none).toList();
+  final reasons = SkipReason.values.where((r) => r != SkipReason.none).toList();
   return showModalBottomSheet<SkipReason>(
     // The route holds the system bars: a sheet that sizes itself can
     // otherwise run under the status bar. See [pickExercise].
@@ -559,9 +556,11 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     final all = ref.watch(exerciseCatalogProvider).valueOrNull ?? const [];
     final q = _query.trim().toLowerCase();
     final filtered = all
-        .where((e) =>
-            (_muscle == null || e.muscle == _muscle) &&
-            (q.isEmpty || e.name.toLowerCase().contains(q)))
+        .where(
+          (e) =>
+              (_muscle == null || e.muscle == _muscle) &&
+              (q.isEmpty || e.name.toLowerCase().contains(q)),
+        )
         .toList();
 
     // Only the muscles something is filed under, in `MuscleGroup` order so a
@@ -628,7 +627,11 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.fromLTRB(
-                        Space.gutter, 0, Space.gutter, Space.md),
+                      Space.gutter,
+                      0,
+                      Space.gutter,
+                      Space.md,
+                    ),
                     children: [
                       AppChip(
                         label: 'All',
@@ -679,8 +682,9 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                               hue: context.c.forMuscle(e.muscle),
                               selected: _muscle == e.muscle,
                               onTap: () => setState(
-                                () => _muscle =
-                                    _muscle == e.muscle ? null : e.muscle,
+                                () => _muscle = _muscle == e.muscle
+                                    ? null
+                                    : e.muscle,
                               ),
                             ),
                             subtitle: e.equipment.label,

@@ -14,7 +14,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 - [x] Regimes, sessions, slots and cycles; a cycle advances on work done, not on the calendar.
 - [x] Deload after N cycles, per regime and overridable per slot.
-- [x] Prefill scoped to the session, with ghost text, labelled borrows and adoption on tick.
+- [x] Prefill scoped to the session, with ghost text and adoption on tick. A session with no history of its own opens blank; the ⓘ names where the movement was last done and fills nothing in.
 - [x] Logging writes snapshots, so editing a programme never rewrites history.
 - [x] Six regimes, one active, each with an identity hue and a unique living name.
 - [x] The exercise catalog archives rather than deletes; starter catalog seeded, no regime ever is.

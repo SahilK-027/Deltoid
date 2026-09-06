@@ -601,36 +601,99 @@ void main() {
   test('an exercise added mid-session knows its own history', () async {
     // Resolving prefill once when the log opened meant an exercise added at
     // 19:40 read "first time" with a year behind it, and a set typed with only
-    // reps was stored against a null weight.
+    // reps was stored against a null weight. The history has to be this
+    // session's to be offered at all, so the exercise is one Push 1 has
+    // trained before — taken off today's card and put back on.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+
+    final first = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+    );
+    final entry = (await repo.workoutDetail(first))!.entries.first;
+    for (final s in entry.sets) {
+      await repo.updateSet(
+        s.id,
+        weight: const Value(60),
+        reps: const Value(10),
+        isDone: const Value(true),
+      );
+    }
+    await repo.completeWorkout(first);
+
+    final second = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+    );
+    final today = (await repo.workoutDetail(second))!
+        .entries
+        .firstWhere((e) => e.exercise.id == entry.exercise.id);
+    await repo.removeExerciseFromWorkout(today.workoutExercise.id);
+    await repo.addExerciseToWorkout(second, entry.exercise.id);
+
+    final prefill = await repo.prefillForWorkout(
+      workoutId: second,
+      exerciseId: entry.exercise.id,
+    );
+    expect(prefill.source, PrefillSource.sameSession);
+    expect(prefill.sets.first.weight, 60);
+
+    // And the rows it arrived with mirror that shape rather than a flat three.
+    final detail = await repo.workoutDetail(second);
+    final added = detail!.entries
+        .firstWhere((e) => e.exercise.id == entry.exercise.id);
+    expect(added.sets.length, prefill.sets.length);
+  });
+
+  test('an exercise this session has never trained arrives blank', () async {
+    // The one rule, at the point it is easiest to break: an exercise added on
+    // the spot has no plan behind it, so another session's numbers are the
+    // only ones there are — and they are still not this session's. Train Leg 1
+    // on Monday and Leg 2 on Friday and every plate in Friday's session used
+    // to open filled from Monday's.
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
     final pull1 = await sessionNamed('Pull 1');
 
-    // Train an exercise that is not in Push 1, so it can be added later.
-    final rows = await repo.startWorkout(regimeId: regime.id, sessionId: pull1.id);
-    final rowDetail = await repo.workoutDetail(rows);
-    final rowEntry = rowDetail!.entries.first;
+    final rows = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: pull1.id,
+    );
+    final rowEntry = (await repo.workoutDetail(rows))!.entries.first;
     for (final s in rowEntry.sets) {
-      await repo.updateSet(s.id,
-          weight: const Value(60), reps: const Value(10), isDone: const Value(true));
+      await repo.updateSet(
+        s.id,
+        weight: const Value(60),
+        reps: const Value(10),
+        isDone: const Value(true),
+      );
     }
     await repo.completeWorkout(rows);
 
-    final push = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final push = await repo.startWorkout(
+      regimeId: regime.id,
+      sessionId: push1.id,
+    );
     await repo.addExerciseToWorkout(push, rowEntry.exercise.id);
 
     final prefill = await repo.prefillForWorkout(
       workoutId: push,
       exerciseId: rowEntry.exercise.id,
     );
+    // Where it was last done, so the ⓘ can say so.
     expect(prefill.source, PrefillSource.otherSession);
-    expect(prefill.sets.first.weight, 60);
+    expect(prefill.reference!.sessionName, 'Pull 1');
+    // And nothing to fill a cell with.
+    expect(prefill.sets, isEmpty);
+    expect(prefill.hasSuggestion, isFalse);
 
-    // And the rows it arrived with mirror that shape rather than a flat three.
-    final detail = await repo.workoutDetail(push);
-    final added = detail!.entries
+    // The rows are the template's own, not a shape mirrored off Pull 1.
+    final added = (await repo.workoutDetail(push))!
+        .entries
         .firstWhere((e) => e.exercise.id == rowEntry.exercise.id);
-    expect(added.sets.length, prefill.sets.length);
+    expect(added.sets.every((s) => s.weight == null), isTrue);
+    expect(added.sets.every((s) => s.setType == SetType.working), isTrue);
   });
 
   test('a warm-up is last time too', () async {

@@ -32,13 +32,28 @@ app exists.
 1. Most recent **completed, non-deload** workout **with the same `sessionId`**.
 2. Failing that, a **deload** performance of the same session — a light week in
    this slot still reflects this slot's progression.
-3. Only then borrow from another session, returned as
-   `PrefillSource.otherSession` — **and the UI must say so out loud.** Today it
-   says it on the exercise's ⓘ: an amber dot on the button whenever the numbers
-   are borrowed, and a sentence inside naming the session and date they came
-   from. The channel may change; the disclosure may not.
+3. Nothing. A session with no history of its own **opens blank**.
 
-Never "simplify" this to a plain most-recent lookup.
+Step 3 used to borrow the most recent performance from any session, labelled in
+amber. A label is not enough to make that number mean what a prefill means:
+"borrowed from Leg 1" reads as *where this movement was last done*, and it is
+not — it is the most recent performance anywhere, which for a movement trained
+in two sessions is whichever came round last. Train Leg 1 for the first time on
+Monday and Leg 2 for the first time on Friday, and every plate in Friday's
+session arrived filled from Monday's, from a day that says nothing about what
+belongs here. That is the failure the one rule exists to prevent, reintroduced
+by its own fallback.
+
+What survives is the knowledge, not the number. The other session's performance
+still comes back as `PrefillSource.otherSession` with a `reference` and **no
+sets**, so `hasSuggestion` is false and every reader downstream — the ghosts,
+the shape a workout opens with, the deload scaling, adoption on tick — treats it
+as the first time it is. **The ⓘ must still name where the movement was last
+done**, and it does: "First time in this session · Last done in Leg 1 · 12 Jul.
+This day starts blank." The channel may change; that disclosure may not.
+
+Never "simplify" this to a plain most-recent lookup, and never let a suggestion
+in through step 3.
 
 ---
 
@@ -61,7 +76,7 @@ Never "simplify" this to a plain most-recent lookup.
 | A rate needs the weeks to have happened                         | Sessions-per-week was `sessionsInTheLast29Days / 4`, which told a two-day-old install it trained "0.3 / week". `domain/consistency.dart` divides by the weeks it actually has and prints a plain count below a fortnight of history.                                                                                                                                                                                                                                                                                                                          |
 | **A position is unique among live rows**                        | `sessions`, `session_exercises`, `workout_exercises` and `set_logs` all carry a partial unique index on their parent plus `orderIndex`. Every append takes one past the highest live position rather than the live count — a tombstone leaves a gap and nothing renumbers behind it — and the index is what holds when the writer is a restore rather than a tap. **A reorder therefore cannot renumber in place**: see `renumber` in [§ 4](#4-code).                                                                                                         |
 | **One session is open at a time**                               | A partial unique index on `workouts (status) WHERE status = 'inProgress'`, the same shape as the single-active-regime one. `startWorkout`'s check reads outside the transaction that writes, so Start and the backfill sheet could both find nothing running — and `openWorkout` then hides the loser behind the newer one: unreachable, in progress forever, counted by nothing.                                                                                                                                                                             |
-| **A day answers to one name in its regime**                     | `idx_sessions_name_live`, keyed on `lower(trim(name))`. The prefill disclosure names the day it borrowed from, History filters by it, and the chart labels its lines with it — two live `Push 1`s makes all three ambiguous. Across regimes is fine, which is why `LoggedSession` carries the regime name.                                                                                                                                                                                                                                                    |
+| **A day answers to one name in its regime**                     | `idx_sessions_name_live`, keyed on `lower(trim(name))`. The prefill disclosure names the day a movement was last done in, History filters by it, and the chart labels its lines with it — two live `Push 1`s makes all three ambiguous. Across regimes is fine, which is why `LoggedSession` carries the regime name.                                                                                                                                                                                                                                                    |
 | **An enum column is checked in the database**                   | `textEnum` throws on a string no member answers to, and takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a hand-written `CHECK … IN (…)`, and `schema_constraints_test` walks every member of every enum, so a value added to one and not the other fails a test rather than a screen.                                                                                                                                                                                          |
 | **A number that cannot mean anything is refused at the column** | Deload percentages, backwards rep ranges, a `dayKey` of 0, a session ending before it started, a set that is a leg of itself, a bodyweight of 850. Each is reachable only through a restore or a merged row — the writer that does not pass the repository, which is what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke.                                                                                                          |
 
@@ -462,6 +477,7 @@ rather than shape. Where the checks live now:
 
 | Rule                                                                                    | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The one rule** — a session's numbers are its own                                       | `test/domain/prefill_test.dart` and `test/data/training_repository_test.dart`. Step 3 is the one that erodes: it is the path a first-ever session takes, so a suggestion leaking through it is invisible until the week it teaches you the wrong weight. Two tests hold it shut — one on `resolvePrefill` directly, one through the repository on the ad-hoc add, where an exercise arrives with no plan behind it and another session's numbers are the only ones there are |
 | The structural invariants of the database                                               | `lib/data/db/invariants.dart` — twenty rules re-derived in SQL, seventeen structural and three about the sync columns, each with a perturbation test in `test/integrity/invariant_oracle_test.dart`. **It ships**: a restore refuses a file breaking a rule no repair can fix, and reports what the repairs could not reach; a pull reports rather than refuses, because § 15 rule 9. The three sync-column rules are advisory everywhere — a log stamped by a broken clock is still the whole log |
 | Those invariants under arbitrary use                                                    | `test/integrity/model_fuzz_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Every derived number                                                                    | `test/domain/` — hand-computed literals, never `expect(f(x), f(x))`                                                                                                                                                                                                                                                                                                                                                                                                                                |
