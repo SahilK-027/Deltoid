@@ -15,7 +15,9 @@ type so the two cannot disagree again. The tables in the applied sections are
 kept as the record of what changed.
 
 Nothing in this document is outstanding. It is kept as the record, and as the
-list a later pass should re-run rather than re-derive.
+list a later pass should re-run rather than re-derive. **Section 6 records what
+the first sweep missed**, and how, which is the part worth reading before
+trusting any audit like this one.
 
 The app's copy is, on the whole, deliberate and better than most. It is
 sentence-cased throughout, it states consequences rather than asking "are you
@@ -177,7 +179,33 @@ Two further points:
 
 ---
 
-## 6. What is already right
+## 6. What the first sweep missed
+
+The findings above came from one regex: single-quoted literals starting with a
+capital, five characters or more, under `lib/features`, `lib/core`,
+`lib/domain` and `lib/data`. Re-running the audit with a real extractor — every
+literal outside a comment, in every file under `lib/`, singular and plural,
+short and long — turned up a further fourteen strings in four classes the first
+pass was structurally unable to see. All are fixed; the classes are recorded
+because they are how the next audit should be built.
+
+| Class | What it hid | Where |
+| ----- | ----------- | ----- |
+| **Files at the root of `lib/`** | `lib/main.dart` and `lib/app.dart` were in neither globbed directory. `main.dart` held **`Something went wrong on screen.`** and **`That did not go through.`** — the two handlers that catch every uncaught framework error and every dropped async write, and the generic-error voice rule 11 names first. `failure.dart`'s own doc says this text is "written for them, not for a log", with an example; these were the counter-example. `app.dart` showed a raw exception on the screen that appears when the database will not open. | `lib/main.dart:32`, `lib/main.dart:36`, `lib/app.dart:168` |
+| **Strings assembled at runtime** | The user-facing text was a function call, so no literal ever read badly. `tableLabel` turned a table name into a table name with the underscore removed, so a restore said it had found "412 set logs and only 380", a failed pull said "one set logs entry", and the progress sheet counted through "workout exercises". Its own comment said table names "are the wire format, not English" and then did nothing about it. There were two copies of it, one in `core/progress.dart` and one private to `pull.dart` — the drift RULES § 4 exists to prevent. A restore failure also printed an invariant's internal name: "(two live regimes wear one identity)". | `lib/domain/table_labels.dart` now holds a real mapping, singular and plural |
+| **A class fixed one member at a time** | Section 1 fixed `The server refused that: ${e.message}` and stopped there. Eight more sites appended a raw Dart exception to a sentence a user was meant to act on — `Could not start the session: $e`, `Export failed: $e`, `Restore failed: $e`. Worse, `Restore failed:` prefixed messages that were already written for a reader, producing `Restore failed: FormatException: This backup is incomplete…`. They now report through `reportFailure`, which announces the sentence and keeps the exception for the console. | `workouts_screen.dart` ×4, `settings_screen.dart` ×2, `history_screen.dart`, `exercise_history_screen.dart` |
+| **Rules I had stated but not swept for** | Section 2 called out an em dash bolting a consequence onto a clause, and then left two in place. Section 4 removed trailing ellipses from placeholders and left one. Section 3's `towards` sweep missed an occurrence inside a nested ternary. And `70kg`/`76kg` in the bodyweight empty state was missing its space *and* hardcoded kilograms into an app that also runs in pounds. | `settings_screen.dart:626`, `exercise_sheets.dart:237`, `regime_screen.dart:629`, `exercise_screen.dart:688`, `bodyweight_screen.dart:184` |
+
+**The lesson for the next pass**: grep for what a string *looks like* and you
+find the strings that look wrong. The four classes above are all cases where
+the defect is not visible in any single literal — because the file was outside
+the search, because the sentence is assembled from a function, because the
+member fixed was not the class, or because the rule was stated and never
+mechanised. Extract every literal, then read them all.
+
+---
+
+## 7. What is already right
 
 Recorded so that a later pass does not "fix" it:
 

@@ -626,7 +626,7 @@ Future<void> addSessionPrompt(
   final name = await promptForText(
     context,
     title: 'New day',
-    hint: 'Push 1, Upper A, Legs …',
+    hint: 'Push 1, Upper A, Legs',
     validate: (value) => taken.contains(value.trim().toLowerCase())
         ? 'This regime already has a day called ${value.trim()}'
         : null,

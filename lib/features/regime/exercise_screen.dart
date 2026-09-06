@@ -685,7 +685,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               're-read as ${picked.isHold ? 'seconds held' : 'reps'}. '
               '${picked.isHold ? 'Its estimated 1RM and its share of session '
                   'volume go away, because a hold has neither.' : 'It gets an '
-                  'estimated 1RM and counts toward session volume again.'}',
+                  'estimated 1RM and counts towards session volume again.'}',
           confirmLabel: 'Change it',
           destructive: false,
         );

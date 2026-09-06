@@ -50,7 +50,7 @@ void main() {
     );
     expect(
       backupState(pending(), SyncTrouble.refused),
-      contains('turned the last attempt down'),
+      contains('refused the last attempt'),
     );
   });
 

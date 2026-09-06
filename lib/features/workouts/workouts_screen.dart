@@ -27,6 +27,7 @@ import 'volume_history_screen.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
+import '../../core/failure.dart';
 
 /// True between tapping Start and the log screen appearing.
 ///
@@ -51,7 +52,6 @@ Future<void> _startSession(
 
   final container = ProviderScope.containerOf(context, listen: false);
   final navigator = Navigator.of(context);
-  final messenger = ScaffoldMessenger.of(context);
 
   container.read(_startingProvider.notifier).state = true;
   try {
@@ -61,12 +61,8 @@ Future<void> _startSession(
     await navigator.push(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
-  } catch (e) {
-    showToastOn(
-      messenger,
-      'Could not start the session: $e',
-      destructive: true,
-    );
+  } catch (e, st) {
+    reportFailure(e, st, what: 'That session could not be started.');
   } finally {
     container.read(_startingProvider.notifier).state = false;
   }
@@ -262,12 +258,8 @@ Future<void> _logPastSession(
     );
   } on StateError catch (e) {
     showToastOn(messenger, e.message, destructive: true);
-  } catch (e) {
-    showToastOn(
-      messenger,
-      'Could not open that session: $e',
-      destructive: true,
-    );
+  } catch (e, st) {
+    reportFailure(e, st, what: 'That session could not be opened.');
   }
 }
 
@@ -1189,8 +1181,8 @@ class _ResumeHero extends ConsumerWidget {
       if (!await repo.completeWorkout(workout.id)) {
         showToastOn(messenger, 'That session is no longer there');
       }
-    } catch (e) {
-      showToastOn(messenger, 'Could not finish it: $e', destructive: true);
+    } catch (e, st) {
+      reportFailure(e, st, what: 'That session could not be finished.');
     }
   }
 
@@ -1210,15 +1202,14 @@ class _ResumeHero extends ConsumerWidget {
     );
     if (!ok || !context.mounted) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     final repo = ProviderScope.containerOf(
       context,
       listen: false,
     ).read(trainingRepositoryProvider);
     try {
       await repo.abandonWorkout(workout.id);
-    } catch (e) {
-      showToastOn(messenger, 'Could not discard it: $e', destructive: true);
+    } catch (e, st) {
+      reportFailure(e, st, what: 'That session could not be discarded.');
     }
   }
 

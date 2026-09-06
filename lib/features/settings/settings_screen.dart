@@ -24,6 +24,7 @@ import '../regime/regime_settings.dart' show StepperRow;
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
+import '../../core/failure.dart';
 
 // `lastBackupProvider` lives in `core/providers.dart`: one fires after every
 // finished session, and the screen that reports it is not the screen that
@@ -208,8 +209,11 @@ class SettingsScreen extends ConsumerWidget {
       );
       if (result == null) return;
       file = result;
-    } catch (e) {
-      showToastOn(messenger, 'Export failed: $e', destructive: true);
+    } on BackupSaveException catch (e) {
+      showToastOn(messenger, e.message, destructive: true);
+      return;
+    } catch (e, st) {
+      reportFailure(e, st, what: 'The backup could not be written.');
       return;
     }
 
@@ -354,8 +358,13 @@ class SettingsScreen extends ConsumerWidget {
       );
       if (result == null) return;
       showToastOn(messenger, 'Restored ${result.rowsWritten} rows');
-    } catch (e) {
-      showToastOn(messenger, 'Restore failed: $e', destructive: true);
+    } on FormatException catch (e) {
+      // The messages these carry are already written for a reader — "this
+      // backup is incomplete", "update the app before restoring it". Prefixing
+      // them turned each one into `Restore failed: FormatException: …`.
+      showToastOn(messenger, e.message, destructive: true);
+    } catch (e, st) {
+      reportFailure(e, st, what: 'Your history could not be restored.');
     }
   }
 }
@@ -623,7 +632,7 @@ String backupState(SyncState? state, SyncTrouble? trouble) {
       switch (trouble) {
         SyncTrouble.offline => " There's no connection right now.",
         SyncTrouble.refused =>
-          ' The account turned the last attempt down — it will keep trying.',
+          ' The account refused the last attempt. It will keep trying.',
         null => '',
       },
     ].join(),

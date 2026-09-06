@@ -10,6 +10,7 @@ import '../db/invariants.dart';
 import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
 import 'sync_backend.dart';
+import '../../domain/table_labels.dart';
 
 /// `app_settings` key holding how far this device has read the account.
 ///
@@ -240,8 +241,8 @@ class PullService {
             error,
             stack,
             what:
-                'One ${_label(spec.name)} entry from your account could not '
-                'be saved on this phone.',
+                'One ${tableLabelOne(spec.name)} from your account could '
+                'not be saved on this phone.',
           );
         }
       }
@@ -457,8 +458,6 @@ class PullService {
     final value = wire[serverUpdatedAtColumn];
     return value is String ? DateTime.tryParse(value)?.toUtc() : null;
   }
-
-  String _label(String table) => table.replaceAll('_', ' ');
 
   // ---------------------------------------------------------------------------
   // Collisions — SYNC.md § 9. Two *different* rows claiming one slot, which

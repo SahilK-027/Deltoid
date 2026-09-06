@@ -42,6 +42,3 @@ typedef JobStep = ({
 });
 
 typedef ProgressReport = void Function(JobStep step);
-
-/// `set_logs` → `set logs`. The table names are the wire format, not English.
-String tableLabel(String table) => table.replaceAll('_', ' ');

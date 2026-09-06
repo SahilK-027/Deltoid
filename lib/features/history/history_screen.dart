@@ -209,7 +209,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
             error: (e, _) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(Space.xxxl),
-                child: Text('Could not load history.\n\n$e',
+                child: Text('Your history could not be loaded.',
                     textAlign: TextAlign.center, style: context.t.bodyMedium),
               ),
             ),

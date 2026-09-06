@@ -29,11 +29,11 @@ void main() {
     reportFailure(
       details.exception,
       details.stack ?? StackTrace.current,
-      what: 'Something went wrong on screen.',
+      what: 'Part of this screen could not be drawn.',
     );
   };
   PlatformDispatcher.instance.onError = (error, stack) {
-    reportFailure(error, stack, what: 'That did not go through.');
+    reportFailure(error, stack, what: 'That change was not saved.');
     return false;
   };
 

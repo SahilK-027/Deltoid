@@ -13,6 +13,7 @@ import '../db/invariants.dart';
 import '../db/table_spec.dart';
 import '../repositories/repairs.dart';
 import '../seed/seeder.dart';
+import '../../domain/table_labels.dart';
 
 /// Bumped whenever the export shape changes in a way an older build could not
 /// read. Import refuses anything newer than it understands rather than
@@ -787,7 +788,7 @@ class BackupService {
       if (unfixable.isNotEmpty) {
         throw FormatException(
           'This backup describes a history that cannot be put back '
-          '(${unfixable.first.rule}), so nothing has been restored.',
+          'together, so nothing has been restored.',
         );
       }
     });

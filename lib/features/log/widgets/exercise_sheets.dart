@@ -234,7 +234,8 @@ Future<void> showExerciseMenu(
           AppRow(
             icon: Icons.tune_rounded,
             title: 'Exercise settings',
-            subtitle: 'Rest, bar, targets — for this day, from next time on',
+            subtitle: 'Rest, bar and targets, for this day or from next '
+                'time on',
             onTap: () {
               Navigator.of(sheetContext).pop();
               openExercise(

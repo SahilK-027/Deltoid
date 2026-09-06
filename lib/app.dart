@@ -165,7 +165,10 @@ class _Boot extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(Space.xxxl),
                   child: Text(
-                    'Could not open the database.\n\n$e',
+                    'Deltoid could not open your training history. '
+                    'Nothing has been changed or deleted. Restart the app, '
+                    'and restore from a backup if this keeps '
+                    'happening.\n\n$e',
                     textAlign: TextAlign.center,
                     style: context.t.bodyMedium,
                   ),

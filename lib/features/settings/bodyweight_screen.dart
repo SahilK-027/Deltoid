@@ -180,9 +180,8 @@ class BodyweightScreen extends ConsumerWidget {
                   icon: Icons.monitor_weight_outlined,
                   title: 'No weights logged',
                   message: 'Needed to score bodyweight and bodyweight-plus '
-                      'lifts. Seven '
-                      'pull-ups at 70kg and seven at 76kg are not the same '
-                      'lift.',
+                      'lifts. Seven pull-ups at your lightest are not the '
+                      'same lift as seven at your heaviest.',
                   action: FilledButton(
                     onPressed: () => logBodyweightPrompt(context, ref),
                     child: const Text('Log bodyweight'),

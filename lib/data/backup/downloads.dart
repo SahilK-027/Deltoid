@@ -24,7 +24,7 @@ bool get canSaveToDownloads => !kIsWeb && Platform.isAndroid;
 Future<String> saveToDownloads(File file) async {
   if (!canSaveToDownloads) {
     throw const BackupSaveException(
-      'Saving to Downloads is only available on Android.',
+      'Saving to Downloads is not available on this device.',
     );
   }
   try {
