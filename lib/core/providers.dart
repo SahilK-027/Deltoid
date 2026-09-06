@@ -12,22 +12,25 @@ import '../domain/rest.dart';
 import '../domain/units.dart';
 import 'sync_providers.dart';
 
-/// The version of the build actually installed, `1.3.1 (6)`.
+/// The version of the build actually installed, `1.3.1`.
 ///
 /// Read from the package rather than written down in Dart. A number typed into
 /// a Settings screen is a number that stops matching `pubspec.yaml` at the
 /// first release nobody remembers to update it for, and the one thing an About
 /// section exists to answer is which build this is.
 ///
+/// **The build number is deliberately not shown.** `--split-per-abi` adds an
+/// ABI offset to `versionCode` when it packages — 1000 for armeabi-v7a, 2000
+/// for arm64 — so `1.3.1+6` installs as 2006 and About read "1.3.1 (2006)".
+/// That number is a packaging artefact: it identifies the APK rather than the
+/// release, it does not match the tag, and it cannot be looked up anywhere.
+///
 /// Null while it is being read, and on the rare platform that cannot answer —
 /// About draws the name without it rather than a placeholder.
 final appVersionProvider = FutureProvider<String?>((ref) async {
   try {
     final info = await PackageInfo.fromPlatform();
-    if (info.version.isEmpty) return null;
-    return info.buildNumber.isEmpty
-        ? info.version
-        : '${info.version} (${info.buildNumber})';
+    return info.version.isEmpty ? null : info.version;
   } on Object {
     // A missing platform channel is not worth a red screen on Settings.
     return null;

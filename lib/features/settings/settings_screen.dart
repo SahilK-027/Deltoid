@@ -87,12 +87,18 @@ class SettingsScreen extends ConsumerWidget {
         // asked for daily, which is why it had never once been logged
         // through the UI. Tapping the figure is the log; the past is a link.
         _BodyweightCard(bodyweight: bodyweight),
-        const _AccountSection(),
         const SizedBox(height: Space.section),
         const SectionHeader('Backup'),
         ListCard(
           inset: Space.lg,
           children: [
+            // The account is the first row of the same card, not a card above
+            // it: backing up to Google and backing up to a file are one
+            // question asked two ways. It renders nothing at all in a build
+            // with no sync configured, and a card cannot hold a nothing —
+            // ListCard would rule a divider under it — so the condition is
+            // here rather than inside the row.
+            if (ref.watch(syncAuthProvider) != null) const _AccountSection(),
             AppRow(
               icon: Icons.ios_share,
               title: 'Export a backup file',
@@ -112,10 +118,16 @@ class SettingsScreen extends ConsumerWidget {
             AppRow(
               icon: Icons.schedule,
               title: 'Automatic backup',
+              // "After each finished session" alone never said whether it had
+              // ever happened — it reads as a description or as a promise
+              // depending on what you came to the row for, and the one thing
+              // a backup row exists to answer is whether there is a backup.
               subtitle: lastBackup == null
-                  ? 'After each finished session'
+                  ? 'Has not run yet. It writes a file after each finished '
+                        'session.'
                   : 'Last ran '
-                        '${DateFormat('d MMM, HH:mm').format(lastBackup)}',
+                        '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
+              subtitleMaxLines: 3,
             ),
           ],
         ),
@@ -459,16 +471,8 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
         account == null &&
         ref.watch(welcomeAnswerProvider).valueOrNull == WelcomeAnswer.account;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: Space.section),
-        const SectionHeader('Account'),
-        ListCard(
-          inset: Space.lg,
-          children: account == null
-              ? [
-                  AppRow(
+    return account == null
+        ? AppRow(
                     icon: dropped
                         ? Icons.cloud_sync_outlined
                         : Icons.cloud_off_outlined,
@@ -490,31 +494,25 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                     trailing: _signingIn ? const RowSpinner() : null,
                     // A second tap would open a second sheet behind the first.
                     onTap: _signingIn ? null : () => _signIn(context, ref),
-                    chevron: !_signingIn,
-                  ),
-                ]
-              : [
-                  // One row, opening the two ways out rather than listing
+            chevron: !_signingIn,
+          )
+        // One row, opening the two ways out rather than listing
                   // them. Side by side on the page they read as the same
                   // action twice: both titles start "Sign out", and the
                   // difference between them — whether the history stays on
                   // this phone — was a subtitle each, in a column with room
                   // for neither to finish the thought.
-                  AppRow(
-                    icon: Icons.account_circle_outlined,
-                    title: account.email ?? 'Signed in',
-                    subtitle: backupState(
-                      ref.watch(syncStateProvider).valueOrNull,
-                      ref.watch(syncTroubleProvider).valueOrNull,
-                    ),
-                    subtitleMaxLines: 3,
-                    onTap: () => _openAccountSheet(context, ref),
-                    chevron: true,
-                  ),
-                ],
-        ),
-      ],
-    );
+        : AppRow(
+            icon: Icons.account_circle_outlined,
+            title: account.email ?? 'Signed in',
+            subtitle: backupState(
+              ref.watch(syncStateProvider).valueOrNull,
+              ref.watch(syncTroubleProvider).valueOrNull,
+            ),
+            subtitleMaxLines: 3,
+            onTap: () => _openAccountSheet(context, ref),
+            chevron: true,
+          );
   }
 
   /// The two ways out, where each has room to say what it does.
@@ -527,8 +525,9 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
     final c = context.c;
     final choice = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.transparent,
       useSafeArea: true,
+      // `AppSheet` draws its own grab handle, tighter than the framework's.
+      showDragHandle: false,
       builder: (sheet) => AppSheet(
         title: 'Account',
         contentPadding: EdgeInsets.zero,
@@ -717,8 +716,9 @@ class _UnitRow extends ConsumerWidget {
   ) async {
     final picked = await showModalBottomSheet<WeightUnit>(
       context: context,
-      backgroundColor: Colors.transparent,
       useSafeArea: true,
+      // `AppSheet` draws its own grab handle, tighter than the framework's.
+      showDragHandle: false,
       builder: (sheet) => AppSheet(
         title: 'Weight units',
         contentPadding: EdgeInsets.zero,
@@ -1078,8 +1078,9 @@ Future<void> showRestSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     useSafeArea: true,
+    // `AppSheet` draws its own grab handle, tighter than the framework's.
+    showDragHandle: false,
     builder: (sheet) => Consumer(
       builder: (context, ref, _) {
         final prefs =
