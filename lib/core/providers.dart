@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/backup/backup_service.dart';
 import '../data/db/database.dart';
@@ -10,6 +11,28 @@ import '../domain/cycle_engine.dart';
 import '../domain/rest.dart';
 import '../domain/units.dart';
 import 'sync_providers.dart';
+
+/// The version of the build actually installed, `1.3.1 (6)`.
+///
+/// Read from the package rather than written down in Dart. A number typed into
+/// a Settings screen is a number that stops matching `pubspec.yaml` at the
+/// first release nobody remembers to update it for, and the one thing an About
+/// section exists to answer is which build this is.
+///
+/// Null while it is being read, and on the rare platform that cannot answer —
+/// About draws the name without it rather than a placeholder.
+final appVersionProvider = FutureProvider<String?>((ref) async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    if (info.version.isEmpty) return null;
+    return info.buildNumber.isEmpty
+        ? info.version
+        : '${info.version} (${info.buildNumber})';
+  } on Object {
+    // A missing platform channel is not worth a red screen on Settings.
+    return null;
+  }
+});
 
 /// Single database instance for the app's lifetime.
 final databaseProvider = Provider<AppDatabase>((ref) {

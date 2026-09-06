@@ -62,6 +62,39 @@ void main() {
     }
   }
 
+  /// Scrolls until [text] is built, however far down the page it sits.
+  ///
+  /// A fixed drag was wrong twice over: the page is short enough now that one
+  /// drag can overshoot a row entirely, and a test that opens the same row
+  /// twice dragged a second time from wherever the first left it.
+  Future<void> scrollTo(WidgetTester tester, String text) async {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      if (find.text(text).evaluate().isNotEmpty) return;
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pump();
+    }
+  }
+
+  /// Opens one of the Training card's rows — which is also what a person does
+  /// now that rest and the unit are a row each rather than a card each.
+  Future<void> openRow(WidgetTester tester, String title) async {
+    await scrollTo(tester, title);
+    // Built is not the same as on screen: a `ListView` builds past the fold,
+    // and a tap on a row below it lands on nothing.
+    await tester.ensureVisible(find.text(title));
+    await tester.pump();
+    await tester.tap(find.text(title));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+  }
+
+  Future<void> openRestSheet(WidgetTester tester) =>
+      openRow(tester, 'Rest timers');
+
+  Future<void> openUnitSheet(WidgetTester tester) =>
+      openRow(tester, 'Weight units');
+
   group('Settings', () {
     testWidgets('with nothing logged: the masthead, and an invitation', (
       tester,
@@ -107,49 +140,40 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Bodyweight'), findsOneWidget);
-      expect(find.text('Data'), findsOneWidget);
-      expect(find.text('Export backup'), findsOneWidget);
+      expect(find.text('Backup'), findsOneWidget);
+      expect(find.text('Export a backup file'), findsOneWidget);
+      expect(find.text('Restore from a file'), findsOneWidget);
 
       // A `ListView` builds what is on screen, so the tail of the page has to
       // be scrolled to before it exists at all.
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
-
-      expect(find.text('Rest'), findsOneWidget);
-      expect(find.text('Default rest'), findsOneWidget);
-      expect(find.text('Between exercises'), findsOneWidget);
-      expect(find.text('Rest sound'), findsOneWidget);
-
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
-
-      expect(find.text('Units'), findsOneWidget);
+      //
+      // Rest and the unit are rows stating their answer, not sections
+      // spelling out every option on the page.
+      await scrollTo(tester, 'Rest timers');
+      expect(find.text('Training'), findsOneWidget);
+      expect(find.text('Rest timers'), findsOneWidget);
+      expect(find.text('Weight units'), findsOneWidget);
       expect(find.text('Kilograms'), findsOneWidget);
-      expect(find.text('Pounds'), findsOneWidget);
 
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
-
+      await scrollTo(tester, 'About');
       expect(find.text('Appearance'), findsOneWidget);
       expect(find.text('System'), findsOneWidget);
-      expect(find.text('Light'), findsOneWidget);
-      expect(find.text('Dark'), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
+      expect(find.text('Deltoid'), findsOneWidget);
     });
 
     testWidgets('rest ships at two minutes, and the steps are quarter-minutes',
         (tester) async {
       await pump(tester, const SettingsScreen());
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
+      await openRestSheet(tester);
 
       // Both numbers, before anything has been stored: the shipped default.
       expect(find.text('2:00'), findsNWidgets(2));
 
-      // The + belonging to `Default rest` — the first stepper in the section.
+      // The + belonging to `Between sets` — the first stepper in the sheet.
       final plus = find.descendant(
         of: find.ancestor(
-          of: find.text('Default rest'),
+          of: find.text('Between sets'),
           matching: find.byType(Row),
         ),
         matching: find.byIcon(Icons.add_rounded),
@@ -169,19 +193,21 @@ void main() {
     testWidgets('the tone can be turned off; the buzz is not part of it',
         (tester) async {
       await pump(tester, const SettingsScreen());
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
+      await openRestSheet(tester);
 
       expect(
-        find.text('The tone at 0:00. The phone still buzzes either way.'),
+        find.text(
+          'Plays a tone when the rest reaches zero. The phone vibrates '
+          'either way.',
+        ),
         findsOneWidget,
       );
 
-      // The switch belonging to `Rest sound`, not "whatever switch is last".
+      // The switch belonging to `Alert sound`, not "whatever switch is last".
       await tester.tap(
         find.descendant(
           of: find.ancestor(
-            of: find.text('Rest sound'),
+            of: find.text('Alert sound'),
             matching: find.byType(Row),
           ),
           matching: find.byType(Switch),
@@ -220,11 +246,7 @@ void main() {
       tester,
     ) async {
       await pump(tester, const SettingsScreen());
-      // Two drags: Rest sits between Data and Units.
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pump();
+      await openUnitSheet(tester);
 
       await tester.tap(find.text('Pounds'));
       for (var i = 0; i < 40; i++) {
@@ -241,6 +263,7 @@ void main() {
       // A radio is one tap, and this one is on the way past to a backup.
       expect(await savedUnit(), WeightUnit.kg);
 
+      await openUnitSheet(tester);
       await tester.tap(find.text('Pounds'));
       for (var i = 0; i < 40; i++) {
         await tester.pump(const Duration(milliseconds: 16));

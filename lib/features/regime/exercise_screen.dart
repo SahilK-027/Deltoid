@@ -244,7 +244,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   AppRow(
                     title: 'Targets',
                     subtitle: 'What this day asks for',
-                    trailing: _PickedValue(targetLabel(entry.slot)),
+                    trailing: RowValue(targetLabel(entry.slot)),
                     onTap: () => showTargetEditor(
                         context, ref, entry.slot, entry.exercise),
                   ),
@@ -299,7 +299,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ),
                 AppRow(
                   title: 'Muscle',
-                  trailing: _PickedValue.orChoose(muscle?.label),
+                  trailing: RowValue.orChoose(muscle?.label),
                   onTap: () async {
                     final picked = await _pick<MuscleGroup>(
                       context,
@@ -325,7 +325,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ),
                 AppRow(
                   title: 'Equipment',
-                  trailing: _PickedValue.orChoose(equipment?.label),
+                  trailing: RowValue.orChoose(equipment?.label),
                   onTap: () async {
                     final picked = await _pick<Equipment>(
                       context,
@@ -352,7 +352,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       ? 'Decides what the number you type means'
                       : loadBlurb(loadMode),
                   trailing: loadMode == null
-                      ? _PickedValue.orChoose(null)
+                      ? RowValue.orChoose(null)
                       : const Icon(Icons.chevron_right_rounded, size: 20),
                   onTap: () => _editLoadMode(exercise, loadMode),
                 ),
@@ -362,7 +362,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 if (loadMode == LoadMode.total)
                   AppRow(
                     title: 'Bar',
-                    trailing: _PickedValue.orChoose(
+                    trailing: RowValue.orChoose(
                       barKind == null
                           ? null
                           : barKind == BarKind.none
@@ -404,7 +404,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   subtitle: measure.isHold
                       ? 'Seconds held, with no reps and no estimated 1RM'
                       : 'Repetitions',
-                  trailing: _PickedValue(measure.label),
+                  trailing: RowValue(measure.label),
                   onTap: () => _editMeasure(exercise, measure),
                 ),
                 AppRow(
@@ -799,45 +799,6 @@ String _loadModeName(LoadMode mode) => switch (mode) {
       LoadMode.bodyweightPlus => 'bodyweight plus the entered load',
     };
 
-/// A trailing figure on a row, in the value size with the row's own chevron
-/// after it.
-class _PickedValue extends StatelessWidget {
-  const _PickedValue(this.text) : pending = false;
-
-  /// An unanswered question, while a new exercise is being drafted: the word
-  /// `Choose` in `textTertiary` where the value will go. Not a dash — a dash is
-  /// for a measurement that should exist and doesn't (rule 4), and this is a
-  /// question waiting on you.
-  const _PickedValue.orChoose(String? value)
-      : text = value ?? 'Choose',
-        pending = value == null;
-
-  final String text;
-  final bool pending;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            text,
-            style: pending
-                ? context.t.labelLarge?.copyWith(color: context.c.textTertiary)
-                : context.t.labelLarge,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: Space.sm),
-        Icon(Icons.chevron_right_rounded,
-            size: 18, color: context.c.textTertiary),
-      ],
-    );
-  }
-}
-
 /// The rest this exercise gets in this day.
 ///
 /// The same shape as the deload rows below, and for the same reason: a null
@@ -933,7 +894,7 @@ class _BarRow extends ConsumerWidget {
           subtitle: own == null
               ? 'Following the exercise'
               : 'This day only. Other days keep theirs.',
-          trailing: _PickedValue(_label(live)),
+          trailing: RowValue(_label(live)),
           onTap: () async {
             final picked = await _pick<BarKind>(
               context,

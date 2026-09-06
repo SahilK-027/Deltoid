@@ -478,6 +478,7 @@ class AppRow extends StatelessWidget {
     this.chevron = false,
     this.ink = true,
     this.subtitleLeading,
+    this.subtitleMaxLines = 2,
   });
 
   final String title;
@@ -504,6 +505,15 @@ class AppRow extends StatelessWidget {
 
   /// Adds the standard chevron. Ignored when [trailing] is set.
   final bool chevron;
+
+  /// How many lines the subtitle may take before it is cut.
+  ///
+  /// Two is right for a row on a page, where the subtitle is one clause and a
+  /// third line would push the row past the one below it. A row inside a sheet
+  /// is the opposite case: the sheet exists *because* the choice needs room to
+  /// explain itself, and a description cut mid-sentence there defeats the only
+  /// reason it was moved off the page. Raise it where the words are the point.
+  final int subtitleMaxLines;
 
   /// Set false where the row's own trailing control is the feedback — a radio
   /// that snaps under the finger says "taken" faster than a wash crossing the
@@ -557,7 +567,7 @@ class AppRow extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: context.t.bodyMedium,
-                      maxLines: 2,
+                      maxLines: subtitleMaxLines,
                       overflow: TextOverflow.ellipsis,
                     )
                   else
@@ -1288,6 +1298,50 @@ class IconTile extends StatelessWidget {
 /// It is the trailing control of an [AppRow] — a list of rows that are one
 /// choice each, where a [SegmentedPill] would put three words in a track and
 /// lose the room to say what each one means.
+/// A trailing figure on a row, in the value size with the row's own chevron
+/// after it.
+///
+/// Shared because three screens want the same trailing slot — an exercise's
+/// fields, and Settings' unit and rest rows — and a hand-rolled `Row` that
+/// looks like one drifts off the others within a week, which is the argument
+/// THEME makes for section headers and holds here for the same reason.
+class RowValue extends StatelessWidget {
+  const RowValue(this.text, {super.key}) : pending = false;
+
+  /// An unanswered question, while a new exercise is being drafted: the word
+  /// `Choose` in `textTertiary` where the value will go. Not a dash — a dash is
+  /// for a measurement that should exist and doesn't (rule 4), and this is a
+  /// question waiting on you.
+  const RowValue.orChoose(String? value, {super.key})
+      : text = value ?? 'Choose',
+        pending = value == null;
+
+  final String text;
+  final bool pending;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            text,
+            style: pending
+                ? context.t.labelLarge?.copyWith(color: context.c.textTertiary)
+                : context.t.labelLarge,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: Space.sm),
+        Icon(Icons.chevron_right_rounded,
+            size: 18, color: context.c.textTertiary),
+      ],
+    );
+  }
+}
+
 class AppRadio extends StatelessWidget {
   const AppRadio({super.key, required this.selected});
 

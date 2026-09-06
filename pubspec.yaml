@@ -54,6 +54,9 @@ dependencies:
   crypto: ^3.0.7
   flutter_svg: ^2.3.0
   connectivity_plus: ^7.3.1
+  # Already resolved as a transitive dependency; named here because Settings
+  # reads the installed version rather than repeating the number in Dart.
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:

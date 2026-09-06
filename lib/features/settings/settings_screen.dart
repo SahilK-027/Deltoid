@@ -89,66 +89,48 @@ class SettingsScreen extends ConsumerWidget {
         _BodyweightCard(bodyweight: bodyweight),
         const _AccountSection(),
         const SizedBox(height: Space.section),
-        const SectionHeader('Data'),
+        const SectionHeader('Backup'),
         ListCard(
           inset: Space.lg,
           children: [
             AppRow(
               icon: Icons.ios_share,
-              title: 'Export backup',
-              subtitle:
-                  'One file with every workout, ready for Drive or '
-                  'iCloud.',
+              title: 'Export a backup file',
+              // One clause each. What the file is and where it can go is the
+              // sheet's to say, and the sheet has the width to say it.
+              subtitle: 'Every workout, in one file',
               onTap: () => _export(context, ref),
               chevron: true,
             ),
             AppRow(
               icon: Icons.settings_backup_restore,
-              title: 'Restore from backup',
-              subtitle: 'Replaces everything currently on this device.',
+              title: 'Restore from a file',
+              subtitle: 'Replaces everything on this phone',
               onTap: () => _restore(context, ref),
               chevron: true,
             ),
             AppRow(
               icon: Icons.schedule,
-              // "Last backup" over a date that only ever moves for the
-              // automatic file, while a manual export you made a minute ago
-              // is nowhere on the screen, reads as a backup that did not
-              // happen. Only the automatic copy is the app's to speak for:
-              // Save to Downloads and Share hand the file to the system, and
-              // where it goes afterwards is not something this row can know.
-              title: lastBackup == null
-                  ? 'No automatic backup yet'
-                  : 'Last auto backup '
-                        '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
-              // The distinction is carried by "automatic" in the title.
-              // Spelling it out again down here ran the row past the two
-              // lines it draws and cut the sentence in half.
-              subtitle: 'Written after each finished session.',
+              title: 'Automatic backup',
+              subtitle: lastBackup == null
+                  ? 'After each finished session'
+                  : 'Last ran '
+                        '${DateFormat('d MMM, HH:mm').format(lastBackup)}',
             ),
           ],
         ),
         const SizedBox(height: Space.section),
-        const SectionHeader('Rest'),
-        const _RestSection(),
-        const SizedBox(height: Space.section),
-        const SectionHeader('Units'),
-        const _UnitPicker(),
+        const SectionHeader('Training'),
+        ListCard(
+          inset: Space.lg,
+          children: const [_RestRow(), _UnitRow()],
+        ),
         const SizedBox(height: Space.section),
         const SectionHeader('Appearance'),
         const _ThemePicker(),
         const SizedBox(height: Space.section),
         const SectionHeader('About'),
-        AppCard(
-          child: Text(
-            // Not "everything stays on this device" — the masthead's eyebrow
-            // says that, and a fact stated twice on one screen is the rule
-            // this app breaks most often (THEME rule 6).
-            'Sessions carry their own history, so the same exercise '
-            'progresses independently in each one.',
-            style: context.t.bodySmall,
-          ),
-        ),
+        const _AboutCard(),
       ],
     );
   }
@@ -400,7 +382,7 @@ class _BodyweightCard extends ConsumerWidget {
               ? 'Not logged'
               : '${formatBodyweight(latest.weightKg, unit)} ${unit.label}',
           subtitle: latest == null
-              ? 'Needed to score bodyweight and bodyweight-plus lifts'
+              ? 'Used to score your bodyweight lifts'
               : loggedToday
               ? 'Logged today  ·  ${bodyweight.count} entries'
               : 'Last entry '
@@ -501,6 +483,7 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                         ? 'This phone was signed out. Everything logged since '
                               'is still here and still waiting.'
                         : 'Your history is on this phone and nowhere else.',
+                    subtitleMaxLines: 3,
                     // The chevron is the affordance, so it goes while the
                     // spinner is there: two of them would say the row is both
                     // busy and ready.
@@ -511,6 +494,12 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                   ),
                 ]
               : [
+                  // One row, opening the two ways out rather than listing
+                  // them. Side by side on the page they read as the same
+                  // action twice: both titles start "Sign out", and the
+                  // difference between them — whether the history stays on
+                  // this phone — was a subtitle each, in a column with room
+                  // for neither to finish the thought.
                   AppRow(
                     icon: Icons.account_circle_outlined,
                     title: account.email ?? 'Signed in',
@@ -518,26 +507,59 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                       ref.watch(syncStateProvider).valueOrNull,
                       ref.watch(syncTroubleProvider).valueOrNull,
                     ),
-                  ),
-                  AppRow(
-                    icon: Icons.logout,
-                    title: 'Sign out',
-                    subtitle: 'Your training stays on this phone.',
-                    onTap: () => _signOut(context, ref),
-                    chevron: true,
-                  ),
-                  AppRow(
-                    icon: Icons.delete_sweep_outlined,
-                    title: 'Sign out and remove from this phone',
-                    subtitle: 'Your training stays in your Google account '
-                        'and is removed from this phone.',
-                    onTap: () => _signOutAndForget(context, ref),
+                    subtitleMaxLines: 3,
+                    onTap: () => _openAccountSheet(context, ref),
                     chevron: true,
                   ),
                 ],
         ),
       ],
     );
+  }
+
+  /// The two ways out, where each has room to say what it does.
+  ///
+  /// They are not variations on one action. Signing out stops the backing up
+  /// and changes nothing else; the second one empties this phone. The titles
+  /// say which, the descriptions say what happens to the training, and the
+  /// destructive one is last because red is where a list ends (THEME → Sheets).
+  Future<void> _openAccountSheet(BuildContext context, WidgetRef ref) async {
+    final c = context.c;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheet) => AppSheet(
+        title: 'Account',
+        contentPadding: EdgeInsets.zero,
+        children: [
+          AppRow(
+            icon: Icons.logout,
+            title: 'Sign out',
+            subtitle: 'Your training stays on this phone and you carry on '
+                'logging. Backing up stops until you sign in again.',
+            subtitleMaxLines: 4,
+            onTap: () => Navigator.of(sheet).pop('out'),
+          ),
+          AppRow(
+            icon: Icons.delete_sweep_outlined,
+            title: 'Sign out and delete data',
+            subtitle: 'Every session is deleted from this phone. Your '
+                'account keeps its copy, so signing in again restores it. '
+                'Use this when the phone is about to stop being yours.',
+            subtitleMaxLines: 4,
+            tint: c.negative,
+            onTap: () => Navigator.of(sheet).pop('forget'),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    if (choice == 'out') {
+      await _signOut(context, ref);
+    } else if (choice == 'forget') {
+      await _signOutAndForget(context, ref);
+    }
   }
 
   Future<void> _signIn(BuildContext context, WidgetRef ref) async {
@@ -667,89 +689,58 @@ String _since(DateTime at) {
 /// training day can carry its own rest, set on that exercise's own screen, and
 /// it outranks the default here. This section is what an exercise falls back
 /// to and what the walk to the next machine is worth.
-class _RestSection extends ConsumerWidget {
-  const _RestSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final prefs = ref.watch(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
-    final db = ref.read(databaseProvider);
-
-    return ListCard(
-      inset: Space.lg,
-      children: [
-        StepperRow(
-          label: 'Default rest',
-          helper: 'For an exercise that has not been given its own',
-          value: formatRestClock(prefs.defaultSeconds),
-          onDecrement: prefs.defaultSeconds > kMinRestSeconds
-              ? () => setRestDefaultSeconds(
-                    db,
-                    prefs.defaultSeconds - kRestStepSeconds,
-                  )
-              : null,
-          onIncrement: prefs.defaultSeconds < kMaxRestSeconds
-              ? () => setRestDefaultSeconds(
-                    db,
-                    prefs.defaultSeconds + kRestStepSeconds,
-                  )
-              : null,
-        ),
-        StepperRow(
-          label: 'Between exercises',
-          helper: 'After the last set of one, before the first of the next',
-          value: formatRestClock(prefs.betweenExercises),
-          onDecrement: prefs.betweenExercises > kMinRestSeconds
-              ? () => setRestBetweenExercisesSeconds(
-                    db,
-                    prefs.betweenExercises - kRestStepSeconds,
-                  )
-              : null,
-          onIncrement: prefs.betweenExercises < kMaxRestSeconds
-              ? () => setRestBetweenExercisesSeconds(
-                    db,
-                    prefs.betweenExercises + kRestStepSeconds,
-                  )
-              : null,
-        ),
-        AppRow(
-          title: 'Rest sound',
-          // The buzz is deliberately not part of this switch: it is the half
-          // that works with the phone face down on a bench, which is where it
-          // spends the rest.
-          subtitle: 'The tone at 0:00. The phone still buzzes either way.',
-          trailing: Switch(
-            value: prefs.sound,
-            onChanged: (on) => setRestSound(db, on),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Rows with radios, not a segmented pill: a pill fits the labels and nothing
-/// else, and the unit is the one setting here that changes what every number
-/// in the app means. A row has the width to say so.
-class _UnitPicker extends ConsumerWidget {
-  const _UnitPicker();
+/// The unit, as one row showing the answer.
+///
+/// It was two radio rows on the page. Radios are right where a choice needs
+/// room to say what it means (THEME → Toggles), and this one does — switching
+/// restates every number in the app — but the place with room is the sheet,
+/// not a card that has to carry both options forever to be read once a year.
+class _UnitRow extends ConsumerWidget {
+  const _UnitRow();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
-    return ListCard(
-      inset: Space.lg,
-      children: [
-        for (final unit in WeightUnit.values)
-          AppRow(
-            title: _unitName(unit),
-            trailing: AppRadio(selected: unit == current),
-            ink: false,
-            onTap: () => _switchTo(context, ref, from: current, to: unit),
-          ),
-      ],
+    return AppRow(
+      icon: Icons.straighten,
+      title: 'Weight units',
+      trailing: RowValue(_unitName(current)),
+      onTap: () => _open(context, ref, current),
     );
+  }
+
+  Future<void> _open(
+    BuildContext context,
+    WidgetRef ref,
+    WeightUnit current,
+  ) async {
+    final picked = await showModalBottomSheet<WeightUnit>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheet) => AppSheet(
+        title: 'Weight units',
+        contentPadding: EdgeInsets.zero,
+        children: [
+          for (final unit in WeightUnit.values)
+            AppRow(
+              title: _unitName(unit),
+              // The sheet is where the option has room to say what it means,
+              // which is the whole reason the choice moved into one.
+              subtitle: switch (unit) {
+                WeightUnit.kg => 'Weights, charts and plates in kilograms',
+                WeightUnit.lb => 'Weights, charts and plates in pounds',
+              },
+              trailing: AppRadio(selected: unit == current),
+              ink: false,
+              onTap: () => Navigator.of(sheet).pop(unit),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    await _switchTo(context, ref, from: current, to: picked);
   }
 
   /// Asks first, the way an exercise's own fields do.
@@ -999,4 +990,157 @@ class _ThemeMiniature extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The name of the app, the build actually installed, and the one sentence
+/// that says what makes it different from every other training log.
+///
+/// It replaces a card holding one `bodySmall` paragraph and nothing else. Two
+/// things were wrong with that: the type was a step below every other sentence
+/// on the page, so the only section that reads as an explanation was the only
+/// one set smaller than the rows above it, and a person looking for a version
+/// number — which is what anybody opens About for — found no number at all.
+class _AboutCard extends ConsumerWidget {
+  const _AboutCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final version = ref.watch(appVersionProvider).valueOrNull;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('Deltoid', style: context.t.titleMedium),
+              const Spacer(),
+              // Absent rather than a placeholder while it is being read: a
+              // dash here would be rule 4's dash, which means a measurement
+              // that should exist and does not, and this one is simply late.
+              if (version != null)
+                Text(
+                  version,
+                  style: context.t.labelLarge?.copyWith(color: c.textSecondary),
+                ),
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+          Text(
+            // Not "everything stays on this device" — the masthead's eyebrow
+            // says that, and a fact stated twice on one screen is the rule
+            // this app breaks most often (THEME rule 6).
+            'Sessions carry their own history, so the same exercise '
+            'progresses independently in each one. A bench press in Push 1 '
+            'is offered what Push 1 lifted last time, never what Push 2 did.',
+            style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Rest, as one row that says what it is set to and opens the rest.
+///
+/// The three controls used to sit on the page, and a stepper leaves 136pt for
+/// the words beside it — so every helper line under them was cut off mid
+/// sentence: "For an exercise that has not been given its own…". Neither
+/// shortening them nor letting them wrap fixes that, because the room is taken
+/// by the control. In a sheet each one has the full width, and the page gets
+/// three rows back.
+class _RestRow extends ConsumerWidget {
+  const _RestRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
+
+    return AppRow(
+      icon: Icons.timer_outlined,
+      title: 'Rest timers',
+      // The summary is the two numbers, because they are what a person opens
+      // this row to check and what they would otherwise have to open it to see.
+      subtitle:
+          '${formatRestClock(prefs.defaultSeconds)} between sets and '
+          '${formatRestClock(prefs.betweenExercises)} between exercises',
+      onTap: () => showRestSheet(context),
+      chevron: true,
+    );
+  }
+}
+
+/// The rest settings, with room for each one to say what it governs.
+Future<void> showRestSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    useSafeArea: true,
+    builder: (sheet) => Consumer(
+      builder: (context, ref, _) {
+        final prefs =
+            ref.watch(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
+        final db = ref.read(databaseProvider);
+
+        return AppSheet(
+          title: 'Rest timers',
+          children: [
+            StepperRow(
+              label: 'Between sets',
+              helper: 'The default for an exercise that has not been given '
+                  'a rest of its own',
+              value: formatRestClock(prefs.defaultSeconds),
+              onDecrement: prefs.defaultSeconds > kMinRestSeconds
+                  ? () => setRestDefaultSeconds(
+                        db,
+                        prefs.defaultSeconds - kRestStepSeconds,
+                      )
+                  : null,
+              onIncrement: prefs.defaultSeconds < kMaxRestSeconds
+                  ? () => setRestDefaultSeconds(
+                        db,
+                        prefs.defaultSeconds + kRestStepSeconds,
+                      )
+                  : null,
+            ),
+            StepperRow(
+              label: 'Between exercises',
+              helper: 'The pause after the last set of one movement, before '
+                  'the first set of the next',
+              value: formatRestClock(prefs.betweenExercises),
+              onDecrement: prefs.betweenExercises > kMinRestSeconds
+                  ? () => setRestBetweenExercisesSeconds(
+                        db,
+                        prefs.betweenExercises - kRestStepSeconds,
+                      )
+                  : null,
+              onIncrement: prefs.betweenExercises < kMaxRestSeconds
+                  ? () => setRestBetweenExercisesSeconds(
+                        db,
+                        prefs.betweenExercises + kRestStepSeconds,
+                      )
+                  : null,
+            ),
+            AppRow(
+              title: 'Alert sound',
+              // The buzz is deliberately not part of this switch: it is the
+              // half that works with the phone face down on a bench, which is
+              // where it spends the rest.
+              subtitle: 'Plays a tone when the rest reaches zero. The phone '
+                  'vibrates either way.',
+              subtitleMaxLines: 3,
+              trailing: Switch(
+                value: prefs.sound,
+                onChanged: (on) => setRestSound(db, on),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
