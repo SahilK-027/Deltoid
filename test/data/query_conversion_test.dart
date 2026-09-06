@@ -7,6 +7,7 @@ import 'package:deltoid/domain/prefill.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:deltoid/domain/session_name.dart';
 
 /// The rule every raw-SQL conversion in this repository is held to: an
 /// unbounded query is only rewritten once a test has run the old drift path and
@@ -118,7 +119,7 @@ Future<List<PastPerformance>> performancesViaDrift(
           workoutId: w.id,
           slotId: we.id,
           sessionId: w.sessionId,
-          sessionName: session?.name ?? 'Ad-hoc',
+          sessionName: session?.name ?? unplannedSessionName,
           dayKey: w.dayKey,
           startedAt: w.startedAt,
           isDeload: w.isDeload,
@@ -471,7 +472,7 @@ void main() {
     expect(all.map((p) => p.dayKey).toList(),
         [20260409, 20260404, 20260403, 20260402, 20260401]);
     expect(all.first.sessionId, isNull);
-    expect(all.first.sessionName, 'Ad-hoc');
+    expect(all.first.sessionName, unplannedSessionName);
     expect(all.map((p) => p.isDeload).toList(),
         [false, true, false, false, false]);
     expect(all.map((p) => p.skipReason).toList(), [

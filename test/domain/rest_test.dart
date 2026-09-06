@@ -60,9 +60,9 @@ void main() {
     });
 
     test('never draws a negative rest', () {
-      // The bar says "Rest done" past zero and the lock screen is replaced at
-      // the crossing, so nothing should ever reach here with a negative — and
-      // if something does, `-1:-5` is not what it prints.
+      // The bar says "Rest finished" past zero and the lock screen is
+      // replaced at the crossing, so nothing should ever reach here with a
+      // negative — and if something does, `-1:-5` is not what it prints.
       expect(formatRestClock(0), '0:00');
       expect(formatRestClock(-30), '0:00');
     });

@@ -15,6 +15,7 @@ import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import '../../core/widgets/toast.dart';
+import '../../domain/session_name.dart';
 
 /// One day, exactly as it was logged.
 ///
@@ -58,7 +59,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
     // one made it look like somewhere you navigate to rather than into.
     return Scaffold(
       appBar: AppBar(
-        title: Text(detail.session?.name ?? 'Ad-hoc session'),
+        title: Text(detail.session?.name ?? unplannedSessionName),
         actions: [
           if (workout.isDeload) ...[
             Pill('Deload', color: c.deload),
@@ -177,7 +178,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
       // `AppSheet` draws its own grab handle, tighter than the framework's.
       showDragHandle: false,
       builder: (sheet) => AppSheet(
-        title: detail.session?.name ?? 'Ad-hoc session',
+        title: detail.session?.name ?? unplannedSessionName,
         subtitle: DateFormat('d MMMM yyyy')
             .format(dateFromDayKey(detail.workout.dayKey)),
         // Full-bleed rows, no card. The rows had been sitting on a card inside
@@ -276,7 +277,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final ok = await confirmAction(
       context,
       title: 'Delete this session?',
-      message: '${detail.session?.name ?? 'Ad-hoc session'} · $date\n\n'
+      message: '${detail.session?.name ?? unplannedSessionName} · $date\n\n'
           '$sets logged set${sets == 1 ? '' : 's'} will be removed from '
           'history, the heatmap and every last-time suggestion. If it closed a '
           'cycle, the cycle reopens.\n\nThis cannot be undone.',

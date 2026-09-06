@@ -341,7 +341,7 @@ Future<void> showExerciseMenu(
 /// offered in the set sheet: backoff, rest-pause and AMRAP exist in the data
 /// and arrive from a template, but nothing types them by hand mid-session.
 String _typeBlurb(SetType type) => switch (type) {
-  SetType.working => 'Counts toward the top set and e1RM',
+  SetType.working => 'Counts towards the top set and est. 1RM',
   // Half of what this used to say was untrue. A warm-up is out of the
   // progression maths — no top set, no e1RM, no volume — and it is *not*
   // out of last-time: the ramp is mirrored into next week's rows and

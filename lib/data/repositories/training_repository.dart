@@ -12,6 +12,7 @@ import '../../domain/units.dart';
 import '../db/database.dart';
 import '../db/renumber.dart';
 import '../db/watch.dart';
+import '../../domain/session_name.dart';
 
 /// A workout exercise joined with its catalog row — what every log and history
 /// view actually needs.
@@ -1629,7 +1630,9 @@ class TrainingRepository {
             workoutId: r.read<String>('workout_id'),
             slotId: slotId,
             sessionId: r.readNullable<String>('session_id'),
-            sessionName: r.readNullable<String>('session_name') ?? 'Ad-hoc',
+            sessionName:
+                r.readNullable<String>('session_name') ??
+                unplannedSessionName,
             dayKey: r.read<int>('day_key'),
             startedAt: r.read<int>('started_at'),
             isDeload: r.read<bool>('is_deload'),
@@ -1973,7 +1976,8 @@ class TrainingRepository {
             dayKey: workout.dayKey,
             startedAt: workout.startedAt,
             sessionId: workout.sessionId,
-            sessionName: r.readTableOrNull(db.sessions)?.name ?? 'Ad-hoc',
+            sessionName:
+                r.readTableOrNull(db.sessions)?.name ?? unplannedSessionName,
             isDeload: workout.isDeload,
             skipReason: we.skipReason,
             sets: sets,
@@ -2190,7 +2194,8 @@ class TrainingRepository {
       points.add(ProgressPoint(
         dayKey: dayKey,
         sessionId: r.readNullable<String>('session_id'),
-        sessionName: r.readNullable<String>('session_name') ?? 'Ad-hoc',
+        sessionName:
+            r.readNullable<String>('session_name') ?? unplannedSessionName,
         isDeload: r.read<bool>('is_deload'),
         topSetLoad: score.topSetLoad,
         topSetReps: score.topSetReps,

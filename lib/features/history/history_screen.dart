@@ -11,6 +11,7 @@ import '../log/widgets/exercise_sheets.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
+import '../../domain/session_name.dart';
 
 /// Which reading of "history" is on screen.
 enum HistoryView { sessions, exercises }
@@ -548,7 +549,7 @@ class _WorkoutRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          summary.sessionName ?? 'Ad-hoc session',
+                          summary.sessionName ?? unplannedSessionName,
                           style: context.t.titleMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

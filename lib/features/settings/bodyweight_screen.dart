@@ -167,7 +167,7 @@ class BodyweightScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Log a weight',
+            tooltip: 'Log bodyweight',
             onPressed: () => logBodyweightPrompt(context, ref),
           ),
           const SizedBox(width: Space.sm),
@@ -179,7 +179,8 @@ class BodyweightScreen extends ConsumerWidget {
               ? EmptyState(
                   icon: Icons.monitor_weight_outlined,
                   title: 'No weights logged',
-                  message: 'Needed to score bodyweight and BW+ lifts. Seven '
+                  message: 'Needed to score bodyweight and bodyweight-plus '
+                      'lifts. Seven '
                       'pull-ups at 70kg and seven at 76kg are not the same '
                       'lift.',
                   action: FilledButton(

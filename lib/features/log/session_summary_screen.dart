@@ -12,6 +12,7 @@ import '../../domain/session_diff.dart';
 import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import 'log_providers.dart';
+import '../../domain/session_name.dart';
 
 /// Changes ticked in the summary's programme section but not yet written.
 ///
@@ -110,7 +111,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(
                         Space.gutter, Space.lg, Space.gutter, Space.xl),
                     child: Text(
-                      detail.session?.name ?? 'Ad-hoc session',
+                      detail.session?.name ?? unplannedSessionName,
                       textAlign: TextAlign.center,
                       // `section`, not `pageTitle`: the masthead type is
                       // uppercase and belongs to a tab you navigated to. This is

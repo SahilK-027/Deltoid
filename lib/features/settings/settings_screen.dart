@@ -391,7 +391,7 @@ class _BodyweightCard extends ConsumerWidget {
               ? 'Not logged'
               : '${formatBodyweight(latest.weightKg, unit)} ${unit.label}',
           subtitle: latest == null
-              ? 'Needed to score bodyweight and BW+ lifts'
+              ? 'Needed to score bodyweight and bodyweight-plus lifts'
               : loggedToday
               ? 'Logged today  ·  ${bodyweight.count} entries'
               : 'Last entry '

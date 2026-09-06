@@ -69,7 +69,7 @@ class RestTimerBar extends StatelessWidget {
                   // still measured from `startedAt` by the log screen.
                   if (over)
                     Text(
-                      'Rest done',
+                      'Rest finished',
                       style: context.t.titleMedium?.copyWith(
                         color: c.positive,
                       ),

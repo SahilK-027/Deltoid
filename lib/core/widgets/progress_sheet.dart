@@ -78,7 +78,7 @@ class _ProgressSheet extends StatelessWidget {
                 const SizedBox(height: Space.xs),
                 Text(
                   switch (current?.phase) {
-                    null => 'Starting…',
+                    null => 'Starting',
                     JobPhase.reading => 'Reading ${current!.detail}',
                     // Named rather than left as a stalled bar: this is the
                     // phase that takes the longest and reports nothing, and

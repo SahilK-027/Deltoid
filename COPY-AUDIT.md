@@ -4,11 +4,13 @@ Every user-facing string in `lib/` measured against
 [CLAUDE.md rule 11](CLAUDE.md#the-rules-most-easily-broken) and
 [THEME § 4 "The words"](THEME.md#the-words).
 
-**Status.** Sections 1 and 2 have been applied — every string in them now reads
-as the "Suggested" column, and the widget tests that asserted the old wording
-were updated with them. Sections 3, 4 and 5 are outstanding: the consistency
-sweep, the placeholders, and the commit and release-note conventions. The
-tables in the applied sections are kept as the record of what changed.
+**Status.** Sections 1, 2 and 3 have been applied — every string in them now
+reads as the "Pick" or "Suggested" column, and the tests that asserted the old
+wording were updated with them. One row of section 3 is deliberately left: the
+`Deltoid_Backup` folder name, which cannot be renamed without stranding the
+files already in the old one. Sections 4 and 5 are outstanding: the
+placeholders, and the commit and release-note conventions. The tables in the
+applied sections are kept as the record of what changed.
 
 The app's copy is, on the whole, deliberate and better than most. It is
 sentence-cased throughout, it states consequences rather than asking "are you
@@ -77,7 +79,7 @@ Findings are graded:
 
 ---
 
-## 3. Grade 3 — the same idea, spelled two ways · outstanding
+## 3. Grade 3 — the same idea, spelled two ways · **applied**
 
 | Idea | Spellings in the app | Pick |
 | ---- | -------------------- | ---- |
@@ -89,7 +91,7 @@ Findings are graded:
 | Towards / toward | `towards` ([workouts_screen.dart:257](lib/features/workouts/workouts_screen.dart:257)), `toward` ([exercise_sheets.dart:344](lib/features/log/widgets/exercise_sheets.dart:344), [enums.dart:168](lib/domain/enums.dart:168)) | `towards`, matching the app's Commonwealth spelling elsewhere. |
 | Logging a weight | Sheet action `Log a weight` ([bodyweight_screen.dart:170](lib/features/settings/bodyweight_screen.dart:170)), button `Log bodyweight` ([:187](lib/features/settings/bodyweight_screen.dart:187), [:844](lib/features/settings/bodyweight_screen.dart:844)) | `Log bodyweight` throughout. |
 | Ellipsis on a busy state | `Starting…` ([progress_sheet.dart:81](lib/core/widgets/progress_sheet.dart:81)) against `Signing in` ([welcome_screen.dart:224](lib/features/welcome/welcome_screen.dart:224)), `Exporting` ([settings_screen.dart:204](lib/features/settings/settings_screen.dart:204)), `Restoring` ([:351](lib/features/settings/settings_screen.dart:351)), `Holding` ([hold_pad.dart:192](lib/features/log/widgets/hold_pad.dart:192)) | No ellipsis. A spinner already says the thing is running. |
-| The Downloads folder | `Deltoid_Backup` ([downloads.dart:7](lib/data/backup/downloads.dart:7)) | Surfaced to the user in `Into $downloadsFolder, where a file manager can …` ([settings_screen.dart:185](lib/features/settings/settings_screen.dart:185)). An underscored identifier read as a sentence. `Deltoid Backups`, subject to the migration cost of moving an existing folder. |
+| The Downloads folder | `Deltoid_Backup` ([downloads.dart:7](lib/data/backup/downloads.dart:7)) | Surfaced to the user in `Into $downloadsFolder, where a file manager can …` ([settings_screen.dart:185](lib/features/settings/settings_screen.dart:185)). An underscored identifier read as a sentence. **Left as it is**: `Deltoid Backups` would be the right name, but renaming it strands every backup already written to the old folder, and the app has no way to move them. Worth doing only alongside a migration that does. |
 
 ---
 

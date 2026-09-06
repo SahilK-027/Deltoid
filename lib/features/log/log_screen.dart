@@ -32,6 +32,7 @@ import 'widgets/hold_pad.dart';
 import 'widgets/rest_timer.dart';
 import 'widgets/set_row.dart';
 import '../../core/widgets/toast.dart';
+import '../../domain/session_name.dart';
 
 /// Which value the keypad is currently editing.
 class EditTarget {
@@ -348,7 +349,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         .ignore();
   }
 
-  /// What the rest alert says under "Rest done": the movement it is a rest
+  /// What the rest alert says under "Rest finished": the movement it is a rest
   /// from, falling back to the session when the workout is still empty. The
   /// session's name was all it ever said, which on a phone in a pocket is the
   /// one thing you already know.
@@ -447,7 +448,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     });
   }
 
-  /// Whether rest is still on the clock. Past zero the bar says "Rest done"
+  /// Whether rest is still on the clock. Past zero the bar says "Rest finished"
   /// and the number is no longer being counted, so a new target may land.
   bool get _restRunning {
     final startedAt = _restStartedAt;
@@ -1571,7 +1572,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     await showReorderSheet(
       context,
       title: 'Reorder exercises',
-      subtitle: detail.session?.name ?? 'Today',
+      subtitle: detail.session?.name ?? unplannedSessionName,
       items: [
         for (final e in detail.entries)
           (id: e.workoutExercise.id, label: e.exercise.name),

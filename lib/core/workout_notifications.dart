@@ -301,7 +301,7 @@ class WorkoutNotifications {
     if (!at.isAfter(DateTime.now().add(const Duration(seconds: 1)))) return;
     await _schedule(
       id: _restId,
-      title: 'Rest done',
+      title: 'Rest finished',
       body: body,
       at: at,
       details: _restDetails(sound: sound),
@@ -347,7 +347,7 @@ class WorkoutNotifications {
     try {
       await _plugin.show(
         id: _restId,
-        title: 'Rest done',
+        title: 'Rest finished',
         body: body,
         notificationDetails: _restDetails(sound: true),
       );
