@@ -59,6 +59,18 @@ class WorkoutNotifications {
   /// on its own: transparent everywhere it is not the shape.
   static const _smallIcon = '@drawable/ic_stat_deltoid';
 
+  /// `DeltoidColors.dark.surface`, spelled out rather than imported: the shade
+  /// paints this row itself, from a number, with no theme behind it and no
+  /// chance to ask which one is in force.
+  ///
+  /// The app's own charcoal rather than a colour invented for the lock screen.
+  /// A purple was tried and both ends of it were wrong: the palette's lavender
+  /// is 2.6:1 against white, so Android read it as a light surface and printed
+  /// black text on it, and taking the hue down far enough to earn white text
+  /// produced a colour this app does not otherwise contain. White sits on this
+  /// at 15.8:1, and the row looks like the app it came from.
+  static const _tint = Color(0xFF1F1F1F);
+
   bool _ready = false;
   bool _unsupported = false;
 
@@ -133,6 +145,7 @@ class WorkoutNotifications {
     required String body,
     required int done,
     required int total,
+    required DateTime startedAt,
     int? restSecondsLeft,
     int? restTargetSeconds,
   }) async {
@@ -140,21 +153,30 @@ class WorkoutNotifications {
     // **What the clock says depends on who is holding the line up.**
     //
     // With the service, the seconds are posted one at a time and the number
-    // beside the movement is current. Without it — no shape of foreground
+    // under the movement is current. Without it — no shape of foreground
     // service was accepted — nothing here is awake to post a second one, so
-    // the line says that a rest is running and leaves the number to the alarm
-    // that ends it. A stale `1:47` sitting next to a finished rest would be
-    // worse than no number at all.
+    // the line drops the clock and leaves the end of the rest to the alarm. A
+    // stale 1:47 sitting beside a finished rest would be worse than no number.
     final resting = restSecondsLeft != null;
     final live = resting && !_serviceUnavailable;
-    final line = switch (true) {
-      _ when live => '${formatRestClock(restSecondsLeft)} · $body',
-      _ when resting => 'Resting · $body',
-      _ => body,
-    };
+
+    // **One line, and the clock leads it.**
+    //
+    // It was two, carried on a big-text style, and that is how the row grew
+    // five deep: the app's name, the title, the bar, the clock, the movement.
+    // Nothing on that fifth line was worth the height it cost — the clock and
+    // the movement are two short facts and they fit one line with a separator
+    // between them.
+    //
+    // The clock goes first because the end of this line is not guaranteed: a
+    // long enough movement name ellipsizes, and what fell off the end was the
+    // clock. What is still running is the half that cannot be cut.
+    final clock = live ? formatRestClock(restSecondsLeft) : null;
+    final line = clock == null ? body : '$clock · $body';
     final details = _sessionDetails(
       done: done,
       total: total,
+      startedAt: startedAt,
       restSecondsLeft: live ? restSecondsLeft : null,
       restTargetSeconds: live ? restTargetSeconds : null,
     );
@@ -172,6 +194,28 @@ class WorkoutNotifications {
         );
         return;
       }
+      // **Posted before the service adopts it, or nobody sees it for ten
+      // seconds.**
+      //
+      // From Android 12 the system holds back a foreground service's
+      // notification for up to ten seconds when the service starts while the
+      // app is on screen — which is every time a workout opens. The line for a
+      // session you have just started is exactly the line that should not
+      // arrive late, and the platform's own opt-out,
+      // `setForegroundServiceBehavior(FOREGROUND_SERVICE_IMMEDIATE)`, is not
+      // something this plugin exposes. A notification already showing under
+      // that id is not deferred, so it is posted first and the service takes
+      // it over. Once only: after that the service owns the line and every
+      // update goes through it.
+      if (!_serviceRunning) {
+        await _plugin.show(
+          id: _sessionId,
+          title: title,
+          body: line,
+          notificationDetails: details,
+        );
+      }
+
       // **Three ways to put this line up, and it takes the first that works.**
       //
       // `specialUse` is an API 34 constant being handed to
@@ -233,7 +277,11 @@ class WorkoutNotifications {
         // Composed again: the clock in it was written on the understanding
         // that something would keep it moving, and nothing will.
         body: resting ? 'Resting · $body' : body,
-        notificationDetails: _sessionDetails(done: done, total: total),
+        notificationDetails: _sessionDetails(
+          done: done,
+          total: total,
+          startedAt: startedAt,
+        ),
       );
     } on MissingPluginException {
       _unsupported = true;
@@ -246,6 +294,7 @@ class WorkoutNotifications {
   NotificationDetails _sessionDetails({
     required int done,
     required int total,
+    DateTime? startedAt,
     int? restSecondsLeft,
     int? restTargetSeconds,
   }) {
@@ -259,6 +308,13 @@ class WorkoutNotifications {
         'Session in progress',
         channelDescription: 'The session you are training, and the rest clock.',
         icon: _smallIcon,
+        // **Coloured, and it takes a foreground service to be allowed to be.**
+        //
+        // `colorized` paints the whole line rather than tinting the app name,
+        // and Android grants that only to a foreground service — which this is
+        // already, for the rest bar's sake, so the licence comes free.
+        color: _tint,
+        colorized: true,
         // The header's small grey line, next to the app name: where the
         // session stands, which is the one number that is true whether or not
         // a rest is running.
@@ -290,12 +346,24 @@ class WorkoutNotifications {
         ongoing: true,
         autoCancel: false,
         category: AndroidNotificationCategory.workout,
-        // No chronometer. The system draws that in the header's top corner and
-        // nowhere else, which puts the number that matters furthest from the
-        // bar it belongs to. The time left is written into the body instead,
-        // on the line above the bar, by the same second-by-second post that
-        // moves the bar.
-        showWhen: false,
+        // **The session's age is the system's to draw, and it draws it in
+        // minutes.**
+        //
+        // `when` is the moment the workout started, and the shade renders it
+        // as "42m" beside the app name — the same line, and the same shape,
+        // that every other ongoing notification on the phone uses.
+        //
+        // No chronometer. Asking for one gets a clock ticking in seconds, and
+        // a clock ticking in seconds cannot survive this line: a rest re-posts
+        // it once a second, every post rebuilds the row, and the clock
+        // restarts with it. Standing it down for the rest only moved the
+        // problem — the header then swapped between a ticking clock and a
+        // static "42m" at both ends of every rest, which is a twitch a minute
+        // rather than one a second. How long you have been training wants no
+        // precision. The number that does is on the bar.
+        showWhen: startedAt != null,
+        when: startedAt?.millisecondsSinceEpoch,
+        usesChronometer: false,
       ),
     );
   }

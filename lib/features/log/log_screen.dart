@@ -332,17 +332,38 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // and what is next; "3 of 12 sets" says where the session is, and that
     // belongs in the header line rather than in place of it.
     final exercise = _currentExerciseName(detail);
+    // "Flat DB Bench Press (1/3)" — the movement and where you are in it, the
+    // same count the header on screen is showing.
+    final entry = detail.entries.isEmpty
+        ? null
+        : detail.entries[math.max(
+            0,
+            math.min(detail.entries.length - 1, _page),
+          )];
+    final (position, counted) = entry == null
+        ? (0, 0)
+        : setPosition(entry.sets);
     final left = resting
         ? _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds
         : null;
     WorkoutNotifications.instance
         .showSession(
-          title: detail.session?.name ?? 'Workout',
-          // The plain line. Whether a clock goes in front of it is decided
-          // where it is known whether anything will keep that clock moving.
-          body: exercise ?? '$done of $total sets',
+          // Named the way a tracker names itself, because that is what this
+          // line is: something running in the background that you have not
+          // forgotten about.
+          title: 'Currently tracking ${detail.session?.name ?? 'your workout'}',
+          // The movement and the set. Whether a clock joins it is decided where
+          // it is known whether anything will keep that clock moving.
+          body: exercise == null
+              ? '$done of $total sets'
+              : counted > 0
+              ? '$exercise ($position/$counted)'
+              : exercise,
           done: done,
           total: total,
+          startedAt: DateTime.fromMillisecondsSinceEpoch(
+            detail.workout.startedAt,
+          ),
           restSecondsLeft: left,
           restTargetSeconds: resting ? _restTargetSeconds : null,
         )
@@ -755,10 +776,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Leaving without finishing is fine — the session keeps running and
         // survives a force-stop — but it has to be said out loud, or the sets
         // logged so far look lost.
-        showToast(
-          context,
-          'Session still running. Resume it from Workouts.',
-        );
+        showToast(context, 'Session still running. Resume it from Workouts.');
         Navigator.of(context).pop();
       },
       child: Scaffold(
@@ -2038,15 +2056,8 @@ class _ExercisePage extends ConsumerWidget {
     final c = context.c;
     final skipped = entry.workoutExercise.skipReason != SkipReason.none;
 
-    // Warm-ups are not set 1, and a drop run is one set rather than three:
-    // counting rows shifted every number away from the programme it came from.
     final groups = _groupSets(entry.sets);
-    final counted = groups
-        .where((g) => g.sets.first.setType != SetType.warmup)
-        .toList();
-    final countedDone = counted
-        .where((g) => g.sets.every((s) => s.isDone))
-        .length;
+    final (position, counted) = setPosition(entry.sets);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -2072,11 +2083,10 @@ class _ExercisePage extends ConsumerWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (!skipped && counted.isNotEmpty) ...[
+                  if (!skipped && counted > 0) ...[
                     const SizedBox(height: 2),
                     Text(
-                      'Set ${math.min(countedDone + 1, counted.length)} '
-                      'of ${counted.length}',
+                      'Set $position of $counted',
                       style: context.t.bodyMedium?.copyWith(
                         color: c.textSecondary,
                       ),
@@ -2330,6 +2340,25 @@ class _SetGroupData {
 /// adjacency instead — every run of consecutive `drop` rows — could not tell
 /// one drop set with two legs from two drop sets side by side, so converting
 /// two sets in a row merged them into one.
+/// Which set of how many, for one exercise: the number on the log's header and
+/// the number in the lock-screen line.
+///
+/// **One computation, because it is one fact** (RULES § 6). Warm-ups are not
+/// set 1 and a drop run is one set rather than three, so counting rows shifts
+/// every number away from the programme it came from — and two screens
+/// counting rows differently is how the header and the notification end up
+/// disagreeing about which set you are on.
+///
+/// Returns `(position, counted)`, where position is the set now being worked
+/// and never runs past the last one.
+(int, int) setPosition(List<SetLog> sets) {
+  final counted = _groupSets(
+    sets,
+  ).where((g) => g.sets.first.setType != SetType.warmup).toList();
+  final done = counted.where((g) => g.sets.every((s) => s.isDone)).length;
+  return (math.min(done + 1, counted.length), counted.length);
+}
+
 List<_SetGroupData> _groupSets(List<SetLog> sets) {
   final at = {for (var i = 0; i < sets.length; i++) sets[i].id: i};
 
