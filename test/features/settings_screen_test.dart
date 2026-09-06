@@ -91,7 +91,7 @@ void main() {
   }
 
   Future<void> openRestSheet(WidgetTester tester) =>
-      openRow(tester, 'Rest timers');
+      openRow(tester, 'Rest time & alert');
 
   Future<void> openUnitSheet(WidgetTester tester) =>
       openRow(tester, 'Weight units');
@@ -150,9 +150,9 @@ void main() {
       //
       // Rest and the unit are rows stating their answer, not sections
       // spelling out every option on the page.
-      await scrollTo(tester, 'Rest timers');
+      await scrollTo(tester, 'Rest time & alert');
       expect(find.text('Training'), findsOneWidget);
-      expect(find.text('Rest timers'), findsOneWidget);
+      expect(find.text('Rest time & alert'), findsOneWidget);
       expect(find.text('Weight units'), findsOneWidget);
       expect(find.text('Kilograms'), findsOneWidget);
 

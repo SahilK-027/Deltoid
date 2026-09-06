@@ -1068,7 +1068,7 @@ class _RestRow extends ConsumerWidget {
 
     return AppRow(
       icon: Icons.timer_outlined,
-      title: 'Rest timers',
+      title: 'Rest time & alert',
       // The summary is the two numbers, because they are what a person opens
       // this row to check and what they would otherwise have to open it to see.
       subtitle:
@@ -1095,7 +1095,7 @@ Future<void> showRestSheet(BuildContext context) {
         final db = ref.read(databaseProvider);
 
         return AppSheet(
-          title: 'Rest timers',
+          title: 'Rest time & alert',
           // Full-bleed rows carry their own padding, so the sheet adds none of
           // its own at the sides — the double-inset [AppSheet.contentPadding]
           // warns about. Bottom only, for the last row to breathe.
@@ -1210,7 +1210,7 @@ class _KeepScreenOnRow extends ConsumerWidget {
         ref.watch(sessionPrefsProvider).valueOrNull ?? sessionPrefsDefaults;
 
     return AppRow(
-      icon: Icons.brightness_high_outlined,
+      icon: Icons.stay_current_portrait_outlined,
       title: 'Keep screen on',
       subtitle: 'Stops the phone locking while a session is open.',
       subtitleMaxLines: 3,
