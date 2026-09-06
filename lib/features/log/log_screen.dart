@@ -1020,10 +1020,19 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// The keypad is a sibling in the Column, so opening it shrinks the page
   /// under it. Nothing scrolled the active row back, which on an exercise with
   /// five or more sets could leave you typing into a row you cannot see.
+  ///
+  /// **Only when the row cannot be seen.** It used to scroll to a fixed
+  /// alignment every time, which on the four sets an exercise usually has —
+  /// every one of them still on screen with the keypad up — meant the whole
+  /// page lurched a little under the thumb on every tap, to reveal something
+  /// that was never hidden. The check runs after the frame that inserts the
+  /// keypad, so what it measures against is the shortened viewport rather than
+  /// the one the row was tapped in.
   void _revealRow(String setId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = _rowKeys[setId]?.currentContext;
       if (context == null) return;
+      if (_isFullyVisible(context)) return;
       Scrollable.ensureVisible(
         context,
         alignment: 0.35,
@@ -1031,6 +1040,17 @@ class _LogScreenState extends ConsumerState<LogScreen>
         curve: Motion.curve,
       );
     });
+  }
+
+  /// Whether the widget at [context] is inside its scrollable's viewport, top
+  /// and bottom both. Answers false when there is nothing to measure with,
+  /// which puts the scroll back — the old behaviour, and the safe one.
+  static bool _isFullyVisible(BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    final viewport = Scrollable.maybeOf(context)?.context.findRenderObject();
+    if (box == null || !box.hasSize || viewport is! RenderBox) return false;
+    final top = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
+    return top >= 0 && top + box.size.height <= viewport.size.height;
   }
 
   Widget _keypad(
