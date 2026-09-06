@@ -463,6 +463,40 @@ asleep, and that the hand-back leaves exactly one sound behind.
 why the change was made rather than what it changed, because the diff already
 says what.
 
+### The shape of a commit subject
+
+`<emoji> <type>(<scope>): <imperative clause>`, at most 50 characters after the
+emoji, no full stop. The clause completes _"if applied, this commit will …"_ —
+`fix(prefill): treat a session's first set as a first time`, not
+`fix(prefill): a first time in a session is a first time`. A subject that
+states a conclusion instead of a change can only be verified by opening the
+diff, which is the body's job and not the subject's. This is
+[CLAUDE.md rule 11](CLAUDE.md#the-rules-most-easily-broken); it applies to the
+body and to `CHANGELOG.md` as well.
+
+**The type is authoritative and the emoji follows it.** The emoji is there to
+be scanned in `git log --oneline` and nothing more, so it must never disagree
+with the type beside it — `📝 fix(log):` and `💄 fix(log):` are both in the
+history, and one of them is wrong. One emoji per type:
+
+| Type       | Emoji | For                                                    |
+| ---------- | ----- | ------------------------------------------------------ |
+| `feat`     | ✨    | Something the app did not do before                    |
+| `fix`      | 🐛    | Behaviour that was wrong                               |
+| `fix`      | 💄    | Behaviour that was wrong **and only visual**           |
+| `perf`     | ⚡️    | Same behaviour, less work                              |
+| `refactor` | ♻️    | Same behaviour, different shape                        |
+| `test`     | ✅    | Tests only                                             |
+| `docs`     | 📝    | Documents only                                         |
+| `build`    | 🔐    | Signing, flavours, the manifest                        |
+| `chore`    | 🔧    | Tooling and configuration                              |
+| `chore`    | 🔖    | A release: the version bump and nothing else           |
+
+A release commit carries `chore(release): <version>+<build>` and a body saying
+what kind of release it is and why. `CHANGELOG.md` is written in the same
+commit, in the user's terms rather than the diff's, and is the record a person
+reads — the release commit's body is the record a maintainer reads.
+
 ### A rule that matters is a rule something checks
 
 A comment cannot fail a build. Every rule that lives only in prose holds exactly

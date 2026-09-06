@@ -8,9 +8,14 @@ Every user-facing string in `lib/` measured against
 as the "Pick" or "Suggested" column, and the tests that asserted the old
 wording were updated with them. One row of section 3 is deliberately left: the
 `Deltoid_Backup` folder name, which cannot be renamed without stranding the
-files already in the old one. Section 5 is outstanding: the commit and
-release-note conventions. The tables in the applied sections are kept as the
-record of what changed.
+files already in the old one. Section 5 is applied too, with one decision taken
+against the finding: the gitmoji prefixes stay, and
+[RULES § 7](RULES.md#the-shape-of-a-commit-subject) now fixes one emoji per
+type so the two cannot disagree again. The tables in the applied sections are
+kept as the record of what changed.
+
+Nothing in this document is outstanding. It is kept as the record, and as the
+list a later pass should re-run rather than re-derive.
 
 The app's copy is, on the whole, deliberate and better than most. It is
 sentence-cased throughout, it states consequences rather than asking "are you
@@ -136,7 +141,7 @@ respect.
 
 ---
 
-## 5. Beyond the UI: commits and release notes · outstanding
+## 5. Beyond the UI: commits and release notes · **applied**
 
 Rule 11 covers these too, and they need more work than the app does.
 
@@ -159,14 +164,16 @@ bodies that say it well.
 
 Two further points:
 
-- **The gitmoji prefixes** (`🔖 ✨ 💄 📝 🐛 🔧`) duplicate the Conventional
-  Commits type that follows them, and `💄 fix(log):` and `📝 fix(log):` show
-  the two disagreeing. Either the emoji or the type carries the category, not
-  both.
-- **There are no release notes.** `chore(release): 1.3.0+5` is a version bump
-  with no record of what changed for the user. Five releases have shipped
-  without one. A `CHANGELOG.md`, written in the user's terms rather than the
-  diff's, is the missing artefact rule 11 assumes exists.
+- **The gitmoji prefixes** (`🔖 ✨ 💄 📝 🐛 🔧`) duplicated the Conventional
+  Commits type that follows them, and `💄 fix(log):` and `📝 fix(log):` showed
+  the two disagreeing. **Resolved in favour of keeping them**: the emoji is a
+  scanning aid in `git log --oneline` and the type stays authoritative, so
+  [RULES § 7](RULES.md#the-shape-of-a-commit-subject) now fixes one emoji per
+  type rather than leaving it to the day.
+- **There were no release notes.** `chore(release): 1.3.0+5` was a version bump
+  with no record of what changed for the user, five times over.
+  [CHANGELOG.md](CHANGELOG.md) now reconstructs 1.0.0 through 1.3.0 from the
+  history and is written in the same commit as every version bump from here.
 
 ---
 

@@ -35,6 +35,7 @@ data behind them.
 | **[SYNC.md](SYNC.md)**     | Before changing cloud backup. Sections 1–16 are the design: what syncs, what never syncs, how a conflict resolves, and the ten things sync must never do. Sections 17–20 are the implementation: architecture, the seven phases, and what must exist outside the repository |
 | **[README.md](README.md)** | Setup, commands, project layout, and how the layers fit together                                                                                          |
 | **[TODO.md](TODO.md)**     | What is done and what is left. Status is recorded there and nowhere else                                                                                  |
+| **[CHANGELOG.md](CHANGELOG.md)** | Every release, in terms of what changed for the user. Written in the release commit, alongside the version bump                        |
 | [SETUP-SYNC.md](SETUP-SYNC.md) | Only when the question is how a person configures their own Supabase and Google projects. Operational setup, not design                                |
 
 This file contains no facts of its own. If anything here contradicts one of
