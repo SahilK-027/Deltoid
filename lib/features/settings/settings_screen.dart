@@ -135,7 +135,12 @@ class SettingsScreen extends ConsumerWidget {
         const SectionHeader('Training'),
         ListCard(
           inset: Space.lg,
-          children: const [_RestRow(), _UnitRow()],
+          children: const [
+            _RestRow(),
+            _UnitRow(),
+            _SessionNotificationRow(),
+            _KeepScreenOnRow(),
+          ],
         ),
         const SizedBox(height: Space.section),
         const SectionHeader('Appearance'),
@@ -1134,15 +1139,25 @@ Future<void> showRestSheet(BuildContext context) {
             ),
             AppRow(
               title: 'Alert sound',
-              // The buzz is deliberately not part of this switch: it is the
-              // half that works with the phone face down on a bench, which is
-              // where it spends the rest.
-              subtitle: 'Plays a tone when the rest reaches zero. The phone '
-                  'vibrates either way.',
+              subtitle: 'Plays a tone when the rest reaches zero.',
               subtitleMaxLines: 3,
               trailing: Switch(
                 value: prefs.sound,
                 onChanged: (on) => setRestSound(db, on),
+              ),
+            ),
+            AppRow(
+              title: 'Vibration',
+              // Its own switch rather than half of the one above, because the
+              // two fail differently: the tone is what carries over a gym, and
+              // the buzz is what a phone lying face down on a bench still
+              // reports.
+              subtitle: 'Buzzes when the rest reaches zero, whether or not '
+                  'the tone is on.',
+              subtitleMaxLines: 3,
+              trailing: Switch(
+                value: prefs.vibrate,
+                onChanged: (on) => setRestVibrate(db, on),
               ),
             ),
           ],
@@ -1150,4 +1165,59 @@ Future<void> showRestSheet(BuildContext context) {
       },
     ),
   );
+}
+
+/// Whether a session posts its ongoing line.
+///
+/// The line is a foreground service, and Android will not run one without a
+/// notification — so this is not "hide it", it is "do not run it". The
+/// subtitle says what that costs, because the cost is a feature: the rest bar
+/// drains a second at a time only because a service is holding it. The alert
+/// itself is a scheduled alarm and arrives either way, which is the half worth
+/// promising.
+class _SessionNotificationRow extends ConsumerWidget {
+  const _SessionNotificationRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs =
+        ref.watch(sessionPrefsProvider).valueOrNull ?? sessionPrefsDefaults;
+
+    return AppRow(
+      icon: Icons.notifications_none_rounded,
+      title: 'Session notification',
+      subtitle: prefs.notification
+          ? 'Shows what you are training and the rest clock while a session '
+                'is open.'
+          : 'Off. The rest alert still sounds, but the clock stops counting '
+                'while the screen is off.',
+      subtitleMaxLines: 3,
+      trailing: Switch(
+        value: prefs.notification,
+        onChanged: (on) => setSessionNotification(ref.read(databaseProvider), on),
+      ),
+    );
+  }
+}
+
+/// Whether the screen is held awake for the length of a session.
+class _KeepScreenOnRow extends ConsumerWidget {
+  const _KeepScreenOnRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs =
+        ref.watch(sessionPrefsProvider).valueOrNull ?? sessionPrefsDefaults;
+
+    return AppRow(
+      icon: Icons.brightness_high_outlined,
+      title: 'Keep screen on',
+      subtitle: 'Stops the phone locking while a session is open.',
+      subtitleMaxLines: 3,
+      trailing: Switch(
+        value: prefs.keepScreenOn,
+        onChanged: (on) => setKeepScreenOn(ref.read(databaseProvider), on),
+      ),
+    );
+  }
 }

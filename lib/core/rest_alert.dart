@@ -81,16 +81,18 @@ class RestAlert {
   /// letting a rest end in silence. Every failure here is a real one seen in a
   /// gym: audio focus refused during a call, a player that would not build, a
   /// process the system has stopped giving audio to.
-  Future<bool> fire({bool sound = true}) async {
-    unawaited(HapticFeedback.heavyImpact());
-    // A second pulse a beat later: one is easy to miss mid-set. Deliberately
-    // not awaited — the alert must not hold the caller for 220ms.
-    unawaited(
-      Future.delayed(
-        const Duration(milliseconds: 220),
-        HapticFeedback.heavyImpact,
-      ),
-    );
+  Future<bool> fire({bool sound = true, bool vibrate = true}) async {
+    if (vibrate) {
+      unawaited(HapticFeedback.heavyImpact());
+      // A second pulse a beat later: one is easy to miss mid-set. Deliberately
+      // not awaited — the alert must not hold the caller for 220ms.
+      unawaited(
+        Future.delayed(
+          const Duration(milliseconds: 220),
+          HapticFeedback.heavyImpact,
+        ),
+      );
+    }
 
     // Nothing owed: the switch is off, or this platform has no audio to play
     // through. Neither is a failure, and neither wants a notification thrown

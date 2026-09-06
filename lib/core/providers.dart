@@ -9,6 +9,7 @@ import '../data/repositories/repairs.dart';
 import '../data/repositories/training_repository.dart';
 import '../domain/cycle_engine.dart';
 import '../domain/rest.dart';
+import '../domain/session_prefs.dart';
 import '../domain/units.dart';
 import 'sync_providers.dart';
 
@@ -187,19 +188,30 @@ Future<void> setWeightUnit(AppDatabase db, WeightUnit unit) {
 /// One provider rather than three: the log screen wants all of it at once, and
 /// three `StreamProvider`s over the same table would be three watches on one
 /// query for the sake of looking tidy.
-typedef RestPrefs = ({int defaultSeconds, int betweenExercises, bool sound});
+typedef RestPrefs = ({
+  int defaultSeconds,
+  int betweenExercises,
+  bool sound,
+  bool vibrate,
+});
 
 const restPrefsDefaults = (
   defaultSeconds: kDefaultRestSeconds,
   betweenExercises: kDefaultRestSeconds,
   sound: true,
+  vibrate: true,
 );
 
 final restPrefsProvider = StreamProvider<RestPrefs>((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.appSettings)
     ..where(
-      (t) => t.key.isIn([restDefaultKey, restBetweenExercisesKey, restSoundKey]),
+      (t) => t.key.isIn([
+        restDefaultKey,
+        restBetweenExercisesKey,
+        restSoundKey,
+        restVibrateKey,
+      ]),
     );
   return query.watch().map((rows) {
     final byKey = {for (final row in rows) row.key: row.value};
@@ -207,6 +219,7 @@ final restPrefsProvider = StreamProvider<RestPrefs>((ref) {
       defaultSeconds: parseRestSeconds(byKey[restDefaultKey]),
       betweenExercises: parseRestSeconds(byKey[restBetweenExercisesKey]),
       sound: parseRestSound(byKey[restSoundKey]),
+      vibrate: parseRestVibrate(byKey[restVibrateKey]),
     );
   });
 });
@@ -233,6 +246,53 @@ Future<void> setRestSound(AppDatabase db, bool on) {
   return db.into(db.appSettings).insertOnConflictUpdate(
         AppSettingsCompanion.insert(
           key: restSoundKey,
+          value: on ? 'on' : 'off',
+        ),
+      );
+}
+
+Future<void> setRestVibrate(AppDatabase db, bool on) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: restVibrateKey,
+          value: on ? 'on' : 'off',
+        ),
+      );
+}
+
+/// What the app does to the phone while a session is open. Same shape and the
+/// same table as [restPrefsProvider], and read together for the same reason:
+/// the log screen wants both at once.
+typedef SessionPrefs = ({bool notification, bool keepScreenOn});
+
+const sessionPrefsDefaults = (notification: true, keepScreenOn: true);
+
+final sessionPrefsProvider = StreamProvider<SessionPrefs>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.appSettings)
+    ..where((t) => t.key.isIn([sessionNotificationKey, keepScreenOnKey]));
+  return query.watch().map((rows) {
+    final byKey = {for (final row in rows) row.key: row.value};
+    return (
+      notification: parseSessionNotification(byKey[sessionNotificationKey]),
+      keepScreenOn: parseKeepScreenOn(byKey[keepScreenOnKey]),
+    );
+  });
+});
+
+Future<void> setSessionNotification(AppDatabase db, bool on) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: sessionNotificationKey,
+          value: on ? 'on' : 'off',
+        ),
+      );
+}
+
+Future<void> setKeepScreenOn(AppDatabase db, bool on) {
+  return db.into(db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: keepScreenOnKey,
           value: on ? 'on' : 'off',
         ),
       );

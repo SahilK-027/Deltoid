@@ -30,6 +30,7 @@ library;
 const restDefaultKey = 'rest_default_seconds';
 const restBetweenExercisesKey = 'rest_between_seconds';
 const restSoundKey = 'rest_sound';
+const restVibrateKey = 'rest_vibrate';
 
 /// Two minutes, the number the app ships with and falls back to.
 const int kDefaultRestSeconds = 120;
@@ -69,6 +70,13 @@ int parseRestSeconds(String? raw, {int fallback = kDefaultRestSeconds}) {
 
 /// Whether the end-of-rest tone plays. On unless it has been turned off.
 bool parseRestSound(String? raw) => raw?.trim() != 'off';
+
+/// Whether the end-of-rest alert buzzes. On unless it has been turned off.
+///
+/// Separate from the tone because they fail differently: the tone is what
+/// carries over a gym, the buzz is what a phone face down on a bench still
+/// reports. Turning one off is not a wish to turn the other off.
+bool parseRestVibrate(String? raw) => raw?.trim() != 'off';
 
 /// The clock face: `2:00`, `0:45`. Used wherever a rest is counted or shown
 /// as a value the ± controls are changing.

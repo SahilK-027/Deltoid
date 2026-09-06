@@ -240,8 +240,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
       }
     });
     // The whole point of this screen is to be put down between sets, so the
-    // screen must not lock while a workout is open.
-    WakelockPlus.enable().ignore();
+    // screen must not lock while a workout is open — unless it has been asked
+    // not to. `disable` in `dispose` is unconditional either way: turning the
+    // switch off mid-session must not leave a wakelock nobody will release.
+    if (_sessionPrefs.keepScreenOn) WakelockPlus.enable().ignore();
     // Load the tone now; the first rest of the session shouldn't be the one
     // that pays for decoding it.
     RestAlert.instance.warmUp().ignore();
@@ -346,6 +348,14 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final left = resting
         ? _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds
         : null;
+    // Off means the foreground service does not start at all: Android will
+    // not run one without a notification, so there is no quieter shape of this
+    // to offer. What is lost is the live clock — the end-of-rest alert is a
+    // scheduled alarm rather than part of the service, and still arrives.
+    if (!_sessionPrefs.notification) {
+      WorkoutNotifications.instance.clear().ignore();
+      return;
+    }
     WorkoutNotifications.instance
         .showSession(
           // Named the way a tracker names itself, because that is what this
@@ -483,6 +493,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
   RestPrefs get _restPrefs =>
       ref.read(restPrefsProvider).valueOrNull ?? restPrefsDefaults;
 
+  /// What Settings allows this screen to do to the phone. Read, not watched,
+  /// for the same reason as [_restPrefs].
+  SessionPrefs get _sessionPrefs =>
+      ref.read(sessionPrefsProvider).valueOrNull ?? sessionPrefsDefaults;
+
   /// How long the rest after [setId] should run and whether it is the gap
   /// between two exercises, or null when there is nothing left to rest for.
   ///
@@ -558,6 +573,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
           endsAt,
           body: _restAlertBody(),
           sound: _restPrefs.sound,
+          vibrate: _restPrefs.vibrate,
         )
         .ignore();
 
@@ -598,14 +614,17 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// So a refusal is answered by posting the alert that was taken back.
   void _fireInAppAlert() {
     final sound = _restPrefs.sound;
+    final vibrate = _restPrefs.vibrate;
     final name = _restAlertBody();
-    RestAlert.instance.fire(sound: sound).then((played) {
+    RestAlert.instance.fire(sound: sound, vibrate: vibrate).then((played) {
       // `sound` is checked again rather than leaned on: `fire` reports a silent
       // rest as discharged, so this is unreachable with the switch off — and a
       // fallback that could make a noise the switch forbids is not something
       // to leave resting on that.
       if (played || !sound) return;
-      WorkoutNotifications.instance.showRestDoneNow(body: name).ignore();
+      WorkoutNotifications.instance
+          .showRestDoneNow(body: name, vibrate: vibrate)
+          .ignore();
     }).ignore();
   }
 

@@ -49,8 +49,17 @@ class WorkoutNotifications {
   /// `rest_done`; it has to post on a channel that never had a sound. Both
   /// vibrate — the buzz is the half that works with the phone in a pocket, and
   /// it is not what the setting is about.
+  // **Four channels, because vibration is a property of the channel.** From
+  // Android 8 a channel's sound and vibration are fixed when it is created and
+  // cannot be edited by the app afterwards — only by the user, in the system's
+  // own settings. Two switches therefore need four channels rather than two
+  // booleans on the notification, and a phone that has seen every combination
+  // ends up with four entries under the app's notification settings. That is
+  // the platform's shape, not a choice.
   static const _restChannel = 'rest_done';
   static const _restSilentChannel = 'rest_done_silent';
+  static const _restStillChannel = 'rest_done_still';
+  static const _restSilentStillChannel = 'rest_done_silent_still';
 
   /// The status bar draws a small icon from its **alpha channel alone**, every
   /// opaque pixel painted one flat colour by the system. The launcher icon is
@@ -439,6 +448,7 @@ class WorkoutNotifications {
     DateTime at, {
     String? body,
     bool sound = true,
+    bool vibrate = true,
   }) async {
     if (!await init()) return;
     // Already gone. `zonedSchedule` throws on a date in the past, and the
@@ -450,16 +460,29 @@ class WorkoutNotifications {
       title: 'Rest finished',
       body: body,
       at: at,
-      details: _restDetails(sound: sound),
+      details: _restDetails(sound: sound, vibrate: vibrate),
       what: 'rest alert',
     );
   }
 
-  NotificationDetails _restDetails({required bool sound}) {
+  NotificationDetails _restDetails({
+    required bool sound,
+    required bool vibrate,
+  }) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        sound ? _restChannel : _restSilentChannel,
-        sound ? 'Rest finished' : 'Rest finished (silent)',
+        switch ((sound, vibrate)) {
+          (true, true) => _restChannel,
+          (true, false) => _restStillChannel,
+          (false, true) => _restSilentChannel,
+          (false, false) => _restSilentStillChannel,
+        },
+        switch ((sound, vibrate)) {
+          (true, true) => 'Rest finished',
+          (true, false) => 'Rest finished (no vibration)',
+          (false, true) => 'Rest finished (silent)',
+          (false, false) => 'Rest finished (silent, no vibration)',
+        },
         channelDescription: 'Fires when a rest period is up.',
         icon: _smallIcon,
         importance: Importance.max,
@@ -473,7 +496,7 @@ class WorkoutNotifications {
             ? const RawResourceAndroidNotificationSound('rest_done')
             : null,
         audioAttributesUsage: AudioAttributesUsage.alarm,
-        enableVibration: true,
+        enableVibration: vibrate,
         // The set after it starts when you start it. A "rest done" still
         // sitting there twenty minutes later is noise.
         timeoutAfter: 120000,
@@ -488,14 +511,14 @@ class WorkoutNotifications {
   /// refused audio focus, a call, a process the system has stopped giving
   /// audio to. The rest still has to end audibly, so what was taken back is
   /// handed straight to the notification that would have fired anyway.
-  Future<void> showRestDoneNow({String? body}) async {
+  Future<void> showRestDoneNow({String? body, bool vibrate = true}) async {
     if (!await init()) return;
     try {
       await _plugin.show(
         id: _restId,
         title: 'Rest finished',
         body: body,
-        notificationDetails: _restDetails(sound: true),
+        notificationDetails: _restDetails(sound: true, vibrate: vibrate),
       );
     } on MissingPluginException {
       _unsupported = true;

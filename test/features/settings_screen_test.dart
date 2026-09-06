@@ -12,6 +12,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:deltoid/domain/session_prefs.dart';
 
 /// Settings and the bodyweight log, pumped against a real database.
 ///
@@ -196,10 +197,7 @@ void main() {
       await openRestSheet(tester);
 
       expect(
-        find.text(
-          'Plays a tone when the rest reaches zero. The phone vibrates '
-          'either way.',
-        ),
+        find.text('Plays a tone when the rest reaches zero.'),
         findsOneWidget,
       );
 
@@ -240,6 +238,75 @@ void main() {
       final moved = container.read(restPrefsProvider).valueOrNull;
       expect(moved?.betweenExercises, 210);
       expect(moved?.defaultSeconds, 120);
+    });
+
+    testWidgets('the three session switches store what they are set to', (
+      tester,
+    ) async {
+      await pump(tester, const SettingsScreen());
+
+      // Shipped defaults: on, with nothing written to say so.
+      expect(
+        container.read(sessionPrefsProvider).valueOrNull?.notification,
+        isTrue,
+      );
+
+      await openRow(tester, 'Session notification');
+      // The row is a switch, not a chevron — `openRow` taps the title, which
+      // does nothing. Tap the switch itself.
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Session notification'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byType(Switch),
+        ).first,
+      );
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      final rows = await (db.select(db.appSettings)
+            ..where((t) => t.key.equals(sessionNotificationKey)))
+          .get();
+      expect(rows.single.value, 'off');
+      expect(
+        container.read(sessionPrefsProvider).valueOrNull?.notification,
+        isFalse,
+        reason: 'the log screen reads this before starting the service',
+      );
+      // And it is its own switch: the screen is still held awake.
+      expect(
+        container.read(sessionPrefsProvider).valueOrNull?.keepScreenOn,
+        isTrue,
+      );
+    });
+
+    testWidgets('vibration is its own switch, not half of the tone', (
+      tester,
+    ) async {
+      await pump(tester, const SettingsScreen());
+      await openRestSheet(tester);
+
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Vibration'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byType(Switch),
+        ).first,
+      );
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      final prefs = container.read(restPrefsProvider).valueOrNull;
+      expect(prefs?.vibrate, isFalse);
+      // The tone is untouched — the two are read separately at the moment a
+      // rest ends, and turning one off must not silence the other.
+      expect(prefs?.sound, isTrue);
     });
 
     testWidgets('the unit asks before it restates every number in the app', (
