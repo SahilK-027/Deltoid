@@ -101,6 +101,43 @@ void main() {
     });
   });
 
+  test('a pair is spelled out unless the surface has already said so', () {
+    // The default, for a list that stands alone: what you picked up, and that
+    // there are two of them.
+    expect(
+      loadLabel(
+        loadMode: LoadMode.perSide,
+        weight: 20,
+        addedWeight: null,
+        unit: WeightUnit.kg,
+      ),
+      '20 kg × 2',
+    );
+    // Off where the load mode is stated beside the list. The suffix would
+    // repeat it, using an `×` that means reps in the format next to it.
+    expect(
+      loadLabel(
+        loadMode: LoadMode.perSide,
+        weight: 20,
+        addedWeight: null,
+        unit: WeightUnit.kg,
+        pair: false,
+      ),
+      '20 kg',
+    );
+    // Nothing else changes: the flag is about the pair and only the pair.
+    expect(
+      loadLabel(
+        loadMode: LoadMode.total,
+        weight: 60,
+        addedWeight: null,
+        unit: WeightUnit.kg,
+        pair: false,
+      ),
+      '60 kg',
+    );
+  });
+
   group('loadWithCount', () {
     test('appends what was done against the load', () {
       expect(

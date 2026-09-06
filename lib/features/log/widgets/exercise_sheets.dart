@@ -79,13 +79,10 @@ Future<void> showExerciseInfo(
         // saying plainly: it tells you the ⓘ is not hiding a suggestion, and
         // it tells you where to look if you want the number yourself.
         if (prefill?.source == PrefillSource.otherSession)
-          AppRow(
-            icon: Icons.call_split_rounded,
-            title: 'First time in this session',
-            subtitle:
-                'Last done in ${prefill!.reference!.sessionName} · '
-                '${DateFormat('d MMM').format(dateFromDayKey(prefill.reference!.dayKey))}'
-                '. This day starts blank',
+          _LastElsewhere(
+            reference: prefill!.reference!,
+            exercise: exercise,
+            unit: unit,
           )
         else
           AppRow(
@@ -234,7 +231,8 @@ Future<void> showExerciseMenu(
           AppRow(
             icon: Icons.tune_rounded,
             title: 'Exercise settings',
-            subtitle: 'Rest, bar and targets, for this day or from next '
+            subtitle:
+                'Rest, bar and targets, for this day or from next '
                 'time on',
             onTap: () {
               Navigator.of(sheetContext).pop();
@@ -712,5 +710,170 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     // `ExerciseScreen`).
     final created = await createExerciseFlow(context, initialName: name);
     if (created != null) navigator.pop(created);
+  }
+}
+
+/// The movement's last performance, in the session that is not this one.
+///
+/// Folded shut, because of what it is: numbers this session has no claim on.
+/// Prefill will not offer them — a first time here opens blank, which is the
+/// one rule — and that is a decision about what gets *filled in*, not a reason
+/// to pretend the movement has no past. Opening this is asking a question, and
+/// the answer is a line of text that nothing can adopt.
+class _LastElsewhere extends StatefulWidget {
+  const _LastElsewhere({
+    required this.reference,
+    required this.exercise,
+    required this.unit,
+  });
+
+  final PastPerformance reference;
+  final Exercise exercise;
+  final WeightUnit unit;
+
+  @override
+  State<_LastElsewhere> createState() => _LastElsewhereState();
+}
+
+class _LastElsewhereState extends State<_LastElsewhere> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final sets = widget.reference.sets;
+    final date = DateFormat(
+      'd MMM',
+    ).format(dateFromDayKey(widget.reference.dayKey));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppRow(
+          icon: Icons.call_split_rounded,
+          title: 'First time in this session',
+          subtitle:
+              'Last done in ${widget.reference.sessionName} · $date'
+              '${sets.isEmpty ? '' : ' · Tap to see it'}',
+          trailing: sets.isEmpty
+              ? null
+              : AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: Motion.fast,
+                  curve: Motion.curve,
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 18,
+                    color: c.textTertiary,
+                  ),
+                ),
+          onTap: sets.isEmpty ? null : () => setState(() => _open = !_open),
+        ),
+        // Sets, one to a line, in the shape the exercise's own history draws
+        // them: what kind of set, what was on it, and what was done with it.
+        // The compressed `82.5×8` form was tried here and reads as debris —
+        // that form belongs in a column with a heading over it, not loose
+        // under a row.
+        //
+        // Indented to where the row above starts its title rather than to the
+        // sheet's gutter, so the block hangs off the row it belongs to instead
+        // of starting a new one.
+        AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.emphasized,
+          alignment: Alignment.topCenter,
+          child: !_open
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  // Left to where the row above starts its title, right to
+                  // where its chevron is actually drawn. Both sit nominally
+                  // `Space.lg` from the edge, but the chevron is a glyph inside
+                  // an 18dp icon box and stops short of it, so a count padded
+                  // to the same 16 overhung the arrow it lines up under.
+                  padding: const EdgeInsets.fromLTRB(56, 0, Space.xl, Space.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < sets.length; i++)
+                        _PastSetLine(
+                          set: sets[i],
+                          position: i,
+                          exercise: widget.exercise,
+                          unit: widget.unit,
+                        ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One set of a past performance, drawn the way the exercise's own history
+/// draws it: the kind of set on the left, the load, and the count on the right.
+///
+/// A `PastSet` rather than a `SetLog`, which is the only reason this is not the
+/// same widget — it is the same three columns and the same type scale.
+class _PastSetLine extends StatelessWidget {
+  const _PastSetLine({
+    required this.set,
+    required this.position,
+    required this.exercise,
+    required this.unit,
+  });
+
+  final PastSet set;
+  final int position;
+  final Exercise exercise;
+  final WeightUnit unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final type = set.type.shortLabel;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xs),
+      // Centred, and one type size across the row. The load was a size up on
+      // the count, which set the two on different baselines and read as one
+      // number being the answer and the other its footnote — they are the two
+      // halves of one set.
+      child: Row(
+        children: [
+          // Wide enough for two digits and the gap after them, and no wider.
+          // This column is 34 on the exercise's own history page, where it sits
+          // at the card's edge with the whole width behind it; here it is
+          // already indented to the row above, and the same 34 left the set
+          // number stranded away from the load it belongs to.
+          SizedBox(
+            width: 24,
+            child: Text(
+              type.isEmpty ? '${position + 1}' : type,
+              style: context.t.labelMedium?.copyWith(color: c.textTertiary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              loadLabel(
+                loadMode: exercise.loadMode,
+                weight: set.weight,
+                addedWeight: set.addedWeight,
+                unit: unit,
+                // The row below this list says whether the number is per hand.
+                pair: false,
+              ),
+              style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+            ),
+          ),
+          Text(
+            exercise.measureMode.isHold
+                ? 'held ${formatCount(set.reps, MeasureMode.hold)}'
+                : '${set.reps ?? 0} reps',
+            style: context.t.labelMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 }

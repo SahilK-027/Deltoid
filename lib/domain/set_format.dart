@@ -26,6 +26,19 @@ String loadLabel({
   required double? weight,
   required double? addedWeight,
   required WeightUnit unit,
+
+  /// Whether a pair of dumbbells is spelled out as `× 2`.
+  ///
+  /// On by default, because a bare `20 kg` against a per-hand movement is
+  /// ambiguous about the only thing that matters — whether that is what you
+  /// picked up or what you moved.
+  ///
+  /// Off where the surface has already said which it is. The exercise sheet
+  /// prints "The weight you type is per hand, and two are moving" two rows
+  /// under the sets it lists, so the suffix there restates what the reader has
+  /// just been told, and does it with an `×` that means something else one
+  /// format over.
+  bool pair = true,
 }) {
   if (loadMode == LoadMode.bodyweight) return 'Bodyweight';
   if (loadMode == LoadMode.bodyweightPlus) {
@@ -34,7 +47,7 @@ String loadLabel({
         : 'BW + ${formatWeight(addedWeight, unit)} ${unit.label}';
   }
   if (weight == null) return '—';
-  final perSide = loadMode == LoadMode.perSide ? ' × 2' : '';
+  final perSide = pair && loadMode == LoadMode.perSide ? ' × 2' : '';
   return '${formatWeight(weight, unit)} ${unit.label}$perSide';
 }
 
@@ -92,11 +105,11 @@ String setLabel({
 
 /// What the number you type into an exercise means, in the one line a row has.
 String loadBlurb(LoadMode mode) => switch (mode) {
-      LoadMode.total => 'The weight you type is the whole load',
-      LoadMode.perSide => 'The weight you type is per hand, and two are moving',
-      LoadMode.bodyweight => 'Reps only, no external load',
-      LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
-    };
+  LoadMode.total => 'The weight you type is the whole load',
+  LoadMode.perSide => 'The weight you type is per hand, and two are moving',
+  LoadMode.bodyweight => 'Reps only, no external load',
+  LoadMode.bodyweightPlus => 'Bodyweight plus anything you add',
+};
 
 /// The heaviest thing you actually did, as an index into [sets].
 ///
@@ -128,8 +141,10 @@ String loadBlurb(LoadMode mode) => switch (mode) {
 /// Returns null only for an empty list. Ranking by index rather than returning
 /// a set keeps this free of the row type: the caller already holds the list.
 int? heaviestLogged({
-  required List<({SetType setType, double? weight, double? addedWeight, int? reps})>
-      sets,
+  required List<
+    ({SetType setType, double? weight, double? addedWeight, int? reps})
+  >
+  sets,
   required MeasureMode measureMode,
   required LoadMode loadMode,
 }) {
@@ -138,17 +153,19 @@ int? heaviestLogged({
     for (var i = 0; i < sets.length; i++)
       if (sets[i].setType != SetType.warmup) i,
   ];
-  final pool = counted.isEmpty ? [for (var i = 0; i < sets.length; i++) i] : counted;
+  final pool = counted.isEmpty
+      ? [for (var i = 0; i < sets.length; i++) i]
+      : counted;
   // A set with no load at all sorts below one that has any, rather than being
   // read as zero and tying with a bar that genuinely weighs nothing.
   double rank(int i) => measureMode.isHold
       ? (sets[i].reps ?? 0).toDouble()
       : (effectiveLoad(
-            mode: loadMode,
-            weight: sets[i].weight,
-            addedWeight: sets[i].addedWeight,
-          ) ??
-          -1);
+              mode: loadMode,
+              weight: sets[i].weight,
+              addedWeight: sets[i].addedWeight,
+            ) ??
+            -1);
   var best = pool.first;
   for (final i in pool) {
     if (rank(i) > rank(best)) best = i;
