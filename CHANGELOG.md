@@ -10,6 +10,43 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.3.1 — 2026-09-06
+
+### Fixed
+
+- **The end-of-rest alert has a sound again, on every release build.** The tone
+  the system plays when a rest ends is an Android resource, and the release
+  build's resource shrinker had been deleting it from the APK for want of a
+  reference it could see. Every release ever installed has been missing it. The
+  tone that plays with the app open is a different file, which is why the alert
+  worked in front of you and never from a pocket, and why this looked for so
+  long like a problem with alarms.
+- **The session notification appears at all.** 1.3.0 gave it a new status bar
+  icon, the shrinker removed that too, and a notification whose icon does not
+  exist cannot be posted — so the line describing the workout never appeared,
+  and the phone reported that the app had never sent a notification.
+- The rest clock stays on screen while the keypad is open. It used to be taken
+  away the moment you tapped a cell, which is the moment you are most likely to
+  be looking at it.
+- On a narrow screen the rest bar no longer overflows its row.
+- `BW` is drawn in the same size as the weight beside it, so `BW + 10` reads as
+  one value rather than a superscript and a number.
+
+### Changed
+
+- The notification for a session in progress reads as a tracker: "Currently
+  tracking Push 1", the movement and the set you are on under it, and the rest
+  clock in front of that while one is running. It carries the app's own
+  charcoal, and how long you have been training sits beside the app's name the
+  way it does on any other ongoing notification.
+
+### Added
+
+- The exercise information sheet folds open on what was done in the other
+  session, for a movement this session has not trained before. The numbers are
+  still not filled in anywhere — a first time here starts blank — but they are
+  one tap away instead of gone.
+
 ## 1.3.0 — 2026-09-06
 
 ### Added
