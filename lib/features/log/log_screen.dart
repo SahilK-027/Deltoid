@@ -866,12 +866,20 @@ class _LogScreenState extends ConsumerState<LogScreen>
                   onPressed: () => _finish(detail),
                 ),
               ),
-            if (_showRestBar && _restStartedAt != null && _editing == null)
+            // **The rest clock stays up while you type.**
+            //
+            // It used to be dropped from the tree the moment a cell was
+            // focused — the keypad was not covering it, it was not there —
+            // which took the number away at the one moment you are most likely
+            // to be looking at the screen. It sits above the keypad instead,
+            // so the seconds left and the ± are both still in reach.
+            if (_showRestBar && _restStartedAt != null)
               RestTimerBar(
                 startedAt: _restStartedAt!,
                 targetSeconds: _restTargetSeconds,
                 onAdjust: (delta) => _adjustRest(detail, delta),
                 onDismiss: _dismissRestBar,
+                aboveKeypad: _editing != null,
               ),
             if (_editing != null) _keypad(detail, prefill, cells),
           ],

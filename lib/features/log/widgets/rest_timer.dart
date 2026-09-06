@@ -14,12 +14,18 @@ class RestTimerBar extends StatelessWidget {
     required this.targetSeconds,
     required this.onAdjust,
     required this.onDismiss,
+    this.aboveKeypad = false,
   });
 
   final DateTime startedAt;
   final int targetSeconds;
   final ValueChanged<int> onAdjust;
   final VoidCallback onDismiss;
+
+  /// Whether the keypad is open underneath this bar. The keypad holds the
+  /// bottom inset when it is there, and two widgets both insetting for one
+  /// gesture bar leaves a band of surface between them.
+  final bool aboveKeypad;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,7 @@ class RestTimerBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
+        bottom: !aboveKeypad,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -58,34 +65,64 @@ class RestTimerBar extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    over ? Icons.check_circle_outline : Icons.timer_outlined,
-                    size: 18,
-                    color: over ? c.positive : c.textSecondary,
-                  ),
-                  const SizedBox(width: Space.md),
-                  // Counting up past zero is a number nobody acts on, so the
-                  // bar states the fact and stops. What was actually rested is
-                  // still measured from `startedAt` by the log screen.
-                  if (over)
-                    Text(
-                      'Rest finished',
-                      style: context.t.titleMedium?.copyWith(
-                        color: c.positive,
-                      ),
-                    )
-                  else ...[
-                    Text(
-                      _format(remaining),
-                      style: context.t.titleMedium?.copyWith(
-                        fontFeatures: tabular,
-                        color: c.textPrimary,
-                      ),
+                  // **The clock takes what is left, not what it wants.**
+                  //
+                  // This was a `Spacer` between two groups of natural size,
+                  // which holds until the row is narrower than the two groups
+                  // together — and on a small screen, with the bar now staying
+                  // up while the keypad is open, it overflowed by a few pixels.
+                  // The striped band that draws over an overflow is not
+                  // something to put under a set. The controls are fixed and
+                  // the words give way instead.
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          over
+                              ? Icons.check_circle_outline
+                              : Icons.timer_outlined,
+                          size: 18,
+                          color: over ? c.positive : c.textSecondary,
+                        ),
+                        const SizedBox(width: Space.md),
+                        // Counting up past zero is a number nobody acts on, so
+                        // the bar states the fact and stops. What was actually
+                        // rested is still measured from `startedAt` by the log
+                        // screen.
+                        if (over)
+                          Flexible(
+                            child: Text(
+                              'Rest finished',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.t.titleMedium?.copyWith(
+                                color: c.positive,
+                              ),
+                            ),
+                          )
+                        else ...[
+                          Text(
+                            _format(remaining),
+                            style: context.t.titleMedium?.copyWith(
+                              fontFeatures: tabular,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: Space.sm),
+                          // The one word here that can be dropped without
+                          // losing a fact: the clock beside it is the timer.
+                          Flexible(
+                            child: Text(
+                              'rest',
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: context.t.labelSmall,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: Space.sm),
-                    Text('rest', style: context.t.labelSmall),
-                  ],
-                  const Spacer(),
+                  ),
                   if (!over) ...[
                     _StepButton(label: '−30', onTap: () => onAdjust(-30)),
                     const SizedBox(width: Space.sm),
