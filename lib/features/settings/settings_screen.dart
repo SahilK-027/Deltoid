@@ -88,7 +88,7 @@ class SettingsScreen extends ConsumerWidget {
         // through the UI. Tapping the figure is the log; the past is a link.
         _BodyweightCard(bodyweight: bodyweight),
         const SizedBox(height: Space.section),
-        const SectionHeader('Backup'),
+        const SectionHeader('Account & backup'),
         ListCard(
           inset: Space.lg,
           children: [
@@ -141,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
         const SectionHeader('Appearance'),
         const _ThemePicker(),
         const SizedBox(height: Space.section),
-        const SectionHeader('About'),
+        const SectionHeader('About app'),
         const _AboutCard(),
       ],
     );
@@ -1025,12 +1025,19 @@ class _AboutCard extends ConsumerWidget {
           ),
           const SizedBox(height: Space.sm),
           Text(
+            // What the app is, then the one thing that makes it different
+            // from every other training log. The second sentence earns its
+            // place: session-scoped progression is the reason this exists
+            // (CLAUDE.md rule 1), and without it the paragraph describes any
+            // tracker on the store.
+            //
             // Not "everything stays on this device" — the masthead's eyebrow
             // says that, and a fact stated twice on one screen is the rule
             // this app breaks most often (THEME rule 6).
-            'Sessions carry their own history, so the same exercise '
-            'progresses independently in each one. A bench press in Push 1 '
-            'is offered what Push 1 lifted last time, never what Push 2 did.',
+            'An exercise tracker for building your own training regimes and '
+            'logging your progress as you get stronger. Each session keeps '
+            'its own history, so the same movement progresses independently '
+            'in each one.',
             style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
           ),
         ],
@@ -1084,6 +1091,10 @@ Future<void> showRestSheet(BuildContext context) {
 
         return AppSheet(
           title: 'Rest timers',
+          // Full-bleed rows carry their own padding, so the sheet adds none of
+          // its own at the sides — the double-inset [AppSheet.contentPadding]
+          // warns about. Bottom only, for the last row to breathe.
+          contentPadding: const EdgeInsets.only(bottom: Space.md),
           children: [
             StepperRow(
               label: 'Between sets',

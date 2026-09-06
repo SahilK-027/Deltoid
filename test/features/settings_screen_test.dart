@@ -140,7 +140,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Bodyweight'), findsOneWidget);
-      expect(find.text('Backup'), findsOneWidget);
+      expect(find.text('Account & backup'), findsOneWidget);
       expect(find.text('Export a backup file'), findsOneWidget);
       expect(find.text('Restore from a file'), findsOneWidget);
 
@@ -155,10 +155,10 @@ void main() {
       expect(find.text('Weight units'), findsOneWidget);
       expect(find.text('Kilograms'), findsOneWidget);
 
-      await scrollTo(tester, 'About');
+      await scrollTo(tester, 'About app');
       expect(find.text('Appearance'), findsOneWidget);
       expect(find.text('System'), findsOneWidget);
-      expect(find.text('About'), findsOneWidget);
+      expect(find.text('About app'), findsOneWidget);
       expect(find.text('Deltoid'), findsOneWidget);
     });
 
@@ -278,6 +278,29 @@ void main() {
   });
 
   group('Bodyweight screen', () {
+    testWidgets('the chart range survives leaving the screen', (tester) async {
+      // The range lived in the route's `State`, so picking 1M and coming back
+      // later drew 3M again — the widget had been rebuilt from its
+      // initialiser and nothing remembered the answer.
+      await TrainingRepository(db).logBodyweight(DateTime.now(), 76.5);
+      await pump(tester, const BodyweightScreen());
+
+      expect(
+        container.read(bodyweightWindowProvider).range,
+        ChartRange.threeMonths,
+      );
+
+      container.read(bodyweightWindowProvider.notifier).state =
+          const TrendWindow.rolling(ChartRange.month);
+
+      // Leave, and come back to a screen built from scratch.
+      await pump(tester, const SettingsScreen());
+      await pump(tester, const BodyweightScreen());
+
+      expect(container.read(bodyweightWindowProvider).range, ChartRange.month);
+    });
+
+
     testWidgets('with no entries: the full-page empty state', (tester) async {
       await pump(tester, const BodyweightScreen());
 

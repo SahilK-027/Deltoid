@@ -204,7 +204,29 @@ class BodyweightScreen extends ConsumerWidget {
 /// going" — was the one thing 365 dated numbers could not answer. The trend is
 /// on top now, and the past is a month at a time, collapsed: `March 2026 ·
 /// 76.4 avg · −0.8`, opening to its days when you want one.
-class _MonthList extends StatefulWidget {
+/// How far back the bodyweight chart looks, and how it averages.
+///
+/// Providers rather than `State`, because the route is what was wrong: both
+/// lived in `_MonthListState`, so picking 1M and coming back to the screen
+/// later drew 3M again — the widget had been disposed and rebuilt from its
+/// initialiser. A range is a way of looking at the log, and it should still be
+/// how you are looking at it when you return.
+///
+/// Not shared with `chartRangeProvider`: a bodyweight range and an exercise's
+/// range are two questions, and moving one to move the other is a surprise.
+/// Deliberately not persisted to `app_settings` either — this is where you
+/// left the screen, not a setting you chose, and a fresh launch may as well
+/// open on the default.
+final bodyweightWindowProvider = StateProvider<TrendWindow>(
+  (ref) => const TrendWindow.rolling(ChartRange.threeMonths),
+);
+
+/// The averaging the user picked, or null for "let the range decide". See
+/// [chartGranularityProvider] for why the choice is stored and not the
+/// granularity it resolved to.
+final bodyweightGranularityProvider = StateProvider<Granularity?>((ref) => null);
+
+class _MonthList extends ConsumerStatefulWidget {
   const _MonthList({
     required this.months,
     required this.latest,
@@ -218,24 +240,15 @@ class _MonthList extends StatefulWidget {
   final WeightUnit unit;
 
   @override
-  State<_MonthList> createState() => _MonthListState();
+  ConsumerState<_MonthList> createState() => _MonthListState();
 }
 
-class _MonthListState extends State<_MonthList> {
+class _MonthListState extends ConsumerState<_MonthList> {
   /// The months that are open, by [BodyweightMonth.ym]. Every other month is a
   /// summary until asked — the days you might correct are the ones you just
   /// logged — and only an open month's days are ever queried.
   final _open = <int>{};
   bool _seeded = false;
-
-  /// How far back the chart looks. Not a filter on the list: the list is the
-  /// record, the chart is the reading.
-  TrendWindow _window = const TrendWindow.rolling(ChartRange.threeMonths);
-
-  /// The averaging the user picked, or null for "let the range decide". See
-  /// [chartGranularityProvider] for why the choice is stored and not the
-  /// granularity it resolved to.
-  Granularity? _granularity;
 
   /// Years there is something to look at, for the picker. Derived from the
   /// month summaries, which is at most one entry per month rather than one per
@@ -287,10 +300,12 @@ class _MonthListState extends State<_MonthList> {
                 latest: widget.latest,
                 years: _years,
                 unit: unit,
-                window: _window,
-                onWindow: (w) => setState(() => _window = w),
-                granularity: _granularity,
-                onGranularity: (g) => setState(() => _granularity = g),
+                window: ref.watch(bodyweightWindowProvider),
+                onWindow: (w) =>
+                    ref.read(bodyweightWindowProvider.notifier).state = w,
+                granularity: ref.watch(bodyweightGranularityProvider),
+                onGranularity: (g) =>
+                    ref.read(bodyweightGranularityProvider.notifier).state = g,
               ),
               const SizedBox(height: Space.section),
             ],
