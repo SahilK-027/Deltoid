@@ -42,8 +42,8 @@ those documents, the other document is correct.
 
 ## The rules most easily broken
 
-These ten cause the most damage when they are missed. All of them are explained
-in full in [RULES.md](RULES.md).
+These eleven cause the most damage when they are missed. All of them are
+explained in full in [RULES.md](RULES.md).
 
 1. **Prefill is scoped to the session, not the exercise.** Push 1 and Push 2
    maintain separate progressions for the same movement. This is the entire
@@ -75,6 +75,18 @@ in full in [RULES.md](RULES.md).
 10. **Never copy the project to preserve an old version.** No `old-*/`
     directories, no `*.bak` files, no second checkout, and no worktree kept "for
     reference". Read history with `git show <commit>:<path>`.
+11. **Every word this project publishes is finished prose.** That covers the
+    strings in the app, commit subjects and bodies, release notes, and the
+    documents. A string is a grammatical sentence or a clean noun phrase, it
+    names what happens rather than gesturing at it, and it reads as though a
+    release engineer wrote it: no exclamation marks, no slang or mascot voice,
+    no clipped half-sentence standing in for an explanation, no interface
+    riddle the reader has to solve. A commit subject is an imperative clause
+    naming the change, not an aphorism about it, and a release note tells the
+    user what is different rather than what the diff touched. Sentence case,
+    plain vocabulary, and Commonwealth spelling throughout.
+    [THEME § 4 "The words"](THEME.md#the-words) governs the app's strings and
+    is the arbiter wherever this rule is less specific.
 
 A load-bearing rule should be enforced by a mechanism rather than a comment: an
 assertion, a schema constraint, or a test.
