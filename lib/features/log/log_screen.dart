@@ -338,9 +338,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
     WorkoutNotifications.instance
         .showSession(
           title: detail.session?.name ?? 'Workout',
-          body: left != null
-              ? [formatRestClock(left), ?exercise].join(' · ')
-              : exercise ?? '$done of $total sets',
+          // The plain line. Whether a clock goes in front of it is decided
+          // where it is known whether anything will keep that clock moving.
+          body: exercise ?? '$done of $total sets',
           done: done,
           total: total,
           restSecondsLeft: left,

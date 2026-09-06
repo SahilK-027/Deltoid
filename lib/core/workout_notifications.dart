@@ -4,6 +4,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../domain/rest.dart';
+
 /// The workout, on the lock screen.
 ///
 /// Two notifications, and they answer two different questions.
@@ -63,6 +65,17 @@ class WorkoutNotifications {
   /// Whether the session's foreground service is up, so [clear] only asks for
   /// it to be torn down when there is something to tear down.
   bool _serviceRunning = false;
+
+  /// The service types that were accepted, once one set has been. Kept so the
+  /// per-second updates during a rest do not re-walk the ladder — and so a
+  /// phone that refuses `specialUse` pays for that refusal once a workout
+  /// rather than once a second.
+  Set<AndroidServiceForegroundType>? _serviceTypes;
+
+  /// Set when no shape of foreground service was accepted at all. The line is
+  /// posted as an ordinary notification from then on, and the rest bar goes
+  /// with the service: nothing is awake to drain it.
+  bool _serviceUnavailable = false;
 
   /// The Android half of the plugin, or null off Android — where a foreground
   /// service is neither available nor meaningful, and the session line falls
@@ -124,39 +137,104 @@ class WorkoutNotifications {
     int? restTargetSeconds,
   }) async {
     if (!await init()) return;
+    // **What the clock says depends on who is holding the line up.**
+    //
+    // With the service, the seconds are posted one at a time and the number
+    // beside the movement is current. Without it — no shape of foreground
+    // service was accepted — nothing here is awake to post a second one, so
+    // the line says that a rest is running and leaves the number to the alarm
+    // that ends it. A stale `1:47` sitting next to a finished rest would be
+    // worse than no number at all.
+    final resting = restSecondsLeft != null;
+    final live = resting && !_serviceUnavailable;
+    final line = switch (true) {
+      _ when live => '${formatRestClock(restSecondsLeft)} · $body',
+      _ when resting => 'Resting · $body',
+      _ => body,
+    };
     final details = _sessionDetails(
       done: done,
       total: total,
-      restSecondsLeft: restSecondsLeft,
-      restTargetSeconds: restTargetSeconds,
+      restSecondsLeft: live ? restSecondsLeft : null,
+      restTargetSeconds: live ? restTargetSeconds : null,
     );
     try {
       final android = _android;
-      if (android == null) {
-        // Not Android. Nothing here needs a service to be correct — only to
-        // be current while the process is asleep, which is not a state the
-        // other platforms this builds for are in.
+      if (android == null || _serviceUnavailable) {
+        // Not Android, or a phone that would not take the service. Nothing
+        // here needs a service to be *correct*, only to be current while the
+        // process is asleep.
         await _plugin.show(
           id: _sessionId,
           title: title,
-          body: body,
+          body: line,
           notificationDetails: details,
         );
         return;
       }
-      await android.startForegroundService(
+      // **Three ways to put this line up, and it takes the first that works.**
+      //
+      // `specialUse` is an API 34 constant being handed to
+      // `startForeground(id, notification, type)` on phones as old as API 24,
+      // and what a framework does with a type it has never heard of is not
+      // something this can know for every one of them. Measured on an Android
+      // 12 phone, the typed call is accepted — the type is declared in the
+      // manifest and the platform takes it — so the first rung is the one that
+      // holds there. This is a guard against the versions nobody has run it
+      // on, not a fix for a failure that was seen.
+      //
+      // Each rung is tried until one holds: the typed service, the untyped one
+      // (`startForeground` without a type is legal, and below API 34 there is
+      // nothing to declare), and finally an ordinary notification with no
+      // service behind it. That last rung is the line as it was before the
+      // service existed — nothing is awake to drain a bar from, so the bar is
+      // dropped there and everything else about the line survives.
+      //
+      // A rung that fails says so in a debug build. Silence here means the
+      // first one was taken.
+      for (final types
+          in _serviceRunning
+              ? [_serviceTypes]
+              : const [
+                  {
+                    AndroidServiceForegroundType
+                        .foregroundServiceTypeSpecialUse,
+                  },
+                  null,
+                ]) {
+        try {
+          await android.startForegroundService(
+            id: _sessionId,
+            title: title,
+            body: line,
+            notificationDetails: details.android,
+            // Restarted by the system if it is ever killed under memory
+            // pressure, because the workout it is counting is still open
+            // behind it.
+            startType: AndroidServiceStartType.startSticky,
+            foregroundServiceTypes: types,
+          );
+          _serviceRunning = true;
+          _serviceTypes = types;
+          return;
+        } on MissingPluginException {
+          rethrow;
+        } catch (error) {
+          _log('starting the session service with types=$types', error);
+        }
+      }
+
+      // No service will take it. A plain notification still says what is being
+      // trained and how far through it you are.
+      _serviceUnavailable = true;
+      await _plugin.show(
         id: _sessionId,
         title: title,
-        body: body,
-        notificationDetails: details.android,
-        // Restarted by the system if it is ever killed under memory pressure,
-        // because the workout it is counting is still open behind it.
-        startType: AndroidServiceStartType.startSticky,
-        foregroundServiceTypes: const {
-          AndroidServiceForegroundType.foregroundServiceTypeSpecialUse,
-        },
+        // Composed again: the clock in it was written on the understanding
+        // that something would keep it moving, and nothing will.
+        body: resting ? 'Resting · $body' : body,
+        notificationDetails: _sessionDetails(done: done, total: total),
       );
-      _serviceRunning = true;
     } on MissingPluginException {
       _unsupported = true;
     } catch (error) {
