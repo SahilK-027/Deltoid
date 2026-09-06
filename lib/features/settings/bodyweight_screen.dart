@@ -601,8 +601,8 @@ class _TrendCard extends ConsumerWidget {
               formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
               message: marks.isEmpty
                   ? 'Nothing logged in this range.'
-                  : 'One ${by.noun} with a weigh-in in it. A second one gives '
-                      'it a shape.',
+                  : 'Only one ${by.noun} has a weigh-in. A second one is '
+                      'needed before a trend can be drawn.',
             )
           else
             TrendChart(

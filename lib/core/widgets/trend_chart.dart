@@ -805,7 +805,7 @@ class _TrendChartState extends State<TrendChart>
         if (dense) ...[
           const SizedBox(height: Space.sm),
           Text(
-            'Pinch to zoom, drag to pan',
+            'Pinch to zoom and drag to pan.',
             style: context.t.bodySmall?.copyWith(color: c.textTertiary),
           ),
         ],

@@ -44,11 +44,11 @@ void main() {
     expect(find.text('Start hold'), findsOneWidget);
   });
 
-  testWidgets('with nothing behind it there is nothing to beat', (
+  testWidgets('with nothing behind it there is nothing to compare against', (
     tester,
   ) async {
     await pump(tester);
-    expect(find.text('Nothing to beat yet'), findsOneWidget);
+    expect(find.text('No previous hold to compare against'), findsOneWidget);
     expect(find.textContaining('last time'), findsNothing);
   });
 

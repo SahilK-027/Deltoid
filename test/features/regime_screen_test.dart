@@ -118,11 +118,11 @@ void main() {
     await pumpEditor(tester, id);
 
     expect(tester.takeException(), isNull);
-    // Every day is a tab, and `Add day +` is the last one.
+    // Every day is a tab, and `Add day` is the last one.
     for (final s in ppl.sessions) {
       expect(find.text(s.name), findsWidgets);
     }
-    expect(find.text('Add day  +'), findsOneWidget);
+    expect(find.text('Add day'), findsOneWidget);
     // The count is the heading (§7).
     expect(find.textContaining('exercises'), findsWidgets);
   });
@@ -134,7 +134,7 @@ void main() {
     await pumpEditor(tester, id);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Add day  +'), findsOneWidget);
+    expect(find.text('Add day'), findsOneWidget);
     // The cycle belongs to the programme being trained, not to this one.
     expect(find.textContaining('Cycle '), findsNothing);
   });

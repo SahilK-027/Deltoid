@@ -723,8 +723,8 @@ class BackupService {
         final landed = await codec.count();
         if (landed < declared) {
           throw FormatException(
-            'This backup is incomplete. It says it holds $declared '
-            '${tableLabel(codec.name)} and only $landed arrived, so nothing has '
+            'This backup is incomplete: it records $declared '
+            '${tableLabel(codec.name)} but contains only $landed. Nothing has '
             'been restored.',
           );
         }
@@ -828,8 +828,8 @@ class BackupService {
       reportFailure(
         StateError(violation.toString()),
         StackTrace.current,
-        what: 'Your history was restored, but part of it did not fit together '
-            'the way it should. It is worth a look before you train on it.',
+        what: 'Your history was restored, but some records are inconsistent. '
+            'Review your recent sessions before training.',
       );
     }
 

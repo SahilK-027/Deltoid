@@ -80,9 +80,9 @@ class _AdoptionSheet extends StatelessWidget {
         Text(
           // What merge costs, in the sentence next to the button rather than in
           // a surprise afterwards: nothing is lost and the result is not clean.
-          'Merging keeps everything and tidies nothing: days both sides '
-          'recorded appear twice, and exercises you made yourself can end up '
-          'listed twice.',
+          'Merging keeps every record from both sides without removing '
+          'duplicates. A day recorded on both will appear twice, as will any '
+          'exercise you created on both.',
           style: context.t.bodySmall?.copyWith(
             color: c.textTertiary,
             height: 1.5,

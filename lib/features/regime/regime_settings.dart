@@ -31,7 +31,7 @@ Future<void> showRegimeSettings(
     showDragHandle: false,
     // The screen's context, kept for the rows that close this sheet and open
     // the next thing: a sheet's own context is dead the moment it pops, and
-    // `Re-order days` would then open on nothing.
+    // `Reorder days` would then open on nothing.
     builder: (sheet) => _SettingsSheet(regime: regime, host: context),
   );
 }
@@ -92,7 +92,7 @@ class _SettingsSheet extends ConsumerWidget {
         if (sessions.length > 1)
           AppRow(
             icon: Icons.swap_vert_rounded,
-            title: 'Re-order days',
+            title: 'Reorder days',
             subtitle: 'The order one cycle runs in',
             onTap: () async {
               // Read *before* the pop: this sheet is about to be disposed, and

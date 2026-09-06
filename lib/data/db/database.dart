@@ -198,8 +198,7 @@ class AppDatabase extends _$AppDatabase {
       reportFailure(
         error,
         stack,
-        what: 'The clock this phone stamps your training with could not be '
-            'saved.',
+        what: 'The time zone used to date your training could not be saved.',
       );
     }
     await super.close();

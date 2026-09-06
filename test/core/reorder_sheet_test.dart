@@ -18,7 +18,7 @@ void main() {
               child: TextButton(
                 onPressed: () => showReorderSheet(
                   context,
-                  title: 'Re-order exercises',
+                  title: 'Reorder exercises',
                   subtitle: 'Push 1',
                   items: const [
                     (id: 'a', label: 'Bench press'),
@@ -88,7 +88,7 @@ void main() {
                       Navigator.of(sheet).pop();
                       showReorderSheet(
                         context,
-                        title: 'Re-order days',
+                        title: 'Reorder days',
                         subtitle: 'The order one cycle runs in',
                         items: const [
                           (id: 'a', label: 'Push 1'),
@@ -131,7 +131,7 @@ void main() {
               child: TextButton(
                 onPressed: () => showReorderSheet(
                   context,
-                  title: 'Re-order days',
+                  title: 'Reorder days',
                   subtitle: 'The order one cycle runs in',
                   items: const [
                     (id: 'a', label: 'Push 1'),

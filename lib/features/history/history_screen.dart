@@ -458,7 +458,7 @@ class _FeedFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // "That is everything" only means something to someone who has been
+    // "End of history" only means something to someone who has been
     // scrolling. On a list that never filled a page it is a caption under a
     // single row, floating in the empty half of the screen.
     if (!page.hasMore && page.items.length < historyPageSize) {
@@ -481,7 +481,7 @@ class _FeedFooter extends StatelessWidget {
       child: Center(
         // No count here: the masthead already carries the total, and a second
         // one at the bottom of the list is the same fact twice.
-        child: Text('That is everything', style: context.t.bodySmall),
+        child: Text('End of history', style: context.t.bodySmall),
       ),
     );
   }
@@ -664,7 +664,7 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
                   message: q.isEmpty
                       ? 'Once a session is finished, every movement in it gets '
                           'its own history here.'
-                      : 'Nothing in your exercises is called that.',
+                      : 'No exercise matches that search.',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.only(bottom: Space.huge),

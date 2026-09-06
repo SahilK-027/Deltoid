@@ -123,9 +123,9 @@ class RegimesScreen extends ConsumerWidget {
                               message: summaries.isEmpty
                                   ? 'Build your own split, or start from a '
                                       'template and edit it into shape.'
-                                  : 'Nothing else yet. A second split can be '
-                                      'built without losing the one you are '
-                                      'mid-cycle on.',
+                                  : 'No other regimes yet. You can build a '
+                                      'second one without disturbing the '
+                                      'cycle you are training.',
                             ),
                             if (summaries.isEmpty) ...[
                               const SizedBox(height: Space.lg),
@@ -323,7 +323,7 @@ class _RegimeRow extends ConsumerWidget {
             icon: Icons.delete_outline_rounded,
             title: 'Delete regime',
             subtitle: total > 1
-                ? 'Its days and slots go with it'
+                ? 'Its days and the exercises in them are deleted too'
                 : 'The only regime, so there would be nothing to train',
             tint: total > 1 ? sheet.c.negative : sheet.c.textTertiary,
             onTap: total > 1

@@ -268,7 +268,7 @@ Future<void> showExerciseMenu(
           icon: Icons.remove_circle_outline,
           title: entry.workoutExercise.skipReason == SkipReason.none
               ? 'Mark as skipped'
-              : 'Un-skip',
+              : 'Clear the skip',
           subtitle: 'Recorded with a reason, not just left blank',
           onTap: () async {
             final navigator = Navigator.of(sheetContext);
@@ -295,7 +295,7 @@ Future<void> showExerciseMenu(
         if (total > 1)
           AppRow(
             icon: Icons.swap_vert_rounded,
-            title: 'Re-order exercises',
+            title: 'Reorder exercises',
             subtitle: 'Drag them into the order you are training them',
             onTap: () {
               Navigator.of(sheetContext).pop();

@@ -520,7 +520,8 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                   AppRow(
                     icon: Icons.delete_sweep_outlined,
                     title: 'Sign out and remove from this phone',
-                    subtitle: 'The account keeps its copy.',
+                    subtitle: 'Your training stays in your Google account '
+                        'and is removed from this phone.',
                     onTap: () => _signOutAndForget(context, ref),
                     chevron: true,
                   ),

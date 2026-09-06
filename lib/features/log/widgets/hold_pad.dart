@@ -189,7 +189,7 @@ class _HoldPadState extends State<HoldPad> {
         const SizedBox(height: Space.sm),
         if (previous == null)
           Text(
-            running ? 'Holding' : 'Nothing to beat yet',
+            running ? 'Holding' : 'No previous hold to compare against',
             style: context.t.labelSmall,
           )
         else ...[

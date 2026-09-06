@@ -48,7 +48,12 @@ Future<SignInOutcome> signInAndAdopt(
   final messenger = ScaffoldMessenger.of(context);
 
   if (auth == null) {
-    showToastOn(messenger, 'This build cannot sign in.', destructive: true);
+    showToastOn(
+      messenger,
+      'This version of Deltoid cannot sign in. Everything you log stays on '
+      'this phone.',
+      destructive: true,
+    );
     return SignInOutcome.failed;
   }
 
@@ -101,7 +106,7 @@ Future<SignInOutcome> signInAndAdopt(
     if (watched && context.mounted) {
       backup = await withProgressSheet<File?>(
         context,
-        title: 'Getting your training',
+        title: 'Restoring your training',
         task: (report) =>
             adoption.adopt(survey.shape, choice: choice, onProgress: report),
       );

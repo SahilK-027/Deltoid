@@ -174,7 +174,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                       sessionName: sessionName,
                     ),
                   SectionHeader(
-                    hasNote ? 'Session note' : 'How did it go?',
+                    'Session note',
                     actionLabel: hasNote ? 'Edit' : null,
                     onAction: hasNote
                         ? () => _editSessionNote(context, ref, workout)

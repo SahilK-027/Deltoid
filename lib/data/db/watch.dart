@@ -65,7 +65,11 @@ extension WatchTables on GeneratedDatabase {
         // sites around `AsyncValue.when` would be the thorough fix; saying so
         // out loud at the one place that knows is the honest one.
         if (!cancelled) {
-          reportFailure(error, stack, what: 'Some of this could not be loaded.');
+          reportFailure(
+            error,
+            stack,
+            what: 'Part of this screen could not be loaded.',
+          );
           controller.addError(error, stack);
         }
       } finally {

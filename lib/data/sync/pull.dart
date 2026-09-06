@@ -178,9 +178,9 @@ class PullService {
         reportFailure(
           StateError(violation.toString()),
           StackTrace.current,
-          what: 'Some rows from your account did not fit together on this '
-              'phone. Your training is all here — something in it may look '
-              'doubled until the next sync.',
+          what: 'Part of the data from your account could not be reconciled '
+              'on this phone. Nothing has been lost. Some entries may appear '
+              'twice until the next sync.',
         );
       }
     }
@@ -240,8 +240,8 @@ class PullService {
             error,
             stack,
             what:
-                'One ${_label(spec.name)} row from your account could not be '
-                'saved on this phone.',
+                'One ${_label(spec.name)} entry from your account could not '
+                'be saved on this phone.',
           );
         }
       }
@@ -909,8 +909,8 @@ class PullService {
         StateError('no free identity slot for regime $id'),
         StackTrace.current,
         what:
-            'A programme from your account could not fit on this phone — you '
-            'already have $identitySlots.',
+            'A programme from your account could not be added to this phone. '
+            'You already have $identitySlots.',
       );
       return _ours(resolved, {'deletedAt': nowMs()});
     }

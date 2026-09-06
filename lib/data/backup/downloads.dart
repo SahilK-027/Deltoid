@@ -38,7 +38,8 @@ Future<String> saveToDownloads(File file) async {
     throw BackupSaveException(e.message ?? 'The file could not be saved.');
   } on MissingPluginException {
     throw const BackupSaveException(
-      'This build cannot write to Downloads. Use Share instead.',
+      'Saving to Downloads is not available on this device. '
+      'Use Share instead.',
     );
   }
 }

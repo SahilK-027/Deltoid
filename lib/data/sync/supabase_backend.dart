@@ -112,7 +112,7 @@ class SupabaseBackend implements SyncBackend {
     } on PostgrestException catch (e) {
       final code = e.code ?? '';
       throw SyncTransportFailure(
-        'The server refused that: ${e.message}',
+        'Your account could not be reached. ${e.message}',
         transient: code.startsWith('5') || code.isEmpty,
       );
     } on Object catch (e) {

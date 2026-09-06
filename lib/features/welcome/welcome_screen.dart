@@ -203,7 +203,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                     // does. The screen's own question is answered by the two
                     // buttons under it, and a line asking it as well would be the
                     // same fact twice (THEME rule 6).
-                    'Your training sidekick, right in the pocket!',
+                    'Your training log, on the phone you already carry.',
                     textAlign: TextAlign.center,
                     // Lighter and a shade smaller than the page-title scale: the
                     // reference line is a sentence, not a heading, and w800 makes

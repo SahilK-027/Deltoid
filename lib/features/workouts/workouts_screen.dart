@@ -1064,7 +1064,7 @@ class _ResumeHero extends ConsumerWidget {
             const SizedBox(width: Space.sm),
             Expanded(
               child: Text(
-                stale ? 'Left open' : 'In progress',
+                stale ? 'Unfinished' : 'In progress',
                 style: context.t.labelSmall?.copyWith(color: mark),
               ),
             ),
@@ -1118,13 +1118,14 @@ class _ResumeHero extends ConsumerWidget {
         if (foreignRegime != null) ...[
           const SizedBox(height: Space.sm),
           Text(
-            'Finishing it advances $foreignRegime, not $activeRegimeName',
+            'Finishing it counts towards $foreignRegime, not towards '
+            '$activeRegimeName.',
             style: context.t.bodyMedium,
           ),
         ],
         const SizedBox(height: Space.lg),
         PrimaryButton(
-          label: stale ? 'Carry on with it' : 'Resume session',
+          label: 'Resume session',
           icon: Icons.play_arrow_rounded,
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => LogScreen(workoutId: workout.id)),

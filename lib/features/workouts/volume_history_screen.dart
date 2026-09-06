@@ -42,8 +42,8 @@ class VolumeHistoryScreen extends ConsumerWidget {
               final h when h.isEmpty => const EmptyState(
                   icon: Icons.bar_chart_rounded,
                   title: 'Nothing counted yet',
-                  message: 'Tick some sets and the weeks land here, '
-                      'one bar each.',
+                  message: 'Complete some sets and each week appears here '
+                      'as a bar.',
                 ),
               final h => _Grid(history: h),
             },

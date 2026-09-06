@@ -294,7 +294,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   title: 'Name',
                   // A new exercise has nothing to show yet, and a dash is for a
                   // number that should be there (rule 4) — this is a prompt.
-                  subtitle: name.isEmpty ? 'Tap to name it' : name,
+                  subtitle: name.isEmpty ? 'Not named yet' : name,
                   onTap: () => _editName(exercise, name),
                 ),
                 AppRow(

@@ -84,10 +84,11 @@ class _ProgressSheet extends StatelessWidget {
                     // phase that takes the longest and reports nothing, and
                     // silence here is what made the whole thing look hung.
                     JobPhase.encoding =>
-                      'Packing ${current!.detail} into one file',
+                      'Writing ${current!.detail} to the backup file',
                     JobPhase.decoding =>
                       'Reading the file · ${current!.detail}',
-                    JobPhase.clearing => 'Clearing this device',
+                    JobPhase.clearing =>
+                      'Clearing existing data on this device',
                     // The one phase that waits on a network. Named as rows
                     // rather than as a table on its own, because what makes a
                     // first pull long is the count and not which table it is

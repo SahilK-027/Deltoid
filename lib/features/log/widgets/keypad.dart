@@ -146,7 +146,10 @@ class SetKeypad extends StatelessWidget {
                         foregroundColor: c.textSecondary,
                       ),
                       onPressed: onUseHint,
-                      child: Text('Last: ${isTime ? formatDigits(hint!) : hint}'),
+                      child: Text(
+                        'Last time '
+                        '${isTime ? formatDigits(hint!) : hint}',
+                      ),
                     ),
                   const Spacer(),
                   SizedBox(

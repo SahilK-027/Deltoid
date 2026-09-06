@@ -143,7 +143,7 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
                     labels: [for (final s in sessions) s.name],
                     index: day,
                     onSelect: (i) => setState(() => _day = i),
-                    trailingLabel: 'Add day  +',
+                    trailingLabel: 'Add day',
                     onTrailing: () => _addDay(regime.id, sessions.length),
                   ),
               ],
@@ -372,7 +372,7 @@ class _DayBody extends ConsumerWidget {
               ),
               const SizedBox(width: Space.sm),
               AppChip(
-                label: 'Re-order',
+                label: 'Reorder',
                 icon: Icons.swap_vert_rounded,
                 onTap: slots.length < 2
                     ? null
@@ -398,8 +398,8 @@ class _DayBody extends ConsumerWidget {
             padding: EdgeInsets.symmetric(horizontal: Space.gutter),
             child: EmptyBox(
               icon: Icons.self_improvement_rounded,
-              message: 'A rest day, until something is in it. Add an exercise '
-                  'and this becomes a day the cycle expects you to train.',
+              message: 'This day is a rest day until it holds an exercise. '
+                  'Add one and the cycle will expect you to train it.',
             ),
           )
         else
@@ -484,7 +484,7 @@ class _DayBody extends ConsumerWidget {
     final repo = ref.read(regimeRepositoryProvider);
     return showReorderSheet(
       context,
-      title: 'Re-order exercises',
+      title: 'Reorder exercises',
       subtitle: session.name,
       items: [
         for (final s in slots) (id: s.slot.id, label: s.exercise.name),
@@ -583,7 +583,7 @@ String targetLabel(SessionExercise slot) {
   return '${slot.targetSets} × $range';
 }
 
-/// Re-orders the days of a regime. Opened from the regime settings sheet, since
+/// Reorders the days of a regime. Opened from the regime settings sheet, since
 /// the tab strip is where you *read* the order and not where you change it.
 ///
 /// Takes the **repository**, not a [WidgetRef]. The settings sheet closes
@@ -599,7 +599,7 @@ Future<void> showDayReorder(
 ) {
   return showReorderSheet(
     context,
-    title: 'Re-order days',
+    title: 'Reorder days',
     subtitle: 'The order one cycle runs in',
     items: [for (final s in sessions) (id: s.id, label: s.name)],
     onCommit: repo.reorderSessions,

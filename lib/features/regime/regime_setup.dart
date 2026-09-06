@@ -192,7 +192,8 @@ class _TemplateSheet extends StatelessWidget {
             title: 'New regime',
             // The sheet says what it will make, before it asks anything (THEME → Composing a screen).
             subtitle: full
-                ? 'Nothing to pick until a regime is deleted'
+                ? 'No template can be created while the regime limit is '
+                      'reached'
                 : 'A split you can edit freely afterwards',
           ),
           // Scratch first and alone, then the templates under a heading of

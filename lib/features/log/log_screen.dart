@@ -754,7 +754,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Leaving without finishing is fine — the session keeps running and
         // survives a force-stop — but it has to be said out loud, or the sets
         // logged so far look lost.
-        showToast(context, 'Session still running. Resume it from Today.');
+        showToast(
+          context,
+          'Session still running. Resume it from Workouts.',
+        );
         Navigator.of(context).pop();
       },
       child: Scaffold(
@@ -1151,7 +1154,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
           ? null
           : () => _commit(hint, target),
       nextLabel: needsReps
-          ? (entry.exercise.measureMode.isHold ? 'Time?' : 'Reps?')
+          ? (entry.exercise.measureMode.isHold ? 'Enter time' : 'Enter reps')
           : isLast
           ? 'Done'
           : 'Next',
@@ -1567,7 +1570,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final repo = ref.read(trainingRepositoryProvider);
     await showReorderSheet(
       context,
-      title: 'Re-order exercises',
+      title: 'Reorder exercises',
       subtitle: detail.session?.name ?? 'Today',
       items: [
         for (final e in detail.entries)
