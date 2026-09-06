@@ -77,9 +77,7 @@ class SetTableHeader extends StatelessWidget {
           const SizedBox(width: Space.sm),
           Expanded(
             child: Text(
-              loadMode == LoadMode.bodyweight
-                  ? 'Load'
-                  : unit.label,
+              loadMode == LoadMode.bodyweight ? 'Load' : unit.label,
               style: label,
               textAlign: TextAlign.center,
             ),
@@ -613,10 +611,8 @@ class _ValueCellState extends State<_ValueCell> {
       // A clock buffer holds the digits typed so far, not a number: `225` is
       // shown as `2:25` from the third keystroke, the way the field will read
       // once it is written.
-      builder: (context, buffer, _) => _build(
-        context,
-        widget.isTime ? formatDigits(buffer) : buffer,
-      ),
+      builder: (context, buffer, _) =>
+          _build(context, widget.isTime ? formatDigits(buffer) : buffer),
     );
   }
 
@@ -673,9 +669,14 @@ class _ValueCellState extends State<_ValueCell> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (widget.prefix != null) ...[
+              // The same size as the number it qualifies. It was a size down,
+              // which read as a superscript on `BW + 10` rather than as the
+              // first half of one value — the two are one reading, and the eye
+              // should not have to change gear between them. Still tertiary:
+              // quieter than the number, because the number is what changes.
               Text(
                 widget.prefix!,
-                style: context.t.labelSmall?.copyWith(color: c.textTertiary),
+                style: context.t.labelLarge?.copyWith(color: c.textTertiary),
               ),
               const SizedBox(width: 3),
             ],
