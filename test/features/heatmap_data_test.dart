@@ -27,7 +27,7 @@ Workout _workout(String id, int dayKey, {bool isDeload = false}) => Workout(
     );
 
 void main() {
-  // Four sessions, three days: an old one, two on one Monday, one today.
+  // Four sessions, three days: one well back, two on one Monday, one today.
   //
   //   1 June  — w-1
   //  17 June  — w-b, the last day outside the 28-day window

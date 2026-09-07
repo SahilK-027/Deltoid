@@ -13,12 +13,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The registry both whole-row readers answer to.
 ///
-/// These tests used to live beside the backup codec, because a file written by
-/// an older build was the only reader that could meet a row it did not fully
-/// recognise. [SYNC.md § 14](SYNC.md#14-two-builds-one-account) adds the second
-/// one — a phone pulling rows from a server another build wrote — and it is the
-/// same problem, so it gets the same defaults and the same tests rather than a
-/// second list that has to agree with this one forever.
+/// Two readers can meet a row they do not fully recognise: the backup codec, on
+/// a file written by an older build, and a pull
+/// ([SYNC.md § 14](SYNC.md#14-two-builds-one-account)), on a server another
+/// build wrote. It is one problem, so it gets one set of defaults and one set
+/// of tests rather than a second list that has to agree with this one
+/// forever.
 void main() {
   late AppDatabase db;
   late TrainingRepository repo;

@@ -1,9 +1,8 @@
-/// A cycle is one full pass through every session in the regime — not a
-/// calendar week.
+/// The state of one cycle: a complete pass through every session in a regime.
 ///
-/// This matters because life is not a calendar. Miss Thursday and the cycle
-/// simply hasn't finished yet; it advances when the work is done. Deloads are
-/// counted in cycles for the same reason.
+/// A cycle is not a calendar week. If a session is missed, the cycle has simply
+/// not yet finished; it advances when the work is completed rather than when a
+/// period elapses. Deloads are scheduled in cycles for the same reason.
 class CycleStatus {
   const CycleStatus({
     required this.cycleId,
@@ -16,8 +15,8 @@ class CycleStatus {
     required this.deloadAfterCycles,
   });
 
-  /// The open cycle's row id, so a screen that shows a cycle can also act on
-  /// it: close it early, or override whether it is a deload.
+  /// The open cycle's row id, so that a screen displaying a cycle can also
+  /// operate on it, closing it early or overriding its deload status.
   final String cycleId;
 
   final int cycleIndex;
@@ -26,10 +25,11 @@ class CycleStatus {
   /// Every session in the regime, in programme order.
   final List<String> sessionIds;
 
-  /// Sessions with at least one completed workout in this cycle.
+  /// The sessions with at least one completed workout in this cycle.
   final Set<String> completedSessionIds;
 
-  /// Completed cycles since the last deload cycle (deloads themselves excluded).
+  /// The number of completed cycles since the last deload, excluding deload
+  /// cycles themselves.
   final int cyclesSinceDeload;
 
   final bool deloadEnabled;
@@ -43,12 +43,14 @@ class CycleStatus {
 
   double get progress => total == 0 ? 0 : done / total;
 
-  /// The next session to train: the first one in programme order that hasn't
-  /// been done this cycle. Once the cycle is complete, it wraps to the start of
-  /// the next one.
+  /// The next session to train: the first in programme order not yet completed
+  /// in this cycle.
   ///
-  /// Deliberately order-based rather than date-based, so training out of order
-  /// or doing a session twice never strands the rest of the programme.
+  /// Once the cycle is complete this wraps to the start of the next one.
+  ///
+  /// The selection is based on programme order rather than on dates, so that
+  /// training out of sequence, or repeating a session, never leaves the
+  /// remainder of the programme unreachable.
   String? get nextSessionId {
     if (sessionIds.isEmpty) return null;
     for (final id in sessionIds) {
@@ -57,25 +59,25 @@ class CycleStatus {
     return sessionIds.first;
   }
 
-  /// Sessions still owed in this cycle, in order.
+  /// The sessions outstanding in this cycle, in programme order.
   List<String> get remainingSessionIds =>
       sessionIds.where((id) => !completedSessionIds.contains(id)).toList();
 
-  /// Whether the cycle that follows this one should be a deload.
+  /// Whether the cycle following this one should be a deload.
   ///
-  /// A deload cycle never triggers another one — the counter resets when it
-  /// starts.
+  /// A deload cycle never schedules another: the counter resets when one
+  /// begins.
   bool get nextCycleIsDeload {
     if (!deloadEnabled || deloadAfterCycles <= 0) return false;
     if (isDeload) return false;
     return cyclesSinceDeload + 1 >= deloadAfterCycles;
   }
 
-  /// True when this is the last cycle before a deload, so Today can warn ahead
-  /// of time rather than surprising you on the day.
+  /// Whether this is the final cycle before a deload, allowing the Workouts
+  /// screen to indicate it in advance rather than on the day.
   bool get deloadAfterThisCycle => nextCycleIsDeload;
 
-  /// How many normal cycles remain before the next deload.
+  /// The number of ordinary cycles remaining before the next deload.
   int get cyclesUntilDeload {
     if (!deloadEnabled || deloadAfterCycles <= 0) return -1;
     if (isDeload) return deloadAfterCycles;
@@ -104,7 +106,7 @@ class CycleStatus {
   }
 }
 
-/// What the next cycle should look like once the current one closes.
+/// The parameters of the cycle to be opened once the current one closes.
 class NextCycle {
   const NextCycle({
     required this.cycleIndex,
@@ -115,10 +117,11 @@ class NextCycle {
   final int cycleIndex;
   final bool isDeload;
 
-  /// Carried into the new cycle: resets to zero when a deload begins.
+  /// Carried into the new cycle. Resets to zero when a deload begins.
   final int cyclesSinceDeload;
 }
 
+/// Determines the parameters of the cycle following [current].
 NextCycle planNextCycle(CycleStatus current) {
   final deload = current.nextCycleIsDeload;
   return NextCycle(

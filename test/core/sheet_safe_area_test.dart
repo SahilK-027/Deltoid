@@ -6,20 +6,20 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// It defaults to *false*, and with `isScrollControlled` — which every sheet in
 /// this app passes, because they size themselves to their content — that lets a
-/// sheet take the whole screen, status bar included. The catalog picker did
-/// exactly that: `Exercises` was drawn across the clock and the battery.
+/// sheet take the whole screen, status bar included — a catalog picker drawing
+/// `Exercises` across the clock and the battery.
 ///
-/// It cannot be fixed inside the sheet, which is what makes this mechanical
+/// It cannot be answered inside the sheet, which is what makes this mechanical
 /// rather than advisory. A modal route reports **both** `padding` and
 /// `viewPadding` as zero to its own child — measured on a phone with the
-/// keyboard up, `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` — so every
-/// arithmetic version of the fix was reserving `max(0, 0)` and three of them
-/// shipped before anyone measured. The inset is the route's to know.
+/// keyboard up, `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` — so any
+/// arithmetic version reserves `max(0, 0)` and looks correct. The inset is the
+/// route's to know.
 ///
-/// The bug is also latent almost everywhere: a sheet only reaches the status
-/// bar once its content is tall enough, so a three-row confirm looks fine
-/// forever and the one sheet with a focused field and forty-six rows does not.
-/// Seventeen call sites were one long list away from the same defect.
+/// It is also latent almost everywhere: a sheet only reaches the status bar
+/// once its content is tall enough, so a three-row confirm looks right forever
+/// and the one sheet with a focused field and forty-six rows does not. Every
+/// call site is one long list away from the same defect.
 ///
 /// Like `clamp_bounds_test`, this reads source text rather than understanding
 /// Dart. It catches the accident, which is the only way this has ever happened.

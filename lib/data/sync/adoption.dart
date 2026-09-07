@@ -23,7 +23,7 @@ import 'sync_backend.dart';
 /// | Local | Cloud | |
 /// | --- | --- | --- |
 /// | nothing | data | [pull] — new phone, nothing to lose |
-/// | training | empty | [push] — the phone you have been using |
+/// | training | empty | [push] — the device already in use |
 /// | training | training | [ask] — never resolved silently |
 enum AdoptionShape {
   /// Both sides empty, or the account holds the only history. Adopt it.
@@ -68,7 +68,7 @@ enum AdoptionChoice {
 /// The three shapes at sign-in, and the `starterKey` dedup that follows the
 /// third.
 ///
-/// **Nothing here is silent.** [survey] reads both sides and decides nothing;
+/// No step here is silent. [survey] reads both sides and decides nothing;
 /// [adopt] does only what it was told. The one rule that outranks the rest:
 /// *whichever side is not kept is written to a backup file first, automatically,
 /// before anything is overwritten* — a decision made once at a sign-in screen
@@ -166,8 +166,9 @@ class AdoptionService {
           );
         } finally {
           // Seeded even when the pull did not finish. A phone with no catalog
-          // cannot be trained on at all, and the welcome screen is answered by
-          // now, so nothing else would ever seed it. The duplicate this risks —
+          // cannot be trained on at all, and the welcome screen has already
+          // been answered, so nothing else would seed it. The duplicate this
+          // risks —
           // the account's catalog arriving behind a locally seeded one — is
           // what [dedupeCatalog] is for, and the engine runs it after every
           // pull rather than only here.

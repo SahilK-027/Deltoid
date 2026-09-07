@@ -9,8 +9,9 @@ import 'database.dart';
 /// which restores a file written by some other build, and the sync pull
 /// applier, which applies a row written by some other build.
 /// [SYNC.md § 14](SYNC.md#14-two-builds-one-account) says both must read a row
-/// with one column more, or one fewer, than the reader knows — and **the way to
-/// make that true is to share the code, not to remember the rule.** Two lists of
+/// with one column more, or one fewer, than the reader recognises. The way to
+/// guarantee that is to share the implementation rather than to rely on the
+/// rule being remembered. Two lists of
 /// defaults that must agree forever will not.
 ///
 /// So the half both need lives here: the table's name, the table itself, the
@@ -39,7 +40,8 @@ class TableSpec {
   /// class — the generic `map()` reads database rows, not serialised ones, and
   /// would quietly mangle enum and converter columns.
   ///
-  /// **A column added after v1 gets its default spread under `row` here**, or a
+  /// A column added after v1 must have its default spread beneath `row` here,
+  /// or a
   /// row written before that column existed dies on a null cast. The test in
   /// `test/data/table_spec_test.dart` walks every column of every table and
   /// asks each parser what it does with the column missing, so this is checked
@@ -50,7 +52,8 @@ class TableSpec {
   ///
   /// Only `app_settings` says no, and it says no for good:
   /// [SYNC.md § 4](SYNC.md#4-what-the-server-holds). It holds `device_id`, the
-  /// unit preference and the theme — which phone you are on and how that phone
+  /// unit preference and the theme, describing which device is in use and how
+  /// that device
   /// should look — and syncing `device_id` would break the tie-break it exists
   /// for.
   final bool syncs;
@@ -135,8 +138,8 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
         table: db.workoutExercises,
         // A row written before the muscle or bar snapshots existed has no key
         // for them, and null is the honest value in both: the row predates the
-        // column, so readers fall back to the catalog rather than being told it
-        // was `other`, or that it sat on no bar.
+        // column, so readers fall back to the catalog rather than being told
+        // the muscle is `other`, or that it sat on no bar.
         parse: (row) => WorkoutExercise.fromJson(
             {'muscle': null, 'barKind': null, ...row}),
         syncs: true,

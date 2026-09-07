@@ -37,10 +37,10 @@ Color setTypeColour(BuildContext context, SetType type) => switch (type) {
 
 /// The column headings above the set table.
 ///
-/// The units live here and nowhere else. They used to sit inside every field as
-/// a `kg` / `reps` suffix, which is the same word printed five times down a
-/// column and a chunk of the width of a field you have to read a number out of
-/// at arm's length.
+/// The units live here and nowhere else. A `kg` / `reps` suffix inside every
+/// field is the same word printed five times down a column, and it takes a
+/// chunk of the width of a field you have to read a number out of at arm's
+/// length.
 class SetTableHeader extends StatelessWidget {
   const SetTableHeader({
     super.key,
@@ -64,8 +64,8 @@ class SetTableHeader extends StatelessWidget {
     // the spec's own header row reads `Set · kg · Reps · ✓`.
     final label = context.t.bodySmall?.copyWith(color: c.textTertiary);
     // The gutter is the page's, so the SET column starts on the same vertical
-    // as the exercise name above it. The table used to sit in a card, inset a
-    // second time by the card's own padding, and lined up with nothing.
+    // as the exercise name above it. In a card the table is inset a second
+    // time by the card's own padding, and lines up with nothing.
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.sm),
       child: Row(
@@ -482,9 +482,9 @@ class _SwipeToDeleteState extends State<SwipeToDelete> {
       onHorizontalDragCancel: () => _settle(0),
       child: Stack(
         // The button lives past the row's right edge and is clipped away until
-        // the swipe brings it in. Sitting still underneath, it did not read as
-        // part of the row at all: the row left, and a red panel it had been
-        // hiding was simply there.
+        // the swipe brings it in. Sitting still underneath, it does not read as
+        // part of the row at all: the row leaves, and a red panel it was hiding
+        // is simply there.
         clipBehavior: Clip.hardEdge,
         children: [
           AnimatedContainer(
@@ -625,14 +625,14 @@ class _ValueCellState extends State<_ValueCell> {
     // has to hold `102.5` and be read from the floor, and it marked the one
     // thing on the row you most want to read as a number.
     //
-    // It used to be italic as well — but no italic face is bundled, so Skia
-    // synthesised a slant by shearing the upright glyphs. Faux oblique on the
-    // screen this app is mostly used on was the cheapest-looking thing in it.
+    // Not italic either: no italic face is bundled, so Skia would synthesise a
+    // slant by shearing the upright glyphs, and faux oblique is the
+    // cheapest-looking thing that can go on this screen.
 
     // A logged set steps back: its numbers are settled, and the row you are
-    // working on has to be the brightest thing in the table. The wash that used
-    // to say "done" ran the width of the card and was the loudest band on the
-    // screen — this and the solid checkbox carry it instead (THEME → Components).
+    // working on has to be the brightest thing in the table. This and the solid
+    // checkbox say "done", rather than a wash running the width of the card,
+    // which is the loudest band on the screen (THEME → Components).
     final valueColour = !hasValue
         ? c.textTertiary
         : (widget.done ? c.textSecondary : c.textPrimary);
@@ -669,10 +669,10 @@ class _ValueCellState extends State<_ValueCell> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (widget.prefix != null) ...[
-              // The same size as the number it qualifies. It was a size down,
-              // which read as a superscript on `BW + 10` rather than as the
-              // first half of one value — the two are one reading, and the eye
-              // should not have to change gear between them. Still tertiary:
+              // The same size as the number it qualifies. A size down reads as
+              // a superscript on `BW + 10` rather than as the first half of one
+              // value — the two are one reading, and the eye should not have to
+              // change gear between them. Still tertiary:
               // quieter than the number, because the number is what changes.
               Text(
                 widget.prefix!,
@@ -858,9 +858,9 @@ class _DoneBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
-    // An actual checkbox: empty square when open, filled when ticked. It was a
-    // filled grey block with a grey tick already in it, which read as
-    // "completed" on every row and made the real completed state invisible.
+    // An actual checkbox: empty square when open, filled when ticked. A filled
+    // grey block with a grey tick already in it reads as "completed" on every
+    // row, which makes the real completed state invisible.
     return Pressable(
       onTap: onTap,
       child: SizedBox(

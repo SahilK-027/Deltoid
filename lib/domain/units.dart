@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
-/// Which unit weights are shown and typed in.
+/// The unit in which weights are displayed and entered.
 ///
-/// Storage is always kilograms. Converting at the edges is the only safe
-/// arrangement: a database holding mixed units silently breaks every
-/// historical comparison the app is built on, and there is no way to tell
-/// afterwards which rows meant what.
+/// Storage is always in kilograms, with conversion performed at the
+/// presentation boundary. A database holding mixed units would silently
+/// invalidate every historical comparison the application performs, with no way
+/// to determine afterwards which unit a given row used.
 enum WeightUnit { kg, lb }
 
 const kgPerLb = 0.45359237;
@@ -16,18 +16,21 @@ extension WeightUnitX on WeightUnit {
         WeightUnit.lb => 'lb',
       };
 
-  /// The plate step the keypad's ± keys move by, in display units.
+  /// The increment applied by the keypad's plus and minus keys, in display
+  /// units.
   ///
-  /// 2.5 kg is the smallest pair of plates on a kilo bar; 5 lb is its
-  /// equivalent on a pound bar. Using 2.5 for both would be a step nobody's
-  /// gym has.
+  /// 2.5 kg is the smallest pair of plates on a kilogram bar, and 5 lb is the
+  /// equivalent on a pound bar. Applying 2.5 to both would produce an increment
+  /// that matches no standard plate set.
   double get step => switch (this) {
         WeightUnit.kg => 2.5,
         WeightUnit.lb => 5,
       };
 
-  /// What a displayed number is rounded to. Half a kilo is the smallest
-  /// microplate in normal use; a pound is the equivalent granularity.
+  /// The granularity to which a displayed number is rounded.
+  ///
+  /// Half a kilogram is the smallest microplate in common use, and one pound is
+  /// the equivalent granularity.
   double get increment => switch (this) {
         WeightUnit.kg => 0.5,
         WeightUnit.lb => 1,
@@ -43,8 +46,9 @@ extension WeightUnitX on WeightUnit {
         WeightUnit.lb => value * kgPerLb,
       };
 
-  /// A stored kg value as a display number, snapped to this unit's granularity
-  /// so 100 kg reads as 220 lb rather than 220.46226218487757.
+  /// Converts a stored kilogram value to a display number, rounded to this
+  /// unit's granularity so that 100 kg is rendered as 220 lb rather than
+  /// 220.46226218487757.
   double display(double kg) {
     final raw = fromKg(kg);
     return (raw / increment).roundToDouble() * increment;
@@ -56,17 +60,18 @@ extension WeightUnitX on WeightUnit {
       );
 }
 
-/// Rounds a load to the granularity of [unit], in kg.
+/// Rounds a load to the granularity of [unit], in kilograms.
 ///
-/// Deload scaling and any other computed weight goes through this, so a
-/// suggestion is always a number you can actually load on a bar.
+/// Deload scaling and every other computed weight is passed through this
+/// function, so that a suggested weight is always one that can be loaded on a
+/// bar.
 double roundLoadIn(double kg, WeightUnit unit) {
   if (unit == WeightUnit.kg) return (kg * 2).round() / 2;
   final lb = kg / kgPerLb;
   return lb.roundToDouble() * kgPerLb;
 }
 
-/// Trailing zeros are noise on a gym screen.
+/// Formats a stored kilogram value in [unit], omitting trailing zeros.
 String formatInUnit(double kg, WeightUnit unit) {
   final v = unit.display(kg);
   if (v == v.roundToDouble()) return v.toStringAsFixed(0);
@@ -77,13 +82,14 @@ String formatInUnit(double kg, WeightUnit unit) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
-/// The move from [previousKg] to [kg], as it will actually be *shown* — or
-/// null when both round to the same displayed figure.
+/// Formats the change from [previousKg] to [kg] as it will be displayed, or
+/// null when both values round to the same displayed figure.
 ///
-/// Comparing the raw kilograms was wrong in the one direction that matters:
-/// two weights 0.2 apart differ, so the row printed a signed delta, and then
-/// formatting rounded it to the display increment and it came out as "+0". A
-/// change too small for the app to show is not a change the app should claim.
+/// The comparison is performed on displayed values rather than raw kilograms.
+/// Two weights 0.2 kg apart differ numerically, so a raw comparison would emit
+/// a signed delta which formatting then rounds to the display increment,
+/// producing "+0". A change too small to display is not a change the
+/// application should report.
 String? formatDeltaInUnit(double kg, double previousKg, WeightUnit unit) {
   final difference = unit.display(kg) - unit.display(previousKg);
   if (difference.abs() < unit.increment / 2) return null;
@@ -91,31 +97,31 @@ String? formatDeltaInUnit(double kg, double previousKg, WeightUnit unit) {
   return '${difference > 0 ? '+' : '−'}$magnitude';
 }
 
-/// What a bodyweight is shown to, in display units.
+/// The display granularity for bodyweight, in display units.
 ///
-/// Bodyweight is the one figure in the app that is not plates. Every other
-/// weight rounds to [WeightUnitX.increment] because it has to be loadable on a
-/// bar — half a kilo is the smallest microplate — but nobody loads
-/// themselves. A scale reads a tenth, so typing 76.4 and being shown 76.5 was
-/// the app telling you your own weight is wrong — twice over: once in the
-/// figure, and again in the sheet, which prefilled the rounded number so
-/// correcting anything else about the entry silently moved the weight.
+/// Bodyweight is the one figure in the application that does not describe
+/// plates. Every other weight is rounded to [WeightUnitX.increment] because it
+/// must be loadable on a bar, half a kilogram being the smallest microplate.
+/// Scales read to a tenth, so an entered 76.4 displayed as 76.5 would
+/// contradict the entered value twice: once in the figure itself, and again in
+/// the entry sheet, which prefills the rounded value, so that correcting any
+/// other field would silently alter the weight.
 const bodyweightIncrement = 0.1;
 
-/// A stored bodyweight as a display number, to the tenth.
+/// Converts a stored bodyweight to a display number, to one decimal place.
 double displayBodyweight(double kg, WeightUnit unit) =>
     roundToDecimals(unit.fromKg(kg), 1);
 
-/// As [formatInUnit], at bodyweight's precision. Trailing zeros still go: 76.0
-/// reads `76`.
+/// As [formatInUnit], at bodyweight precision. Trailing zeros are omitted, so
+/// 76.0 is rendered as `76`.
 String formatBodyweight(double kg, WeightUnit unit) {
   final v = displayBodyweight(kg, unit);
   if (v == v.roundToDouble()) return v.toStringAsFixed(0);
   return v.toStringAsFixed(1);
 }
 
-/// As [formatDeltaInUnit], at bodyweight's precision — and null for the same
-/// reason: a difference too small to show is not a change to claim.
+/// As [formatDeltaInUnit], at bodyweight precision. Returns null for the same
+/// reason: a difference too small to display is not a change to report.
 String? formatBodyweightDelta(double kg, double previousKg, WeightUnit unit) {
   final difference =
       displayBodyweight(kg, unit) - displayBodyweight(previousKg, unit);
@@ -124,24 +130,25 @@ String? formatBodyweightDelta(double kg, double previousKg, WeightUnit unit) {
   return '${difference > 0 ? '+' : '−'}$magnitude';
 }
 
-/// Smallest sensible display precision, used where a raw double would show
-/// fifteen decimals of floating point noise.
+/// Rounds [v] to [places] decimal places.
+///
+/// Used where a raw double would otherwise render fifteen decimal places of
+/// floating-point error.
 double roundToDecimals(double v, int places) {
   final f = math.pow(10, places);
   return (v * f).round() / f;
 }
 
-/// Trailing zeros are noise on a gym screen: 22.5 stays 22.5, 60.0 becomes 60.
+/// Renders a stored kilogram value in [unit], omitting trailing zeros, so that
+/// 22.5 remains 22.5 and 60.0 becomes 60.
 ///
-/// Takes a stored kilogram value and renders it in [unit]. Capped at two
-/// decimals because this also formats *computed* numbers — an estimated 1RM is
-/// an arbitrary double, and `55.733333333333334 kg` is not a weight anyone has
-/// ever lifted.
+/// Capped at two decimal places because this also formats computed values. An
+/// estimated one-rep maximum is an arbitrary double, and `55.733333333333334
+/// kg` is not a meaningful weight.
 ///
-/// [unit] is required on purpose. It was optional with a kilogram default for
-/// exactly one commit, and in that commit two call sites forgot it and rendered
-/// pounds as kilograms — next to a tooltip that had it right. An optional unit
-/// makes "wrong" the thing that compiles.
+/// [unit] is required rather than defaulting to kilograms. A default is
+/// straightforward to omit accidentally, which renders pounds as kilograms; a
+/// required parameter makes the incorrect call fail to compile.
 String formatWeight(double kg, WeightUnit unit) {
   final v = unit.display(kg);
   if (v == v.roundToDouble()) return v.toStringAsFixed(0);

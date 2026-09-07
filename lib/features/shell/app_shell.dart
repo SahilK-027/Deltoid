@@ -31,14 +31,13 @@ class _AppShellState extends State<AppShell>
   ];
 
   /// Drives the fade-and-rise. A controller rather than a
-  /// `TweenAnimationBuilder` keyed on the index, which is what this was:
-  /// changing a key throws away the element subtree under it, and the subtree
-  /// under it was the `IndexedStack`. Every tab switch therefore **rebuilt all
-  /// four screens from scratch** — the thing `IndexedStack` is there to
-  /// prevent — dropping their scroll positions and their providers' warm state,
-  /// and doing all of that work on the same frame the nav bar's ripple was
-  /// trying to animate. That is why switching tabs hitched and why the ripple
-  /// appeared to freeze halfway.
+  /// `TweenAnimationBuilder` keyed on the index: changing a key throws away the
+  /// element subtree under it, and the subtree here is the `IndexedStack`. Keyed
+  /// that way every tab switch **rebuilds all four screens from scratch** — the
+  /// thing `IndexedStack` is there to prevent — dropping their scroll positions
+  /// and their providers' warm state, and doing all of it on the same frame the
+  /// nav bar's ripple is trying to animate, which hitches the switch and freezes
+  /// the ripple halfway.
   late final _fade = AnimationController(
     vsync: this,
     duration: Motion.base,
@@ -84,14 +83,14 @@ class _AppShellState extends State<AppShell>
   }
 }
 
-// `Today` was already lying: the screen backfills a session logged on Tuesday
-// and resumes one left open yesterday, so a tab named after a day shows other
-// days. The page keeps the date as its own title (THEME → Composing a screen) — only the label moved.
+// Not `Today`: the screen backfills a session logged on Tuesday and resumes one
+// left open yesterday, so a tab named after a day shows other days. The page
+// keeps the date as its own title (THEME → Composing a screen).
 //
-// Settings takes the slot Progress left behind, and not for symmetry:
-// bodyweight logging lives in there and is not a setting. It is data entered
-// weekly that feeds every pull-up and dip score in the app, and it had never
-// once been logged through the UI while it sat two taps deep behind a cog.
+// Settings holds the fourth slot, and not for symmetry: bodyweight logging
+// lives in there and is not a setting. It is data entered weekly that feeds
+// every pull-up and dip score in the app, and two taps deep behind a cog is
+// where it goes unlogged.
 //
 // Workouts wears a drawn stack of plates rather than Material's dumbbell.
 // Material ships exactly one piece of gym equipment, and it is the icon every
@@ -179,9 +178,9 @@ class _NavItem extends StatelessWidget {
     final tint = selected ? c.textPrimary : c.textSecondary;
 
     // The one destination control in the app, tapped more than anything else,
-    // and until now the only tappable thing with no press state at all: no
-    // scale, no dim, no ink. A tab that does not answer the finger makes the
-    // whole app feel a frame behind.
+    // so it answers the finger like everything else does: a tab with no press
+    // state at all — no scale, no dim, no ink — makes the whole app feel a
+    // frame behind.
     return InkResponse(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -314,7 +313,7 @@ class _NavSplash extends InteractiveInkFeature {
     if (status == AnimationStatus.completed) dispose();
   }
 
-  // The press no longer ends the animation — it runs to `_duration` either way.
+  // The press does not end the animation: it runs to `_duration` either way.
   @override
   void confirm() {}
 

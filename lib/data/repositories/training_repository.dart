@@ -30,13 +30,13 @@ class ExerciseEntry {
 
 /// Everything the Today screen renders, in one value.
 ///
-/// Today used to assemble itself out of a dozen independently watched queries
-/// arranged in dependency layers — regime, then its sessions, then the cycle
-/// status, then a slot count per session row. Each layer resolved a frame or
-/// two after the one above it, so an app whose answers were already on disk
-/// still revealed its first screen in stages. Worse, the frame before
-/// `sessions` arrived was indistinguishable from a regime with no sessions in
-/// it, so the "no sessions" empty state flashed at people who had five.
+/// The screen's regime, its sessions, the cycle status and the per-session
+/// slot counts resolve together, from a single watched query. Assembling them
+/// from separate queries would layer them by dependency and resolve each layer
+/// a frame or two after the one above it, revealing a screen whose answers are
+/// already on disk in stages; it would also make the frame before `sessions`
+/// arrives indistinguishable from a regime with no sessions, flashing the
+/// "no sessions" empty state at someone who has five.
 class TodaySnapshot {
   const TodaySnapshot({
     required this.regime,
@@ -67,9 +67,9 @@ class TodaySnapshot {
       openWorkoutOwner;
 
   /// Sets actually ticked off in the open workout. Zero for a session started
-  /// and never worked in — the difference between "you left this running" and
-  /// "you mis-tapped Start three days ago", which is the only thing that
-  /// decides whether the app may throw it away on its own.
+  /// and never worked in. This distinguishes a session left running from one
+  /// started by a mis-tap several days earlier, which is the sole criterion
+  /// determining whether the application may discard it automatically.
   final int openWorkoutDoneSets;
 
   /// Every set row in the open workout, done or not — the denominator Today
@@ -78,9 +78,10 @@ class TodaySnapshot {
 
   /// Exercise names in the open workout, in slot order.
   ///
-  /// Read off `workoutExercises`, **not** off the session template: the log is
+  /// Read from `workoutExercises` rather than from the session template: the log
+  /// is
   /// a snapshot taken at Start, so an exercise swapped out of the programme
-  /// since then is still in the session you are standing in.
+  /// since then remains in the session currently open.
   final List<String> openWorkoutExerciseNames;
 
   /// Whether anything has ever been finished — "brand new install" as opposed
@@ -308,10 +309,10 @@ class TrainingRepository {
   /// have to mirror last time's *shape*. The log screen then resolves prefill
   /// for the same exercises all over again, because it needs last time's
   /// *numbers* for the ghosts — the same walk through history, twice, on the
-  /// one tap in the app you are standing at a bar waiting for. On fifty years
+  /// single tap in the application that is waited on directly. On fifty years
   /// that is 96ms of work followed by another 121ms of the same work.
   ///
-  /// **Read once, then dropped.** The entry is only ever handed to the first
+  /// Read once, then discarded. The entry is only ever handed to the first
   /// caller and every later resolution goes to the database, so the widest this
   /// can be out of date is the few milliseconds between writing the workout and
   /// the screen for it building — a window in which nothing can have changed
@@ -354,19 +355,18 @@ class TrainingRepository {
   ///
   /// Find-and-create in one transaction, because this is a *write* reached from
   /// several watched reads at once — `workoutsProvider` and `cycleStatusProvider`
-  /// both land here, and on a regime with no cycle yet each of them found
-  /// nothing and inserted one. Three open cycles for one regime, and every
-  /// count downstream — the deload counter included — reading whichever came
-  /// back first.
+  /// both land here, and on a regime with no cycle yet each of them would find
+  /// nothing and insert one. Three open cycles for one regime, and every count
+  /// downstream — the deload counter included — reading whichever came back
+  /// first.
   /// Null when the regime is gone — deleted from the Regimes screen while
   /// Today, the log or a chart was still watching it.
   ///
-  /// This used to read the regime with `getSingle`, which throws on no rows. It
-  /// is reached from watched queries, so the throw landed in a stream, and every
-  /// screen reads those with `valueOrNull` — so the visible symptom of deleting
-  /// a regime under an open screen was that screen returning to its loading
-  /// state and staying there. "There is no cycle" is an answer the callers
-  /// already know how to render; an exception is not.
+  /// The missing regime is reported as null rather than thrown. This is reached
+  /// from watched queries, and every screen reads those with `valueOrNull`, so a
+  /// throw would surface as that screen returning to its loading state and
+  /// staying there. "There is no cycle" is an answer the callers already know
+  /// how to render; an exception is not.
   Future<Cycle?> ensureOpenCycle(String regimeId) =>
       db.transaction(() => _ensureOpenCycle(regimeId));
 
@@ -384,15 +384,15 @@ class TrainingRepository {
         .getSingleOrNull();
     if (open != null) return open;
 
-    // **A deleted programme opens no new cycles.** A tombstoned regime is gone
+    // A deleted programme opens no new cycles. A tombstoned regime is absent
     // from every screen, and `invariant_oracle` refuses a live cycle under one
     // — the cycle is the counter a deload is scheduled off, and scheduling
     // against a programme nobody can see is meaningless.
     //
     // Reachable without sync at all: delete the active regime while a session
-    // logged under it is still open, then finish that session. The two-device
-    // fuzz found it; `model_fuzz_test` could not, because deleting a regime is
-    // not one of its operations.
+    // logged under it is still open, then finish that session. Covered by the
+    // two-device fuzz and not by `model_fuzz_test`, which has no delete-regime
+    // operation.
     final regime = await (db.select(db.regimes)
           ..where((t) => t.id.equals(regimeId) & t.deletedAt.isNull()))
         .getSingleOrNull();
@@ -440,9 +440,9 @@ class TrainingRepository {
 
   /// Collapses regimes that already carry more than one open cycle.
   ///
-  /// [ensureOpenCycle] is a transaction now, so no new pair can be made — but a
-  /// phone that ran an earlier build has the pairs it made then, and nothing
-  /// about them heals on its own: Today reads the newest open cycle, so a
+  /// [ensureOpenCycle] is a transaction, so no new pair can be made — but a
+  /// phone that ran an earlier build carries the pairs it made then, and
+  /// nothing about them heals on its own: Today reads the newest open cycle, so a
   /// regime that has never been trained opens on "Cycle 2", the sessions logged
   /// under one of them do not count towards the other, and the deload lands
   /// wherever the count happens to fall.
@@ -531,7 +531,7 @@ class TrainingRepository {
 
   /// Moves a live workout off a cycle that has been tombstoned under it.
   ///
-  /// `healDuplicateOpenCycles` already repoints **its own** workouts before it
+  /// `healDuplicateOpenCycles` already repoints its own workouts before it
   /// tombstones a duplicate — but only the ones on the phone it runs on. The
   /// other device is holding workouts on the same loser cycle, learns about the
   /// tombstone through a pull, and is left with live workouts naming a dead
@@ -542,7 +542,7 @@ class TrainingRepository {
   /// value here and an honest one: the session happened, and which cycle it
   /// counted towards is no longer known.
   ///
-  /// **The qualifier is the same one the oracle uses.** A *deleted* programme
+  /// The qualifier is the same one the oracle applies. A deleted programme
   /// keeps its history and its workouts go on naming its tombstoned cycles by
   /// design; this is only about live ones.
   Future<int> healWorkoutsNamingDeadCycles() async {
@@ -572,7 +572,8 @@ class TrainingRepository {
   /// cycle arrives naming a regime that is gone, and `invariant_oracle` calls
   /// that *live cycles under a dead regime*.
   ///
-  /// **Only the cycles.** A deleted programme keeps its history — that is why
+  /// Only the cycles are affected. A deleted programme retains its history,
+  /// which is why
   /// the oracle has no rule about workouts under a dead regime — and the cycle
   /// is the counter the deload is scheduled off rather than a record of
   /// anything performed.
@@ -595,11 +596,11 @@ class TrainingRepository {
 
   /// Tombstones exercise snapshots and sets left alive under a deleted workout.
   ///
-  /// The pairs [abandonWorkout] used to leave behind, on a phone that ran the
-  /// build before it took the tree with it. Nothing about them heals on its own
-  /// and nothing on screen shows them, because every read joins the workout —
-  /// but they are live rows carrying `dirty`, so they are exactly what a first
-  /// sync push would send.
+  /// [abandonWorkout] now takes the whole tree, so this repairs databases
+  /// carrying pairs from a build that did not. Nothing heals them on its own and
+  /// nothing on screen shows them, because every read joins the workout — but
+  /// they are live rows carrying `dirty`, so they are exactly what a first sync
+  /// push would send.
   ///
   /// Idempotent, and one query wide on a database with nothing wrong with it,
   /// which is what lets it run at every launch.
@@ -628,7 +629,7 @@ class TrainingRepository {
     // pass above cannot see: it looks for *live* snapshots, and this row's
     // parent is dead.
     //
-    // **A sync pull is what makes this reachable.** One phone deletes a
+    // A sync pull is what makes this state reachable. One device deletes a
     // session, taking the whole tree; the other, offline, adds a set inside it
     // and pushes afterwards — [SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does)
     // row 8. The set arrives under a tombstoned parent, and `invariant_oracle`
@@ -827,19 +828,18 @@ class TrainingRepository {
   /// rings on the calendar.
   ///
   /// Aggregated in SQL rather than folded in Dart. The grid needs three facts
-  /// about a day and the query this replaced — a plain select of every
-  /// completed workout, since deleted — was handing over every column of every
-  /// workout to get them: fifty years is a few thousand rows, each one
-  /// serialised across the database isolate's port and rebuilt as an object on
-  /// the UI isolate, to be thrown away the moment the day it belongs to had
-  /// been counted. That transfer is the hitch you feel when Consistency opens.
+  /// about a day, and a plain select of every completed workout hands over every
+  /// column of every workout to get them: fifty years is a few thousand rows,
+  /// each one serialised across the database isolate's port and rebuilt as an
+  /// object on the UI isolate, to be thrown away the moment the day it belongs
+  /// to has been counted. That transfer is the delay observed when Consistency
+  /// opens.
   ///
-  /// **Raw, and unbounded is why.** Its row count is one per day you have ever
-  /// trained, so it is the shape the row-mapping rule is about: at four grouped
-  /// columns
-  /// per row through drift's `TypedResult.read` — 14µs a call — a long history
-  /// spends most of Consistency's open inside the row mapper rather than inside
-  /// SQLite. Read positionally off a `QueryRow` the same rows and the same
+  /// Raw SQL, because the query is unbounded. Its row count is one per day ever
+  /// trained, which is the case the row-mapping rule addresses: at four grouped
+  /// columns per row through drift's `TypedResult.read`, at 14µs a call, a long
+  /// history spends most of Consistency's opening inside the row mapper rather
+  /// than inside SQLite. Read positionally off a `QueryRow` the same rows and the same
   /// numbers cost a fraction of it; see [exerciseProgress], where the
   /// measurement was taken. The price is that a renamed column compiles and
   /// fails on a device, so `query_conversion_test.dart` reads every column this
@@ -860,12 +860,12 @@ class TrainingRepository {
 
     return [
       for (final r in rows)
-        // A day with no id behind it is not a day that can be opened, and it
-        // used to be handed over as one: the empty string went to the calendar
-        // as a workout to push, `workoutDetail` found nothing, and the tap
-        // landed on a screen saying the session was gone. `max(id)` over a
-        // group that produced a row cannot actually be null — the guard is for
-        // the shape of the answer, not for a case anyone has seen.
+        // A day with no id behind it is not a day that can be opened. Handing
+        // one over would send the empty string to the calendar as a workout to
+        // push, `workoutDetail` would find nothing, and the tap would land on a
+        // screen saying the session was gone. `max(id)` over a group that
+        // produced a row cannot actually be null — the guard is for the shape
+        // of the answer, not for a case anyone has seen.
         if (r.readNullable<String>('any_id') != null)
           LoggedDay(
             dayKey: r.read<int>('day_key'),
@@ -884,15 +884,17 @@ class TrainingRepository {
   ///
   /// Three rules, all of them decisions rather than defaults:
   ///
-  /// * **Ticked sets only.** [startWorkout] writes the planned rows up front,
-  ///   so counting rows would credit you with a session you have not done yet.
-  /// * **Volume set types only** ([countsAsVolume]) — not the progress rule.
+  /// * Ticked sets only. [startWorkout] writes the planned rows in advance,
+  ///   so counting rows would credit a session that has not been performed.
+  /// * Volume set types only ([countsAsVolume]), which is not the progress
+  ///   rule.
   ///   A backoff set is work; a drop leg is the same set continued.
-  /// * **Deload weeks count.** A light week is still sets performed, and this
+  /// * Deload weeks are counted. A light week is still sets performed, and
+  ///   this
   ///   number is about work done rather than about progress — the same call
   ///   `domain/consistency.dart` already made for the heatmap. The chart is
   ///   where deloads are excluded, because an e1RM off 80% describes the
-  ///   programme rather than you.
+  ///   programme rather than the lifter.
   ///
   /// Left in drift deliberately: the `GROUP BY` is on the muscle, so this
   /// returns one row per muscle group — twelve, whatever the history behind
@@ -978,13 +980,13 @@ class TrainingRepository {
 
   /// The template slot for one movement in one day.
   ///
-  /// **Ordered and limited rather than asked for as a single row**, because a
+  /// Ordered and limited rather than requested as a single row, because a
   /// day is allowed to hold the same movement twice — squats early and again
   /// as a burnout — and the picker says so in as many words: it *marks* an
   /// exercise already in the session rather than refusing it. `getSingleOrNull`
   /// throws on two rows, and it throws inside a tap handler, so the symptom of
-  /// a supported thing to do was a menu that would not open at all. A merge or
-  /// a restore can deliver the same shape without anyone having chosen it.
+  /// doing a supported thing would be a menu that will not open at all. A merge
+  /// or a restore can deliver the same shape without anyone having chosen it.
   ///
   /// The first occurrence in the day wins, so every reader agrees on which slot
   /// answers for the movement rather than each getting whichever row SQLite
@@ -1050,9 +1052,9 @@ class TrainingRepository {
       ),
     ])
       ..where(
-        // Sets logged in the session you are standing in count the moment they
-        // are ticked: the bar list is read mid-workout, and a set you have done
-        // is a set you have done whether or not you have pressed Finish yet.
+        // Sets logged in the open session count from the moment they are
+        // ticked. The bar list is read mid-workout, and a completed set is
+        // counted whether or not the session has been finished.
         db.workouts.status.equalsValue(WorkoutStatus.abandoned).not() &
             db.workouts.deletedAt.isNull() &
             db.workoutExercises.deletedAt.isNull() &
@@ -1066,7 +1068,7 @@ class TrainingRepository {
       );
   }
 
-  /// Hard sets per muscle **per day**, between two day keys inclusive.
+  /// Hard sets per muscle per day, between two day keys inclusive.
   ///
   /// Counted by day rather than by week on purpose. `day_key` is a `yyyyMMdd`
   /// integer, not a date, so bucketing into weeks in SQL would mean unpacking
@@ -1077,14 +1079,13 @@ class TrainingRepository {
   /// The volume rules are [setsByMuscleSince]'s, exactly — same joins, same
   /// filters, same definition of a hard set.
   ///
-  /// **No longer bounded**, and that is why it is raw. This used to lean on the
-  /// range control never asking for more than a year — a few hundred rows —
-  /// and then `All` arrived and asked for fifty. Forty thousand grouped rows
-  /// through drift's `TypedResult.read` is over half a second on the UI
-  /// isolate, which is the pause between picking `All` and seeing bars. Read
-  /// positionally off a `QueryRow` it is a fraction of that, for the same rows
-  /// and the same numbers — see [exerciseProgress], which is where this
-  /// measurement was taken.
+  /// Unbounded, which is why it is raw SQL. The range control's `All` requests
+  /// for fifty years. Forty thousand grouped rows through drift's
+  /// `TypedResult.read` is over half a second on the UI isolate, which is the
+  /// pause between picking `All` and seeing bars. Read positionally off a
+  /// `QueryRow` it is a fraction of that, for the same rows and the same
+  /// numbers — see [exerciseProgress], which is where this measurement was
+  /// taken.
   Future<List<({int dayKey, MuscleGroup muscle, int sets})>> setsByMuscleDaily({
     required int fromDayKey,
     required int toDayKey,
@@ -1135,12 +1136,12 @@ class TrainingRepository {
   /// Which movements produced a region's sets, most first.
   ///
   /// The question a regional total cannot answer: `Back 17.8 per week` is a
-  /// number you can read and not act on, and "eleven of those were lat
-  /// pulldowns and none were rows" is the same training telling you what to
-  /// change. Counted over the same span and through the same filters as
+  /// figure that can be read but not acted on, whereas "eleven of those were
+  /// lat pulldowns and none were rows" describes the same training in terms
+  /// that indicate what to change. Counted over the same span and through the same filters as
   /// [setsByMuscleDaily], so the parts add up to the whole.
   ///
-  /// The **name** is read live rather than snapshotted, unlike the muscle:
+  /// The name is read live rather than snapshotted, unlike the muscle:
   /// renaming "Dips" to "Weighted dips" is the same movement under a corrected
   /// label, and a list showing both would be the rename failing rather than
   /// history being preserved. What a movement *trained* is a fact about the
@@ -1229,8 +1230,8 @@ class TrainingRepository {
     if (changes.isEmpty) return;
 
     await db.transaction(() async {
-      // One past the highest live position. Counting live rows handed a new
-      // slot a position a surviving one still held, because a removed slot is
+      // One past the highest live position. Counting live rows hands a new
+      // slot a position a surviving one still holds, because a removed slot is
       // tombstoned and nothing renumbers behind it.
       Future<int> nextOrderIndex() async {
         final live = await (db.select(db.sessionExercises)
@@ -1320,8 +1321,8 @@ class TrainingRepository {
             .get();
 
         // Today's order first, then anything the workout never touched, kept in
-        // its existing relative order — a slot you skipped is not a slot you
-        // asked to move to the end.
+        // its existing relative order: a skipped slot has not been requested
+        // to move to the end.
         final wanted = <SessionExercise>[];
         for (final exerciseId in reorder.exerciseIds) {
           final slot =
@@ -1386,8 +1387,8 @@ class TrainingRepository {
   /// One transaction, because the three steps only make sense together: between
   /// closing this cycle and opening the next, the regime has no open cycle at
   /// all, and every read of `cycleStatus` that lands there mints one of its own.
-  /// `ensureOpenCycle` is a transaction for exactly that reason; leaving the
-  /// gap open between two of them gave the race back.
+  /// `ensureOpenCycle` is a transaction for exactly that reason, and leaving
+  /// the gap open between two of them hands the race straight back.
   Future<void> advanceCycle(String regimeId) => db.transaction(() async {
         final cycle = await _ensureOpenCycle(regimeId);
         if (cycle == null) return;
@@ -1405,11 +1406,11 @@ class TrainingRepository {
   /// The cycle that was open on [at], or null when the date predates every
   /// cycle this regime has had.
   ///
-  /// A backdated workout used to attach to whatever cycle is open *now*.
-  /// Backfilling yesterday is usually the same cycle and nobody notices;
-  /// backfilling three weeks ago counted towards the current cycle, could
-  /// complete it on the strength of work done under a previous one, and moved
-  /// the deload counter early.
+  /// A backdated workout belongs to the cycle that was open when it happened,
+  /// not to whichever is open now. Backfilling yesterday is usually the same
+  /// cycle either way; backfilling three weeks ago would otherwise count
+  /// towards the current cycle, complete it on the strength of work done under
+  /// a previous one, and move the deload counter early.
   Future<Cycle?> cycleCovering(String regimeId, DateTime at) async {
     final stamp = at.millisecondsSinceEpoch;
     final cycles = await (db.select(db.cycles)
@@ -1431,11 +1432,12 @@ class TrainingRepository {
 
   /// Closes the open cycle if every session it still owes has been trained.
   ///
-  /// Only `completeWorkout` used to close a cycle, so deleting the last
-  /// untrained day of a cycle left it complete-but-open: Today showed
-  /// "UP NEXT: Push 1" over a full row of filled dots until the next workout
-  /// happened to heal it. A cycle should close the moment it is satisfied,
-  /// whatever satisfied it.
+  /// A cycle closes the moment it is satisfied, whatever satisfied it — which
+  /// is why deletion calls this and not only `completeWorkout`. Deleting the
+  /// last untrained day of a cycle otherwise leaves it complete-but-open, and
+  /// Today shows "UP NEXT: Push 1" over a full row of filled dots until the
+  /// next workout happens to heal it.
+  ///
   /// One transaction, for the reason [advanceCycle] gives: the close and the
   /// open that follows it are a single act, and the moment between them is a
   /// regime with no open cycle.
@@ -1487,9 +1489,9 @@ class TrainingRepository {
   ///
   /// [sessionId] guarantees the most recent performances *in that session* are
   /// in the result whatever [limit] is. Without it, fanning one movement across
-  /// many training days pushed a slot left untrained for 30-odd performances
-  /// elsewhere out of the window, and prefill quietly fell back to another
-  /// session — labelled honestly, but not the number you wanted. The
+  /// many training days pushes a slot left untrained for 30-odd performances
+  /// elsewhere out of the window, and prefill quietly falls back to another
+  /// session, labelled accurately but not the intended figure. The
   /// same-session lookup should have no horizon; the cross-session fallback
   /// still does.
   /// A null [limit] takes the whole history — for the chart, which is the one
@@ -1516,7 +1518,7 @@ class TrainingRepository {
 
     // Keyed on the slot rather than the workout. The same movement can be run
     // twice in one session — a second pass, a different implement — and keying
-    // this on the workout threw one of the two away before prefill ever saw it.
+    // this on the workout throws one of the two away before prefill sees it.
     String keyOf(PastPerformance p) =>
         p.slotId.isEmpty ? p.workoutId : p.slotId;
 
@@ -1525,8 +1527,8 @@ class TrainingRepository {
       bySlot.putIfAbsent(keyOf(p), () => p);
     }
     // Sort on the same key both queries ordered by. Sorting the merged list on
-    // dayKey alone put two performances from one day in map insertion order,
-    // so prefill could pick the earlier and call it last time.
+    // dayKey alone leaves two performances from one day in map insertion order,
+    // so prefill can pick the earlier and call it last time.
     //
     // Two slots of one workout tie on `startedAt`, so the slot id breaks it —
     // ids are UUID v7, so the lower one is the slot that was created first,
@@ -1541,12 +1543,12 @@ class TrainingRepository {
     return merged;
   }
 
-  /// **Raw, and the gather is why.** This is unbounded at `limit: null` and
-  /// used to hydrate whole `WorkoutExercise`, `Workout` and `Session` rows to
-  /// read eight columns of them, then collect their sets with
-  /// `WHERE workout_exercise_id IN (…)` — one bound parameter per performance,
-  /// which on a long history is a statement thousands of variables wide, built
-  /// and bound on the UI isolate. The slot list is now a subquery
+  /// Raw SQL, because of the gather. This is unbounded at `limit: null`, so
+  /// hydrating whole `WorkoutExercise`, `Workout` and `Session` rows to read
+  /// eight columns of them, then collecting their sets with
+  /// `WHERE workout_exercise_id IN (…)`, would put one bound parameter per
+  /// performance into a statement thousands of variables wide on a long
+  /// history, built and bound on the UI isolate. The slot list is a subquery
   /// inside the set statement instead: the same predicate text, built once
   /// below so the two statements cannot drift apart, and four bound parameters
   /// however long the history gets.
@@ -1639,9 +1641,8 @@ class TrainingRepository {
             // Sets logged before the exercise was marked skipped did happen:
             // two sets then a bad shoulder is two real sets. They stay
             // eligible here *and* are shown under the skip pill in history, so
-            // there is one story rather than two. This used to be decided by
-            // accident — nothing read skipReason, and the empty-sets check did
-            // the filtering.
+            // there is one story rather than two. Read from `skipReason`
+            // deliberately, rather than falling out of the empty-sets check.
             skipReason: SkipReason.values.byName(r.read<String>('skip_reason')),
             sets: setsByWe[slotId] ?? const <PastSet>[],
           );
@@ -1674,7 +1675,8 @@ class TrainingRepository {
     String? regimeId,
     bool deloadOnly = false,
   }) async {
-    // **Bounded by the page, not by the log** — the answer every query in this
+    // Bounded by the page rather than by the log, which is the answer every
+    // query in this
     // repository owes. It stays drift rather than raw because its row
     // count is what the user has scrolled into view; the `IN (…)` gathers below
     // are one bound parameter per row of *that*. The ceiling is not a product
@@ -1781,8 +1783,8 @@ class TrainingRepository {
     ])
           ..addColumns([db.workoutExercises.exerciseId, performed, lastDay])
           // "2 sessions" has to mean times trained. A slot left blank still
-          // counts — you turned up and the row was there — but one you marked
-          // skipped, with a reason, did not happen.
+          // counts, the session having been attended and the row present, but
+          // one marked skipped with a reason did not occur.
           ..where(db.workoutExercises.deletedAt.isNull() &
               db.workoutExercises.skipReason
                   .equalsValue(SkipReason.none) &
@@ -1816,12 +1818,12 @@ class TrainingRepository {
   /// regime each belongs to and how many times it was logged.
   ///
   /// The filter offers these and nothing else. A picker built from the *active*
-  /// regime's sessions would omit every day you trained under the split you
-  /// stopped running, which is precisely the history worth filtering; one built
+  /// regime's sessions would omit every day trained under a discontinued
+  /// split, which is precisely the history worth filtering; one built
   /// from all sessions ever created would offer days that return an empty list.
   ///
-  /// Grouped by session, so the row count is the number of training days you
-  /// have ever run — a handful per regime — rather than the number of workouts
+  /// Grouped by session, so the row count is the number of distinct training
+  /// days ever run, a handful per regime, rather than the number of workouts
   /// behind them. Drift is the right cost at that size.
   Future<List<LoggedSession>> loggedSessions() async {
     final logged = db.workouts.id.count();
@@ -1854,8 +1856,8 @@ class TrainingRepository {
           lastDayKey: r.read(lastDay) ?? 0,
         ),
     ];
-    // Most recently trained first: the day you want back is nearly always one
-    // you are still running.
+    // Most recently trained first: the day being sought is almost always one
+    // still in use.
     sessions.sort((a, b) => b.lastDayKey.compareTo(a.lastDayKey));
     return sessions;
   }
@@ -1870,7 +1872,7 @@ class TrainingRepository {
   /// One page of a single exercise's history, newest first.
   ///
   /// Carries the session each performance belongs to, because "3×8 at 22.5" only
-  /// means something once you know whether it was Push 1 or Push 2.
+  /// is meaningful only once it is known whether it was Push 1 or Push 2.
   Future<List<ExercisePerformance>> exerciseHistoryPage(
     String exerciseId, {
     int limit = 20,
@@ -1881,7 +1883,7 @@ class TrainingRepository {
     assert(limit > 0 && limit <= 5000,
         'this list pages by keyset — $limit rows is a paging bug, not a page');
     // A slot with nothing ticked in it and no reason given is not a
-    // performance: it is a row that was on the screen. Left in, it drew a card
+    // performance: it is a row that was on the screen. Left in, it draws a card
     // reading "Nothing logged" with a dash where the weight goes — most easily
     // reached by running one movement twice in a day and only working the
     // second of them. A skipped slot stays, sets or not: the reason is the
@@ -1938,12 +1940,13 @@ class TrainingRepository {
       setsByWe.putIfAbsent(s.workoutExerciseId, () => []).add(s);
     }
 
-    // The catalog row behind these performances. `getSingle` threw here when it
-    // was missing, which is unreachable through the app — a movement is
-    // archived, never deleted — and entirely reachable through a restore whose
-    // exercise rows were pruned, or a delete arriving from another device. The
-    // throw landed inside a paged read, so the whole history screen for that
-    // movement went blank rather than the one row that had lost its name.
+    // The catalog row behind these performances, answered as null rather than
+    // thrown when it is missing. That is unreachable through the app — a
+    // movement is archived, never deleted — and entirely reachable through a
+    // restore whose exercise rows were pruned, or a delete arriving from
+    // another device. A throw lands inside a paged read, blanking the whole
+    // history screen for that movement rather than the one row that has lost
+    // its name.
     final exercise = await (db.select(db.exercises)
           ..where((t) => t.id.equals(exerciseId)))
         .getSingleOrNull();
@@ -1991,9 +1994,10 @@ class TrainingRepository {
 
   /// Bodyweight history, used to score bodyweight and BW+ lifts.
   ///
-  /// **Raw, and unbounded is why.** One row per day ever weighed, growing for
-  /// as long as the app is used, and it was hydrating whole `BodyweightLog` row
-  /// objects — every column, sync bookkeeping included — to read two of them.
+  /// Raw SQL, because the query is unbounded. One row per day ever weighed,
+  /// growing for
+  /// as long as the app is used, so hydrating whole `BodyweightLog` row objects
+  /// reads every column, sync bookkeeping included, to get at two of them.
   /// Whole rows are the most expensive of drift's three read paths (~120ms per
   /// five thousand rows against ~16ms positional), and this is on the path of
   /// every bodyweight and BW+ chart. Covered field by field, against the drift
@@ -2032,14 +2036,15 @@ class TrainingRepository {
   /// The look-up and the insert are one act on purpose: a double tap on Save,
   /// or the same day logged from Settings and the bodyweight screen at once,
   /// had both callers find no row and both insert one. Two weights for one day
-  /// is not a duplicate you can see — the screen shows whichever the query
+  /// is not a visible duplicate: the screen displays whichever the query
   /// returns first, and every bodyweight-scored lift on that day reads the
   /// other one half the time.
   /// [replacing] moves an entry to another day, which is a delete plus a re-log
-  /// because the day is this table's key — and therefore has to be **one act**.
-  /// Run as two calls it was two transactions with a gap between them, and a
-  /// crash or a kill in that gap left the weight gone from the day it was on and
-  /// never written to the day it was moved to. That loss is silent twice over:
+  /// because the day is this table's key, and must therefore be a single
+  /// operation.
+  /// Run as two calls it is two transactions with a gap between them, and a
+  /// crash or a kill in that gap leaves the weight gone from the day it was on
+  /// and never written to the day it was moved to. That loss is silent twice over:
   /// nothing on the bodyweight screen says a day is missing, and the reading
   /// either side is simply interpolated across the hole, quietly rescoring every
   /// pull-up and dip in between.
@@ -2089,21 +2094,21 @@ class TrainingRepository {
   /// separate lines — averaging them would hide the very progression the
   /// per-session split exists to protect.
   ///
-  /// Unbounded on purpose. This used to ask for the most recent 400
-  /// performances, which silently cut the chart off: the year picker is built
-  /// from the points that came back, so a movement trained more than 400 times
-  /// lost its early years from the axis *and* from the list of years you are
-  /// allowed to ask for, with nothing on screen to say a horizon existed.
+  /// Unbounded on purpose. The year picker is built from the points that come
+  /// back, so any horizon would silently cut the chart off: a movement trained
+  /// more times than the limit allows would lose its early years from the axis
+  /// *and* from the list of years that can be asked for, with nothing on screen
+  /// to say a horizon existed.
   ///
-  /// **Two raw statements, and both the raw part and the two part are the
-  /// point.** This used to run on [pastPerformances], which hydrates whole
-  /// `SetLog` row objects — every column, sync bookkeeping included — and
-  /// gathers them with `WHERE workout_exercise_id IN (…)`, one bound parameter
-  /// per performance. Thirty years of one movement is 130ms of that before the
-  /// chart can be drawn, which is why it landed a beat after the list beneath
-  /// it. Nearly all of it is drift's row mapping rather than SQLite: the same
+  /// Two raw statements, both the use of raw SQL and the split being
+  /// deliberate. [pastPerformances] hydrates whole `SetLog` row objects, every
+  /// column, sync bookkeeping included — and gathers them with
+  /// `WHERE workout_exercise_id IN (…)`, one bound parameter per performance.
+  /// Thirty years of one movement is 130ms of that before the chart can be
+  /// drawn, landing it a beat after the list beneath it. Nearly all of it is
+  /// drift's row mapping rather than SQLite: the same
   /// five thousand rows cost 120ms through `readTable`, 90ms through
-  /// `TypedResult.read`, and **16ms** read positionally off a `QueryRow` — so
+  /// `TypedResult.read`, and 16ms read positionally off a `QueryRow`, so
   /// the two queries the chart needs ask for the columns it reads, by name, and
   /// map them here.
   ///
@@ -2121,7 +2126,7 @@ class TrainingRepository {
 
     // The same predicate in both statements: a performance is a live slot on a
     // completed, live workout. Skipped slots stay in for the reason
-    // [_performances] gives — sets logged before you stopped did happen.
+    // [_performances] gives: sets logged before stopping did occur.
     const live = 'we.deleted_at IS NULL AND wo.deleted_at IS NULL '
         "AND wo.status = 'completed'";
 
@@ -2227,9 +2232,9 @@ class TrainingRepository {
   /// Set rows are pre-created to mirror *last time in this session* — including
   /// its warmup structure — rather than a flat "3 sets". Repeating last week's
   /// shape is the behaviour being carried over from the Notion tables.
-  /// [at] backdates the workout, for writing down a session you forgot to log
-  /// on the day. It never returns a running workout, because a session being
-  /// trained right now is not the one you are backfilling.
+  /// [at] backdates the workout, for recording a session that was not logged on
+  /// the day. It never returns a running workout, because a session currently
+  /// being trained is not the one being backfilled.
   Future<String> startWorkout({
     required String regimeId,
     required String sessionId,
@@ -2292,7 +2297,7 @@ class TrainingRepository {
 
     // Prefill is resolved before the transaction so the write stays short.
     //
-    // Resolved **together**, not one after another: each slot is its own chain
+    // Resolved together rather than sequentially: each slot is its own chain
     // of queries across the database isolate's port, and awaiting them in
     // series made the tap cost the sum of six round trips instead of the
     // longest one. The same reasoning `workoutPrefillProvider` already applies
@@ -2399,9 +2404,9 @@ class TrainingRepository {
         }
 
         // Drop legs are attached to the set above them as they are written.
-        // Only the *types* were mirrored, so last week's drop set came back as
-        // a row of unrelated `D`s — each its own group, each with its own
-        // capsule and `+`, none of them a leg of anything.
+        // Mirroring the *types* alone brings last week's drop set back as a
+        // row of unrelated `D`s — each its own group, each with its own capsule
+        // and `+`, none of them a leg of anything.
         String? head;
         for (var k = 0; k < shape.length; k++) {
           final id = newId();
@@ -2439,8 +2444,8 @@ class TrainingRepository {
   ///
   /// Two readings, in order: the slot's own number if it has been given one,
   /// otherwise the default from Settings. Nothing else — see
-  /// [rest.dart](../../domain/rest.dart) for why the third reading, the last
-  /// rest actually taken on the movement, was taken out.
+  /// [rest.dart](../../domain/rest.dart) for why there is no third reading off
+  /// the last rest actually taken on the movement.
   Future<int> restTargetFor({
     required String exerciseId,
     required String? sessionId,
@@ -2468,7 +2473,7 @@ class TrainingRepository {
   }
 
   /// Remembers a rest target against the session slot, so next week opens with
-  /// the number you settled on rather than a flat 120 seconds.
+  /// the configured value rather than a flat 120 seconds.
   ///
   /// Returns false when there is no slot to write it to — an exercise added
   /// mid-session isn't in the template, and the update would match no rows and
@@ -2522,10 +2527,10 @@ class TrainingRepository {
   /// Who a workout belongs to, looked up by id rather than filtered out of the
   /// active regime's sessions.
   ///
-  /// Start a workout, switch regimes, and the resume card used to read
-  /// "Workout" — the session was real, it just wasn't in the list being
-  /// searched. Finishing it advances *its* regime's cycle, not the one on
-  /// screen, so the card has to be able to say which.
+  /// Start a workout and switch regimes, and the session is still real but no
+  /// longer in the active regime's list — searching that list would leave the
+  /// resume card reading "Workout". Finishing it advances *its* regime's cycle,
+  /// not the one on screen, so the card has to be able to say which.
   Future<({String? sessionName, String regimeId, String? regimeName})?>
       workoutOwner(String workoutId) async {
     final workout = await (db.select(db.workouts)
@@ -2676,9 +2681,9 @@ class TrainingRepository {
         restSeconds: restSeconds,
         note: note,
         // Cleared on an untick as deliberately as it is stamped on a tick: a
-        // set that is not done has no moment it was done at, and leaving the
-        // old stamp behind left `restTargetFor` reading a rest off a set that
-        // had been taken back.
+        // set that is not done has no moment it was done at, and a stamp left
+        // behind would leave `restTargetFor` reading a rest off a set that had
+        // been taken back.
         completedAt: !isDone.present
             ? const Value.absent()
             : isDone.value
@@ -2747,7 +2752,7 @@ class TrainingRepository {
       // Every number here is a `setIndex`, never a position in [sets]. The two
       // are only the same while the exercise has never had a set deleted:
       // deletes are tombstones and nothing renumbers after them, so the live
-      // rows of an exercise you have deleted the first set of are 1, 2, 3 held
+      // rows of an exercise whose first set has been deleted are 1, 2, 3 held
       // at positions 0, 1, 2. Numbering from the position gave the new row an
       // index the row above it already held — two live rows on one index, in an
       // order the database could break either way, which is the same failure
@@ -2828,13 +2833,12 @@ class TrainingRepository {
 
   /// Changes a set's type, keeping the drop group around it consistent.
   ///
-  /// The sheet wrote the type and nothing else, which left two shapes the table
-  /// cannot draw: a drop set with no leg to have dropped into, and legs still
-  /// nested under a head that is no longer a drop at all.
+  /// Writing the type and nothing else leaves two shapes the table cannot
+  /// draw: a drop set with no leg to have dropped into, and legs still nested
+  /// under a head that is not a drop at all.
+  ///
   /// One transaction, because a conversion is several writes that only make
-  /// sense together: a head that became a drop but never got its leg, or legs
-  /// left nested under a head that is no longer a drop, are both shapes the
-  /// table cannot draw. Interrupted halfway, it now leaves the set as it was.
+  /// sense together. Interrupted halfway, it leaves the set as it was.
   Future<void> setSetType(String setId, SetType type) =>
       db.transaction(() => _setSetType(setId, type));
 
@@ -2854,7 +2858,8 @@ class TrainingRepository {
       return;
     }
 
-    // A drop set is a set you dropped weight inside, so it needs somewhere to
+    // A drop set is a set within which weight was reduced, so it requires
+    // somewhere to
     // record the drop.
     if (type == SetType.drop) {
       await addDropLeg(set.workoutExerciseId, headSetId: setId);
@@ -2869,9 +2874,9 @@ class TrainingRepository {
               .get();
 
       // An empty leg goes with the drop that created it. Promoting them all
-      // turned one set into four: the legs a conversion adds for you are not
-      // sets you decided to do, and undoing the conversion has to undo them
-      // too. A leg with something logged in it is a set you did — that one is
+      // turned one set into four: the legs a conversion adds were not chosen
+      // by the user, and reversing the conversion must remove them. A leg with
+      // data logged in it is a performed set, and that one is
       // promoted rather than deleted, whatever the head becomes.
       final empty = [
         for (final leg in legs)
@@ -2916,10 +2921,12 @@ class TrainingRepository {
   }
 
   /// Reorders exercises within a workout only — the session template is
-  /// untouched, so rearranging today never rewrites what you did in March.
+  /// untouched, so rearranging today never rewrites what was logged in
+  /// March.
   ///
   /// Two passes through free ground — see [renumber]. The log screen is a
-  /// `PageView` keyed on this order, so a duplicate position is the page you
+  /// `PageView` keyed on this order, so a duplicate position determines the
+  /// page
   /// swipe to being whichever way SQLite broke the tie;
   /// `idx_workout_exercises_position_live` refuses it, and a one-pass renumber
   /// walks straight into that refusal.
@@ -3014,10 +3021,10 @@ class TrainingRepository {
           ..where((t) => t.id.equals(workout.regimeId)))
         .getSingleOrNull();
 
-    // The slot's own deload override, exactly as `startWorkout` reads it. This
-    // used to take the regime's figures whatever the slot said, so the same
-    // exercise deloaded one way when the session opened and another way when it
-    // was added ten minutes later.
+    // The slot's own deload override, exactly as `startWorkout` reads it.
+    // Taking the regime's figures regardless would deload the same exercise one
+    // way when the session opened and another way when it was added ten minutes
+    // later.
     final sessionId = workout.sessionId;
     final slot = sessionId == null
         ? null
@@ -3121,9 +3128,9 @@ class TrainingRepository {
   /// Substitutes one exercise for another in place.
   ///
   /// A swap is a substitution, not a delete plus an append: the replacement
-  /// takes the old slot's position and target, so the page you are standing on
-  /// does not move out from under you mid-session. Doing this as
-  /// remove-then-add sent the replacement to the end of the workout.
+  /// takes the replaced slot's position and target, so the page currently open
+  /// does not move mid-session. Performing this as
+  /// remove-then-add would send the replacement to the end of the workout.
   Future<String> replaceExerciseInWorkout(
     String workoutExerciseId,
     String newExerciseId,
@@ -3156,7 +3163,8 @@ class TrainingRepository {
     final stamp = nowMs();
     await db.transaction(() async {
       // The displaced slot's sets go with it. Two sets logged into a movement
-      // you then swapped away are not the new movement's, and leaving them live
+      // subsequently swapped away do not belong to the new movement, and
+      // leaving them live
       // under a tombstoned slot is the whole of the cascade rule — the sets
       // stay `dirty` and unreachable, and `doneSetCount` stops seeing them,
       // which is what lets the launch sweep call the whole session empty.
@@ -3218,29 +3226,28 @@ class TrainingRepository {
 
   /// Finishes a workout and closes its cycle if that was the last session owed.
   ///
-  /// **All of it in one transaction.** The cycle close used to run after the
-  /// commit, which left a window — a crash, a kill, a battery — where the
-  /// session was finished and the cycle it satisfied was still open. Today then
-  /// showed "UP NEXT" over a full row of filled dots, and the deload counted a
-  /// cycle that had already been trained. `deleteWorkout` pulled its own cycle
-  /// repair inside its transaction for the mirror-image reason; this is the
-  /// same fix on the way in.
+  /// All of it in one transaction. Closing the cycle after the commit would
+  /// leave a window — a crash, a kill, a battery — where the session is
+  /// finished and the cycle it satisfied is still open. Today would then show
+  /// "UP NEXT" over a full row of filled dots, and the deload would count a
+  /// cycle that had already been trained. `deleteWorkout` keeps its own cycle
+  /// repair inside its transaction for the mirror-image reason.
   /// False when there was no workout to finish — deleted from History while its
   /// own log was open, or discarded from a second door onto the same session.
   ///
-  /// Answered rather than thrown, and answered rather than swallowed. `getSingle`
-  /// used to throw here, which died in the gesture handler and left the log
-  /// screen sitting there; returning nothing at all would be worse, because the
-  /// caller would go on to open a summary of a workout that no longer exists.
+  /// Answered rather than thrown, and answered rather than swallowed. A throw
+  /// would die in the gesture handler and leave the log screen sitting there;
+  /// returning nothing at all would be worse, because the caller would go on to
+  /// open a summary of a workout that no longer exists.
   Future<bool> completeWorkout(String workoutId) =>
       db.transaction(() => _completeWorkout(workoutId));
 
   Future<bool> _completeWorkout(String workoutId) async {
-    // **Live rows only.** A delete here is a tombstone, so a workout removed
-    // from History is still a row — and this look-up did not filter it, so
-    // finishing one stamped `completed` onto a session that had been deleted,
-    // and re-marked it dirty for a sync to push. Nothing on screen showed it,
-    // because every read path filters `deletedAt` and this write did not.
+    // Live rows only. A delete here is a tombstone, so a workout removed
+    // from History is still a row. Without the `deletedAt` filter, finishing
+    // one would stamp `completed` onto a deleted session and re-mark it dirty
+    // for a sync to push, invisibly: every read path filters `deletedAt`, so
+    // nothing on screen would show it.
     final workout = await (db.select(db.workouts)
           ..where((t) => t.id.equals(workoutId) & t.deletedAt.isNull()))
         .getSingleOrNull();
@@ -3361,10 +3368,11 @@ class TrainingRepository {
   /// Clears out sessions started a day or more ago with nothing logged in them.
   ///
   /// A mis-tap on Start writes a workout that then sits on Today forever,
-  /// blocking every other session behind "finish the one you are in". Nothing
+  /// blocking every other session behind a prompt to finish the open one.
+  /// Nothing
   /// in it is worth keeping, so it goes at launch without asking.
   ///
-  /// **Only when [doneSetCount] is zero.** A session with real sets in it left
+  /// Only when [doneSetCount] is zero. A session containing logged sets, left
   /// open overnight is the far more common shape — trained it, never pressed
   /// Finish — and deleting that would destroy a day's work to save a tap. Those
   /// stay, and Today offers to finish or discard them explicitly.
@@ -3372,14 +3380,14 @@ class TrainingRepository {
     Duration olderThan = const Duration(hours: 24),
   }) async {
     final cutoff = nowMs() - olderThan.inMilliseconds;
-    // **`updatedAt`, not `startedAt`.** This asks how long ago the row was
+    // `updatedAt` rather than `startedAt`. This asks how long ago the row was
     // written, and `startedAt` is the one column the app deliberately moves
-    // into the past: `startWorkout(at:)` backdates it so a session you forgot
+    // into the past: `startWorkout(at:)` backdates it so that a session not
     // to log sorts into history where it belongs. Keyed on `startedAt`, a
-    // backfill for last Tuesday was **already past this cutoff the instant it
-    // was created**, and this runs before first paint on every launch — so
+    // backfill for the previous week is already past this cutoff at the moment
+    // it is created, and this runs before first paint on every launch, so
     // opening the backfill sheet, getting the log screen and being killed by
-    // Android before you ticked anything lost the whole session with no
+    // Android before anything was ticked lost the whole session with no
     // message.
     //
     // `updatedAt` is never backdated: it is stamped by `nowMs` on the insert
@@ -3437,7 +3445,8 @@ class TrainingRepository {
   /// device sets belonging to a slot that does not exist, and no tombstone ever
   /// follows to clear them.
   ///
-  /// **Not a transaction of its own**, so every caller owes one: this is half
+  /// Not a transaction of its own, so every caller must provide one: this is
+  /// half
   /// of a cascade and the other half is the parent's own write.
   Future<void> _tombstoneSetsOf(List<String> workoutExerciseIds, int stamp) =>
       (db.update(db.setLogs)
@@ -3483,8 +3492,9 @@ class TrainingRepository {
 
   /// Moves a logged day to another date.
   ///
-  /// A training log has to let you write down Monday's session on Wednesday,
-  /// and fix a date you got wrong. `startedAt` moves with `dayKey` on purpose:
+  /// A training log must permit Monday's session to be recorded on Wednesday,
+  /// and an incorrect date to be corrected. `startedAt` moves with `dayKey`
+  /// deliberately:
   /// the heatmap reads the day key, but history pages on `startedAt`, and a row
   /// that sorts by one date while displaying another is worse than either.
   /// The clock time and the session's duration are preserved.
@@ -3552,7 +3562,8 @@ class TrainingRepository {
     });
   }
 
-  /// The context that explains a bad week when you read it back in six months.
+  /// The context that explains a poor week when the log is reviewed months
+  /// later.
   Future<void> setWorkoutNotes(String workoutId, String? notes) async {
     final trimmed = notes?.trim();
     await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
@@ -3648,21 +3659,21 @@ class TrainingRepository {
       if (held.isNotEmpty) return;
     }
 
-    // **A regime holds one open cycle, and a later one is not the only one
-    // that can be open.** `later` is every live cycle numbered above this one,
-    // and the loop above is the whole of what used to be checked — which
-    // assumes the only cycle that could still be open is one of them. That
-    // holds on a single device, where cycles close in index order and the open
-    // one is always the highest. It does not hold once a second device exists:
+    // A regime holds one open cycle, and a later cycle is not the only one that
+    // may be open. `later` is every live cycle numbered above this one,
+    // and checking only those, as the loop above does, assumes the one cycle
+    // that could still be open is among them. That holds on a single device,
+    // where cycles close in index order and the open one is always the highest.
+    // It does not hold once a second device exists:
     // the merge re-numbers a collided cycle ([SYNC.md § 9](../../../SYNC.md#9-collision--two-rows-one-slot)),
     // so index order stops matching the order they were closed in, and the
     // regime can carry an open cycle at or below this one's index.
     //
     // Reopening on top of that is refused by `idx_cycles_regime_open_live`,
-    // which threw `UNIQUE constraint failed: cycles.regime_id` from inside
-    // `deleteWorkout` and took the whole delete down with it. The index did its
-    // job — nothing was corrupted, the transaction rolled back — but a delete
-    // that cannot run is still a delete that cannot run.
+    // would throw `UNIQUE constraint failed: cycles.regime_id` from inside
+    // `deleteWorkout` and take the whole delete down with it. The index would
+    // be doing its job — nothing corrupted, the transaction rolled back — but a
+    // delete that cannot run is still a delete that cannot run.
     //
     // So this takes the same conservative half the comment above already
     // takes: leave the earlier cycle closed. It costs at most a deload landing

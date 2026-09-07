@@ -1,26 +1,26 @@
-/// What to hang on each end of the bar to make a number.
+/// Calculation of the plates required on each end of a bar for a target weight.
 ///
-/// Pure arithmetic, no database and no widgets: the gym is the one place this
-/// app is read at arm's length with a bar in your hands, and "which plates" is
-/// the question it has to answer without being wrong once.
+/// Pure arithmetic, with no database or widget dependencies. This is read at
+/// arm's length while loading a bar, and must not produce an incorrect
+/// result.
 library;
 
 /// The plates assumed to exist, heaviest first.
 ///
-/// Deliberately a fixed set rather than a per-gym inventory. This is one
-/// person's log in one gym; a plate-inventory editor is a settings screen, a
-/// migration and a maintenance burden to describe a rack that does not change.
-/// If it ever does, this list is the only thing that moves.
+/// Deliberately a fixed set rather than a configurable inventory. A
+/// plate-inventory editor would require a settings screen, a migration and
+/// ongoing maintenance in order to describe a rack that does not change. Should
+/// it change, this list is the only definition that requires updating.
 const olympicPlatesKg = <double>[25, 20, 15, 10, 5, 2.5];
 
-/// The smallest change these plates can make to a bar: the lightest plate, on
-/// both ends. Nothing between two multiples of this is loadable.
+/// The smallest increment these plates can add to a bar: the lightest plate on
+/// both ends. No weight between two multiples of this value is loadable.
 final plateStepKg = olympicPlatesKg.last * 2;
 
-/// One plate size and how many of it go on each end.
+/// A single plate size and the quantity required on each end.
 typedef PlateStack = ({double kg, int count});
 
-/// How a target weight breaks down over a bar.
+/// The decomposition of a target weight into a bar and its plates.
 class PlateLoad {
   const PlateLoad({
     required this.barKg,
@@ -31,43 +31,45 @@ class PlateLoad {
   /// The empty bar.
   final double barKg;
 
-  /// Plates for **one** end, heaviest first. Empty means an empty bar.
+  /// The plates for one end, heaviest first. An empty list denotes a bare
+  /// bar.
   final List<PlateStack> perSide;
 
-  /// What the plates could not make, in kg of total load. Non-zero when the
-  /// target is not a multiple of [plateStepKg] — a 2.5kg keypad step on a
-  /// rack whose smallest plate is 2.5kg lands here every other press.
+  /// The portion of the total load the plates cannot produce, in kilograms.
   ///
-  /// Reported rather than rounded away: silently drawing 60kg when 61kg was
-  /// typed would make the diagram a liar at the exact moment it is trusted.
+  /// Non-zero when the target is not a multiple of [plateStepKg]. A 2.5 kg
+  /// keypad increment against a rack whose smallest plate is 2.5 kg produces a
+  /// remainder on alternate presses.
+  ///
+  /// Reported rather than silently rounded. Rendering 60 kg for an entered
+  /// 61 kg would make the diagram inaccurate at the moment it is relied upon.
   final double remainderKg;
 
   bool get isBarOnly => perSide.isEmpty;
 
-  /// Total the drawn plates actually add up to, bar included.
+  /// The total weight the rendered plates produce, including the bar.
   double get loadedKg =>
       barKg + perSide.fold(0.0, (sum, p) => sum + p.kg * p.count) * 2;
 
-  /// One end's load, which is the number lifters say out loud
+  /// The load on one end, which is the figure conventionally quoted
   /// ("a hundred a side").
   double get perSideKg => perSide.fold(0.0, (sum, p) => sum + p.kg * p.count);
 }
 
-/// Breaks [totalKg] down into bar plus plates, or null when there is nothing
-/// to draw.
+/// Decomposes [totalKg] into a bar and its plates, returning null when there is
+/// nothing to render.
 ///
-/// Null — not an empty load — for a target **under** the bar: an impossible
-/// weight has no plate diagram, and drawing a bare bar for "I typed 15 on a
-/// 20kg bar" would answer a question nobody asked.
+/// Returns null, rather than an empty load, for a target below the bar weight.
+/// An unattainable weight has no plate diagram, and rendering a bare bar for a
+/// 15 kg target on a 20 kg bar would answer a question that was not asked.
 ///
-/// The bar weight exactly is a load, and a drawn one: `isBarOnly`, no plates,
-/// asserted by `an empty bar loads nothing`. This said "at or under" and meant
-/// it about neither the code nor the test beneath it — the boundary is
-/// `totalKg < barKg`.
+/// A target equal to the bar weight is a valid load and is rendered as such:
+/// `isBarOnly`, with no plates, as asserted by `an empty bar loads nothing`.
+/// The boundary condition is `totalKg < barKg`.
 ///
-/// Greedy from the heaviest plate down, which is both optimal for this set
-/// (every plate divides the next one up, or is half of it) and what you
-/// actually do at the rack: big ones first, and they go on inside.
+/// The algorithm is greedy from the heaviest plate down. This is optimal for
+/// this plate set, in which each plate divides or halves the next, and it
+/// matches loading practice, where the heaviest plates are placed innermost.
 PlateLoad? solvePlateLoad({
   required double totalKg,
   required double barKg,
@@ -75,13 +77,15 @@ PlateLoad? solvePlateLoad({
 }) {
   if (barKg <= 0 || totalKg < barKg) return null;
 
-  // Integer half-kilos of *total* load, not per side. Two reasons, and the
-  // second one cost a red test: doubles leave 2.4999999999999996kg of
-  // "unloadable" weight on a bar that loads exactly, and a per-side figure is
-  // not always a whole number of half-kilos — 62.5kg on a 20kg bar is 21.25 a
-  // side, which rounds to 21.5 and invents a kilo that is not on the bar.
+  // Integer half-kilograms of total load rather than per-side load, for two
+  // reasons. Floating-point arithmetic leaves 2.4999999999999996 kg of
+  // apparently unloadable weight on a bar that loads exactly, and a per-side
+  // figure is not always a whole number of half-kilograms: 62.5 kg on a 20 kg
+  // bar is 21.25 per side, which rounds to 21.5 and introduces a kilogram that
+  // is not present.
   //
-  // One plate goes on at both ends, so it spends `kg * 4` halves of total.
+  // A plate is placed on both ends, so it consumes `kg * 4` half-kilograms of
+  // the total.
   var remainingHalves = ((totalKg - barKg) * 2).round();
   final perSide = <PlateStack>[];
 

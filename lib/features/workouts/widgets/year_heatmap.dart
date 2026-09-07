@@ -6,13 +6,13 @@ import '../heatmap_data.dart';
 
 /// One calendar year, drawn rather than built.
 ///
-/// The old version was a `Widget` per day — a `Tooltip` wrapping a `Container`,
-/// 366 of them per year, inside a `ListView` whose children are built eagerly.
-/// Thirty years of history was **eleven thousand widgets** laid out and painted
-/// before the first frame, which is exactly what the scroll felt like.
-///
-/// A year is one `CustomPaint` now: 366 rounded rectangles on a canvas, no
+/// A year is one `CustomPaint`: 366 rounded rectangles on a canvas, no
 /// elements, no layout, no tooltips. The whole screen is a handful of paints.
+///
+/// A `Widget` per day — a `Tooltip` wrapping a `Container`, 366 of them per
+/// year, inside a `ListView` whose children are built eagerly — puts **eleven
+/// thousand widgets** through layout and paint before the first frame on thirty
+/// years of history, which is exactly what the scroll feels like.
 ///
 /// It also fits the width instead of scrolling. A year you have to drag through
 /// is not a year at a glance, which is the only reason to open this screen —
@@ -32,15 +32,15 @@ class YearHeatmap extends StatefulWidget {
 }
 
 class _YearHeatmapState extends State<YearHeatmap> {
-  /// The day being inspected. Tooltips were the old way of answering "which
-  /// day is that", and a tooltip per cell is what made this screen slow — one
-  /// readout under the grid says the same thing and costs one widget.
+  /// The day being inspected. One readout under the grid answers "which day is
+  /// that" for the cost of one widget, where a tooltip per cell is most of what
+  /// makes this screen slow.
   int? _picked;
 
   /// The month strip sits *under* the grid, not over it, and it is the only
-  /// axis the year gets. The weekday column went with the old layout: three
-  /// letters down the left cost a tenth of the width to answer a question
-  /// nobody opens this screen with, and losing it makes every cell bigger.
+  /// axis the year gets. There is no weekday column: three letters down the
+  /// left cost a tenth of the width to answer a question nobody opens this
+  /// screen with, and the space goes into the cells instead.
   ///
   /// Tall enough for one line of `labelSmall` and no taller — this row *is* the
   /// bottom of the block, so every spare pixel in it shows up as a card that
@@ -288,10 +288,9 @@ class _YearPainter extends CustomPainter {
   /// four or five columns wide, so anchoring to its first week pushes every
   /// label left of the block it names and makes December fall off the end.
   ///
-  /// All twelve, always. They used to be dropped when two would have touched,
-  /// which is how a year ended up labelled Jan, Apr, Jul, Oct — the type
-  /// shrinks to fit instead, down to a floor, because a missing month is worse
-  /// than a small one.
+  /// All twelve, always. The type shrinks to fit, down to a floor, rather than
+  /// dropping labels when two would touch — that is how a year ends up labelled
+  /// Jan, Apr, Jul, Oct, and a missing month is worse than a small one.
   void _months(Canvas canvas, Size size, Map<int, _Span> spans) {
     if (spans.isEmpty) return;
     final top = 7 * cell + 6 * gap + gap;

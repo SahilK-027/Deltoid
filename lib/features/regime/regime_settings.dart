@@ -15,8 +15,8 @@ import 'regime_screen.dart';
 /// deload schedule and the order of the days are all things you change once and
 /// then live with.
 ///
-/// The catalog and the list of regimes used to be in here too. They are on the
-/// Regime index now — neither is a property of this programme.
+/// The catalog and the list of regimes are on the Regime index instead:
+/// neither is a property of this programme.
 Future<void> showRegimeSettings(
   BuildContext context,
   WidgetRef ref,
@@ -269,7 +269,7 @@ class StepperRow extends StatelessWidget {
         row,
         Padding(
           // Aligned with the title above it, and carrying the row's bottom
-          // padding now that the row itself has none to give.
+          // padding, the row itself having none to give.
           padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
           child: Text(helper!, style: context.t.bodyMedium),
         ),

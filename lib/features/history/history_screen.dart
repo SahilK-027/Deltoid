@@ -22,11 +22,11 @@ final historyViewProvider =
 /// Two ways in, because "what did I do" has two meanings: which day
 /// (Sessions) and which lift (Exercises).
 ///
-/// A third once existed — the old Notion table, exercises down the side and one
-/// column per date. It was dropped: the feed answers "which day" better and the
-/// per-exercise history answers "how has this moved" better, and a spreadsheet
-/// re-created inside the app that replaced the spreadsheet is one screen of
-/// horizontally scrolled cells nobody opened.
+/// Not a third: a Notion-style table, exercises down the side and one column
+/// per date, is answered better by the feed for "which day" and by the
+/// per-exercise history for "how has this moved". A spreadsheet re-created
+/// inside the app that replaced the spreadsheet is one screen of horizontally
+/// scrolled cells nobody opens.
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
@@ -43,9 +43,8 @@ class HistoryScreen extends ConsumerWidget {
               title: 'History',
               // The band is a full-width surface, so it is composed across its
               // width: title left, the total right, the control spanning both
-              // underneath. Stacked flush left it left the right half of the
-              // band empty, which is what made it read as unfinished rather
-              // than spare.
+              // underneath. Stacked flush left it leaves the right half of the
+              // band empty, which reads as unfinished rather than spare.
               eyebrow: _eyebrow(overview),
               // Without the eyebrow the title is the first line under the
               // status bar, and 12 leaves it sitting on the notch (THEME → Space).
@@ -75,15 +74,15 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
-  /// `SINCE MARCH 2024` — but only once there is a span to state. A history one
-  /// day old printed "since July 2026", which is the same dishonesty as the
-  /// sessions-per-week rate that divided by three weeks that hadn't happened.
-  /// The line above the title.
+  /// `SINCE MARCH 2024`, the line above the title — but only once there is a
+  /// span to state. A history one day old printing "since July 2026" is the
+  /// same dishonesty as a sessions-per-week rate divided by three weeks that
+  /// have not happened.
   ///
   /// An empty log says so rather than dropping the line: without it the title
   /// is the first thing under the status bar, and the one screen state where
-  /// you most need telling what you are looking at was the one state that said
-  /// the least. Null while the count is still in flight — a line that appears
+  /// you most need telling what you are looking at is the one that says the
+  /// least. Null while the count is still in flight — a line that appears
   /// a frame later is the staged reveal this app avoids.
   static String? _eyebrow(HistoryOverview? overview) {
     if (overview == null) return null;
@@ -115,9 +114,9 @@ class _TotalStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = overview?.sessions;
     // An empty log says so in the eyebrow, and a `—— sessions` beside it is the
-    // same fact twice on one screen (rule 6). It also read as a black rule
-    // rather than as a pair of dashes once the light theme was driven: two em
-    // dashes at 22sp bold in `#111111` is a line, not a zero state.
+    // same fact twice on one screen (rule 6). On the light theme it also reads
+    // as a black rule rather than as a pair of dashes: two em dashes at 22sp
+    // bold in `#111111` is a line, not a zero state.
     //
     // The dash still stands for a count that has not *arrived* — that one is a
     // gap the next frame fills, not an absence the header already named.
@@ -190,8 +189,8 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
     return Column(
       children: [
         // The bar arrives once there is more than one day in history, and
-        // leaves when a filter is cleared on a short log. Both used to happen
-        // between two frames, jolting the list under it.
+        // leaves when a filter is cleared on a short log. Either between two
+        // frames jolts the list under it.
         AnimatedSize(
           duration: Motion.base,
           curve: Motion.emphasized,
@@ -264,9 +263,8 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
               // without reading the rows under it.
               // A month is a section like any other, so it is a
               // `SectionHeader` — same 20sp, same 12 underneath, same gutter as
-              // `Consistency` on Workouts or `Data` in Settings. It was a
-              // hand-rolled row for long enough to drift a few points off all
-              // of them.
+              // `Consistency` on Workouts or `Data` in Settings. Hand-rolled,
+              // it drifts a few points off all of them.
               _MonthHeader(:final label, :final count) => Padding(
                   padding: EdgeInsets.fromLTRB(
                     Space.gutter,
@@ -368,9 +366,9 @@ class _FeedFilterBar extends ConsumerWidget {
       return null;
     }();
 
-    // 12 + a 40pt chip + 12. It was 52 with no bottom padding at all, so the
-    // chips sat flush on the strip's edge and the first row of the feed ran
-    // straight into them — the row below has to clear a control, not touch it.
+    // 12 + a 40pt chip + 12. At 52, with no bottom padding at all, the chips
+    // sit flush on the strip's edge and the first row of the feed runs straight
+    // into them — the row below has to clear a control, not touch it.
     return SizedBox(
       height: 64,
       child: ListView(
@@ -501,15 +499,15 @@ class _WorkoutRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final date = dateFromDayKey(summary.workout.dayKey);
-    // Every session is the heatmap's blue; a deload is orange. The tile carried
-    // the regime's identity hue, which is what made a deload unreadable in this
-    // column — orange against six other colours, and invisible against the
-    // orange regime. Down a feed the question is which of these days was light,
-    // and that is now the only thing the colour answers.
+    // Every session is the heatmap's blue; a deload is orange. The regime's
+    // identity hue would make a deload unreadable in this column — orange
+    // against six other colours, and invisible against the orange regime. Down
+    // a feed the question is which of these days was light, and that is the
+    // only thing the colour answers.
     final mark = summary.workout.isDeload ? c.deload : c.heatOn;
 
     // No programme name: the tile already carries it as colour, and spelled
-    // out it was long enough to push the line into an ellipsis on a phone.
+    // out it is long enough to push the line into an ellipsis on a phone.
     // No `0 min` either — a duration under a minute is a clock that never ran,
     // and printing it as a zero is the bug face rule 4 is about.
     final minutes = summary.durationMinutes;

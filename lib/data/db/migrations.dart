@@ -4,18 +4,18 @@ import 'database.dart';
 
 /// The ladder: one step per released schema change, and every step idempotent.
 ///
-/// It starts here because **sync is what makes it necessary**
+/// It begins here because sync is what makes it necessary
 /// ([RULES.md § 3](RULES.md#3-schema-and-migrations),
-/// [SYNC.md § 18](SYNC.md#18-the-phases)). Until now a schema change was an
-/// edit, a regenerate and a reinstall, which is honest while the only phone
-/// running the app is the one it is written on. Sync is precisely the feature
+/// [SYNC.md § 18](SYNC.md#18-the-phases)). A schema change as an edit, a
+/// regenerate and a reinstall is honest while the only phone running the app is
+/// the one it is written on. Sync is precisely the feature
 /// that lets a phone on one build exchange rows with a server another build
 /// wrote, and a reinstall is not something to ask of a phone that is the only
 /// copy of a history.
 ///
-/// **Idempotent, every step, always.** A device handed an earlier
-/// build and then the newer one again arrives with the structure already in
-/// place and the version stamp behind it — drift replays the step, and
+/// Every step is idempotent, in all cases. A device given an earlier build and
+/// then the newer one again arrives with the structure already in place and the
+/// version stamp behind it: drift replays the step, and
 /// `CREATE INDEX` or `ALTER TABLE ADD COLUMN` on something that already exists
 /// throws at open, before a single screen is drawn. So: [addColumnIfMissing],
 /// never a bare `m.addColumn`; `IF NOT EXISTS`, never a bare `m.createIndex`.
@@ -34,7 +34,8 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // permanently. `regimes.activated_at` is the fact the flag is derived from;
   // see [Regimes.activatedAt] and `resolveActiveRegime`.
   //
-  // **Backfilled onto the regime that is active right now**, because the app
+  // Backfilled onto the regime that is currently active, because the
+  // application
   // already knows the answer and the honest default is only honest for a row
   // nobody has been asked about. Leaving every row null on an existing phone
   // would give the derivation no candidate at all, and the first sync would
@@ -58,7 +59,7 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // `workout_exercises.bar_kind` is the snapshot of what was used, so a bar
   // changed today does not redraw the plates of a session logged in March.
   //
-  // **Both left null, and deliberately not backfilled.** Null reads as "follow
+  // Both are left null and deliberately not backfilled. Null denotes "follow
   // the catalog", which is exactly what every existing row meant when it was
   // written: no slot had an override, and every logged set drew its plates off
   // `exercises.bar_kind`. Copying the catalog's answer onto them would freeze

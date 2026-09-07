@@ -52,9 +52,9 @@ extension MuscleRegionX on MuscleRegion {
 
 /// The region a muscle counts toward, or null for [MuscleGroup.other].
 ///
-/// `other` is filed nowhere on purpose: it is the muscle you picked when none
-/// of the twelve fit, and `Other · 4 sets` answers no question about whether
-/// you have trained enough of anything.
+/// `other` is deliberately assigned to no region. It denotes a movement that
+/// none of the twelve muscles describes, and `Other · 4 sets` answers no
+/// question about training adequacy.
 MuscleRegion? regionOf(MuscleGroup muscle) => switch (muscle) {
   MuscleGroup.chest => MuscleRegion.chest,
   MuscleGroup.back => MuscleRegion.back,
@@ -112,17 +112,19 @@ class MuscleVolume {
 class WeeklyVolume {
   const WeeklyVolume({required this.rows, required this.windowDays});
 
-  /// All six regions, always, in [MuscleRegion] order and never re-sorted: a
-  /// list whose rows move is one you have to read rather than glance at, and a
-  /// muscle you skipped has to keep its place or its absence is invisible.
+  /// All six regions, in [MuscleRegion] order and never re-sorted.
+  ///
+  /// A list whose rows change position must be read rather than scanned, and an
+  /// untrained muscle must retain its position or its absence is not
+  /// apparent.
   final List<MuscleVolume> rows;
 
   final int windowDays;
 
   /// The biggest row, which every bar is drawn against. Zero on an empty week.
   ///
-  /// Normalised to your own maximum rather than to a target: this app has no
-  /// business inventing a number of sets you are failing to hit
+  /// Normalised against the user's own maximum rather than against a target.
+  /// The application does not define a set count the user is expected to reach
   /// (RULES § Scope).
   int get maxSets => rows.fold(0, (m, r) => r.sets > m ? r.sets : m);
 

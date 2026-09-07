@@ -460,10 +460,10 @@ String applyKey(
     default:
       if (buffer == '0') return key;
       final candidate = buffer + key;
-      // A ceiling on the value, not on the digit count. The old rule counted
-      // characters, which let `999.99` through and stopped `1000.5` for being
-      // long rather than for being wrong — and on a bar that reads as the app
-      // refusing a legitimate number.
+      // A ceiling on the value, not on the digit count. Counting characters
+      // lets `999.99` through and stops `1000.5` for being long rather than for
+      // being wrong, which on a bar reads as the app refusing a legitimate
+      // number.
       final value = double.tryParse(candidate);
       if (value == null || value > maxEntry(field)) return buffer;
       return candidate;

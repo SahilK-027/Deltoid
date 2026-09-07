@@ -30,12 +30,12 @@ final exerciseCatalogProvider = StreamProvider<List<Exercise>>((ref) {
 
 /// What this exercise *is*, as opposed to what you can do to it.
 ///
-/// Opened from the ⓘ beside the ⋯. It exists because the header had grown a
-/// running commentary — a line under the exercise's name saying where today's
-/// ghost values came from, or "First time — no previous log" when there was
-/// nothing to say. That line is load-bearing when it names a session ("From
-/// Push 2 · 12 Jul" is the one rule this app exists for), and pure noise when
-/// it announces an absence, so the absence moved in here with the rest of the
+/// Opened from the ⓘ beside the ⋯. It keeps the header from carrying a running
+/// commentary — a line under the exercise's name saying where today's ghost
+/// values came from, or "First time — no previous log" when there is nothing to
+/// say. That line is load-bearing when it names a session ("From Push 2 ·
+/// 12 Jul" is the one rule this app exists for), and pure noise when it
+/// announces an absence, so the absence lives in here with the rest of the
 /// facts that are true but not urgent mid-set.
 Future<void> showExerciseInfo(
   BuildContext context,
@@ -167,9 +167,9 @@ Future<void> showExerciseMenu(
   //
   // The template is safe to edit mid-workout — `WorkoutExercise` and `SetLog`
   // are snapshots rather than pointers (RULES § Data), which is exactly what
-  // `live_workout_vs_editing_test.dart` proves — so nothing here was ever
-  // blocked. There was simply no door: the exercise's own screen, and with it
-  // the day's rest, bar, targets and deload, could only be reached from the
+  // `live_workout_vs_editing_test.dart` proves — so nothing here is blocked.
+  // What it needs is a door: without this row the exercise's own screen, and
+  // with it the day's rest, bar, targets and deload, is reachable only from the
   // Regime tab, which means walking out of the session you are standing in.
   //
   // Resolved before the sheet is built, because the row's presence depends on
@@ -198,8 +198,8 @@ Future<void> showExerciseMenu(
       //
       // Same construction as the session drawer in workout detail: full-bleed
       // `AppRow`s, no card, no rules between them. The two sheets are the same
-      // object in two places and used to be built two different ways, so their
-      // rows sat on different insets and their titles in different sizes.
+      // object in two places, and building them two ways puts their rows on
+      // different insets and their titles in different sizes.
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
         // Today's note on today's exercise. Distinct from the cue above it,
@@ -255,8 +255,8 @@ Future<void> showExerciseMenu(
             navigator.pop();
             if (replacement == null) return;
             // In place: same position, same target sets, set shape from the
-            // replacement's own history. Remove-then-add used to drop it at
-            // the end of the workout.
+            // replacement's own history. Remove-then-add would drop it at the
+            // end of the workout.
             await repo.replaceExerciseInWorkout(
               entry.workoutExercise.id,
               replacement.id,
@@ -312,7 +312,7 @@ Future<void> showExerciseMenu(
             // Only when there is something to lose. Removing an exercise you
             // have not started is a correction and asking about it is noise;
             // removing one you have logged four sets into deletes those four
-            // sets, and it was one tap from a sheet with no way back.
+            // sets, and unasked it is one tap from a sheet with no way back.
             if (logged > 0) {
               final sure = await confirmAction(
                 context,
@@ -341,11 +341,10 @@ Future<void> showExerciseMenu(
 /// and arrive from a template, but nothing types them by hand mid-session.
 String _typeBlurb(SetType type) => switch (type) {
   SetType.working => 'Counts towards the top set and est. 1RM',
-  // Half of what this used to say was untrue. A warm-up is out of the
-  // progression maths — no top set, no e1RM, no volume — and it is *not*
-  // out of last-time: the ramp is mirrored into next week's rows and
-  // ghosted like any other set, which is the whole reason it is worth
-  // typing one in.
+  // A warm-up is out of the progression maths — no top set, no e1RM, no
+  // volume — and it is *not* out of last-time: the ramp is mirrored into
+  // next week's rows and ghosted like any other set, which is the whole
+  // reason it is worth typing one in.
   SetType.warmup => 'Out of progression, filled from last time',
   SetType.drop => 'Continues the set above it, lighter',
   _ => '',
@@ -371,13 +370,13 @@ Future<void> showSetActions(
   WidgetRef ref,
   SetLog set, {
 
-  /// The working-set number the row's chip prints. Not the raw position: the
-  /// sheet used to head itself "Set 4" for the row marked `2` whenever
-  /// warm-ups or drop legs sat above it, because it counted rows.
+  /// The working-set number the row's chip prints. Not the raw position:
+  /// counting rows would head the sheet "Set 4" for the row marked `2` whenever
+  /// warm-ups or drop legs sat above it.
   ///
   /// Only used for a working set. A warm-up's chip prints `W` and a drop leg's
-  /// prints `D`, which are marks on a table, not names — heading a sheet
-  /// "Set W" said nothing.
+  /// prints `D`, which are marks on a table, not names — a sheet headed
+  /// "Set W" says nothing.
   required String label,
 
   /// Which leg of a drop group, counting the head as 1. Null for a set that is
@@ -402,9 +401,9 @@ Future<void> showSetActions(
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
         // A picker, built the way every other picker in the app is: rows with
-        // the live one ticked. It was a strip of chips, which made this the
-        // only sheet where choosing something meant hitting a pill instead of
-        // a row, and the chips carried no room to say what a type does.
+        // the live one ticked. A strip of chips would make this the only sheet
+        // where choosing something means hitting a pill instead of a row, with
+        // no room to say what a type does.
         // Working first, because it is what almost every row already is and
         // what a mis-typed row is being put back to.
         for (final type in const [
@@ -522,12 +521,11 @@ Future<Exercise?> pickExercise(
     // the whole screen — the status bar included, which is where `Exercises`
     // ended up drawn across the clock and the battery.
     //
-    // It could not be fixed inside the sheet, and that was three attempts
-    // finding out. A modal route reports **both** `padding` and `viewPadding`
-    // as zero to its own child — measured on a phone, not assumed:
-    // `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` with the keyboard up. So
-    // every arithmetic version of this was reading `max(0, 0)` and reserving
-    // nothing. The inset is the route's to know.
+    // It cannot be answered inside the sheet. A modal route reports **both**
+    // `padding` and `viewPadding` as zero to its own child — measured on a
+    // phone, not assumed: `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` with
+    // the keyboard up. So every arithmetic version reads `max(0, 0)` and
+    // reserves nothing. The inset is the route's to know.
     useSafeArea: true,
     showDragHandle: false,
     builder: (_) => _ExercisePicker(alreadyIn: alreadyIn),
@@ -570,21 +568,21 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     ];
 
     // Eight tenths of the screen, or whatever is left above the keyboard —
-    // whichever is less. The two were added together before: the sheet reserved
-    // the keyboard *and* then asked for 80% of the whole phone, so with the pad
-    // up it wanted 115% of the screen. This is the one sheet that opens with a
-    // field focused, so it was the one where that always happened.
+    // whichever is less, never the two added together: reserving the keyboard
+    // *and* then asking for 80% of the whole phone wants 115% of the screen
+    // with the pad up. This is the one sheet that opens with a field focused,
+    // so it is the one where that happens every time.
     //
     // **Reserved in one number, the way `AppSheet` does it**, because this
     // sheet builds its own column and has to answer the same question itself.
     //
-    // It used to reserve the keyboard in the padding and leave the gesture bar
-    // to an inner `SafeArea`. Split like that, neither half is reliable: the
-    // height was computed against `viewInsets` alone, so the box asked for more
-    // room than there was above the bar, and the `SafeArea` could only inset
-    // content *within* a box already too tall — on a phone reporting no
-    // `viewPadding` to the sheet's own `MediaQuery` it inset nothing, and the
-    // list ran under the navigation bar.
+    // Reserving the keyboard in the padding and leaving the gesture bar to an
+    // inner `SafeArea` makes neither half reliable: the height is computed
+    // against `viewInsets` alone, so the box asks for more room than there is
+    // above the bar, and the `SafeArea` can only inset content *within* a box
+    // already too tall — on a phone reporting no `viewPadding` to the sheet's
+    // own `MediaQuery` it insets nothing, and the list runs under the
+    // navigation bar.
     //
     // `viewInsets.bottom + padding.bottom` is the right sum for the reason
     // `AppSheet` gives: the two never overlap, because `padding` is what the

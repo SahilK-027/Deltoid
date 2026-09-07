@@ -5,9 +5,9 @@ import 'sync_providers.dart';
 
 /// Keeps the sync engine alive, and tells it when the app comes forward.
 ///
-/// **The lifecycle hook is new.** There is exactly one
-/// `WidgetsBindingObserver` in this app and it belongs to the log screen, which
-/// is already carrying the rest alarm; sync mounts its own at the root
+/// This mounts a second lifecycle observer. The only other
+/// `WidgetsBindingObserver` in the application belongs to the log screen, which
+/// already carries the rest alarm; sync mounts its own at the root
 /// ([SYNC.md § 18](SYNC.md#18-the-phases), phase 3). At the root because a
 /// resume matters most on the screen sync is *not* on: the phone was in a
 /// pocket between sets, and the rows owed are the ones logged before it went

@@ -560,7 +560,7 @@ void main() {
     final payload = await backup.buildPayload();
     // A file written by a build that knows a column, or an enum value, this
     // one does not. Restoring it clears every table first, so the failure
-    // would land after the old data was gone.
+    // would land after the existing data was gone.
     payload['schemaVersion'] = db.schemaVersion + 1;
     final json = jsonEncode(payload);
 
@@ -570,10 +570,10 @@ void main() {
     expect((await db.select(db.workouts).get()).length, 1);
   });
 
-  // A restore from a *lower* schema stamp used to be tested here. At schema 1
-  // there is no lower number to stamp, and what that test was really reaching
-  // for — a row that arrives without a column this build reads — is covered
-  // properly by 'a file written before a column existed still restores'.
+  // There is no test for a restore from a *lower* schema stamp: at schema 1
+  // there is no lower number to stamp, and what such a test would reach for — a
+  // row that arrives without a column this build reads — is covered by 'a file
+  // written before a column existed still restores'.
 
   /// A restore replaces the database entirely or changes nothing, and it
   /// lands every row the file claims to carry.
@@ -820,7 +820,7 @@ void main() {
       // newer one while the older keeps its sets and becomes unreachable. No
       // repair knows a move for it — which of two half-logged sessions is the
       // one you are in is not a question code can answer — so the file is
-      // refused whole and the old rows stay.
+      // refused whole and the rows already on disk stay.
       await logASession();
       await logASession();
       final (workoutId, before) = await census();
@@ -843,13 +843,11 @@ void main() {
     test('a file a repair can straighten out is restored, then straightened',
         () async {
       // The other half of the same check, and the reason it is only ever asked
-      // about the unhealable rules. Discarding a session used to tombstone the
-      // workout and leave its snapshots alive underneath — a tombstone is a
-      // column rather than a foreign key, so nothing refuses one on the way in
-      // and every export written by those builds carries the shape.
-      // `healOrphanedSnapshots` has always put it right on the next launch.
-      // Refusing the file instead would be refusing a history the app can
-      // read.
+      // about the unhealable rules. Snapshots left alive under a tombstoned
+      // workout reach a file freely — a tombstone is a column rather than a
+      // foreign key, so nothing refuses one on the way in — and
+      // `healOrphanedSnapshots` puts it right on the next launch. Refusing the
+      // file instead would be refusing a history the app can read.
       await logASession();
 
       final payload = await backup.buildPayload();
@@ -921,7 +919,7 @@ void main() {
       await expectLater(dying.writeBackup(target), throwsA(anything));
 
       // Byte for byte what was there before. The rename is what buys this: the
-      // old file is never opened for writing at all.
+      // file already on disk is never opened for writing at all.
       expect(target.readAsStringSync(), good);
       expect(namesIn(dir), ['deltoid-2026-03-01-0900.json']);
     });

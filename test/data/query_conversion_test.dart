@@ -10,12 +10,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:deltoid/domain/session_name.dart';
 
 /// The rule every raw-SQL conversion in this repository is held to: an
-/// unbounded query is only rewritten once a test has run the old drift path and
-/// the new one over the same seeded data and found them identical field by
-/// field. The drift implementations below are the ones that were in
-/// `TrainingRepository` before the rewrite, copied verbatim; they stay here
-/// because a parity test whose reference implementation was deleted proves
-/// nothing on the next change.
+/// unbounded query is only rewritten once a test has run the drift path and the
+/// raw one over the same seeded data and found them identical field by field.
+/// The drift implementations below are the ones `TrainingRepository` carried
+/// before each rewrite, copied verbatim; they stay here because a parity test
+/// whose reference implementation was deleted proves nothing on the next
+/// change.
 ///
 /// The second reason they stay: raw SQL gives up compile-time column names, so
 /// a renamed column compiles and fails on a device. These read every column the

@@ -56,7 +56,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
 
     // A pushed screen: small centred title, back arrow, actions on the right.
     // The 30sp masthead belongs to the four destinations — a logged day wearing
-    // one made it look like somewhere you navigate to rather than into.
+    // one looks like somewhere you navigate to rather than into.
     return Scaffold(
       appBar: AppBar(
         title: Text(detail.session?.name ?? unplannedSessionName),
@@ -188,10 +188,10 @@ class WorkoutDetailScreen extends ConsumerWidget {
         subtitle: DateFormat(
           'd MMMM yyyy',
         ).format(dateFromDayKey(detail.workout.dayKey)),
-        // Full-bleed rows, no card. The rows had been sitting on a card inside
-        // a sheet — a panel in a panel — and the sheet's gutter then inset them
-        // a second time on top of the padding `AppRow` already carries, so the
-        // left edge of every action stood in from the title above it.
+        // Full-bleed rows, no card. A card inside a sheet is a panel in a
+        // panel, and the sheet's gutter then insets the rows a second time on
+        // top of the padding `AppRow` already carries, standing the left edge
+        // of every action in from the title above it.
         contentPadding: const EdgeInsets.only(bottom: Space.md),
         children: [
           AppRow(
@@ -394,7 +394,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                       ),
                       // Only when the block has no expansion to hold it. With
                       // sets under it the note is inside, in full, and printing
-                      // an ellipsized copy up here was the same sentence twice
+                      // an ellipsized copy up here is the same sentence twice
                       // — once cut short, once whole.
                       if (note != null && done.isEmpty) ...[
                         const SizedBox(height: Space.xs),
@@ -459,11 +459,9 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                     unit: unit,
                   ),
                 ],
-                // Three different kinds of thing used to sit here as three
-                // identical links: what happened, what was said about it, and
-                // where to go next. They are told apart now — the sets are a
-                // table, the note is a card of prose, and only the one thing
-                // that navigates looks like a link.
+                // Three different kinds of thing, told apart: what happened is
+                // a table, what was said about it is a card of prose, and only
+                // where to go next looks like a link.
                 const SizedBox(height: Space.md),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
@@ -562,8 +560,8 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
 ///
 /// A card of prose, built the same way every other block on this page is: the
 /// note is the *content* of its section, not a quote pinned to the side of one.
-/// It was a sunken panel with a rule down its left, which put the one piece of
-/// writing on the screen in the darkest box on it, at the smallest contrast.
+/// A sunken panel with a rule down its left would put the one piece of writing
+/// on the screen in the darkest box on it, at the smallest contrast.
 class _NoteBlock extends StatelessWidget {
   const _NoteBlock({
     required this.note,
@@ -594,8 +592,9 @@ class _NoteBlock extends StatelessWidget {
               child: Text(
                 text ?? placeholder,
                 // `body` at 15 on `surface`, in the primary colour once there
-                // is something to read — a written note is the only prose on
-                // this page and had been set in the same grey as the captions.
+                // is something to read: a written note is the only prose on
+                // this page, and the captions' grey would file it as a
+                // caption.
                 style: text == null
                     ? context.t.bodyLarge?.copyWith(color: c.textTertiary)
                     : context.t.bodyLarge?.copyWith(color: c.textPrimary),
@@ -664,8 +663,8 @@ class _SetLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  // `loadWithCount`, not a load and a count joined here: this
-                  // line was that function written a second time, and the two
+                  // `loadWithCount`, not a load and a count joined here: that
+                  // would be the same function written a second time, and two
                   // spellings are exactly how one screen ends up disagreeing
                   // with another about the same set.
                   loadWithCount(

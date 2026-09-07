@@ -13,12 +13,11 @@ import '../../core/widgets/toast.dart';
 
 /// The Regimes tab: every programme, and the catalog they are all built from.
 ///
-/// The tab used to open straight into the active regime's editor, which made
-/// the other regimes look deleted — they were two sheets deep behind a sliders
-/// button, next to the catalog. This is the index of the section instead:
-/// what exists, which one is being trained, and the shared list of movements.
-/// One tap in and you are on the same editor as before, now scoped to the
-/// regime you tapped rather than to whichever one is active.
+/// The index of the section: what exists, which one is being trained, and the
+/// shared list of movements. Opening straight into the active regime's editor
+/// makes the other regimes look deleted, two sheets deep behind a sliders
+/// button next to the catalog. One tap in is the same editor, scoped to the
+/// regime tapped rather than to whichever one is active.
 class RegimesScreen extends ConsumerWidget {
   const RegimesScreen({super.key});
 

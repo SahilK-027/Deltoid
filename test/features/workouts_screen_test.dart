@@ -16,10 +16,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Workouts used to assemble itself from a dozen watched queries in dependency
-/// layers, so it revealed itself in stages and flashed an empty state on the
-/// way. These tests are about *what the user sees between frames*, not about
-/// the final tree — pump one frame at a time rather than `pumpAndSettle`.
+/// Workouts resolves in one frame rather than assembling itself from a dozen
+/// watched queries in dependency layers, which reveals the screen in stages and
+/// flashes an empty state on the way. These tests are about *what the user sees
+/// between frames*, not about the final tree — pump one frame at a time rather
+/// than `pumpAndSettle`.
 
 /// The blank template is first in the list and has no sessions in it, which is
 /// Today's *other* empty state, so these tests build a real split.
@@ -128,8 +129,8 @@ void main() {
     final first = clock();
     expect(first, startsWith('02:'));
 
-    // This is the whole point: the old card read `DateTime.now()` once during
-    // build with nothing to rebuild it, so it said "0m" for the entire session.
+    // This is the whole point: `DateTime.now()` read once during build, with
+    // nothing to rebuild the card, says "0m" for the entire session.
     //
     // Both clocks have to move. `pump` advances the fake one the ticker runs
     // on; `runAsync` lets the real one — the one the card reads — advance too,
@@ -144,9 +145,9 @@ void main() {
 
   testWidgets('the consistency grid clears the fold on a six-session split',
       (tester) async {
-    // The grid used to sit under a cycle drawn twice — a row of labelled bars in
-    // the hero card and then the same sessions again as a list — which put it
-    // off the bottom of the screen on every phone.
+    // A cycle drawn twice — a row of labelled bars in the hero card and then
+    // the same sessions again as a list — pushes the grid off the bottom of the
+    // screen on every phone.
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -185,22 +186,21 @@ void main() {
     expect(
       find.text('Nothing logged'),
       findsOneWidget,
-      reason: 'the zero state used to drop the header entirely',
+      reason: 'the zero state carries the header like every other state',
     );
-    // Settings used to be a cog up here, and this test guarded it because a
-    // fresh install restoring a backup had no other route in. It is a nav
-    // destination now, so the cog is gone and the route is one tap from
-    // everywhere — including this screen.
+    // No cog up here: Settings is a nav destination, so a fresh install
+    // restoring a backup reaches it in one tap from everywhere, this screen
+    // included.
     expect(find.byTooltip('Settings'), findsNothing);
   });
 
   testWidgets('a regime with no sessions keeps the page it will have',
       (tester) async {
     // THEME: a thing with no data still has a page, and it is the page it will
-    // have once there is some. This state used to be a lone centred card —
-    // Consistency, Weekly volume and the masthead's count all gone — so adding
-    // the first session looked like it built three sections when all it did was
-    // fill one.
+    // have once there is some. A lone centred card here — Consistency, Weekly
+    // volume and the masthead's count all gone — would make adding the first
+    // session look like it built three sections when all it did was fill
+    // one.
     await createRegimeFromTemplate(
       db,
       regimeTemplates.firstWhere((t) => t.key == 'blank'),
@@ -249,10 +249,10 @@ void main() {
       await pumpWorkouts(tester);
       await frames(tester);
 
-      // It used to be held back until something was logged, on the grounds
-      // that six empty tracks is a chart of nothing. What that cost was the
-      // section appearing from nowhere on the day of the first workout, which
-      // moved everything under it. The page keeps its shape instead.
+      // Not held back until something is logged, on the grounds that six empty
+      // tracks is a chart of nothing: that costs the section appearing from
+      // nowhere on the day of the first workout, moving everything under it.
+      // The page keeps its shape instead.
       expect(find.text('Weekly volume'), findsOneWidget);
       expect(find.byType(VolumeBars), findsOneWidget);
     });

@@ -4,16 +4,16 @@ import 'widgets/keypad.dart' show SetField;
 /// What a set is still missing before it can honestly be marked done, or null
 /// when it is complete.
 ///
-/// **A ticked set with nothing in it is worse than no set at all.** It used to
-/// be allowed, and it wrote a completed row with a null load and null reps:
-/// invisible to the progress chart, useless as next week's prefill, and
-/// indistinguishable later from a set that genuinely happened.
+/// **A ticked set with nothing in it is worse than no set at all.** Allowing it
+/// writes a completed row with a null load and null reps: invisible to the
+/// progress chart, useless as next week's prefill, and indistinguishable later
+/// from a set that genuinely happened.
 ///
-/// Pulled out of `_LogScreenState` and made a function over plain values for
-/// one reason: it was a private method, and the *second* way of ticking a set
-/// — typing reps and pressing Next — never called it. One rule that two paths
-/// have to remember to apply is a rule that holds on one of them. Now both
-/// paths ask this, and it can be tested without pumping a screen.
+/// A function over plain values rather than a method on `_LogScreenState`,
+/// because there are two ways of ticking a set — the checkbox, and typing reps
+/// and pressing Next — and one rule that two paths have to remember to apply is
+/// a rule that holds on one of them. Both paths ask this, and it can be tested
+/// without pumping a screen.
 ///
 /// [ghostWeight] and friends are last time's numbers for this slot. A blank
 /// cell with a ghost behind it is **not** missing: the tick adopts the ghost

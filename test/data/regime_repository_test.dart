@@ -9,7 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Regimes are additive: creating one only moves the active flag. These are the
-/// rules that make "I made a new regime and the old one disappeared" false.
+/// rules that make "I made a new regime and the last one disappeared" false.
 void main() {
   late AppDatabase db;
   late RegimeRepository repo;
@@ -292,7 +292,7 @@ void main() {
       // re-map and no read that can fail. A future version that retires a
       // member still runs its re-mapping UPDATE — but before the table rebuild
       // that narrows this constraint, never after it, because rows written
-      // under the old spelling were legal when they were written.
+      // under the superseded spelling were legal when they were written.
       await expectLater(
         db.customStatement(
           "UPDATE exercises SET bar_kind = 'standard' WHERE id = ?",

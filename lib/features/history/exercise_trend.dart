@@ -16,11 +16,10 @@ import '../../domain/units.dart';
 /// Estimated 1RM over time for one movement, split by the session it was
 /// trained in.
 ///
-/// This was its own tab. "How has my bench moved" is a history question, and
-/// History's per-exercise index is a better picker than the dropdown the
-/// Progress tab opened with, so the chart moved to the head of the exercise's
-/// own history rather than keeping a fourth destination alive to ask the same
-/// thing twice.
+/// Not its own tab. "How has my bench moved" is a history question, and
+/// History's per-exercise index is a better picker than a dropdown, so the
+/// chart sits at the head of the exercise's own history rather than keeping a
+/// fourth destination alive to ask the same thing twice.
 ///
 /// One line per session slot is the point, not a detail: 22.5kg in Push 1 and
 /// 20kg in Push 2 are two progressions, and drawing them as one is the mistake
@@ -99,11 +98,11 @@ final chartRangeProvider =
 /// **`autoDispose`, and that is the point.** Scoring a chart walks four hundred
 /// performances and every set in them — 150ms or more on a long history — and
 /// this watches `set_logs`, the hot table during a session. Kept alive, one
-/// visit to one exercise's chart meant that whole computation re-ran on every
-/// set ticked for the rest of the app's life, for a screen nobody was looking
-/// at, once per exercise ever opened. The exercise beside it
-/// (`exerciseByIdProvider`) and the page under it were already `autoDispose`;
-/// this one was the odd one out.
+/// visit to one exercise's chart re-runs that whole computation on every set
+/// ticked for the rest of the app's life, for a screen nobody is looking at,
+/// once per exercise ever opened. The exercise beside it
+/// (`exerciseByIdProvider`) and the page under it are `autoDispose` for the
+/// same reason.
 final exerciseProgressProvider = StreamProvider.autoDispose
     .family<List<ProgressPoint>, String>((ref, exerciseId) {
   return ref.watch(trainingRepositoryProvider).watchExerciseProgress(exerciseId);
@@ -141,9 +140,10 @@ class ExerciseTrend extends ConsumerWidget {
 
     // **The same shape whatever the answer is**, and that is the whole point of
     // this method. Scoring the chart is a walk over every performance ever, so
-    // it lands a beat after the list beneath it — and while it was absent the
-    // header collapsed to nothing, so the rows drew at the top of the screen
-    // and were then shoved down a chart's height when it arrived. Range bar,
+    // it lands a beat after the list beneath it. Without a fixed shape the
+    // header collapses to nothing while it is absent, so the rows draw at the
+    // top of the screen and are shoved down a chart's height when it
+    // arrives. Range bar,
     // plot, three figures: the layout is built before the numbers are known and
     // only its contents change.
     final points = all == null
@@ -278,11 +278,10 @@ class _Chart extends ConsumerWidget {
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
 
     // Every "there is nothing to draw" below is the chart itself, empty, on the
-    // axes it would have had. It used to be a short captioned box, which
-    // changed the height of the header — so moving from a full year to an
-    // untrained week pulled the performances up under your thumb, and the box
-    // read as the chart having failed rather than as a range you did not train
-    // in.
+    // axes it would have had. A short captioned box instead changes the height
+    // of the header, so moving from a full year to an untrained week pulls the
+    // performances up under your thumb, and the box reads as the chart having
+    // failed rather than as a range you did not train in.
     //
     // **One session is a chart, not an empty state.** A single dot is where you
     // are, and the next one is read against it; refusing to draw it until there

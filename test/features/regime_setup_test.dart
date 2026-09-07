@@ -98,8 +98,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Push / Pull / Legs · 6 day'));
     await tester.pumpAndSettle();
-    // Naming is a sheet now, not a dialog: the way out is its ✕, not a text
-    // button paired with Save (THEME §5, §7).
+    // Naming is a sheet, not a dialog: the way out is its ✕, not a text button
+    // paired with Save (THEME §5, §7).
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
 

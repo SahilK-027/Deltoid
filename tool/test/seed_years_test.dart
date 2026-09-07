@@ -74,10 +74,10 @@ void main() {
   });
 
   test('nobody deadlifts 900kg after fifty years', () async {
-    // Progression used to be a fixed increment per session, which is fine for
-    // a month and absurd for a decade: it produced barbell numbers no human
-    // has lifted and lateral raises heavier than the bar. Loads approach a
-    // ceiling instead, so a long history plateaus like a real one.
+    // A fixed increment per session is fine for a month and absurd for a
+    // decade: it produces barbell numbers no human has lifted and lateral
+    // raises heavier than the bar. Loads approach a ceiling instead, so a long
+    // history plateaus like a real one.
     await BackupService(db).restore(
       jsonEncode(buildSeedPayload(years: 50, seed: 5)),
     );

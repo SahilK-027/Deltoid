@@ -23,8 +23,8 @@ final regimeRepositoryProvider = Provider<RegimeRepository>(
 
 /// Every regime with its size and how much was logged under it. Watched rather
 /// than read on demand: a `ref.read` of a provider nobody listens to always
-/// comes back empty, which is exactly how the old switcher managed to make a
-/// full shelf of regimes look deleted.
+/// comes back empty, which is how a switcher can make a full shelf of regimes
+/// look deleted.
 final regimeSummariesProvider = StreamProvider<List<RegimeSummary>>((ref) {
   return ref.watch(regimeRepositoryProvider).watchRegimeSummaries();
 });
@@ -186,7 +186,7 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
 /// One quiet line in the band (THEME → Components): the cycle is the state of things, not
 /// something the page is about. Everything you can *do* to it — close it early,
 /// call it a deload — is a tap away rather than a pair of buttons taking the top
-/// third of the screen, which is what it used to be.
+/// third of the screen.
 class _CycleLine extends ConsumerWidget {
   const _CycleLine({required this.status, required this.sessions});
 
@@ -352,8 +352,8 @@ class _DayBody extends ConsumerWidget {
         bottom: Space.huge + MediaQuery.viewPaddingOf(context).bottom,
       ),
       children: [
-        // Two chips, not three. `Delete day` was the loudest thing on a page
-        // about what you train, and it sits at the foot now with the other
+        // Two chips, not three: `Delete day` is the loudest thing on a page
+        // about what you train, so it sits at the foot with the other
         // destructive rows in this cluster.
         SizedBox(
           // 16 under the header block, like the first thing on every other
@@ -516,13 +516,12 @@ class _DayBody extends ConsumerWidget {
 
 /// One exercise in a day: one row, name over what it is, target on the right.
 ///
-/// It was a block — name, a muscle pill, and a card under it holding the target
-/// — which is three stacked things per exercise and about 130pt of height. Six
-/// of those is not a training day you can read, it is a wall, and the card's
-/// only job was to be a second tap target for the target sheet. The sheet is
-/// one row down on the slot screen, which is where the rest of this slot's
-/// settings already live; the figure stays visible here, which is what THEME asks for
-/// for.
+/// Not a block — name, a muscle pill, and a card under it holding the target —
+/// which is three stacked things per exercise and about 130pt of height. Six of
+/// those is not a training day you can read, it is a wall, and the card earns
+/// that height only as a second tap target for the target sheet. That sheet is
+/// one row down on the slot screen, where the rest of this slot's settings
+/// live; the figure stays visible here, which is what THEME asks for.
 class _SlotRow extends StatelessWidget {
   const _SlotRow({
     required this.regimeId,

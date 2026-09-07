@@ -141,13 +141,12 @@ class VolumeChart extends StatelessWidget {
 /// The gutter the y labels sit in, to the right of the plot — **measured, not
 /// guessed.**
 ///
-/// It was a flat 26 plus an 8pt gap: 34 points spent on `12`, which is nine
-/// points of ink. The room comes off the plot and therefore off the date labels
-/// under it, which are the ones that were running out of space.
+/// A flat 26 plus an 8pt gap spends 34 points on `12`, which is nine points of
+/// ink. The room comes off the plot and therefore off the date labels under it,
+/// which are the ones short of space.
 ///
-/// Still fixed rather than intrinsic, in the sense the old comment meant: it is
-/// derived from the axis *maximum*, so it changes when the chart rescales and
-/// not as bars move under it.
+/// Fixed rather than intrinsic: it is derived from the axis *maximum*, so it
+/// changes when the chart rescales and not as bars move under it.
 double _yAxisWidth(BuildContext context, int max) {
   final painter = TextPainter(
     text: TextSpan(text: '$max', style: context.t.bodySmall),
@@ -231,13 +230,13 @@ class _Gridlines extends CustomPainter {
 /// The date strip under the baseline: the same seven labels, in the same words,
 /// that a line chart prints (THEME → Charts).
 ///
-/// It used to be built out of *runs* — one `Expanded` per calendar period,
-/// flexed by how many bars it covered, with every *n*th one printed. Three
-/// things were wrong with that and all three were visible. The count was
-/// whatever the calendar happened to produce, so a month showed two labels and
-/// six months showed seven. Each label was clipped to its own run's box, so
-/// `2024` under a narrow year came out as `2`. And a run's box is not centred on
-/// anything, so the words drifted away from the bars they name.
+/// Not built out of *runs* — one `Expanded` per calendar period, flexed by how
+/// many bars it covers, with every *n*th one printed. That fails three visible
+/// ways. The count is whatever the calendar happens to produce, so a month
+/// shows two labels and six months seven. Each label is clipped to its own
+/// run's box, so `2024` under a narrow year comes out as `2`. And a run's box
+/// is not centred on anything, so the words drift away from the bars they
+/// name.
 ///
 /// Positions are chosen the way the line chart chooses ticks — evenly across the
 /// plot, at most seven — and each label is **centred on its bar** rather than
@@ -278,11 +277,11 @@ class _Months extends StatelessWidget {
     // of the width — evenly spaced, all of them interior, no end treated
     // differently from the middle.
     //
-    // The strip used to spread indices from the first bar to the last and
-    // anchor the outer two flush to the edges. Both of those bend the spacing:
-    // rounding to whole bars makes the gaps differ by a slot, and anchoring the
-    // ends makes the two outer gaps unlike the five inner ones. The result read
-    // as *nearly* even, which is worse than either even or obviously not.
+    // Spreading indices from the first bar to the last, or anchoring the outer
+    // two flush to the edges, bends the spacing: rounding to whole bars makes
+    // the gaps differ by a slot, and anchored ends make the two outer gaps
+    // unlike the five inner ones. Either reads as *nearly* even, which is worse
+    // than even or obviously not.
     final indices = [
       for (var k = 0; k < count; k++)
         math.max(0, math.min(n - 1, (((k + 0.5) * n / count) - 0.5).round())),

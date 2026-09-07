@@ -1,26 +1,30 @@
-/// What the app does to the phone while a session is open.
+/// Device behaviour while a training session is open.
 ///
-/// Two switches, both about the app taking something the phone would rather
-/// keep: a permanent line in the shade, and the screen staying lit. Neither
-/// changes a number that is stored, which is why they sit in `app_settings`
-/// with the theme and the units — local, and never synced (SYNC § 15 rule 8).
-/// Whether a phone keeps its screen on is a property of that phone.
+/// Two settings, each governing something the application takes from the
+/// device: a persistent notification in the shade, and the screen remaining
+/// lit. Neither affects stored data, which is why both reside in `app_settings`
+/// alongside the theme and unit preferences — local, and never synchronised
+/// (SYNC § 15 rule 8). Whether a device keeps its screen on is a property of
+/// that device rather than of the account.
 library;
 
-/// The two `app_settings` keys session behaviour is configured through.
+/// The `app_settings` keys through which session behaviour is configured.
 const sessionNotificationKey = 'session_notification';
 const keepScreenOnKey = 'keep_screen_on';
 
-/// Whether the ongoing session line is posted. On unless turned off.
+/// Whether the ongoing session notification is posted. Enabled unless
+/// explicitly disabled.
 ///
-/// It is a foreground service, and Android will not run one without a
-/// notification — so off means the service does not start at all, and the
-/// rest bar stops draining a second at a time while the screen is off. The
-/// end-of-rest alert is a scheduled alarm rather than part of that service, so
-/// it still arrives; what is lost is the live clock, not the alert.
+/// The notification is backed by a foreground service, and Android will not run
+/// one without a notification. Disabling it therefore prevents the service from
+/// starting, and the rest bar no longer counts down while the screen is off.
+/// The end-of-rest alert is a scheduled alarm rather than part of that service
+/// and still arrives; only the live clock is lost.
 bool parseSessionNotification(String? raw) => raw?.trim() != 'off';
 
-/// Whether the screen is held awake while a session is open. On unless turned
-/// off — a phone that sleeps between sets is a phone unlocked again every two
-/// minutes with chalk on your hands.
+/// Whether the screen is held awake while a session is open. Enabled unless
+/// explicitly disabled.
+///
+/// A device that sleeps between sets must be unlocked again every two minutes
+/// during training.
 bool parseKeepScreenOn(String? raw) => raw?.trim() != 'off';

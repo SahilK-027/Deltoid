@@ -36,7 +36,8 @@ class RegimeSlotsFullException implements Exception {
 /// Thrown when a name is nothing but whitespace.
 ///
 /// A regime and an exercise are both identified on screen by their name and
-/// nothing else, so an empty one is a row you cannot point at: History shows a
+/// nothing else, so an empty name yields a row that cannot be identified:
+/// History shows a
 /// blank, the picker shows a blank, and the only way to tell two of them apart
 /// is the order they happen to be in. The UI asks for a name; this is the rule
 /// underneath, so a name can never be lost by a path that forgot to check.
@@ -54,7 +55,7 @@ class BlankNameException implements Exception {
 ///
 /// A regime is identified on screen by its name and its colour, and nothing
 /// else — History says "PPL", Today says "PPL". Two of them called `PPL` is a
-/// history you cannot read, whichever one you meant.
+/// history that cannot be read, whichever was intended.
 class RegimeNameTakenException implements Exception {
   const RegimeNameTakenException(this.name);
 
@@ -90,7 +91,7 @@ class SessionNameTakenException implements Exception {
 ///
 /// Kept separate from logging on purpose. Templates change rarely and
 /// deliberately; workouts change constantly. Mixing the two is how apps end up
-/// rewriting your history when you reorder a list.
+/// rewriting recorded history when a list is reordered.
 class RegimeRepository {
   RegimeRepository(this.db);
 
@@ -98,9 +99,9 @@ class RegimeRepository {
 
   // ── Regimes ───────────────────────────────────────────────────────────
 
-  /// Switching regimes never edits the old one. Push/Pull/Legs history stays
-  /// exactly as it was recorded, still attached to the programme it was run
-  /// under, and can be charted alongside whatever comes next.
+  /// Switching regimes never edits the one being left. Push/Pull/Legs history
+  /// stays exactly as it was recorded, still attached to the programme it was
+  /// run under, and can be charted alongside whatever comes next.
   Future<String> createRegime(String name, {bool activate = true}) async {
     if (name.trim().isEmpty) throw const BlankNameException('regime');
     final id = newId();
@@ -212,8 +213,9 @@ class RegimeRepository {
   /// Workouts hold their own snapshots and stay in History exactly as they were
   /// logged; what disappears is the split and its cycle counter.
   ///
-  /// Its **cycles** go with it — a cycle exists only to number this regime's
-  /// weeks. Its **sessions** deliberately do not, even though nothing outside
+  /// Its cycles are removed with it, a cycle existing only to number this
+  /// regime's weeks. Its sessions deliberately are not, even though nothing
+  /// outside
   /// this regime reads them: `loggedSessions` filters `sessions.deletedAt`, so
   /// tombstoning them removes every one from History's session filter and
   /// takes away the only way to page a retired programme's history. That
@@ -281,7 +283,7 @@ class RegimeRepository {
   /// delete: how big it is, and how much was trained under it.
   ///
   /// Drift rather than raw: both counts are grouped by regime, so
-  /// the row count is the number of programmes you have ever made — single
+  /// the row count is the number of programmes ever created, a single
   /// figures — and the `IN (…)` lists are one parameter per regime rather than
   /// per workout counted.
   Future<List<RegimeSummary>> regimeSummaries() async {
@@ -336,10 +338,10 @@ class RegimeRepository {
 
   /// Only the row that is actually active.
   ///
-  /// This used to rewrite every regime in the table, tombstoned ones included —
-  /// six rows re-stamped and marked dirty to turn one flag off. Harmless while
-  /// the writes stay on this phone; once they are a push, switching programmes
-  /// would ship the whole shelf every time.
+  /// Rewriting every regime in the table, tombstoned ones included, re-stamps
+  /// and dirties six rows to turn one flag off. Harmless while the writes stay
+  /// on this phone; as a push, switching programmes would ship the whole shelf
+  /// every time.
   Future<void> _deactivateAll() async {
     await (db.update(db.regimes)..where((t) => t.isActive.equals(true))).write(
       RegimesCompanion(
@@ -386,8 +388,8 @@ class RegimeRepository {
   /// One past the highest position, in a transaction.
   ///
   /// Not the number of live rows: a deleted session is tombstoned and nothing
-  /// renumbers behind it, so counting handed the new row a position a surviving
-  /// one still held — and two rows on one `orderIndex` leave the programme's
+  /// renumbers behind it, so counting hands the new row a position a surviving
+  /// one still holds — and two rows on one `orderIndex` leave the programme's
   /// order to whichever way SQLite breaks the tie.
   Future<String> addSession(String regimeId, String name) async {
     if (name.trim().isEmpty) throw const BlankNameException('session');
@@ -476,8 +478,9 @@ class RegimeRepository {
   /// Soft delete — past workouts keep pointing at the session, so history
   /// survives a programme change.
   ///
-  /// Its **slots** go with it, because a `session_exercises` row exists only to
-  /// describe the session; its **workouts** do not, because they record what
+  /// Its slots are removed with it, because a `session_exercises` row exists
+  /// only to describe the session; its workouts are not, because they record
+  /// what
   /// was done. A row that *describes* goes with its parent and a row that
   /// *records* stays: that distinction is the whole of the cascade, and widening
   /// it here would delete training rather than a template.
@@ -579,9 +582,10 @@ class RegimeRepository {
   /// ground the moment it is tombstoned — `idx_session_exercises_position_live`
   /// is scoped `WHERE deleted_at IS NULL` — so an append behind it is entitled
   /// to take it, and one that appends past the highest live index takes exactly
-  /// that one when the removed slot was the last. Carrying the old position
-  /// back made the undo throw on the index rather than restore anything; see
-  /// [TrainingRepository.applySessionChanges], which revives the same way.
+  /// that one when the removed slot was the last. Carrying the tombstoned
+  /// position back makes the undo throw on the index rather than restore
+  /// anything; see [TrainingRepository.applySessionChanges], which revives the
+  /// same way.
   Future<void> restoreSessionExercise(String id) async {
     await db.transaction(() async {
       final row = await (db.select(db.sessionExercises)
@@ -618,8 +622,7 @@ class RegimeRepository {
     /// that gets an app closed mid-session.
     Value<int?> restSeconds = const Value.absent(),
     /// Null means "follow the regime". An exercise that is already light does
-    /// not need the same cut as a heavy compound, and the columns carried that
-    /// distinction long before anything could set them.
+    /// not need the same cut as a heavy compound.
     Value<int?> deloadSetDelta = const Value.absent(),
     Value<int?> deloadWeightPct = const Value.absent(),
   }) async {
@@ -639,14 +642,14 @@ class RegimeRepository {
     );
   }
 
-  /// Which bar this movement is loaded on **in this day**.
+  /// Which bar this movement is loaded on within this training day.
   ///
   /// Null clears the override and hands the answer back to the catalog row.
   ///
-  /// **It also patches the session that is open right now**, and only that one.
+  /// It also updates the session currently open, and only that one.
   /// The slot carries the decision to every future run of this day; a workout
-  /// already in progress is the run you are standing in, and the bar you have
-  /// just named is the bar in your hands. Completed workouts are not touched —
+  /// already in progress is the current run, and the bar just specified is the
+  /// one in use. Completed workouts are not modified:
   /// they hold what was actually used, which is the whole reason the snapshot
   /// column exists ([WorkoutExercises.barKind]).
   ///
@@ -654,7 +657,7 @@ class RegimeRepository {
   /// the slot: a `workout_exercises` row points at the exercise and the
   /// workout, never at the template row it was copied from.
   ///
-  /// **One limit falls out of that, and there is no column to fix it with.** A
+  /// One limitation follows from this, and no column addresses it. A
   /// day may run the same movement twice — the picker marks a repeat rather
   /// than refusing it — and those two slots can hold two different bars. Today's
   /// rows cannot be told apart by slot, so naming a bar on either occurrence

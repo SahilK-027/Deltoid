@@ -15,7 +15,7 @@ import 'sync_config.dart';
 /// rather than an excavation. `features/` never imports either package, which
 /// `test/features/no_supabase_in_features_test.dart` holds to.
 ///
-/// **No socket is ever opened.** Realtime is not initialised and never will be:
+/// No socket is ever opened. Realtime is not initialised and will not be:
 /// two phones do not need to see each other's writes within seconds, and a held
 /// connection costs a battery budget to serve a case that does not occur
 /// ([SYNC.md § 1](SYNC.md#1-what-this-is-and-is-not)).

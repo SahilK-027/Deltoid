@@ -6,23 +6,25 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../domain/rest.dart';
 
-/// The workout, on the lock screen.
+/// Lock-screen presentation of an open workout.
 ///
-/// Two notifications, and they answer two different questions.
+/// Two notifications are posted, serving different purposes.
 ///
-/// * **The session** is a silent foreground service: what you are training,
-///   how far through it you are, and — while a rest is running — the rest
-///   itself, as a bar draining towards zero with the time left written beside
-///   it. It is a service because a progress bar has no clock. It holds the
-///   last value posted to it, and an ordinary app is frozen within seconds of
-///   the screen going off, so a bar drained from in here would stop where it
-///   was and stay there. A foreground service is not frozen.
-/// * **The rest alert** is scheduled with the OS rather than fired by the app.
-///   This is the whole point of this file: a Dart `Timer` is frozen the moment
-///   Android suspends the process, so a phone put face down on a bench did not
-///   buzz at the end of the rest — it buzzed when it was picked back up, which
-///   is exactly late enough to be useless. An alarm handed to `AlarmManager`
-///   goes off on time whether or not this app is running.
+/// * The session notification is a silent foreground service reporting the
+///   movement being trained, progress through the session and, while a rest is
+///   running, the rest itself as a bar counting down with the remaining time
+///   beside it. A service is required because a notification progress bar has
+///   no clock of its own: it retains the last value posted to it, and an
+///   ordinary application is suspended within seconds of the screen going off,
+///   so a bar updated from within the process would stop at its last value. A
+///   foreground service is not suspended.
+/// * The rest alert is scheduled with the operating system rather than fired by
+///   the application. This is the primary reason this file exists. A Dart
+///   `Timer` is suspended as soon as Android suspends the process, so a device
+///   left face down does not signal at the end of the rest; it signals when the
+///   device is next handled, which is too late to be useful. An alarm
+///   registered with `AlarmManager` fires on schedule whether or not the
+///   application is running.
 ///
 /// Every call is best-effort. There is no notification plugin in a widget test,
 /// and a missing notification must never take a logged set down with it — so
@@ -49,23 +51,23 @@ class WorkoutNotifications {
   /// `rest_done`; it has to post on a channel that never had a sound. Both
   /// vibrate — the buzz is the half that works with the phone in a pocket, and
   /// it is not what the setting is about.
-  // **Four channels, because vibration is a property of the channel.** From
-  // Android 8 a channel's sound and vibration are fixed when it is created and
-  // cannot be edited by the app afterwards — only by the user, in the system's
-  // own settings. Two switches therefore need four channels rather than two
-  // booleans on the notification, and a phone that has seen every combination
-  // ends up with four entries under the app's notification settings. That is
-  // the platform's shape, not a choice.
+  // Four channels are required because vibration is a property of the channel.
+  // From Android 8 a channel's sound and vibration are fixed at creation and
+  // cannot subsequently be altered by the application, only by the user in the
+  // system settings. Two switches therefore require four channels rather than
+  // two booleans on the notification, and a device that has used every
+  // combination accumulates four entries under the application's notification
+  // settings. This is imposed by the platform.
   static const _restChannel = 'rest_done';
   static const _restSilentChannel = 'rest_done_silent';
   static const _restStillChannel = 'rest_done_still';
   static const _restSilentStillChannel = 'rest_done_silent_still';
 
-  /// The status bar draws a small icon from its **alpha channel alone**, every
-  /// opaque pixel painted one flat colour by the system. The launcher icon is
-  /// a full square of opaque pixels, so handing that over — which is what the
-  /// Flutter template does — draws a featureless white blob. This is the mark
-  /// on its own: transparent everywhere it is not the shape.
+  /// The status bar renders a small icon from its alpha channel alone, painting
+  /// every opaque pixel in a single flat colour. The launcher icon is a fully
+  /// opaque square, so supplying it — as the Flutter template does — produces a
+  /// featureless block. This asset is the mark alone, transparent everywhere
+  /// outside the shape.
   static const _smallIcon = '@drawable/ic_stat_deltoid';
 
   /// `DeltoidColors.dark.surface`, spelled out rather than imported: the shade
@@ -73,11 +75,11 @@ class WorkoutNotifications {
   /// chance to ask which one is in force.
   ///
   /// The app's own charcoal rather than a colour invented for the lock screen.
-  /// A purple was tried and both ends of it were wrong: the palette's lavender
-  /// is 2.6:1 against white, so Android read it as a light surface and printed
-  /// black text on it, and taking the hue down far enough to earn white text
-  /// produced a colour this app does not otherwise contain. White sits on this
-  /// at 15.8:1, and the row looks like the app it came from.
+  /// A purple fails at both ends: the palette's lavender is 2.6:1 against white,
+  /// so Android reads it as a light surface and prints black text on it, and
+  /// taking the hue down far enough to earn white text produces a colour this
+  /// app does not otherwise contain. White sits on this at 15.8:1, and the row
+  /// looks like the app it came from.
   static const _tint = Color(0xFF1F1F1F);
 
   bool _ready = false;
@@ -159,27 +161,28 @@ class WorkoutNotifications {
     int? restTargetSeconds,
   }) async {
     if (!await init()) return;
-    // **What the clock says depends on who is holding the line up.**
+    // What the clock reports depends on which mechanism is holding the
+    // notification.
     //
-    // With the service, the seconds are posted one at a time and the number
-    // under the movement is current. Without it — no shape of foreground
-    // service was accepted — nothing here is awake to post a second one, so
-    // the line drops the clock and leaves the end of the rest to the alarm. A
-    // stale 1:47 sitting beside a finished rest would be worse than no number.
+    // With the service running, the seconds are posted individually and the
+    // value beneath the movement is current. Without it, where no form of
+    // foreground service was accepted, nothing remains awake to post a further
+    // update, so the notification omits the clock and leaves the end of the
+    // rest to the alarm. A stale 1:47 displayed beside a completed rest would
+    // be worse than no value.
     final resting = restSecondsLeft != null;
     final live = resting && !_serviceUnavailable;
 
-    // **One line, and the clock leads it.**
+    // A single line, led by the clock.
     //
-    // It was two, carried on a big-text style, and that is how the row grew
-    // five deep: the app's name, the title, the bar, the clock, the movement.
-    // Nothing on that fifth line was worth the height it cost — the clock and
-    // the movement are two short facts and they fit one line with a separator
-    // between them.
+    // Two lines in a big-text style extend the row to five: the app's name,
+    // the title, the bar, the clock, the movement. Nothing on that fifth line
+    // is worth the height it costs — the clock and the movement are two short
+    // facts, and they fit one line with a separator between them.
     //
     // The clock goes first because the end of this line is not guaranteed: a
-    // long enough movement name ellipsizes, and what fell off the end was the
-    // clock. What is still running is the half that cannot be cut.
+    // long enough movement name ellipsizes, and it is the end that falls off.
+    // What is still running is the half that cannot be cut.
     final clock = live ? formatRestClock(restSecondsLeft) : null;
     final line = clock == null ? body : '$clock · $body';
     final details = _sessionDetails(
@@ -203,14 +206,15 @@ class WorkoutNotifications {
         );
         return;
       }
-      // **Posted before the service adopts it, or nobody sees it for ten
-      // seconds.**
+      // Posted before the service adopts it, otherwise it is not displayed for
+      // ten seconds.
       //
-      // From Android 12 the system holds back a foreground service's
+      // From Android 12 the system withholds a foreground service's
       // notification for up to ten seconds when the service starts while the
-      // app is on screen — which is every time a workout opens. The line for a
-      // session you have just started is exactly the line that should not
-      // arrive late, and the platform's own opt-out,
+      // application is in the foreground, which is the case whenever a workout
+      // is opened. The notification for a session that has just started is
+      // precisely the one that must not be delayed, and the platform's own
+      // opt-out,
       // `setForegroundServiceBehavior(FOREGROUND_SERVICE_IMMEDIATE)`, is not
       // something this plugin exposes. A notification already showing under
       // that id is not deferred, so it is posted first and the service takes
@@ -225,7 +229,8 @@ class WorkoutNotifications {
         );
       }
 
-      // **Three ways to put this line up, and it takes the first that works.**
+      // Three mechanisms are available for posting this notification, and the
+      // first that succeeds is used.
       //
       // `specialUse` is an API 34 constant being handed to
       // `startForeground(id, notification, type)` on phones as old as API 24,
@@ -239,9 +244,9 @@ class WorkoutNotifications {
       // Each rung is tried until one holds: the typed service, the untyped one
       // (`startForeground` without a type is legal, and below API 34 there is
       // nothing to declare), and finally an ordinary notification with no
-      // service behind it. That last rung is the line as it was before the
-      // service existed — nothing is awake to drain a bar from, so the bar is
-      // dropped there and everything else about the line survives.
+      // service behind it. On that last rung nothing is awake to drain a bar
+      // from, so the bar is dropped and everything else about the line
+      // survives.
       //
       // A rung that fails says so in a debug build. Silence here means the
       // first one was taken.
@@ -278,7 +283,7 @@ class WorkoutNotifications {
       }
 
       // No service will take it. A plain notification still says what is being
-      // trained and how far through it you are.
+      // trained and how far through the session it is.
       _serviceUnavailable = true;
       await _plugin.show(
         id: _sessionId,
@@ -317,30 +322,30 @@ class WorkoutNotifications {
         'Session in progress',
         channelDescription: 'The session you are training, and the rest clock.',
         icon: _smallIcon,
-        // **Coloured, and it takes a foreground service to be allowed to be.**
+        // Colourised, which requires a foreground service.
         //
-        // `colorized` paints the whole line rather than tinting the app name,
-        // and Android grants that only to a foreground service — which this is
-        // already, for the rest bar's sake, so the licence comes free.
+        // `colorized` paints the whole notification rather than tinting the
+        // application name, and Android permits it only for a foreground
+        // service. This notification is already one, for the rest bar, so the
+        // permission is available without further cost.
         color: _tint,
         colorized: true,
         // The header's small grey line, next to the app name: where the
         // session stands, which is the one number that is true whether or not
         // a rest is running.
         subText: total > 0 ? '$done of $total sets' : null,
-        // **The bar is the rest, and nothing else is ever drawn in it.**
+        // The progress bar represents the rest and nothing else.
         //
         // A notification's progress bar holds whatever value was last posted
         // to it — it has no clock, and there is no way to hand it one. The
         // seconds it counts down are therefore posted, one a second, by the
         // service holding this line up; that is what the service is for.
         //
-        // It had a second job for one build: the session's own fraction,
-        // between sets. One bar meaning two things has to jump when the
-        // meaning changes, and what that looked like was a rest draining to
-        // empty and then immediately growing back as something else. So there
-        // is no bar at all when no rest is running, and the set count lives in
-        // the header, which never animates.
+        // Giving it a second job — the session's own fraction, between sets —
+        // makes one bar mean two things, and a bar that changes meaning has to
+        // jump: a rest drains to empty and immediately grows back as something
+        // else. So there is no bar at all when no rest is running, and the set
+        // count lives in the header, which never animates.
         showProgress: resting,
         maxProgress: resting ? restTargetSeconds : 0,
         progress: resting ? restSecondsLeft.clamp(0, restTargetSeconds) : 0,
@@ -355,20 +360,19 @@ class WorkoutNotifications {
         ongoing: true,
         autoCancel: false,
         category: AndroidNotificationCategory.workout,
-        // **The session's age is the system's to draw, and it draws it in
-        // minutes.**
+        // The session's elapsed time is rendered by the system, in minutes.
         //
-        // `when` is the moment the workout started, and the shade renders it
-        // as "42m" beside the app name — the same line, and the same shape,
-        // that every other ongoing notification on the phone uses.
+        // `when` is the moment the workout started, and the shade renders it as
+        // "42m" beside the application name, matching every other ongoing
+        // notification on the device.
         //
         // No chronometer. Asking for one gets a clock ticking in seconds, and
         // a clock ticking in seconds cannot survive this line: a rest re-posts
         // it once a second, every post rebuilds the row, and the clock
-        // restarts with it. Standing it down for the rest only moved the
-        // problem — the header then swapped between a ticking clock and a
-        // static "42m" at both ends of every rest, which is a twitch a minute
-        // rather than one a second. How long you have been training wants no
+        // restarts with it. Standing it down for the rest only moves the
+        // problem: the header then swaps between a ticking clock and a static
+        // "42m" at both ends of every rest, which is a twitch a minute rather
+        // than one a second. Elapsed session time requires no
         // precision. The number that does is on the bar.
         showWhen: startedAt != null,
         when: startedAt?.millisecondsSinceEpoch,
@@ -377,15 +381,15 @@ class WorkoutNotifications {
     );
   }
 
-  /// Hands one notification to the OS clock, and **degrades rather than going
-  /// silent** when it will not take an exact one.
+  /// Registers one notification with the operating system's alarm clock,
+  /// degrading rather than failing silently when an exact alarm is refused.
   ///
   /// Exact is what is wanted: Doze batches ordinary alarms into windows
-  /// minutes wide, and a rest alert that lands two minutes late has told you
-  /// nothing you didn't know. But exact alarms are a permission, and a
-  /// permission can be absent — revoked by hand on Android 14, or, the case
-  /// that sent this whole file silent for a year, an Android 12 phone where
-  /// `USE_EXACT_ALARM` is a string the OS has never heard of. The plugin
+  /// minutes wide, and a rest alert arriving two minutes late conveys nothing.
+  /// Exact alarms are, however, a permission, and a
+  /// permission can be absent — revoked by hand on Android 14, or on an
+  /// Android 12 phone where `USE_EXACT_ALARM` is a string the OS has never
+  /// heard of. The plugin
   /// answers that by throwing, and a rest that ends in silence is worse than
   /// one that rings a minute late.
   ///
@@ -432,8 +436,8 @@ class WorkoutNotifications {
   ///
   /// Every failure in this file is swallowed on purpose — a missing
   /// notification must never take a logged set down with it — but swallowed
-  /// silently is how a rest alert that had never once been scheduled looked
-  /// exactly like one that was scheduled and ignored.
+  /// silently, a rest alert that was never once scheduled looks exactly like
+  /// one that was scheduled and ignored.
   void _log(String what, Object error) {
     if (kDebugMode) debugPrint('WorkoutNotifications: $what — $error');
   }
@@ -441,8 +445,8 @@ class WorkoutNotifications {
   /// Hands the end of this rest to the OS alarm clock.
   ///
   /// Exact and allowed while idle: Doze batches ordinary alarms into windows
-  /// minutes wide, and a rest alert that lands two minutes late has told you
-  /// nothing you didn't know. Re-scheduling replaces the pending one, because
+  /// minutes wide, and a rest alert arriving two minutes late conveys nothing.
+  /// Re-scheduling replaces the pending alarm, because
   /// the id is the same.
   Future<void> scheduleRestDone(
     DateTime at, {
@@ -489,22 +493,22 @@ class WorkoutNotifications {
         priority: Priority.high,
         category: AndroidNotificationCategory.alarm,
         // The alarm stream, and the same tone the app plays in the
-        // foreground — so it is audible over whatever is in your ears and
-        // it is not silenced along with the rest of the day's pings.
+        // foreground, so that it is audible over any audio in progress and is
+        // not silenced along with ordinary notifications.
         playSound: sound,
         sound: sound
             ? const RawResourceAndroidNotificationSound('rest_done')
             : null,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: vibrate,
-        // The set after it starts when you start it. A "rest done" still
-        // sitting there twenty minutes later is noise.
+        // The following set begins when the user begins it. A "rest done"
+        // notification still present twenty minutes later is noise.
         timeoutAfter: 120000,
       ),
     );
   }
 
-  /// Posts the rest alert **now**, on the alarm channel.
+  /// Posts the rest alert immediately, on the alarm channel.
   ///
   /// The fallback for the one case the hand-over cannot cover: this screen
   /// took the alert back from the OS, and then the tone would not play — a
@@ -542,7 +546,7 @@ class WorkoutNotifications {
   }
 
   /// Takes the session line and any pending alarm away. Called when the log
-  /// screen closes: a workout you are no longer in has no business holding a
+  /// screen closes, since a workout that is no longer open should not retain a
   /// row on the lock screen.
   Future<void> clear() async {
     if (!_ready || _unsupported) return;
@@ -550,7 +554,7 @@ class WorkoutNotifications {
       await _plugin.cancel(id: _restId);
       // Stopping the service takes its notification with it. The plain cancel
       // still runs behind it, for the platforms that never had a service and
-      // for a line left over from a build that did not use one.
+      // for a line left behind by a build that did not use one.
       if (_serviceRunning) {
         _serviceRunning = false;
         await _android?.stopForegroundService();

@@ -48,9 +48,9 @@ void main() {
 
     test('a value that is not JSON reads as no links', () {
       // A hand-edited backup, or a column written by anything but this app.
-      // One malformed `form_video_urls` used to take the catalog, the exercise
-      // screen and the log down with it, because a converter that throws fails
-      // the whole result set rather than the row.
+      // A converter that throws fails the whole result set rather than the
+      // row, so one malformed `form_video_urls` would take the catalog, the
+      // exercise screen and the log down with it.
       expect(converter.fromSql('not json at all'), isEmpty);
       expect(converter.fromSql('{'), isEmpty);
       expect(converter.fromSql('["unterminated'), isEmpty);

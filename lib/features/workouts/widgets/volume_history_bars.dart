@@ -65,8 +65,8 @@ class _WeeklyBarsState extends State<WeeklyBars>
   int? _touched;
 
   /// The shape of the chart before the range changed. Only the two numbers the
-  /// zoom interpolates — keeping the old week list would pin a year of data in
-  /// memory to draw a fifth of a second of motion.
+  /// zoom interpolates. Keeping the outgoing week list would pin a year of
+  /// data in memory to draw a fifth of a second of motion.
   int _fromWeeks = 0;
   double _fromMax = 0;
 

@@ -54,8 +54,8 @@ class PagedHistory<T> {
 /// do change (`completeWorkout` tombstoning the untouched rows, `deleteWorkout`
 /// taking the tree) both write `workouts` in the same transaction. So the
 /// narrow stream sees every change that matters and none of the ones that
-/// don't. Watching `set_logs` meant every pause in logging re-read the whole
-/// scrolled window to rebuild a list the session is not even in yet.
+/// don't. Watching `set_logs` would have every pause in logging re-read the
+/// whole scrolled window, to rebuild a list the session is not even in yet.
 void _reloadOnHistoryWrites(Ref ref, TrainingRepository repo) {
   Timer? debounce;
   final sub = repo.historyShapeChanges().listen((_) {

@@ -82,18 +82,17 @@ final exercisePrefillProvider = FutureProvider.family<
 /// Last-time numbers for every exercise in a workout, keyed by exercise id.
 ///
 /// Watches the workout rather than being resolved once when the log opens.
-/// Resolving once meant an exercise added or swapped in at 19:40 read "First
-/// time — no previous log" with a year of history behind it, and — because
-/// there was no ghost to adopt — a set typed with only reps was stored against
-/// a null weight.
+/// Resolved once, an exercise added or swapped in at 19:40 reads "First time —
+/// no previous log" with a year of history behind it, and — with no ghost to
+/// adopt — a set typed with only reps is stored against a null weight.
 final workoutPrefillProvider =
     FutureProvider.family<Map<String, PrefillResult>, String>(
         (ref, workoutId) async {
   // Watch the *identity* of the exercise list, not the whole detail. The detail
   // stream re-emits on every write to workouts, workout_exercises or set_logs —
-  // once per completed set — and rebuilding this map on each of those made
-  // every listener rebuild with it. The ids only change when an exercise is
-  // added, swapped or removed, which is exactly when this map is stale.
+  // once per completed set — and rebuilding this map on each of those rebuilds
+  // every listener with it. The ids only change when an exercise is added,
+  // swapped or removed, which is exactly when this map is stale.
   // Joined into a string on purpose: Dart lists compare by identity, so
   // selecting a List would rebuild every time regardless and quietly do
   // nothing at all.
@@ -102,8 +101,8 @@ final workoutPrefillProvider =
   // makes this map stale. Unsorted, dragging a tab changed the key, which
   // re-walked every exercise's history through `resolvePrefill` — six
   // movements against fifty years of logs — for a result guaranteed to be
-  // identical. That work landed on the frame the drop animation was trying to
-  // play, which is what made a reorder judder and then jump.
+  // identical. That work lands on the frame the drop animation is trying to
+  // play, which is what makes a reorder judder and then jump.
   final exerciseIds = await ref.watch(
     workoutDetailProvider(workoutId).selectAsync(
       (detail) => ([
@@ -119,7 +118,7 @@ final workoutPrefillProvider =
 
   // Resolved together, not one after another. Each exercise is its own chain of
   // queries across the database isolate's port, and awaiting them in series
-  // made the log screen's first paint the *sum* of six round trips instead of
+  // makes the log screen's first paint the *sum* of six round trips instead of
   // the longest one.
   final results = await Future.wait([
     for (final exerciseId in ids)

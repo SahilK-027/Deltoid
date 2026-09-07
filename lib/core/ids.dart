@@ -9,7 +9,8 @@ String newId() => _uuid.v7();
 /// The highest stamp this process has handed out. See [nowMs].
 int _lastStamp = 0;
 
-/// Now, in UTC milliseconds, and **never earlier than the last one**.
+/// The current time in UTC milliseconds, never earlier than the previously
+/// issued value.
 ///
 /// This is the number last-write-wins compares, so a clock that moves backwards
 /// does not merely mislabel a row — it makes the row lose to the version it was
@@ -22,7 +23,7 @@ int _lastStamp = 0;
 /// `deviceId`, exactly as [currentDeviceId] describes. The other half —
 /// agreeing on time with a *different* device — is a server's job.
 ///
-/// **The clamp survives a restart**, and it has to: a mark held only in memory
+/// The clamp survives a restart, and must do so: a mark held only in memory
 /// protects one run of the app, and the failure it exists for is precisely the
 /// one that spans a launch. A phone comes off a flat battery with its clock at
 /// the build date, the app opens, a session is logged, and the network corrects
@@ -64,10 +65,11 @@ const lastStampKey = 'last_stamp';
 /// session was shorter than this — and if it was longer, the stamps at risk are
 /// only the ones past the lease.
 ///
-/// **`max(wall + lease, stored)`, never `stored + lease`.** The second
-/// compounds: a phone relaunched twenty times in a minute would walk the mark
-/// twenty leases into the future and every row it stamped would beat every row
-/// from every other device, permanently. The first is bounded by the clock.
+/// Computed as `max(wall + lease, stored)` rather than `stored + lease`. The
+/// latter compounds: a device relaunched twenty times in a minute would advance
+/// the mark twenty leases into the future, and every row it stamped would
+/// thereafter win against every other device permanently. The former is bounded
+/// by the wall clock.
 const stampLeaseMs = 5 * 60 * 1000;
 
 /// Which install wrote a row.
@@ -91,8 +93,7 @@ void setCurrentDeviceId(String id) => _deviceId = id;
 const deviceIdKey = 'device_id';
 
 /// Resets the monotonic clock. Tests only — a fresh in-memory database in the
-/// same process would otherwise inherit the stamps of the one before it, and
-/// now the listener of the one before it too.
+/// same process would otherwise inherit the stamps of the one before it.
 void resetStampsForTesting() => _lastStamp = 0;
 
 /// Local calendar day as `yyyyMMdd`. Used for heatmap grouping and bodyweight
@@ -113,7 +114,8 @@ DateTime dateFromDayKey(int key) =>
 
 /// The calendar date [days] before [date], at local midnight.
 ///
-/// **Named, not subtracted.** `date.subtract(Duration(days: n))` is `n * 86400`
+/// Constructed by naming the date rather than by subtraction.
+/// `date.subtract(Duration(days: n))` is `n * 86400`
 /// seconds of absolute time, and a day that contains a clock change is 23 or 25
 /// hours long — so the result lands on 23:00 or 01:00 of a neighbouring day
 /// rather than on midnight. Dart normalises an out-of-range day component, so

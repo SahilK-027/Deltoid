@@ -20,7 +20,7 @@ import 'sync_providers.dart';
 /// first release nobody remembers to update it for, and the one thing an About
 /// section exists to answer is which build this is.
 ///
-/// **The build number is deliberately not shown.** `--split-per-abi` adds an
+/// The build number is deliberately not displayed. `--split-per-abi` adds an
 /// ABI offset to `versionCode` when it packages — 1000 for armeabi-v7a, 2000
 /// for arm64 — so `1.3.1+6` installs as 2006 and About read "1.3.1 (2006)".
 /// That number is a packaging artefact: it identifies the APK rather than the
@@ -52,9 +52,9 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// The list itself is [repairDatabase], shared with `BackupService.restore` so
 /// a launch and a restore cannot check different things.
 ///
-/// **The catalog is seeded only once the welcome screen has been answered.**
-/// It used to be seeded here, before first paint, which is what would give a
-/// phone that then signs in two catalogs and a history split across both
+/// The catalog is seeded only once the welcome screen has been answered.
+/// Seeding here, before first paint, would give a phone that then signs in two
+/// catalogs and a history split across both
 /// ([SYNC.md § 10](SYNC.md#10-adoption)). The welcome screen renders perfectly
 /// well over an unseeded database — it asks about accounts, not exercises — and
 /// `answerWelcome` seeds before it records the answer, so nothing downstream
@@ -81,7 +81,8 @@ final activeRegimeProvider = StreamProvider<Regime?>((ref) {
 /// One regime by id.
 ///
 /// The editor is reached by pushing a row off the Regime index, so it edits the
-/// regime you tapped rather than the one you happen to be training. Emits null
+/// regime that was tapped rather than the one currently being trained. Emits
+/// null
 /// when that regime is deleted from under the screen.
 final regimeByIdProvider = StreamProvider.family<Regime?, String>((ref, id) {
   final db = ref.watch(databaseProvider);
@@ -123,9 +124,9 @@ final trainingRepositoryProvider = Provider<TrainingRepository>(
 /// Here rather than on the Settings screen because the screen is not what
 /// changes it. The four tabs live in one `IndexedStack` and are all built at
 /// launch, so a provider read only on first build is read *once, before any
-/// session has been finished* — Settings then said "no automatic backup yet"
-/// over a file that had been written an hour earlier, and went on saying it
-/// until the app was restarted. Whoever writes a backup invalidates this.
+/// session has been finished*. Settings would then say "no automatic backup
+/// yet" over a file written an hour earlier, and go on saying it until the app
+/// restarted. Whoever writes a backup invalidates this.
 final lastBackupProvider = FutureProvider<DateTime?>((ref) {
   return BackupService(ref.watch(databaseProvider)).lastAutoExportAt();
 });
@@ -181,9 +182,9 @@ Future<void> setWeightUnit(AppDatabase db, WeightUnit unit) {
 ///
 /// The keys are in `domain/rest.dart` with the parsing, because the repository
 /// reads two of them without Riverpod. They sit in `app_settings` with the
-/// theme and the units, which is to say local and never synced: how long you
-/// rest and whether your phone makes a noise about it are properties of a
-/// phone in a gym, not of an account.
+/// theme and unit preferences, which is to say local and never synchronised.
+/// Rest duration and whether the device produces an audible alert are
+/// properties of a particular device rather than of the account.
 ///
 /// One provider rather than three: the log screen wants all of it at once, and
 /// three `StreamProvider`s over the same table would be three watches on one
@@ -309,5 +310,5 @@ final cycleStatusProvider = StreamProvider<CycleStatus?>((ref) {
 });
 
 // The open workout, the "anything ever finished" flag and the session preview
-// used to live here as three more watched queries. They are part of the Today
-// snapshot now — see `todaySnapshot` in the repository for why.
+// are part of the Today snapshot rather than three more watched queries here —
+// see `todaySnapshot` in the repository for why.

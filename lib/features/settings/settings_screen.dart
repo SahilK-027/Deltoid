@@ -44,10 +44,10 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          // A tab now, not a screen pushed from a cog, so it wears the masthead
+          // A tab, not a screen pushed from a cog, so it wears the masthead
           // every other destination wears — eyebrow included. A title alone on
-          // the band made this the only tab whose header was one line, which is
-          // what made it read as a screen from a different app.
+          // the band would make this the only tab whose header is one line,
+          // which reads as a screen from a different app.
           const HeaderBand(
             child: PageHeader(title: 'Settings', eyebrow: 'On this device'),
           ),
@@ -82,10 +82,10 @@ class SettingsScreen extends ConsumerWidget {
                 ),
         ),
         // The figure logs one, it does not open a screen that offers to.
-        // Bodyweight was behind a cog, then behind a card that pushed a
-        // screen with a `+` in its bar — three taps to type a number you are
-        // asked for daily, which is why it had never once been logged
-        // through the UI. Tapping the figure is the log; the past is a link.
+        // Behind a cog, then behind a card that pushes a screen with a `+` in
+        // its bar, bodyweight is three taps to type a number you are asked for
+        // daily — which is how it goes unlogged. Tapping the figure is the log;
+        // the past is a link.
         _BodyweightCard(bodyweight: bodyweight),
         const SizedBox(height: Space.section),
         const SectionHeader('Account & backup'),
@@ -118,10 +118,10 @@ class SettingsScreen extends ConsumerWidget {
             AppRow(
               icon: Icons.schedule,
               title: 'Automatic backup',
-              // "After each finished session" alone never said whether it had
-              // ever happened — it reads as a description or as a promise
-              // depending on what you came to the row for, and the one thing
-              // a backup row exists to answer is whether there is a backup.
+              // "After each finished session" alone does not say whether it
+              // has ever happened — it reads as a description or as a promise
+              // depending on what you came to the row for, and the one thing a
+              // backup row exists to answer is whether there is a backup.
               subtitle: lastBackup == null
                   ? 'Has not run yet. It writes a file after each finished '
                         'session.'
@@ -154,9 +154,9 @@ class SettingsScreen extends ConsumerWidget {
 
   /// Ask where it goes, then write it with the progress on screen.
   ///
-  /// The share sheet used to be the only way out, and sharing a backup to
-  /// yourself is a strange thing to have to do — every other app that makes a
-  /// file puts it in Downloads.
+  /// A chosen destination rather than the share sheet alone: sharing a backup
+  /// to yourself is a strange thing to have to do, and every other app that
+  /// makes a file puts it in Downloads.
   Future<void> _export(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final box = context.findRenderObject() as RenderBox?;
@@ -289,24 +289,24 @@ class SettingsScreen extends ConsumerWidget {
     if (file == null) return;
 
     // Parsed once, off the UI isolate, and the parsed map is what the restore
-    // is handed. It used to be read three times over — the prompt, then
-    // `restore`'s own check, then the real decode — two of them on the thread
-    // drawing the dialog, which is most of why a long history froze here.
+    // is handed. Reading it once for the prompt, again for `restore`'s own
+    // check and a third time for the real decode puts two full parses on the
+    // thread drawing the dialog, which is most of what freezes a long history
+    // here.
     final BackupSummary summary;
     final Map<String, dynamic> decoded;
     try {
       // **Decoded as UTF-8 off the byte stream** — not `file.readAsString()`,
       // and not `utf8.decode(await file.readAsBytes())` either.
       //
-      // The plugin's string read came back Latin-1 on Android, so every
-      // non-ASCII character in a backup was restored double-encoded: the `·` in
-      // this app's own template names came back as `Â·`, and so would every
-      // accent in a note or an exercise the user had renamed. The exported file
-      // was correct the whole time — the corruption was on the way back in, and
-      // restore replaces the database, so it overwrote the good copy with the
-      // mangled one.
+      // The plugin's string read comes back Latin-1 on Android, which restores
+      // every non-ASCII character in a backup double-encoded: the `·` in this
+      // app's own template names arrives as `Â·`, and so does every accent in a
+      // note or an exercise the user has renamed. The exported file is correct
+      // — the corruption is on the way back in, and restore replaces the
+      // database, so it would overwrite the good copy with the mangled one.
       //
-      // Decoding the bytes by hand fixed the encoding and kept the cost: the
+      // Decoding the bytes by hand fixes the encoding but keeps the cost: the
       // whole file as a UTF-16 string is twice its size in one allocation, and
       // a long history threw `OutOfMemoryError` on that line — the app died
       // with the user's only copy in the file picker. [decodeStream] walks the
@@ -373,18 +373,18 @@ enum _ExportTo { downloads, share }
 class _BodyweightCard extends ConsumerWidget {
   const _BodyweightCard({required this.bodyweight});
 
-  /// The newest entry and the number of them — the two figures this card
-  /// shows. It used to be handed every row in the table to work them out.
+  /// The newest entry and the number of them — the two figures this card shows,
+  /// rather than every row in the table for it to work them out from.
   final BodyweightSummary bodyweight;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
-    // Watched *here*, not at the top of the screen. It was one line in
-    // `SettingsScreen.build`, which made switching kg to lb rebuild the whole
+    // Watched *here*, not at the top of the screen. One line in
+    // `SettingsScreen.build` would make switching kg to lb rebuild the whole
     // page — masthead, every section, the three painted theme miniatures — to
     // change the two words in this row and the tick in the units card. This is
-    // the screen the switch is on, so it is the one that hitched.
+    // the screen the switch is on, so it is the one that would hitch.
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final today = dayKeyOf(DateTime.now());
     final latest = bodyweight.latest;
@@ -695,10 +695,10 @@ String _since(DateTime at) {
 /// to and what the walk to the next machine is worth.
 /// The unit, as one row showing the answer.
 ///
-/// It was two radio rows on the page. Radios are right where a choice needs
-/// room to say what it means (THEME → Toggles), and this one does — switching
-/// restates every number in the app — but the place with room is the sheet,
-/// not a card that has to carry both options forever to be read once a year.
+/// Not two radio rows on the page. Radios are right where a choice needs room
+/// to say what it means (THEME → Toggles), and this one does — switching
+/// restates every number in the app — but the place with room is the sheet, not
+/// a card that has to carry both options forever to be read once a year.
 class _UnitRow extends ConsumerWidget {
   const _UnitRow();
 
@@ -1000,11 +1000,11 @@ class _ThemeMiniature extends StatelessWidget {
 /// The name of the app, the build actually installed, and the one sentence
 /// that says what makes it different from every other training log.
 ///
-/// It replaces a card holding one `bodySmall` paragraph and nothing else. Two
-/// things were wrong with that: the type was a step below every other sentence
-/// on the page, so the only section that reads as an explanation was the only
-/// one set smaller than the rows above it, and a person looking for a version
-/// number — which is what anybody opens About for — found no number at all.
+/// A card holding one `bodySmall` paragraph and nothing else is wrong twice
+/// over: the type sits a step below every other sentence on the page, so the
+/// only section that reads as an explanation is the only one set smaller than
+/// the rows above it, and a person looking for a version number — which is what
+/// anybody opens About for — finds no number at all.
 class _AboutCard extends ConsumerWidget {
   const _AboutCard();
 
@@ -1053,12 +1053,11 @@ class _AboutCard extends ConsumerWidget {
 
 /// Rest, as one row that says what it is set to and opens the rest.
 ///
-/// The three controls used to sit on the page, and a stepper leaves 136pt for
-/// the words beside it — so every helper line under them was cut off mid
-/// sentence: "For an exercise that has not been given its own…". Neither
-/// shortening them nor letting them wrap fixes that, because the room is taken
-/// by the control. In a sheet each one has the full width, and the page gets
-/// three rows back.
+/// On the page, a stepper leaves 136pt for the words beside it, which cuts
+/// every helper line under it off mid sentence: "For an exercise that has not
+/// been given its own…". Neither shortening them nor letting them wrap fixes
+/// that, because the room is taken by the control. In a sheet each one has the
+/// full width, and the page keeps three rows for the three controls.
 class _RestRow extends ConsumerWidget {
   const _RestRow();
 

@@ -6,10 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// `clamp(lower, upper)` throws when `lower > upper`. That is not a rare edge —
 /// it is what happens whenever a bound comes from a layout that got small or a
-/// list that got long. `WeeklyBars` documented its geometry carefully and still
-/// shipped `clamp(1.0, slot)`, which was latent until a range widened enough to
-/// reach it and then fatal on every repaint of the volume screen. The comment
-/// was correct, load-bearing, and did nothing, which is why the rules that
+/// list that got long. A carefully documented geometry is no defence:
+/// `clamp(1.0, slot)` stays latent until a range widens enough to reach it, and
+/// is then fatal on every repaint of the screen it is on. A comment can be
+/// correct, load-bearing and still do nothing, which is why the rules that
 /// matter in this codebase are mechanical (RULES § 7).
 ///
 /// The mechanical form of this one: **both bounds of a `clamp` must be

@@ -105,10 +105,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// The keypad's in-progress text, held in a notifier rather than in state.
   ///
-  /// It used to be a plain field passed down as a widget parameter, so every
-  /// digit rebuilt the exercise page and every SetRow on it — the largest
-  /// rebuild in the app, on its most frequent interaction. Only the cell being
-  /// typed into and the keypad's own readout listen now.
+  /// Only the cell being typed into and the keypad's own readout listen. Passed
+  /// down as a plain widget parameter, every digit would rebuild the exercise
+  /// page and every SetRow on it — the largest rebuild in the app, on its most
+  /// frequent interaction.
   final _buffer = ValueNotifier<String>('');
 
   /// The set row currently swiped open, if any. Shared by every row on the
@@ -168,9 +168,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   bool _restIsBetweenExercises = false;
 
   /// The target belonging to the exercise now on screen, held back while a
-  /// rest started under the previous exercise is still running. Turning the
-  /// page mid-rest used to swap the target under the running clock, so a rest
-  /// with forty seconds left jumped back up to two minutes.
+  /// rest started under the previous exercise is still running. Applying it at
+  /// once would swap the target under the running clock when the page is turned
+  /// mid-rest, sending a rest with forty seconds left back up to two minutes.
   int? _pendingRestTarget;
 
   /// Set once the current rest has reached zero, so the buzz fires on the
@@ -204,9 +204,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   Map<String, PrefillResult> _prefill = const {};
   WorkoutDetail? _detail;
 
-  /// One exercise per page. Scrolling a long vertical stack mid-set was the
-  /// thing this replaces: you only ever care about the movement in front of
-  /// you, and the rail above keeps the rest of the session in view.
+  /// One exercise per page, rather than scrolling a long vertical stack
+  /// mid-set: you only ever care about the movement in front of you, and the
+  /// rail above keeps the rest of the session in view.
   final _pages = PageController();
   int _page = 0;
 
@@ -214,8 +214,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   ///
   /// [_goToPage] can only reach a page that exists in the build it runs in, and
   /// an exercise added a moment ago is not in one yet — the write has been made,
-  /// the watched query has not returned. Adding an exercise therefore landed on
-  /// the last of the *old* pages, which is the one it was already on.
+  /// the watched query has not returned. Without this, adding an exercise
+  /// lands on the last page of the build it ran in — the one already on
+  /// screen.
   int? _wantedPage;
 
   @override
@@ -224,11 +225,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // The screen going off is what breaks the rest clock — see
     // [didChangeAppLifecycleState].
     WidgetsBinding.instance.addObserver(this);
-    // The tick no longer rebuilds the screen. It used to call setState on the
-    // whole log — PageView included — once a second whether or not anything on
-    // it showed a clock; the two widgets that need one now tick themselves.
-    // This is left running only to catch the moment rest reaches zero, which
-    // has to fire even with the keypad covering the bar.
+    // The tick does not rebuild the screen: the two widgets that need a clock
+    // tick themselves, rather than this calling setState on the whole log —
+    // PageView included — once a second whether or not anything on it shows
+    // one. This runs only to catch the moment rest reaches zero, which has to
+    // fire even with the keypad covering the bar.
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       _checkRestElapsed();
@@ -273,11 +274,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
   ///
   /// Everything on this screen that counts — the bar, the buzz — is driven by
   /// a Dart `Timer`, and Android freezes those the moment the process is
-  /// suspended. The alarm that covers that is now armed at the *start* of
-  /// every rest ([_armRestAlert]) rather than here, because this method used
-  /// to be the only thing that armed it: a process suspended without a clean
-  /// `paused` — or one whose timers were simply throttled behind a screen that
-  /// stayed on — had nothing scheduled, and the tone played when the phone was
+  /// suspended. The alarm that covers that is armed at the *start* of every
+  /// rest ([_armRestAlert]) rather than here: armed only from this method, a
+  /// process suspended without a clean `paused` — or one whose timers were
+  /// simply throttled behind a screen that stayed on — has nothing scheduled,
+  /// and the tone plays when the phone is
   /// picked back up, or never.
   ///
   /// What is left here are the two edges. On the way out, an alert this screen
@@ -382,8 +383,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// What the rest alert says under "Rest finished": the movement it is a rest
   /// from, falling back to the session when the workout is still empty. The
-  /// session's name was all it ever said, which on a phone in a pocket is the
-  /// one thing you already know.
+  /// session's name alone, which is what a pocket phone already tells you, is
+  /// the one thing worth nothing here.
   String? _restAlertBody() {
     final detail = _detail;
     if (detail == null) return null;
@@ -420,9 +421,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
     if (_alarmArmed) {
       // The OS still holds this one, which means it has already rung — or is
       // about to, within the second. This is the path a phone left face down
-      // comes back on, and firing here as well is what used to make the tone
-      // play a second time when it was picked up. Nothing to do but record
-      // that the rest is over.
+      // comes back on, where firing here as well would play the tone a second
+      // time when it is picked up. Nothing to do but record that the rest is
+      // over.
       _alarmArmed = false;
     } else {
       _fireInAppAlert();
@@ -454,9 +455,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Loads the rest target for the exercise now on screen.
   ///
-  /// Per exercise rather than one number for the session: the target used to
-  /// reset to 120 s every time the log opened, which is wrong for a heavy
-  /// squat and wrong again for a cable fly.
+  /// Per exercise rather than one number for the session: a single target of
+  /// 120 s is wrong for a heavy squat and wrong again for a cable fly.
   Future<void> _loadRestTarget(WorkoutDetail detail, int index) async {
     if (index < 0 || index >= detail.entries.length) return;
     final seconds = await ref
@@ -730,8 +730,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     _unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     // Watched, though nothing on this screen draws it: [_restPrefs] reads it
     // at the moment a set is ticked, and a provider nobody has subscribed to
-    // has not run its query yet — so the first rest of the session would have
-    // used the shipped defaults rather than the numbers in Settings.
+    // has not run its query yet — so the first rest of the session would use
+    // the built-in defaults rather than the numbers in Settings.
     ref.watch(restPrefsProvider);
 
     // The first page's rest target isn't known until the workout loads.
@@ -905,11 +905,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
               ),
             // **The rest clock stays up while you type.**
             //
-            // It used to be dropped from the tree the moment a cell was
-            // focused — the keypad was not covering it, it was not there —
-            // which took the number away at the one moment you are most likely
-            // to be looking at the screen. It sits above the keypad instead,
-            // so the seconds left and the ± are both still in reach.
+            // It sits above the keypad rather than leaving the tree when a
+            // cell is focused, so the seconds left and the ± are both still in
+            // reach at the one moment you are most likely to be looking at the
+            // screen.
             if (_showRestBar && _restStartedAt != null)
               RestTimerBar(
                 startedAt: _restStartedAt!,
@@ -1044,7 +1043,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // pad: whatever partials it had are no longer claimed, so the count is
         // dropped rather than left behind a closed box. Empty rather than
         // null, so pressing `P` straight afterwards starts from nothing — the
-        // row is still holding the old number until the clearing write below
+        // row still holds the previous number until the clearing write below
         // comes back through the stream.
         _partialStash = '';
         // Closing from the reps half changes nothing about what is being
@@ -1070,13 +1069,12 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// under it. Nothing scrolled the active row back, which on an exercise with
   /// five or more sets could leave you typing into a row you cannot see.
   ///
-  /// **Only when the row cannot be seen.** It used to scroll to a fixed
-  /// alignment every time, which on the four sets an exercise usually has —
-  /// every one of them still on screen with the keypad up — meant the whole
-  /// page lurched a little under the thumb on every tap, to reveal something
-  /// that was never hidden. The check runs after the frame that inserts the
-  /// keypad, so what it measures against is the shortened viewport rather than
-  /// the one the row was tapped in.
+  /// **Only when the row cannot be seen.** Scrolling to a fixed alignment every
+  /// time would lurch the whole page a little under the thumb on every tap, to
+  /// reveal something that was never hidden: an exercise usually has four sets,
+  /// and all of them stay on screen with the keypad up. The check runs after
+  /// the frame that inserts the keypad, so what it measures against is the
+  /// shortened viewport rather than the one the row was tapped in.
   void _revealRow(String setId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = _rowKeys[setId]?.currentContext;
@@ -1093,7 +1091,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Whether the widget at [context] is inside its scrollable's viewport, top
   /// and bottom both. Answers false when there is nothing to measure with,
-  /// which puts the scroll back — the old behaviour, and the safe one.
+  /// which scrolls the row into view — the safe side to fail on.
   static bool _isFullyVisible(BuildContext context) {
     final box = context.findRenderObject() as RenderBox?;
     final viewport = Scrollable.maybeOf(context)?.context.findRenderObject();
@@ -1227,11 +1225,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Buffers the keystroke on screen immediately and the write shortly after.
   ///
-  /// Every digit used to be its own `updateSet`, and every write re-ran the
-  /// three queries behind `watchWorkoutDetail` for the whole workout. Invisible
-  /// on a new phone, not on an old one, and it burns battery for an hour a
-  /// session. The pending write is flushed on Next, on dismiss, on page turn
-  /// and on dispose, so nothing typed can be lost.
+  /// A write per digit re-runs the three queries behind `watchWorkoutDetail`
+  /// for the whole workout — invisible on a new phone, not on an old one, and
+  /// an hour a session of burnt battery. The pending write is flushed on Next,
+  /// on dismiss, on page turn and on dispose, so nothing typed can be lost.
   void _commit(String next, EditTarget target) {
     // No setState: the notifier repaints the one cell and the readout.
     _buffer.value = next;
@@ -1295,10 +1292,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
           : _timeField
           ? secondsFromDigits(_buffer.value)
           : int.tryParse(_buffer.value) ?? 0;
-      // A weight with no reps used to do nothing at all while the key said
-      // "Done": the keypad simply closed. Fall back to last time's reps, which
-      // is what adopting the ghost would have written anyway; with no ghost to
-      // fall back on the key says "Reps?" and this never runs.
+      // A weight with no reps would tick nothing while the key says "Done".
+      // Fall back to last time's reps, which is what adopting the ghost would
+      // have written anyway; with no ghost to fall back on the key says "Reps?"
+      // and this never runs.
       // Not in partial mode: the buffer there is the partial count, and
       // committing last time's reps into it would file eight full reps as
       // eight halves.
@@ -1323,10 +1320,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
       if (reps > 0) {
         // The count is settled — typed, timed, or taken from the ghost a few
-        // lines up and already flushed. **The load may still be blank**, and
-        // until now this path ticked anyway: on a movement you have never done
-        // there is no ghost to adopt from, so a first-ever set went down with
-        // reps and no weight. Same refusal the box has always made.
+        // lines up and already flushed. **The load may still be blank**: on a
+        // movement never done before there is no ghost to adopt from, so
+        // ticking anyway would file a first-ever set with reps and no weight.
+        // Same refusal the checkbox makes.
         //
         // `repsOverride` because the row is a build behind the buffer: the
         // count was written a moment ago and the watched query has not come
@@ -1402,9 +1399,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
       // about it. See [missingBeforeDone] for why.
       if (_refuseIncomplete(set.id)) return;
     }
-    // The same write the keypad's "Next" makes. Ticking the box by hand used to
-    // record no rest at all, so how long a set rested depended on which of two
-    // ways you had marked it done.
+    // The same write the keypad's "Next" makes, so how long a set rested does
+    // not depend on which of the two ways you marked it done.
     final rest = done ? _restTakenSeconds() : null;
     ref
         .read(trainingRepositoryProvider)
@@ -1424,10 +1420,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Sends the thumb to the next set after one is ticked.
   ///
-  /// Ticking a box used to leave the keypad wherever it was — usually on the
-  /// row you had just finished — so the next set began with a tap to move and a
-  /// tap to open. The next open set is the only thing you can do next, and past
-  /// the last one on a page it is on the page after it.
+  /// The next open set is the only thing you can do next, and past the last one
+  /// on a page it is on the page after it. Leaving the keypad where it was —
+  /// usually on the row just finished — starts the next set with a tap to move
+  /// and a tap to open.
   ///
   /// With nothing open left, the keypad goes away instead: the session is
   /// finished, and the screen's one remaining action is the button underneath
@@ -1475,10 +1471,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// A blank the ghost is about to fill does not count. This read the row as it
   /// stood in the last build, but [_adoptGhost] runs immediately before it and
   /// its writes have not come back yet — so a set with last time's numbers
-  /// waiting for it looked empty, and the first tap on the tick only filled the
-  /// fields and opened the keypad. Logging the same numbers as last week, which
-  /// is the single most common thing to do on this screen, took two taps on the
-  /// same box and looked like the first one had missed.
+  /// waiting for it reads as empty, and the first tap on the tick only fills
+  /// the fields and opens the keypad. Logging the same numbers as last week,
+  /// which is the single most common thing to do on this screen, then takes two
+  /// taps on the same box and looks like the first one missed.
   /// The rule itself is [missingBeforeDone]; this only finds the numbers to
   /// hand it. Both tick paths ask through here — see [_refuseIncomplete].
   SetField? _firstEmptyField(String setId, {int? repsOverride}) {
@@ -1505,9 +1501,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// Sends the thumb to what is missing rather than ticking an empty set, and
   /// says whether it did.
   ///
-  /// Shared by the box and the keypad so the two cannot drift: the box has
-  /// always refused an empty set, and Next never did, which is how a first-ever
-  /// movement could be logged with reps and no load at all.
+  /// Shared by the box and the keypad so the two cannot drift. Refused on one
+  /// path and not the other, a first-ever movement can be logged with reps and
+  /// no load at all.
   bool _refuseIncomplete(String setId, {int? repsOverride}) {
     final empty = _firstEmptyField(setId, repsOverride: repsOverride);
     if (empty == null) return false;
@@ -1603,11 +1599,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// Arranges today's exercises, by dragging them.
   ///
-  /// This was `Move earlier` / `Move later` on the ⋮ sheet — one nudge per
-  /// visit, with the sheet closing between each. Two directions is a fine
+  /// Not `Move earlier` / `Move later` on the ⋮ sheet, which is one nudge per
+  /// visit with the sheet closing between each. Two directions is a fine
   /// control for moving something once and a bad one for arranging six
-  /// movements, which is what you have opened it to do. The rail's long-press
-  /// drag still covers the single nudge.
+  /// movements, which is what this is opened to do. The rail's long-press drag
+  /// covers the single nudge.
   Future<void> _reorderExercises(WorkoutDetail detail) async {
     final current = [for (final e in detail.entries) e.workoutExercise.id];
     // Looked up while this widget is certainly alive. A `ref` read from inside
@@ -1638,12 +1634,12 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   /// The order the last move put things in, held until the database agrees.
   ///
-  /// The rail holds its own while a *drag* is in flight, but `Move up` and
-  /// `Move down` in the ⋮ sheet went straight to the repository — so the tab
-  /// stayed where it was, the page animated to a neighbour that had not moved
-  /// yet, and both jumped when the write landed a frame or two later. One
-  /// optimistic order, owned here, covers the drag and both buttons: the rail,
-  /// the pager and the cell map are all built from it.
+  /// The rail holds its own while a *drag* is in flight. Sent straight to the
+  /// repository, `Move up` and `Move down` in the ⋮ sheet leave the tab where it
+  /// was and animate the page to a neighbour that has not moved yet, and both
+  /// jump when the write lands a frame or two later. One optimistic order, owned
+  /// here, covers the drag and both buttons: the rail, the pager and the cell
+  /// map are all built from it.
   List<String>? _pendingOrder;
 
   /// [detail] with the pending order applied, or unchanged when there is none
@@ -1881,14 +1877,14 @@ int _ghostClass(SetType type) => switch (type) {
 
 /// A single exercise, filling the screen.
 ///
-/// The session used to be one long vertical stack, which meant scrolling past
-/// finished work to reach the set in front of you. One exercise per page keeps
-/// the thing you are actually doing at a fixed place on screen.
+/// One exercise per page keeps the thing you are actually doing at a fixed
+/// place on screen. One long vertical stack means scrolling past finished work
+/// to reach the set in front of you.
 /// Session name, elapsed clock, and how far through the work you are.
 ///
-/// The progress track replaces the `12 of 18 sets` line that used to sit under
-/// the title. It is the same fact, and a bar answers "nearly done?" from across
-/// a gym floor in a way two numbers never did.
+/// The progress track carries the same fact as a `12 of 18 sets` line, and a
+/// bar answers "nearly done?" from across a gym floor in a way two numbers
+/// cannot.
 class _LogTopBar extends StatelessWidget {
   const _LogTopBar({
     required this.title,
@@ -2158,10 +2154,10 @@ class _ExercisePage extends ConsumerWidget {
             ),
           )
         else ...[
-          // No card. The table was inset by the page gutter and then again by
-          // the card's own padding, so the SET column started 32dp in while
-          // the exercise name above it started at 16 — the two things a reader
-          // scans down this screen were on different vertical lines. On the
+          // No card. In one the table is inset by the page gutter and then
+          // again by the card's own padding, so the SET column starts 32dp in
+          // while the exercise name above it starts at 16 — the two things a
+          // reader scans down this screen on different vertical lines. On the
           // page it is also one less surface behind a row that already has a
           // fill of its own per field.
           Column(
@@ -2190,8 +2186,8 @@ class _ExercisePage extends ConsumerWidget {
               // The add button lives in the index column, directly under the
               // numbers it continues — no label, because a `+` under a
               // column of set numbers cannot mean anything else. The
-              // `n of m done` line that used to sit here said what the
-              // header already says.
+              // `n of m done` line this replaces said what the header already
+              // says.
               Padding(
                 padding: const EdgeInsets.only(top: Space.sm),
                 child: Row(
@@ -2256,11 +2252,11 @@ enum _FinishChoice { finish, discard, keepLogging }
 
 /// What to do about a session with sets still open.
 ///
-/// This was a two-button confirm built out of a paragraph of text: the counts,
-/// the exercise list and the caveat all ran together in one message, and the
-/// only ways out were "Finish anyway" and "Keep logging". There was no way to
-/// throw the session away from here at all — you had to un-tick every set to
-/// get the "nothing logged" prompt that offered it.
+/// Three answers, not two. A two-button confirm built out of a paragraph of
+/// text runs the counts, the exercise list and the caveat together in one
+/// message and offers only "Finish anyway" and "Keep logging" — with no way to
+/// throw the session away from here at all, short of un-ticking every set to
+/// reach the "nothing logged" prompt.
 Future<_FinishChoice?> _confirmEarlyFinish(
   BuildContext context, {
   required int done,
@@ -2309,9 +2305,9 @@ Future<_FinishChoice?> _confirmEarlyFinish(
           ),
           const SizedBox(height: Space.lg),
           Text(
-            // "Empty" was the wrong word and it cost a set: a row with a weight
-            // typed into it but never ticked is thrown away too, and the sheet
-            // promised it wasn't. Unticked is the rule everywhere else —
+            // Not "empty", which costs a set: a row with a weight typed into
+            // it but never ticked is thrown away too, and "empty" promises
+            // otherwise. Unticked is the rule everywhere else —
             // `completeWorkout` tombstones on `isDone`, not on blankness.
             'Any set you did not tick is discarded. The session is saved with '
             'exactly what you did.',
@@ -2592,8 +2588,8 @@ class _SetGroup extends ConsumerWidget {
       ref,
       group.sets[k],
       // The number the chip prints, not the raw position. Tapping the set
-      // marked `1` used to open a sheet headed "Set 2" whenever a warm-up or
-      // a drop sat above it. The sheet names the type itself.
+      // marked `1` would otherwise open a sheet headed "Set 2" whenever a
+      // warm-up or a drop sat above it. The sheet names the type itself.
       label: group.label,
       leg: k == 0 ? null : k + 1,
       deleteIds: _deleteIds(k),
@@ -2750,12 +2746,13 @@ String _formatElapsed(int startedAtMs) {
 
 /// The ⓘ, with a dot on it when the numbers in the table were borrowed.
 ///
-/// The header used to carry a caption instead — `Last time · 12 Jul`, or
-/// `Borrowed from Push 2 · 3 Aug` in amber. It said what the info sheet already
-/// says, on the screen with the least room for a second line, so it moved
-/// inside. What could not move is the *warning*: numbers prefilled from another
-/// session are the one case where ignoring where they came from means chasing
-/// somebody else's day, so the button wears a dot and the sheet spells it out.
+/// The provenance lives in the sheet rather than in a header caption —
+/// `Last time · 12 Jul`, or `Borrowed from Push 2 · 3 Aug` in amber — which
+/// would say what the sheet already says, on the screen with the least room for
+/// a second line. The *warning* cannot live there alone: numbers prefilled from
+/// another session are the one case where ignoring where they came from means
+/// chasing somebody else's day, so the button wears a dot and the sheet spells
+/// it out.
 class _InfoButton extends StatelessWidget {
   const _InfoButton({required this.onTap});
 

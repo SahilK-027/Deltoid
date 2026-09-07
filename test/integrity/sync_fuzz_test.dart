@@ -40,7 +40,7 @@ import 'invariant_oracle.dart';
 ///   re-slot, re-flag and re-number; it is not allowed to make work disappear.
 ///
 /// **No model.** `model_fuzz_test.dart` conserves values against a deliberately
-/// stupid model, and that is the right oracle for one device: it knows what the
+/// simple model, and that is the right oracle for one device: it knows what the
 /// database should hold because it watched every operation. Here the other
 /// phone is also writing, and what the merge rules *should* produce is precisely
 /// what is under test — a model that predicted it would be a second copy of

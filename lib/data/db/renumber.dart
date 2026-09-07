@@ -31,11 +31,11 @@ export '../../domain/slots.dart' show nextPosition;
 /// so one that does not name exactly [scope] is refused here rather than
 /// several writes later.
 ///
-/// Both halves of that used to be the caller's problem, stated in prose. Handing
-/// a short list to the old signature failed one of two ways: on the unique index
-/// with a message about nothing the caller did wrong, or — when the omitted row
-/// sat above everything the second pass wrote — not at all, reporting success
-/// for a scope it only partly knew about.
+/// Both halves are checked here rather than left to the caller as prose. A
+/// short list otherwise fails one of two ways: on the unique index, with a
+/// message about nothing the caller did wrong, or — when the omitted row sits
+/// above everything the second pass writes — not at all, reporting success for
+/// a scope it only partly knew about.
 Future<void> renumber(
   List<String> orderedIds, {
   required Map<String, int> scope,

@@ -17,12 +17,11 @@ import 'regime_screen.dart';
 /// slot they write is an ordinary row the user can rename, reorder or delete.
 /// Returns the new regime's id, or null if the user backed out.
 ///
-/// [activate] is what makes a shelf of programmes possible. Creating one used
-/// to switch to it, always, so building next month's split meant abandoning the
-/// one you are mid-cycle on — there was no way to have three and choose. From
-/// the Regimes screen it now creates and stays put, and switching is the tap it
-/// always was; from an empty app it activates, because there is nothing to
-/// leave.
+/// [activate] is what makes a shelf of programmes possible. Creating one and
+/// always switching to it means building next month's split abandons the one
+/// you are mid-cycle on, with no way to have three and choose. From the Regimes
+/// screen this creates and stays put, and switching is its own tap; from an
+/// empty app it activates, because there is nothing to leave.
 Future<String?> createRegimeFlow(
   BuildContext context,
   WidgetRef ref, {

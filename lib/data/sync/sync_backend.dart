@@ -6,7 +6,8 @@
 /// never heard of — which [SYNC.md § 14](SYNC.md#14-two-builds-one-account)
 /// requires it to carry rather than choke on.
 ///
-/// **The fake is the point.** An in-memory implementation with its own
+/// The in-memory implementation is the purpose of this abstraction. It has its
+/// own
 /// monotonic clock, able to misbehave deliberately — drop the response after
 /// committing the write, hand back a row from a newer build, fail every third
 /// call — is what makes [SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does)
@@ -22,7 +23,8 @@ abstract interface class SyncBackend {
   /// Every row stamped at or after [cursor], oldest first, at most [limit] of
   /// them. Null pulls the account from its beginning.
   ///
-  /// **At or after, not after.** Two rows can share a `server_updated_at`, and
+  /// At or after, rather than strictly after. Two rows can share a
+  /// `server_updated_at`, and
   /// a strict `>` drops whichever one falls on the far side of a page boundary
   /// — silently, once, with no second chance. Re-reading the boundary row costs
   /// an upsert that is idempotent anyway.
@@ -44,8 +46,8 @@ abstract interface class SyncBackend {
   /// The other half of the same sentence: *most recently 3 March*. The column
   /// is named by the caller because the date the prompt wants is when the user
   /// trained — `workouts.started_at` — and not `updated_at`, which is when a
-  /// row was last touched and would report a decade-old session as today's the
-  /// moment a merge restamped it.
+  /// row was last touched and would report a session from a decade ago as
+  /// today's the moment a merge restamped it.
   Future<DateTime?> latestAt(String table, String column);
 }
 

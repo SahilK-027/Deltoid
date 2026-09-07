@@ -58,7 +58,7 @@ void main() {
       (tester) async {
     // `first` and `last` are the picker's own computed bounds, and a
     // caller that gets them the wrong way round — a history whose newest
-    // workout predates the window it is being offered — used to hand
+    // workout predates the window it is being offered — would otherwise hand
     // `_CalendarCard` a range it cannot page inside. The picker owns the
     // ordering rather than trusting it.
     await open(

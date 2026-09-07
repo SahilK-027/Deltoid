@@ -8,12 +8,12 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The invariants the app used to hold on its own.
+/// The invariants the database refuses on its own.
 ///
-/// Every one of these was already enforced in Dart — a transaction, an upsert,
-/// a deactivate-then-activate. That defence only covers writes that come
+/// Every one of these is also enforced in Dart — a transaction, an upsert, a
+/// deactivate-then-activate — but that defence only covers writes that come
 /// through the repository, and a restore or a merge does not. These prove the
-/// database itself now refuses, so there is no route in that can get it wrong.
+/// schema refuses them, so there is no route in that can get it wrong.
 void main() {
   setUpAll(() {
     // The restore test opens a second database to stand in for a new phone.
@@ -134,11 +134,10 @@ void main() {
   });
 
   test('a drop leg cannot name a head in another exercise', () async {
-    // The column was a real reference, so the head had to exist — but nothing
-    // said *where*. A leg under Bench could name a head under Row, or a head in
-    // last March's workout, and SQLite took it. `addDropLeg` and `setSetType`
-    // always pass a head from the same slot; a restore does not go through
-    // either.
+    // A plain reference makes the head exist without saying *where*: a leg
+    // under Bench could name a head under Row, or a head in last March's
+    // workout, and SQLite would take it. `addDropLeg` and `setSetType` always
+    // pass a head from the same slot; a restore goes through neither.
     final bench = await aWorkoutExercise(await aRegime());
     final row = await aSiblingSlot(bench);
     final head = await aSet(bench, 0);
@@ -386,16 +385,14 @@ void main() {
         .getSingle();
     final mode = (row.data.values.first as String).toLowerCase();
 
-    // This used to accept any of the four recoverable modes and say outright
-    // that nothing in `lib/` set one, so the honest thing was to read whatever
-    // the packaged sqlite3 defaulted to. `database.dart` sets one now, and the
-    // reasoning inverts with it: WAL is a decision — a sync reader and a UI
+    // Named exactly rather than accepting any of the four recoverable modes:
+    // `database.dart` sets one, and WAL is a decision — a sync reader and a UI
     // writer overlap under it and serialise under `delete`
-    // ([SYNC.md § 16](SYNC.md#16-still-to-decide)) — so this names it exactly.
+    // ([SYNC.md § 16](SYNC.md#16-still-to-decide)).
     //
-    // It is still a durable mode, which is the property the old test was really
-    // holding: WAL keeps a log the next open recovers from, unlike `memory`,
-    // which keeps it in RAM, or `off`, which keeps none at all.
+    // It is also a durable mode, which is the property underneath: WAL keeps a
+    // log the next open recovers from, unlike `memory`, which keeps it in RAM,
+    // or `off`, which keeps none at all.
     expect(mode, 'wal',
         reason: 'beforeOpen sets it, so a phone that reads anything else never '
             'ran beforeOpen');

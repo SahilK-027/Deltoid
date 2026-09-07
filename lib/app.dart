@@ -38,12 +38,12 @@ class DeltoidApp extends ConsumerWidget {
       // Damped scrolling everywhere, and no overscroll glow — see
       // [AppScrollBehavior].
       scrollBehavior: const AppScrollBehavior(),
-      // Crossed, not cut. This was `noAnimation` on the argument that lerping
-      // every colour in the tree is a grey wash through the midpoint of two
-      // palettes — true at Material's default 200ms linear, and the reason the
-      // switch is now driven at this app's own micro duration on
-      // `easeOutCubic`: fast enough that the midpoint is never a state you can
-      // read, slow enough that the screen does not appear to be replaced.
+      // Crossed, not cut. Lerping every colour in the tree is a grey wash
+      // through the midpoint of two palettes at Material's default 200ms
+      // linear, which is the argument for `noAnimation` — so the switch runs at
+      // this app's own micro duration on `easeOutCubic` instead: fast enough
+      // that the midpoint is never a state you can read, slow enough that the
+      // screen does not appear to be replaced.
       themeAnimationStyle: AnimationStyle(
         duration: Motion.fast,
         curve: Motion.curve,
@@ -130,11 +130,11 @@ class _Boot extends ConsumerWidget {
     // The status and navigation bars draw over the app, so their *icons* have
     // to be told which way round the app is.
     //
-    // This was set on `appBarTheme.systemOverlayStyle`, which only applies
-    // where there is an `AppBar` — and there is not one anywhere in this app,
-    // because every screen wears a `HeaderBand` of its own. So the icons kept
+    // Not through `appBarTheme.systemOverlayStyle`, which only applies where
+    // there is an `AppBar` — and there is not one anywhere in this app, because
+    // every screen wears a `HeaderBand` of its own. Set there, the icons keep
     // whatever the launch window left behind, which is white: correct on dark
-    // and invisible on light, where the whole bottom strip read as a black
+    // and invisible on light, where the whole bottom strip reads as a black
     // band under a white screen.
     final overlay = _overlayFor(context);
 
@@ -261,11 +261,11 @@ class _ShellWhenReady extends ConsumerWidget {
 /// What Flutter paints while the system splash is still up: nothing but the
 /// background colour.
 ///
-/// This used to draw the mark again, which is what made the splash look like it
-/// fired twice — the OS drew it, dropped it when the engine attached, and this
-/// redrew it a beat later at a different size. The mark now belongs to the
-/// launch window alone; MainActivity holds that window until [_Ready] says boot
-/// is done, so these frames are never seen.
+/// Drawing the mark here makes the splash look like it fires twice: the OS
+/// draws it, drops it when the engine attaches, and this would redraw it a beat
+/// later at a different size. The mark belongs to the launch window alone, and
+/// MainActivity holds that window until [_Ready] says boot is done, so these
+/// frames are never seen.
 class _Holding extends StatelessWidget {
   const _Holding();
 

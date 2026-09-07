@@ -121,9 +121,9 @@ class _ExerciseHistoryScreenState extends ConsumerState<ExerciseHistoryScreen> {
         skipLoadingOnReload: true,
         // The trend, not a spinner in the middle of the screen. Two async reads
         // feed this page — the chart's and the list's — and whichever lands
-        // second used to redraw the whole body, so opening an exercise flashed
-        // a spinner, then rows, then jumped. The header is the same widget in
-        // every state, so only the rows under it appear.
+        // second would otherwise redraw the whole body, so opening an exercise
+        // would flash a spinner, then rows, then jump. The header is the same
+        // widget in every state, so only the rows under it appear.
         loading: () => ListView(
           padding: _padding,
           children: [
@@ -373,9 +373,9 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
                   .join('   '),
               style: context.t.bodyMedium,
             ),
-            // The fold has a height, so it animates to it. It used to appear
-            // between two frames, which reads as the card being replaced
-            // rather than as it opening.
+            // The fold has a height, so it animates to it. Appearing between
+            // two frames reads as the card being replaced rather than as it
+            // opening.
             AnimatedSize(
               duration: Motion.base,
               curve: Motion.emphasized,

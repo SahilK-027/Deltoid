@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 
 /// Rebuilds its child once a second, and nothing else with it.
 ///
-/// The log screen used to hold one `Timer.periodic` that called `setState` on
-/// the entire screen — PageView included — whether or not anything on it was
-/// showing a clock. Two things need the time of day; they can pay for it
+/// One `Timer.periodic` on the log screen would call `setState` on the whole
+/// screen — PageView included — whether or not anything on it was showing a
+/// clock. Two things need the time of day, and they can pay for it
 /// themselves.
 class Ticking extends StatefulWidget {
   const Ticking({

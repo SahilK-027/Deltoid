@@ -24,8 +24,8 @@ void main() {
       expect(applyKey('100', '0', field: SetField.weight), '1000');
       // 10000 is over the ceiling, so the keystroke is dropped.
       expect(applyKey('1000', '0', field: SetField.weight), '1000');
-      // The old rule counted characters and would have refused this for being
-      // six long, though 999.5 is a perfectly ordinary number.
+      // A rule counting characters would refuse this for being six long,
+      // though 999.5 is a perfectly ordinary number.
       expect(applyKey('999.', '5', field: SetField.weight), '999.5');
       // And it lets nothing over the line by way of a decimal.
       expect(applyKey('1000.', '5', field: SetField.weight), '1000.');

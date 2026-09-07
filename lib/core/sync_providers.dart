@@ -47,13 +47,14 @@ Future<bool> welcomeAnswered(AppDatabase db) async {
 
 /// Records the answer, and seeds the catalog if it is still empty.
 ///
-/// **Order is the point.** The catalog is written *before* the flag, so the
-/// moment [welcomeAnsweredProvider] flips there is already a catalog to train
-/// from — the shell renders over a database that is finished rather than one
-/// that is filling in behind it. Killed in between, the flag is absent and the
-/// screen simply asks again, which is the harmless half of the failure.
+/// The order of operations is significant. The catalog is written before the
+/// flag, so that at the moment [welcomeAnsweredProvider] changes there is
+/// already a catalog available: the shell renders over a completed database
+/// rather than one still being populated. If the process is terminated between
+/// the two, the flag is absent and the screen asks again, which is the benign
+/// failure mode.
 ///
-/// **[seed] is false on the one path that has already dealt with the catalog.**
+/// [seed] is false on the one path that has already established a catalog.
 /// Signing in runs [AdoptionService.adopt] first, and an account that holds a
 /// catalog hands over the user's own — with their notes and their edits on it —
 /// rather than being given a second one under different ids. Seeding anyway
@@ -79,7 +80,8 @@ Future<void> answerWelcome(
 /// configured build; this answers the same question from a compile-time
 /// constant and never changes.
 ///
-/// **A build that cannot sign in must not offer to.** An unconfigured build
+/// A build that cannot sign in must not present the option. An unconfigured
+/// build
 /// has no account feature, and a control that produces only an error message
 /// is claiming one it does not have.
 final syncConfiguredProvider = Provider<bool>(

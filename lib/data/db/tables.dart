@@ -16,13 +16,14 @@ import 'converters.dart';
 /// delete on one device propagates instead of being resurrected by the other,
 /// and [dirty] marks rows the local device still owes the server.
 ///
-/// [deviceId] is **the device that wrote the version in front of you**, not the
+/// [deviceId] identifies the device that wrote the version under consideration,
+/// not the
 /// one that created the row. `clientDefault` only fires on an insert, so this
-/// used to name the creator for the rest of the row's life — and last-write-wins
-/// breaks a same-millisecond tie on it, which meant both devices compared the
-/// same originating id, found it equal, and each kept its own copy. Every write
-/// stamps it now; see `stampedNow` in `lib/core/ids.dart` for the trio that
-/// travels together.
+/// would leave it naming the creator for the rest of the row's life — and
+/// last-write-wins breaks a same-millisecond tie on it, so both devices would
+/// compare the same originating id, find it equal, and each keep its own copy.
+/// Every write stamps it; see `stampedNow` in `lib/core/ids.dart` for the trio
+/// that travels together.
 mixin SyncColumns on Table {
   TextColumn get id => text().clientDefault(newId)();
   IntColumn get updatedAt => integer().clientDefault(nowMs)();
@@ -83,8 +84,9 @@ class Exercises extends Table with SyncColumns {
   TextColumn get notes => text().nullable()();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
 
-  /// An enum column is read back through `textEnum`, which **throws on a value
-  /// it does not know** — and not for the one row, but for every read of the
+  /// An enum column is read back through `textEnum`, which throws on an
+  /// unrecognised value, and does so not for the single row but for every read
+  /// of the
   /// table, because a single bad string fails the whole result set. So an
   /// unparseable movement would take the catalog, the log and history down
   /// together. The app can only ever write a name from the enum; a restore or a
@@ -133,8 +135,9 @@ class Exercises extends Table with SyncColumns {
 /// to 0 and the CHECK below bounds the range only, so an export carrying the
 /// key on every regime is taken at its word — the restore's backfill runs only
 /// when a row *lacks* it (`backup_service.dart:723-726`). A hand-edited or
-/// merged file with the same slot twice restored two programmes onto one
-/// colour, and the mark is what History and Today are scanned by.
+/// merged file carrying the same slot twice would otherwise restore two
+/// programmes onto one colour, and the mark is what History and Today are
+/// scanned by.
 ///
 /// Partial on `deleted_at IS NULL` because deleting a regime hands its slot
 /// back — an unscoped index would keep it held by a programme that is gone
@@ -176,14 +179,15 @@ class Regimes extends Table with SyncColumns {
 
   /// When this regime was last made the active one, or null if it never was.
   ///
-  /// **`is_active` is the answer; this is the fact.** The flag is a singleton
+  /// `is_active` is the derived answer; this column is the underlying fact. The
+  /// flag is a singleton
   /// across the whole account — activating one regime deactivates another — so
   /// it is the one column that cannot be merged row by row. Two phones that
-  /// each activated something derived the flag pairwise, against whatever
-  /// happened to be active locally when the row arrived, and could reach
-  /// opposite answers; because the derived deactivation deliberately minted no
-  /// new version, both copies then looked up to date to the other side and the
-  /// disagreement was permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
+  /// each activate something would derive the flag pairwise, against whatever
+  /// happened to be active locally when the row arrived, and can reach opposite
+  /// answers; because the derived deactivation mints no new version, both
+  /// copies then look up to date to the other side and the disagreement is
+  /// permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
   ///
   /// A stamp is a fact about *this row*, so it merges like any other column and
   /// is never rewritten by the merge. Both phones then compute the same winner
@@ -205,8 +209,8 @@ class Regimes extends Table with SyncColumns {
   /// to deload against a period of zero cycles. Both are unreachable through
   /// the settings screen and both are one bad row away from a restore.
   ///
-  /// `deload_set_delta` is documented as negative and was enforced nowhere; a
-  /// positive one adds sets to a light week.
+  /// `deload_set_delta` is documented as negative and constrained here rather
+  /// than only in prose: a positive one adds sets to a light week.
   @override
   List<String> get customConstraints => [
         _liveOrTombstoned,
@@ -223,9 +227,9 @@ class Regimes extends Table with SyncColumns {
 @TableIndex(name: 'idx_sessions_regime', columns: {#regimeId})
 /// No two live sessions in a regime share a position.
 ///
-/// `set_logs` has carried this rule since a `+` inside a deleted drop group put
-/// two sets on one index; it is the same rule and the same failure, and the
-/// programme's running order is what breaks instead of the set table. Every
+/// The same rule `set_logs` carries, against the same failure — a `+` inside a
+/// deleted drop group putting two rows on one index — except that here it is
+/// the programme's running order that breaks rather than the set table. Every
 /// append here already takes one past the highest live position rather than the
 /// live count — this is what holds when the write is a restore or a merge
 /// rather than a tap.
@@ -243,8 +247,7 @@ class Regimes extends Table with SyncColumns {
 /// disclosure says "borrowed from Push 1 on 3 March" and History filters by the
 /// day's name. Two live sessions called `Push 1` in one regime makes every one
 /// of those sentences ambiguous, and there is nothing else on screen to tell
-/// them apart. `regimes` has answered to this rule since the same shelf of
-/// identical names got built there; sessions were left open.
+/// them apart. The same rule `regimes` answers to, one level down.
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_sessions_name_live '
   'ON sessions (regime_id, lower(trim(name))) WHERE deleted_at IS NULL',
@@ -298,7 +301,8 @@ class SessionExercises extends Table with SyncColumns {
   /// kind of friction that gets an app closed mid-session.
   IntColumn get restSeconds => integer().nullable()();
 
-  /// The bar this movement is loaded on **in this day**, when it is not the
+  /// The bar this movement is loaded on within this training day, where it is
+  /// not the
   /// one on the catalog row.
   ///
   /// Per slot for the same reason as the rest above: the same movement is not
@@ -306,13 +310,15 @@ class SessionExercises extends Table with SyncColumns {
   /// off a women's bar on another is two different empty weights, and the
   /// plate diagram is wrong on one of them if the catalog is the only answer.
   ///
-  /// **Null means "follow the catalog"** — not [BarKind.none], which is a
+  /// Null means "follow the catalog", and is distinct from [BarKind.none],
+  /// which is a
   /// decision that this movement sits on no bar at all. The distinction is the
   /// whole point of the column: an override that could not be cleared would
   /// leave every slot permanently answering for a bar nobody chose.
   TextColumn get barKind => textEnum<BarKind>().nullable()();
 
-  /// Per-exercise deload overrides. Schema only for now — no v1 UI.
+  /// Per-exercise deload overrides. Schema only: nothing in the app sets
+  /// these yet.
   IntColumn get deloadSetDelta => integer().nullable()();
   IntColumn get deloadWeightPct => integer().nullable()();
 
@@ -351,8 +357,8 @@ class SessionExercises extends Table with SyncColumns {
 /// A regime cannot hold the same cycle number twice.
 ///
 /// `_ensureOpenCycle` is a transaction for this reason, and there is repair
-/// code for regimes that already carry more than one open cycle — which is the
-/// evidence that this went wrong once, under a build where it was not.
+/// code for regimes carrying more than one open cycle, which is the state a
+/// build without that transaction leaves behind.
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_cycles_regime_index_live '
   'ON cycles (regime_id, cycle_index) WHERE deleted_at IS NULL',
@@ -362,9 +368,8 @@ class SessionExercises extends Table with SyncColumns {
 /// The index above is on `(regime_id, cycle_index)`, so two cycles could be
 /// open at once as long as they were numbered differently — which is exactly
 /// the state `healDuplicateOpenCycles` (`training_repository.dart:446`) exists
-/// to repair, and the evidence that a build reached it. The healer keeps its
-/// job: it repairs a file that already carries the state, and this refuses the
-/// write that would create it. A pull applier is the second writer that makes
+/// to repair. The healer keeps its job — it repairs a file that already carries
+/// the state — and this refuses the write that would create it. A pull applier is the second writer that makes
 /// that distinction matter.
 ///
 /// Scoped on `deleted_at IS NULL` for the healer's sake as much as anyone's —
@@ -405,18 +410,19 @@ class Cycles extends Table with SyncColumns {
 @TableIndex(name: 'idx_workouts_day', columns: {#dayKey})
 @TableIndex(name: 'idx_workouts_cycle', columns: {#cycleId})
 /// History pages by keyset on `(startedAt, id)` descending, which without this
-/// was a scan of every workout and a temp B-tree to sort them — once per page,
-/// with the first page the dearest because nothing is filtered out yet. Small
-/// either way at a human number of sessions, and the index is 148 kB against
-/// thirty years, so this buys under two milliseconds. It is here because it
-/// costs nothing to declare while the schema is still free to change.
+/// index is a scan of every workout and a temp B-tree to sort them — once per
+/// page, with the first page the dearest because nothing is filtered out yet.
+/// Small either way at a human number of sessions, and the index is 148 kB
+/// against thirty years, so this buys under two milliseconds. It is here
+/// because it costs nothing to declare while the schema is still free to
+/// change.
 @TableIndex(name: 'idx_workouts_started', columns: {#startedAt, #id})
 /// One session is open at a time, enforced here rather than only in the check
 /// `startWorkout` makes.
 ///
 /// That check is a read, and it happens before the transaction that writes the
-/// rows — so two taps inside the write window both found nothing running and
-/// both opened a log. `openWorkout` returns the newest by `startedAt`, so the
+/// rows — so two taps inside the write window both find nothing running and
+/// both open a log. `openWorkout` returns the newest by `startedAt`, so the
 /// older one is then hidden behind it: unreachable from any screen, `inProgress`
 /// for good, and counted by nothing. Today's Start button guards against the
 /// double tap; the backfill sheet is a second door onto the same write, and a
@@ -474,7 +480,7 @@ class Workouts extends Table with SyncColumns {
   /// session on two different days at once: ringed on Tuesday in the grid, filed
   /// under Monday in the feed, and reachable from neither reliably.
   ///
-  /// They agree here now, through [tzOffsetMinutes]. The arithmetic is in
+  /// [tzOffsetMinutes] is what makes them agree. The arithmetic is in
   /// seconds rather than milliseconds so the only division is by `started_at`,
   /// which the CHECK above holds positive — SQLite truncates toward zero, which
   /// is a floor for a positive value and a ceiling for a negative one, and a
@@ -506,12 +512,13 @@ class Workouts extends Table with SyncColumns {
 /// An exercise as performed in a specific workout.
 ///
 /// Deliberately a snapshot rather than a pointer to [SessionExercises]:
-/// reordering or swapping mid-workout must never rewrite what you did in March.
+/// reordering or swapping mid-workout must never rewrite previously logged
+/// history.
 @TableIndex(name: 'idx_workout_exercises_workout', columns: {#workoutId})
 @TableIndex(name: 'idx_workout_exercises_exercise', columns: {#exerciseId})
 /// No two live slots in a workout share a position — see [Sessions] for the
 /// rule. The log screen is a `PageView` keyed on this order, so two rows on one
-/// index means the page you swipe to is whichever way SQLite broke the tie.
+/// index leaves the destination page determined by SQLite's tie-breaking.
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_workout_exercises_position_live '
   'ON workout_exercises (workout_id, order_index) WHERE deleted_at IS NULL',
@@ -533,14 +540,14 @@ class WorkoutExercises extends Table with SyncColumns {
 
   /// The muscle this movement trained, copied at the moment it was logged.
   ///
-  /// The snapshot rule applied to a column that used to be read live. Weekly
-  /// volume counted sets through a join onto `exercises.muscle`, which is fine
-  /// over seven days and dishonest over years: recategorising one movement in
-  /// the catalog silently rewrote every week it ever appeared in, and a chart
-  /// of "sets per muscle since 2026" would redraw itself because you fixed a
-  /// label today. What you trained in March is a fact about March.
+  /// The snapshot rule, applied to a column that could otherwise be read live.
+  /// Counting weekly volume through a join onto `exercises.muscle` is fine over
+  /// seven days and dishonest over years: recategorising one movement in the
+  /// catalog would silently rewrite every week it ever appeared in, and a chart
+  /// of "sets per muscle since 2026" would be redrawn by a label corrected
+  /// today. What was trained in March is a fact about March.
   ///
-  /// **Nullable, and null is not [MuscleGroup.other].** Null means the row was
+  /// Nullable, and null is not [MuscleGroup.other]. Null indicates the row was
   /// logged before this column existed and the catalog is the best answer we
   /// have; readers fall back to `exercises.muscle` for exactly those rows
   /// (`_muscleOfLog` in `training_repository.dart`). Defaulting to `other`
@@ -550,13 +557,12 @@ class WorkoutExercises extends Table with SyncColumns {
 
   /// The bar this movement was loaded on, copied at the moment it was logged.
   ///
-  /// The same rule as [muscle] above, applied to the one thing that still read
-  /// live: the plate diagram asked `exercises.bar_kind` every time it drew, so
-  /// changing a bar in the catalog — or, now, in one training day — silently
-  /// re-read every session ever logged. What you put on the bar in March is a
-  /// fact about March.
+  /// The same rule as [muscle] above. Read live, the plate diagram would ask
+  /// `exercises.bar_kind` every time it drew, so changing a bar in the catalog —
+  /// or in one training day — would silently re-read every session ever logged.
+  /// What was loaded on the bar in March is a fact about March.
   ///
-  /// **Nullable, and null is not [BarKind.none].** Null means the row predates
+  /// Nullable, and null is not [BarKind.none]. Null indicates the row predates
   /// this column and the catalog is the best answer available; readers fall
   /// back to it for exactly those rows. `none` is a decision — that this
   /// movement sits on no bar — and defaulting to it would have taken the plate
@@ -649,14 +655,14 @@ class SetLogs extends Table with SyncColumns {
   /// The head of the drop group this set is a leg of, or null when the set
   /// stands on its own.
   ///
-  /// Consecutive `drop` rows used to be treated as one group by position
-  /// alone, which cannot tell "one drop set with two legs" from "two separate
-  /// drop sets that happen to sit next to each other" — converting two sets in
-  /// a row swallowed the second into the first.
+  /// Grouping consecutive `drop` rows by position alone cannot tell "one drop
+  /// set with two legs" from "two separate drop sets that happen to sit next to
+  /// each other" — converting two sets in a row would swallow the second into
+  /// the first.
   ///
-  /// A real reference, like every other relationship here. It was a bare text
-  /// column, so the database would accept a head id that names no set at all —
-  /// the one place the schema took the app's word for it.
+  /// A real reference, like every other relationship here. As a bare text
+  /// column the database would accept a head id that names no set at all, which
+  /// is the schema taking the app's word for it.
   ///
   /// The head must also sit in the *same slot*, which this reference does not
   /// say and the composite foreign key in [customConstraints] does. That one
@@ -671,12 +677,12 @@ class SetLogs extends Table with SyncColumns {
   TextColumn get note => text().nullable()();
   BoolColumn get isDone => boolean().withDefault(const Constant(false))();
 
-  /// A set cannot be a leg of itself. The column is a real reference now, so
-  /// the database already refuses a head that names no set — but it will happily
-  /// accept a row pointing at its own id, and the drop group that describes has
-  /// no head to draw and no end to walk to.
+  /// A set cannot be a leg of itself. Being a real reference, the column
+  /// already refuses a head that names no set — but it will happily accept a
+  /// row pointing at its own id, and the drop group that describes has no head
+  /// to draw and no end to walk to.
   ///
-  /// Nor can a leg name a head under a **different slot**. That is the
+  /// Nor can a leg name a head under a different slot. That is the
   /// composite foreign key, and it has to be one: a CHECK sees one row and this
   /// rule compares two. Carrying `workout_exercise_id` into the key makes the
   /// pair the thing that must match, so a head under another exercise — or in
@@ -693,8 +699,9 @@ class SetLogs extends Table with SyncColumns {
   /// table, tombstones included, or the index does not qualify at all.
   ///
   /// The upper bounds are the other half of the checks above. `weight >= 0`
-  /// refuses the assisted-lift minus sign that made a negative load scoreable;
-  /// these refuse the misplaced decimal on the other side, where a set of
+  /// refuses the assisted-lift minus sign, which would make a negative load
+  /// scoreable; these refuse the misplaced decimal on the other side, where a
+  /// set of
   /// 1 000 000 kg becomes the top set of the chart forever and rescales every
   /// axis it appears on. `reps` carries seconds on a hold, so its ceiling is
   /// generous enough for a very long plank and still short of a stuck timer.
@@ -720,10 +727,11 @@ class SetLogs extends Table with SyncColumns {
 /// and 7 at 76kg are not the same lift.
 ///
 /// Indexed on the day, because this is the one table with a row *per day*:
-/// every other table grows with sessions, and this one grows whether you train
-/// or not. Fifty years of it is 18 000 rows, and the bodyweight screen asks it
-/// three questions — a month's days, a chart window, the newest entry — all of
-/// which were full scans until this existed.
+/// every other table grows with sessions, whereas this one grows whether or not
+/// training occurs. Fifty years of it is 18 000 rows, and the bodyweight screen
+/// asks it
+/// three questions — a month's days, a chart window, the newest entry — every
+/// one of which is a full scan without this.
 @TableIndex(name: 'idx_bodyweight_day', columns: {#dayKey})
 /// One live row per day, enforced here rather than only in the upsert.
 ///

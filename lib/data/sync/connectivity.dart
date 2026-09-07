@@ -6,7 +6,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 /// *a session logged in a basement* into *a session that arrives when the
 /// signal does* rather than one that waits out the backstop.
 ///
-/// **Transitions only.** `onConnectivityChanged` also reports Wi-Fi to mobile
+/// Transitions only. `onConnectivityChanged` also reports Wi-Fi to mobile
 /// and back, and a phone in a lift emits both several times a minute; a push
 /// per event would be a radio kept awake to send nothing. Off-to-on is the only
 /// edge that changes what a failed push would do.

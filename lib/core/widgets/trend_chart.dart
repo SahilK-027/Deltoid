@@ -11,22 +11,24 @@ import 'primitives.dart';
 
 /// The one line chart in the app, and the one range control above it.
 ///
-/// Both were written twice — once for an exercise's e1RM, once for bodyweight —
-/// and the second copy came out with a different range control (`3m 6m 1y All`
-/// in a segmented pill against `1W 1M 3M 1Y` in chips), no edge suppression on
-/// the axes, and no calendar-aware tick spacing, so it printed `Dec 19Jul 26`
-/// and `330 Jul` on top of themselves. A chart is a language, not a widget you
-/// write per screen.
+/// One of each, because a chart is a language rather than a widget written per
+/// screen. Written twice — once for an exercise's e1RM, once for bodyweight —
+/// the second copy comes out with a different range control (`3m 6m 1y All` in
+/// a segmented pill against `1W 1M 3M 1Y` in chips), no edge suppression on the
+/// axes and no calendar-aware tick spacing, printing `Dec 19Jul 26` and
+/// `330 Jul` on top of themselves.
 
 // ─── Range ──────────────────────────────────────────────────────────────────
 
-/// The rolling windows, shortest first. Whole calendar years and *everything*
-/// are the other two questions, and they are the chips at the end of the row.
+/// The rolling windows, shortest first.
 ///
-/// [days] is how far back the window opens **from today, inclusive of today** —
-/// so a week is six days back and seven days on the axis, and `1W` labels the
-/// seven days ending with the one you are standing in rather than eight days
-/// with a stump on each end.
+/// Whole calendar years and the complete log are separate selections, presented
+/// as the chips at the end of the row.
+///
+/// [days] is how far back the window extends from today, inclusive of today, so
+/// that a week is six days back and seven days on the axis. `1W` therefore
+/// labels the seven days ending with the current one rather than eight days
+/// with a partial period at each end.
 enum ChartRange {
   week('1W', 6),
   month('1M', 30),
@@ -74,12 +76,13 @@ class TrendWindow {
 
   bool contains(int dayKey) => dayKey >= fromDayKey && dayKey <= toDayKey;
 
-  /// The window as x-axis bounds, which is what lets a chart with nothing in it
-  /// still draw the time axis you asked for.
+  /// The window expressed as x-axis bounds, which allows a chart with no data
+  /// to render the requested time axis.
   ///
-  /// [earliest] is the first day the chart has data for, and only `All` reads
-  /// it. [toDayKey] is deliberately open at the top for a rolling window — every
-  /// one of them ends today — and an axis cannot be drawn to the year 9999.
+  /// [earliest] is the first day for which the chart has data, and is read only
+  /// by `All`. [toDayKey] is deliberately unbounded above for a rolling window,
+  /// since every such window ends today and an axis cannot be drawn to the year
+  /// 9999.
   (DateTime, DateTime) xBoundsSince([DateTime? earliest]) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -131,10 +134,10 @@ const _axisTicks = 7;
 /// The x axis of a window: where it starts, where it ends, and where the labels
 /// go.
 ///
-/// **Anchored on the right.** Every rolling range ends today, so the last label
-/// is today and the rest are counted back from it — not laid out from the left
-/// edge, which is what made `1W` print whichever day the data happened to start
-/// on and never print today at all.
+/// Anchored on the right. Every rolling range ends today, so the last label is
+/// today and the remainder are counted back from it. Laying labels out from the
+/// left edge instead causes `1W` to print whichever day the data happens to
+/// begin on, and never to print today.
 class TimeAxis {
   const TimeAxis({
     required this.minX,
@@ -148,10 +151,10 @@ class TimeAxis {
   /// labels are strictly inside the plot and have room to print. Without the
   /// padding they sit on the edges, where a label has half a line of space and
   /// prints over its neighbour.
-  /// [zoom] is the pinch scale: `1` is the whole window, `4` is a quarter of it
-  /// on screen. The label ladder is built against **the visible span**, so
-  /// zooming into a decade turns years into months rather than emptying the
-  /// axis — the count stays at seven and only the resolution changes.
+  /// [zoom] is the pinch scale: `1` denotes the whole window and `4` a quarter
+  /// of it on screen. The label sequence is derived from the visible span, so
+  /// zooming into a decade converts years into months rather than emptying the
+  /// axis. The label count remains seven and only the resolution changes.
   factory TimeAxis.of(
     TrendWindow window, {
     DateTime? earliest,
@@ -197,10 +200,10 @@ class TimeAxis {
 /// under it, and this one governs a card. It is also eight choices wide once the
 /// years and the averaging arrive, which is a scroll rather than a track.
 ///
-/// **The averaging chip is a chart control, not a preference.** It sits in the
-/// same row as the range because it answers the same question — how much time
-/// one mark is — and putting it in a menu somewhere else would leave the chart
-/// silently smoothed with nothing on screen saying so.
+/// The averaging chip is a chart control rather than a preference. It occupies
+/// the same row as the range because it answers the same question — how much
+/// time one mark represents — and placing it in a separate menu would leave the
+/// chart smoothed with no on-screen indication.
 class TrendRangeBar extends StatelessWidget {
   const TrendRangeBar({
     super.key,
@@ -228,28 +231,32 @@ class TrendRangeBar extends StatelessWidget {
   /// "everything" leaves it out rather than showing a chip that lies.
   final bool showAll;
 
-  /// The averaging **in force** — what the chip says, and what the chart is
-  /// actually drawing. Null on a chart that does not average, and the chip is
-  /// absent then rather than present and inert.
+  /// The averaging currently in force: the value the chip displays and the
+  /// chart renders.
+  ///
+  /// Null on a chart that does not average, in which case the chip is omitted
+  /// rather than displayed inert.
   final Granularity? granularity;
 
-  /// Whether [granularity] was chosen for you. The chip reads the same either
-  /// way — what the chart is doing is the fact, not how it came to be doing it
-  /// — but the picker has to know which row to tick.
+  /// Whether [granularity] was selected automatically rather than by the user.
+  ///
+  /// The chip renders identically in both cases, since what the chart is doing
+  /// is the relevant fact rather than how that was arrived at. The picker
+  /// requires the distinction in order to mark the correct row.
   final bool granularityIsAuto;
 
-  /// Called with null when `Auto` is picked — the caller stores "no choice"
-  /// rather than the granularity auto happened to resolve to today, or a window
-  /// change would find the chart pinned to a level nobody asked for.
+  /// Called with null when `Auto` is selected. The caller stores the absence of
+  /// a choice rather than the granularity automatic selection resolved to at
+  /// that moment; otherwise a subsequent window change would find the chart
+  /// fixed at a level the user did not request.
   final ValueChanged<Granularity?>? onGranularity;
 
-  /// The averaging levels this *screen* can draw at all. Weekly volume has no
-  /// daily reading, so that screen leaves it out for good.
+  /// The averaging levels the calling screen is able to render at all. Weekly
+  /// volume has no daily reading, so that screen omits it permanently.
   ///
-  /// What the picker actually offers is this list narrowed to the levels the
-  /// **selected range** can show — see [granularitiesFor]. Yearly over one month
-  /// is a chart of a single dot, and a picker that offers it is a picker that
-  /// lies about what it will do.
+  /// The picker offers this list narrowed to the levels the selected range can
+  /// display; see [granularitiesFor]. Yearly granularity over one month yields
+  /// a single point, and a picker offering it would misrepresent the result.
   final List<Granularity> granularities;
 
   /// The most marks this screen's chart can draw at all — see
@@ -269,33 +276,36 @@ class TrendRangeBar extends StatelessWidget {
         if (fits.contains(g)) g,
     ];
     // Never empty, and never without the one in force — a picker that cannot
-    // show you what you are looking at is worse than one with a short list.
+    // display the level currently in force is worse than one offering a short
+    // list.
     if (out.isEmpty) return [?granularity, ...fits.take(1)];
     return out;
   }
 
-  /// The rolling windows offered, shortest first. All of them unless a screen
-  /// has one it cannot honestly draw — weekly volume bars over `1W` is a chart
-  /// of one bar, so that screen passes the three that are charts.
+  /// The rolling windows offered, shortest first.
   ///
-  /// A subset rather than a per-screen control: the chips, the year picker and
-  /// the sheet stay one component, so a screen cannot quietly grow a second
-  /// range control with different spacing (THEME → Charts).
+  /// All of them, unless a screen cannot meaningfully render one: weekly volume
+  /// bars over `1W` produce a single bar, so that screen supplies only the three
+  /// that yield a chart.
+  ///
+  /// A subset rather than a per-screen control, so that the chips, the year
+  /// picker and the sheet remain a single component and a screen cannot acquire
+  /// a second range control with different spacing (THEME → Charts).
   final List<ChartRange> ranges;
 
-  /// Years there is something to look at, newest first. A picker offering 2019
-  /// to a log that starts in 2024 is a list of empty charts.
+  /// The years containing data, newest first. A picker offering 2019 for a log
+  /// beginning in 2024 would list empty charts.
   final List<int> years;
 
   final ValueChanged<TrendWindow> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    // **A track, not a scrolling strip.** Eight chips in a row is wider than a
-    // phone, and a control that has to be dragged sideways before it can be read
-    // hides half its own options — you cannot pick `All` if you do not know it
-    // is there. The ranges are a segmented track that fits by construction:
-    // equal segments, whatever the width, no scroll at any size.
+    // A track rather than a scrolling strip. Eight chips in a row exceed the
+    // width of a phone, and a control that must be dragged sideways before it
+    // can be read conceals half its options: `All` cannot be selected if its
+    // presence is not apparent. The ranges form a segmented track that fits by
+    // construction, with equal segments at any width and no scrolling.
     //
     // The two pickers go underneath rather than beside, because they are a
     // different question. The track asks *how much time*; the row under it says
@@ -369,8 +379,8 @@ class TrendRangeBar extends StatelessWidget {
           AppRow(
             title: 'Auto',
             // Named, because "auto" with nothing after it is a setting whose
-            // effect you cannot check. It also *changes* with the range, which
-            // is the whole point of it and invisible without this line.
+            // effect cannot be verified. It also varies with the range, which
+            // is its purpose and is not apparent without this line.
             subtitle: 'Currently ${granularity?.label.toLowerCase()}',
             onTap: () => Navigator.of(sheet).pop(_auto),
             trailing: AppRadio(selected: granularityIsAuto),
@@ -398,22 +408,21 @@ class TrendRangeBar extends StatelessWidget {
       showDragHandle: false,
       // The sheet keeps itself inside the system's insets rather than relying
       // on the one inside it: `isScrollControlled` lets a long list grow to the
-      // full height of the *window*, which on an edge-to-edge Android is taller
-      // than the screen you can see.
+      // full height of the window, which on an edge-to-edge Android device
+      // exceeds the visible screen.
       useSafeArea: true,
       // And it never takes the whole of it. Twenty years of training is a list
       // longer than a phone, and a sheet that fills the screen is a screen
       // wearing a sheet's clothes — the barrier above it is what says this is a
-      // question you can dismiss.
+      // question that can be dismissed.
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.7,
       ),
       builder: (sheet) => AppSheet(
         title: 'Which year?',
-        // The default padding, minus the top the header already provides. It
-        // used to pass `only(bottom:)`, which drops the sheet's side gutter as
-        // well — the rows then ran edge to edge while every other sheet's did
-        // not.
+        // The default padding, minus the top the header already provides.
+        // `only(bottom:)` would drop the sheet's side gutter as well, running
+        // these rows edge to edge while every other sheet's stay inset.
         contentPadding: const EdgeInsets.fromLTRB(
           Space.gutter,
           0,
@@ -457,7 +466,8 @@ class TrendSeries {
 double trendX(int dayKey) =>
     dateFromDayKey(dayKey).millisecondsSinceEpoch / 86400000;
 
-/// Where a bucket sits on the time axis: **its middle, not its first day**.
+/// The position of a bucket on the time axis: its midpoint rather than its
+/// first day.
 ///
 /// A month plotted on the 1st is drawn half a month early, and at yearly
 /// granularity a mark for 2019 would land on New Year's Day and read as the
@@ -468,9 +478,9 @@ double bucketX(Bucket bucket) =>
     2 /
     86400000;
 
-/// The chart from THEME → Components: dashed horizontal gridlines only,
-/// labels on the
-/// right, no border, markers while they still mark something, horizontal zoom.
+/// The chart from THEME → Components: dashed horizontal gridlines only, labels
+/// on the right, no border, markers while they still mark something, horizontal
+/// zoom.
 class TrendChart extends StatefulWidget {
   const TrendChart({
     super.key,
@@ -509,7 +519,7 @@ class TrendChart extends StatefulWidget {
   /// The band the value axis covers, when the caller knows better than the
   /// spots do.
   ///
-  /// A chart that plots its **whole** history and uses the window only to
+  /// A chart that plots its complete history and uses the window only to
   /// choose what is on screen — which is what makes changing range a zoom
   /// rather than a redraw — cannot scale its axis to its spots, because its
   /// spots are all of them. So the screen works out what is visible and says so
@@ -522,20 +532,21 @@ class TrendChart extends StatefulWidget {
 
 class _TrendChartState extends State<TrendChart>
     with SingleTickerProviderStateMixin {
-  /// **Changing range must feel like moving the walls, not redrawing the room.**
+  /// Changing the range is rendered as a change of scale rather than as a
+  /// redraw.
   ///
-  /// The two things that change when you pick a new range fight each other: the
-  /// bounds want to travel, and the data wants to re-fold at a resolution that
-  /// suits the new span — a year of weeks is not the same list of points as
+  /// Two things change when a new range is selected, and they conflict: the
+  /// bounds must travel, and the data must be re-aggregated at a resolution
+  /// suited to the new span. A year of weeks is not the same list of points as
   /// three months of days, and no interpolation exists between two lists of
-  /// different lengths. Swapping both at once is what read as a rebuild.
+  /// different lengths. Applying both at once reads as a rebuild.
   ///
-  /// So they are separated in time. The bounds animate while **the line you
-  /// were already looking at** is held and scaled with them, which is the zoom;
-  /// the new resolution arrives at the end of it, under the motion, where a
-  /// change of detail in the same shape is nearly invisible. THEME → Charts
-  /// says axis furniture cross-fades rather than travelling, and this is the
-  /// same rule one level up.
+  /// They are therefore separated in time. The bounds animate while the
+  /// previously rendered line is retained and scaled with them, which produces
+  /// the zoom; the new resolution is applied at the end of that motion, where a
+  /// change of detail within the same shape is largely imperceptible.
+  /// THEME → Charts specifies that axis furniture cross-fades rather than
+  /// travels, and this applies the same rule at one level up.
   late final AnimationController _zoomTo = AnimationController(
     vsync: this,
     duration: Motion.base,
@@ -621,17 +632,18 @@ class _TrendChartState extends State<TrendChart>
     final lowest = widget.yRange?.$1 ?? ys.reduce(min);
     final highest = widget.yRange?.$2 ?? ys.reduce(max);
 
-    // The axis of **what is on screen**, not of the window: after a pinch those
-    // are different, and labels that keep describing the window are labels for a
-    // chart you are no longer looking at. Seven of them, always, whatever the
-    // zoom — that is what makes zooming in tell you where you are rather than
-    // taking the dates away.
+    // The axis describes what is on screen rather than the window. After a
+    // pinch the two differ, and labels that continue to describe the window
+    // describe a chart that is no longer displayed. Seven labels are drawn at
+    // any zoom level, which is what allows zooming in to report position rather
+    // than removing the dates.
     final axis = window == null
         ? null
         : TimeAxis.of(window, earliest: widget.earliest, zoom: _scale);
 
     // One session is a chart with one dot on it, and a dot is worth drawing —
-    // it is where you are, on the axis you will read the next one against. Its
+    // it establishes the current position, on the axis the next point is read
+    // against. Its
     // span is zero days, though, and an axis from a day to itself has no width
     // to divide, so a fortnight of air is put either side of it.
     var minX = axis?.minX ?? xs.reduce(min);
@@ -642,8 +654,8 @@ class _TrendChartState extends State<TrendChart>
     }
 
     // Bounds snapped to a round step, so every gridline lands on a number a
-    // person would say. Left to itself the axis labelled `1126.5` at the
-    // extremes, which wrapped onto two lines and collided with the gridline
+    // person would say. Left to itself the axis labels `1126.5` at the
+    // extremes, which wraps onto two lines and collides with the gridline
     // above. The band is the data plus air — never anchored at zero, which
     // draws a year of bodyweight as a flat line an inch off the bottom.
     final step = _niceStep((highest - lowest) / 4);
@@ -653,10 +665,10 @@ class _TrendChartState extends State<TrendChart>
     // stops at zero rather than drawing an axis into numbers that cannot exist.
     if (lowest >= 0 && minY < 0) minY = 0;
 
-    // Where the bounds are *now*, part way between the range you left and the
-    // one you picked. `fl_chart` lerps its own data changes, but it cannot lerp
-    // between two spot lists of different lengths, which is exactly what a
-    // change of resolution is — so the travel is driven here instead.
+    // The bounds at this instant, part way between the previous range and the
+    // selected one. `fl_chart` interpolates its own data changes but cannot
+    // interpolate between two spot lists of different lengths, which is what a
+    // change of resolution produces, so the transition is driven here.
     final t = Motion.emphasized.transform(_zoomTo.value);
     final was = _from;
     if (was != null && t < 1) {
@@ -677,18 +689,18 @@ class _TrendChartState extends State<TrendChart>
         SizedBox(
           height: height,
           child: LineChart(
-            // **Changing range or averaging zooms; it does not reload.** The
-            // box keeps its size and `fl_chart` interpolates what is inside it
-            // — the axis bounds rescale, the line travels to its new shape —
-            // so widening from three months to a year reads as stepping back
-            // from the same chart rather than as a different chart arriving.
+            // Changing the range or averaging rescales the chart rather than
+            // reloading it. The box retains its size and `fl_chart`
+            // interpolates its contents: the axis bounds rescale and the line
+            // travels to its new shape, so widening from three months to a year
+            // reads as a change of scale rather than as a different chart.
             // `base` at the emphasized curve, which THEME § 6 gives anything
             // covering a distance.
             duration: Motion.base,
             curve: Motion.emphasized,
             // Pinch to zoom the time axis, drag to pan. The vertical axis stays
-            // fixed: scaling weight against nothing would make the same
-            // progress look like whatever you last pinched.
+            // fixed: scaling the value axis freely would render identical
+            // progress differently depending on the last pinch.
             transformationConfig: FlTransformationConfig(
               scaleAxis: FlScaleAxis.horizontal,
               minScale: 1,
@@ -800,8 +812,9 @@ class _TrendChartState extends State<TrendChart>
           ),
         ),
         // Markers only while they mark something. Past about forty points the
-        // circles touch and the shape you came to read is hidden by the points
-        // it is made of — so they go, and the gesture is named instead.
+        // circles touch and the shape being examined is obscured by the points
+        // composing it, so the markers are dropped and the gesture is labelled
+        // instead.
         if (dense) ...[
           const SizedBox(height: Space.sm),
           Text(
@@ -838,15 +851,15 @@ class _TrendChartState extends State<TrendChart>
 
 }
 
-/// The same plot with nothing to plot: the gridlines, the right-hand gutter and
-/// the real time axis of the range you asked for, with no line in it.
+/// The same plot with no data: the gridlines, the right-hand gutter and the
+/// time axis of the selected range, with no series rendered.
 ///
-/// It replaced a captioned box, which was the wrong shape twice over. An empty
-/// range is not a failure to draw a chart — it is a chart of a range you did not
-/// train in — and a box half the height of the plot made switching ranges jump
-/// the page under your thumb. The axis stays honest by staying empty: no y
-/// labels, because there is no data to scale them against, and no series at
-/// zero, because a point the metric cannot score is not a zero
+/// A captioned box would be the wrong shape in two respects. An empty range is
+/// not a failure to render a chart; it is a chart of a period in which no
+/// training occurred. A box half the height of the plot also causes the page to
+/// shift when ranges are changed. The axis remains accurate by remaining empty:
+/// no value labels, because there is no data to scale them against, and no
+/// series at zero, because a point the metric cannot score is not a zero
 /// (THEME → Charts).
 class EmptyTrendChart extends StatelessWidget {
   const EmptyTrendChart({
@@ -864,22 +877,24 @@ class EmptyTrendChart extends StatelessWidget {
   /// The first day the chart has anything for, which only `All` reads.
   final DateTime? earliest;
 
-  /// Why it is empty, said **under** the plot in the voice the zoom hint uses —
-  /// never across it. A sentence in the middle of the chart is a dialog box
-  /// wearing a chart's frame; a line beneath it is a caption, and the thing
-  /// above stays a graph. Null while the answer is still being read off disk:
-  /// "nothing logged" is a claim, and a frame that has not read the log yet is
-  /// not entitled to make it.
+  /// The explanation for the empty state, rendered beneath the plot in the same
+  /// style as the zoom hint rather than across it.
+  ///
+  /// A sentence within the chart area reads as a dialog inside a chart frame,
+  /// whereas a line beneath it reads as a caption and leaves the element above
+  /// it a graph. Null while the underlying query is still in flight: "nothing
+  /// logged" is an assertion, and a frame that has not yet read the log cannot
+  /// make it.
   final String? message;
 
-  /// The band the y axis should cover — the movement's whole history, when the
-  /// range you are looking at happens to be empty.
+  /// The band the value axis should cover: the movement's complete history,
+  /// where the selected range contains no data.
   ///
-  /// This is what keeps an empty range a *range*: the numbers stay where they
-  /// were, so switching from a year you trained to a month you did not reads as
-  /// an empty stretch of the same chart rather than as a different widget. Null
-  /// only when nothing has ever been logged, and then the axis is drawn without
-  /// numbers, because there is no honest number to put on it.
+  /// This is what preserves an empty range as a range. The values remain in
+  /// position, so moving from a trained year to an untrained month reads as an
+  /// empty section of the same chart rather than as a different widget. Null
+  /// only when nothing has ever been logged, in which case the axis is drawn
+  /// without values, there being no accurate value to display.
   final (double, double)? scale;
 
   /// A y value as it should be read, exactly as [TrendChart.formatValue].
@@ -907,9 +922,9 @@ class EmptyTrendChart extends StatelessWidget {
         SizedBox(
           height: height,
           child: LineChart(
-            // The empty chart rescales with the same motion as a full one, so
-            // ranging across a stretch you did not train is one continuous zoom
-            // rather than a chart, a jump, and a chart again.
+            // The empty chart rescales with the same motion as a populated
+            // one, so ranging across an untrained period is a single continuous
+            // transition rather than a chart, a discontinuity, and a chart.
             duration: Motion.base,
             curve: Motion.emphasized,
             LineChartData(
@@ -991,17 +1006,18 @@ class EmptyTrendChart extends StatelessWidget {
   }
 }
 
-/// The gutter the value labels sit in, on the right — **measured, not guessed.**
+/// The width of the right-hand gutter containing the value labels, measured
+/// rather than assumed.
 ///
-/// It was 52, then 36. Both were a constant picked for the widest number a
-/// chart might one day print, which means every chart that prints `70` and
-/// `102` gives up a third of that gutter to nothing and the time axis under it
-/// loses the room. Laying out the two extreme labels costs one text measurement
-/// per build and gives the plot back whatever it does not need.
+/// A constant sized for the widest value a chart might print, such as 52 or 36,
+/// causes every chart printing `70` and `102` to surrender a third of that
+/// gutter, and the time axis beneath it loses the corresponding width. Laying
+/// out the two extreme labels costs one text measurement per build and returns
+/// the unused width to the plot.
 ///
-/// Still stable rather than intrinsic: it is derived from the axis *bounds*, so
-/// it changes when the chart rescales and not when a value inside it moves —
-/// the plot cannot shift sideways while you watch a line grow.
+/// Stable rather than intrinsic: it is derived from the axis bounds, so it
+/// changes when the chart rescales and not when a value within it moves. The
+/// plot therefore cannot shift horizontally while a line is being updated.
 double _yGutter(BuildContext context, Iterable<String> labels) {
   final style = context.t.bodySmall;
   var widest = 0.0;
@@ -1027,8 +1043,8 @@ Widget _edgeSafe(double value, TitleMeta meta, Widget child) {
 /// Label resolution follows the span, or four ticks a day apart all render as
 /// the same month and overlap into mush.
 ///
-/// A week is named by its days — `Fri Sat Sun … Thu` — because at that range
-/// the day of the week *is* the question you are asking.
+/// A week is labelled by its days, as `Fri Sat Sun … Thu`, because at that
+/// range the day of the week is the relevant distinction.
 ///
 /// Public because the bar charts read their labels by the same rule. Two kinds
 /// of chart may draw different marks; they may not name the same fortnight two

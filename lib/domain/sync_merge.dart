@@ -17,8 +17,8 @@ library;
 import 'enums.dart';
 import 'slots.dart';
 
-/// What a row was stamped with by the device that wrote the version in front of
-/// you.
+/// The values a row was stamped with by the device that wrote the version
+/// under consideration.
 ///
 /// [fingerprint] is the last resort of the order below, and it exists because
 /// `deviceId` is not the unique name it reads as: it is minted once into
@@ -76,8 +76,8 @@ bool _isNewer(Stamp a, Stamp b) {
 /// not change to give it one ([§ 4](SYNC.md#4-what-the-server-holds)). So the
 /// choice is between two client stamps and no comparison at all, and the
 /// alternatives are worse in both directions: taking the remote always would
-/// discard an edit made seconds ago on the phone in your hand, and keeping the
-/// local always would let a device that has been offline for a month overwrite
+/// discard an edit made seconds earlier on the local device, and keeping the
+/// local version always would allow a device offline for a month to overwrite
 /// every newer row on reconnect — which
 /// [§ 12](SYNC.md#12-every-edge-case-and-what-it-does) row 10 says must not
 /// happen.

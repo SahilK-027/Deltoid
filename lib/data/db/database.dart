@@ -34,14 +34,14 @@ class AppDatabase extends _$AppDatabase {
 
   /// The ladder is running again, one step per change from here on.
   ///
-  /// It carried a v2..v8 ladder once, each step migrating a database shape that
-  /// only ever existed on a test device, and that was thrown away with nothing
-  /// released: those were upgrade paths from states no install would ever be in.
+  /// The numbering starts at 2: the steps before it migrated database shapes
+  /// that only ever existed on a test device, and nothing had been released to
+  /// carry them.
   ///
-  /// It starts over at 2 because sync is what makes a reinstall an unacceptable
+  /// It runs from here because sync is what makes a reinstall an unacceptable
   /// upgrade path — see `migrations.dart`, and
   /// [RULES.md § 3](RULES.md#3-schema-and-migrations) for the protocol a change
-  /// follows now.
+  /// follows.
   @override
   int get schemaVersion => 4;
 
@@ -74,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
           // ([SYNC.md § 16](SYNC.md#16-still-to-decide)). WAL lets them
           // overlap: a writer no longer blocks readers.
           //
-          // **No durability is given up.** `synchronous` is left at the
+          // No durability is sacrificed. `synchronous` is left at the
           // packaged default of `FULL`, which under WAL fsyncs the log on
           // every commit — a set that returned from its transaction survives a
           // power cut, and the file is never corrupt either way. `NORMAL` is
@@ -106,19 +106,19 @@ class AppDatabase extends _$AppDatabase {
           // Give the query planner statistics to plan with.
           //
           // Without them SQLite guesses how selective each table is, and on
-          // this schema it guessed wrong in the one place it hurts most: the
+          // this schema it guesses wrong in the one place it hurts most: the
           // weekly volume query — which re-runs *every time a set is ticked* —
-          // was planned as `SCAN workout_exercises` over every snapshot row
-          // ever written, to answer a question about the last seven days. Fifty
-          // years of training made that 143ms of work per tick. With statistics
-          // the planner starts from `idx_workouts_day` instead and the same
-          // query is under a millisecond.
+          // plans as `SCAN workout_exercises` over every snapshot row ever
+          // written, to answer a question about the last seven days. Fifty
+          // years of training makes that 143ms of work per tick. With
+          // statistics the planner starts from `idx_workouts_day` instead and
+          // the same query is under a millisecond.
           //
           // `optimize` rather than `ANALYZE`: it only re-analyses tables whose
           // shape has actually moved, so it costs nothing on the launches where
-          // nothing has changed and about 30ms on the one after a decade lands.
-          // Every index it needed already existed — all that was missing was
-          // the evidence to use them.
+          // nothing has changed and about 30ms on the one after a decade
+          // lands. The indexes are all already declared; what statistics add
+          // is the evidence to use them.
           await customStatement('PRAGMA optimize');
         },
       );

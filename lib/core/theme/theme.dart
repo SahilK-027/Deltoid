@@ -197,15 +197,15 @@ ThemeData buildTheme(Brightness brightness) {
         ),
       ),
     ),
-    // Every field in the app is this one. It used to be declared at each of the
-    // seven call sites, which is how the exercise search in History ended up
-    // without a focused outline, without the hint colour and with a different
-    // magnifying glass than the identical field in the catalog.
+    // Every field in the app is this one. Declared at each of the seven call
+    // sites instead, they drift: that is how an exercise search ends up without
+    // a focused outline, without the hint colour and with a different
+    // magnifying glass than the identical field beside it.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: c.surfaceHigh,
       // Matches the size the text in a field is set at, so the hint does not
-      // shrink the moment you start typing over it.
+      // shrink as soon as text is entered over it.
       hintStyle: text.bodyLarge?.copyWith(color: c.textTertiary),
       contentPadding: const EdgeInsets.all(Space.lg),
       border: OutlineInputBorder(
@@ -276,16 +276,16 @@ ThemeData buildTheme(Brightness brightness) {
       thumbColor: c.accent,
       overlayColor: c.accent.withValues(alpha: 0.10),
     ),
-    // **A circular spinner has no track, and that is the point of it.**
-    // Material 3 paints `circularTrackColor` as a full ring behind the sweeping
-    // arc. On a bar that track is the shape of the job — `surfaceHighest` is
-    // the *empty bar* track, and an empty row should still be a row. On a
-    // spinner there is no job to outline: the ring is the same circle whatever
-    // is happening, so the only part that moves is a 2px arc inside it, and at
-    // `RowSpinner`'s 16px the whole thing reads as a static circle. THEME says
-    // busy must not look disabled, and `RowSpinner` says only a moving thing
-    // tells the user it is still happening — a permanent ring is what those two
-    // rules are both against.
+    // A circular spinner is drawn without a track. Material 3 paints
+    // `circularTrackColor` as a full ring behind the sweeping arc. On a linear
+    // bar that track represents the extent of the work, `surfaceHighest` being
+    // the empty-bar track, and an empty row should still read as a row. On a
+    // spinner there is no extent to outline: the ring is the same circle
+    // regardless of progress, so the only moving element is a 2px arc within
+    // it, and at `RowSpinner`'s 16px the result reads as a static circle. THEME
+    // requires that a busy state does not appear disabled, and `RowSpinner`
+    // requires that only a moving element indicates work in progress. A
+    // permanent ring satisfies neither.
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: c.accent,
       linearTrackColor: c.surfaceHighest,

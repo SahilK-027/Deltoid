@@ -18,11 +18,11 @@ final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
 
 /// What Today actually asks for: a fixed recent window, not the whole log.
 ///
-/// These tests used to pass `0` and mean "everything", which is the shape
-/// `todaySnapshot` now asserts against — an open-ended key there is every
-/// workout ever written, hydrated as whole rows, on every rebuild of the first
-/// screen. Nothing here logs further back than a few days, so the
-/// window makes no difference to what comes out.
+/// `0` here would mean "everything", which is the shape `todaySnapshot`
+/// asserts against: an open-ended key is every workout ever written, hydrated
+/// as whole rows, on every rebuild of the first screen. Nothing in these tests
+/// logs further back than a few days, so the window makes no difference to what
+/// comes out.
 int get heatmapWindowKey => dayKeyOf(daysBefore(DateTime.now(), 98));
 
 void main() {
@@ -107,8 +107,8 @@ void main() {
 
   test('renaming a starter exercise does not duplicate it on the next template',
       () async {
-    // Templates used to look catalog rows up by name, so a renamed starter
-    // came back as a second row under its old name — two entries in the picker
+    // Looking catalog rows up by name brings a renamed starter back as a
+    // second row under the name it was seeded with — two entries in the picker
     // that nothing can tell apart.
     // Upper / Lower opens with barbell_bench, so renaming that row is what the
     // template has to survive.
@@ -493,8 +493,8 @@ void main() {
   });
 
   test('a forced deload cycle does not scale an already light week', () async {
-    // 80% of 80% is 64%. Reachable only now that a deload can be forced two
-    // cycles running from the regime screen.
+    // 80% of 80% is 64%, reachable by forcing a deload two cycles running from
+    // the regime screen.
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
 
@@ -769,8 +769,8 @@ void main() {
 
   test('moving a day logged in another zone restamps its offset', () async {
     // The move has to carry the offset with it, and a test running in one
-    // fixed zone cannot see that: the old offset and the new one are the same
-    // number, so leaving it alone looks identical to rewriting it.
+    // fixed zone cannot see that: both offsets are the same number, so leaving
+    // it alone looks identical to rewriting it.
     //
     // So the row is put in another zone first. 02:30 UTC on the 15th at -151
     // minutes is 23:59 on the 14th — the same trio the restore fits to a
@@ -1512,11 +1512,11 @@ void main() {
   });
 
   test('rest comes from the slot, then the default in Settings', () async {
-    // Two readings, and no third. There used to be one between them — the last
-    // rest actually taken on the movement, read off `set_logs` — and it is
-    // gone: a number arrived at by measuring how long someone took to pick
-    // their phone back up is not a target, and it made the timer open on a
-    // different number every week with nothing on screen to say why.
+    // Two readings, and no third between them — the last rest actually taken on
+    // the movement, read off `set_logs`. A number arrived at by measuring how
+    // long someone took to pick their phone back up is not a target, and it
+    // opens the timer on a different number every week with nothing on screen
+    // to say why.
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');
     final first =
@@ -2344,7 +2344,7 @@ void main() {
     await (db.update(db.cycles)..where((t) => t.id.equals(closed.id)))
         .write(const CyclesCompanion(cycleIndex: Value(9)));
 
-    // The delete has to survive. It used to throw from inside its own
+    // The delete has to survive rather than throwing from inside its own
     // transaction.
     await repo.deleteWorkout(logged);
 
@@ -2373,12 +2373,10 @@ void main() {
     /// Ages the row, which is what the sweep reads — see
     /// `sweepAbandonedWorkouts`.
     ///
-    /// **Not `startedAt`.** The comment that used to sit here said
-    /// `startWorkout(at:)` moved only the day key, which is false: it backdates
-    /// `startedAt` too, so keying the sweep on that column deleted every
-    /// backfilled session at the next launch. Moving
-    /// `updatedAt` is how you make a row old without also claiming the training
-    /// happened at another time.
+    /// **Not `startedAt`.** `startWorkout(at:)` backdates `startedAt` as well
+    /// as the day key, so keying the sweep on that column would delete every
+    /// backfilled session at the next launch. Moving `updatedAt` ages a row
+    /// without also claiming the training happened at another time.
     Future<void> age(String workoutId, Duration by) async {
       await (db.update(db.workouts)..where((t) => t.id.equals(workoutId)))
           .write(WorkoutsCompanion(
@@ -2608,9 +2606,9 @@ void main() {
       final (:weId, :sets) = await firstExercise();
       await repo.setSetType(sets.first.id, SetType.drop);
 
-      // What the `+` under the spine calls. It used to call addSetAfter with
-      // no parent, so every press produced another parentless `drop` row —
-      // a whole new drop set, complete with its own chip and its own `+`.
+      // What the `+` under the spine calls. `addSetAfter` with no parent
+      // produces another parentless `drop` row on every press — a whole new
+      // drop set, complete with its own chip and its own `+`.
       await repo.addDropLeg(weId, headSetId: sets.first.id);
 
       final after = await setsOf(weId);
@@ -2932,9 +2930,9 @@ void main() {
 
     test('refiling an exercise does not rewrite what it trained in March',
         () async {
-      // The reason the snapshot exists. Weekly volume used to count through a
-      // join onto `exercises.muscle`, so correcting a movement's category today
-      // silently redrew every week it had ever appeared in.
+      // The reason the snapshot exists. Counting weekly volume through a join
+      // onto `exercises.muscle` would let correcting a movement's category
+      // today silently redraw every week it had ever appeared in.
       final regime = await activeRegime();
       final push1 = await sessionNamed('Push 1');
       final id = await repo.startWorkout(

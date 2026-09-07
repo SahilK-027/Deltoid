@@ -11,13 +11,13 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The volume screen used to keep querying after you left it.
+/// The volume screen stops querying once it is left.
 ///
 /// `volumeHistoryProvider` watches `set_logs` — the hot table during a session,
-/// written once per set ticked — and was not `autoDispose`, so opening the
-/// screen once subscribed it for the rest of the app's life. Pick `All`, go and
-/// train, and every set ticked re-queried and re-folded the whole history on
-/// the UI isolate for a screen nobody was looking at.
+/// written once per set ticked. Without `autoDispose`, opening the screen once
+/// subscribes it for the rest of the app's life: pick `All`, go and train, and
+/// every set ticked re-queries and re-folds the whole history on the UI isolate
+/// for a screen nobody is looking at.
 ///
 /// `exerciseProgressProvider` had exactly this bug and its doc comment explains
 /// the fix at length. The lesson was learned in one file and not carried to the

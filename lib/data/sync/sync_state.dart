@@ -6,7 +6,8 @@ import 'push.dart';
 /// Which of [SYNC.md § 2](SYNC.md#2-the-three-states)'s three this install is
 /// in.
 ///
-/// **There is no state for *syncing right now*.** A spinner on a background job
+/// There is no state representing synchronisation in progress. A progress
+/// indicator on a background job
 /// nobody is waiting for is a spinner that teaches the user to wait — so this
 /// is derived from what is on disk and nothing keeps it in step, because there
 /// is no second copy of the answer.
@@ -19,7 +20,8 @@ enum SyncStatus {
 
   /// Signed in, rows owed — offline, or a push that failed.
   ///
-  /// **Normal, not an error.** A session logged in a basement gym is pending
+  /// A normal state rather than an error. A session logged without network
+  /// access is pending
   /// for an hour and that is the design working. The only thing that makes it
   /// worth mentioning is how long it has been true.
   pending,
@@ -52,7 +54,7 @@ class SyncState {
 
   /// When the oldest thing still owed was written, or null when nothing is.
   ///
-  /// **The whole of *for how long*** ([SYNC.md § 2](SYNC.md#2-the-three-states)).
+  /// The complete answer to how long ([SYNC.md § 2](SYNC.md#2-the-three-states)).
   /// Pending is normal — a session logged in a basement gym is pending for an
   /// hour and that is the design working — and the only thing that makes it
   /// worth mentioning is how long it has been true. A screen that says *3

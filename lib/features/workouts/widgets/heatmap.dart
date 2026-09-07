@@ -102,18 +102,18 @@ class ConsistencyHeatmap extends StatelessWidget {
       builder: (context, constraints) {
         const gap = 4.0;
         const labelWidth = 22.0;
-        // The month row and the air under it. The labels used to sit straight
-        // on top of the first cell row, which read as a caption stuck to the
-        // grid rather than a header over it — the weekday column beside it had
-        // breathing room and the months did not.
+        // The month row and the air under it. Labels sitting straight on top
+        // of the first cell row read as a caption stuck to the grid rather than
+        // a header over it, with the weekday column beside them having
+        // breathing room the months do not.
         const monthRow = 15.0;
         const monthGap = 7.0;
         final available = constraints.maxWidth - labelWidth;
         // Still capped — cells any larger read as a chart rather than a
         // texture, and every point of cell size costs seven points of height
         // off the bottom of the screen. 16 rather than 14 so the widest phones
-        // do not leave a margin of empty card to the right of the grid; the
-        // column count does most of that work now.
+        // do not leave a margin of empty card to the right of the grid, though
+        // the column count does most of that work.
         final cell =
             ((available - gap * (weeks - 1)) / weeks).clamp(8.0, 16.0);
 
@@ -138,12 +138,12 @@ class ConsistencyHeatmap extends StatelessWidget {
             // A month is labelled at the column holding its 1st, whatever
             // weekday that is — not at the first Monday of a new month.
             //
-            // The old rule labelled the leading column whenever the window
-            // opened mid-month, and that label then blocked the real one: a
-            // grid starting 30 March printed "Mar" over two days of March and
-            // suppressed "Apr" one column later as a collision. The window's
-            // first days are the least interesting thing in it; the month
-            // boundaries are the whole reason for the row.
+            // Labelling the leading column whenever the window opens mid-month
+            // blocks the real label: a grid starting 30 March would print "Mar"
+            // over two days of March and suppress "Apr" one column later as a
+            // collision. The window's first days are the least interesting
+            // thing in it; the month boundaries are the whole reason for the
+            // row.
             if (date.day == 1 && w - lastLabelWeek >= columnsPerLabel) {
               lastLabelWeek = w;
               monthLabel = DateFormat('MMM').format(date);

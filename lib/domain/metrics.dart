@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import '../core/ids.dart';
 import 'enums.dart';
 
-/// Round a suggested weight to something you can actually load.
+/// Rounds a suggested weight to a value that can be loaded on a bar.
 double roundLoad(double kg) => (kg * 2).round() / 2;
 
 /// Effective load moved by one set, in kg.
@@ -202,9 +202,10 @@ PerformanceScore scorePerformance({
 
 /// Total load moved in one session, in kg.
 ///
-/// Every completed set counts, warm-ups and drop legs included — this is a
-/// "what did the day come to" figure, not a progression score, and the work of
-/// a warm-up is still work you did. [scorePerformance] is the strict one.
+/// Every completed set is counted, including warm-ups and drop legs. This is a
+/// summary of the session's total output rather than a progression score, and
+/// the work performed in a warm-up is still work performed. [scorePerformance]
+/// applies the stricter definition.
 ///
 /// Goes through [effectiveLoad], which is the whole point: a dumbbell entered
 /// as 22.5 is 45kg moving and a chin-up is bodyweight × reps. Reading `weight`

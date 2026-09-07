@@ -9,8 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Dragging a tab must land it where the finger left it and keep it there.
 ///
 /// The rail is built off a database stream, so the frame after a drop still
-/// carries the order the database last emitted — the old one. Without an
-/// optimistic order the tab snaps home and jumps again when the write lands:
+/// carries the order the database last emitted, which is the order before the
+/// drop. Without an optimistic order the tab snaps home and jumps again when
+/// the write lands:
 /// two movements to express one, the first of them backwards.
 void main() {
   ExerciseEntry entry(String id, String name, int order) => ExerciseEntry(

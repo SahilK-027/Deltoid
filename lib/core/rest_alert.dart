@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 
-/// The end-of-rest alert: a buzz you feel through the bench and a tone that
-/// survives whatever is playing in your ears.
+/// The end-of-rest alert: a vibration transmitted through the surface the
+/// device rests on, and a tone audible over any audio already playing.
 ///
 /// It exists as a service rather than two lines in the log screen for one
 /// reason: the player is expensive to build and the tone has to be audible
@@ -73,9 +73,9 @@ class RestAlert {
   ///
   /// [sound] is the Settings switch. It silences the tone and nothing else:
   /// the two pulses still fire, so a muted rest is still felt by a phone lying
-  /// on a bench next to you.
+  /// on a nearby surface.
   ///
-  /// **Returns whether the alert is fully discharged** — the tone played, or
+  /// Returns whether the alert was fully delivered: the tone played, or
   /// none was owed. False means the haptics fired and the tone did not, which
   /// the caller answers by handing the alert back to the OS rather than
   /// letting a rest end in silence. Every failure here is a real one seen in a
@@ -118,7 +118,8 @@ class RestAlert {
   }
 
   /// Drops the player when the workout closes. Holding an audio session open
-  /// for a screen you have left is how an app ends up ducking music forever.
+  /// for a screen that has been left is how an application ends up ducking
+  /// audio indefinitely.
   Future<void> release() async {
     final player = _player;
     _player = null;

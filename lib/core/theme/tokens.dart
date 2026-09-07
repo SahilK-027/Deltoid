@@ -11,12 +11,13 @@ import '../../domain/muscle_volume.dart';
 /// See THEME.md. Two things about this palette are deliberate and easy to undo
 /// by accident:
 ///
-/// * **The greys are pure neutrals.** No blue tint. A charcoal ramp with a hue
-///   in it reads as "themed"; a neutral one reads as designed, and it lets the
-///   data colours be the only thing on screen with a temperature.
-/// * **[accent] is white** (black in the light theme). The primary action, the
-///   selected chip, the active tab — all monochrome. Hue is reserved for things
-///   that *mean* something: a chart series, a record, a deload, a delete.
+/// * The greys are pure neutrals, with no blue tint. A charcoal ramp carrying a
+///   hue reads as themed rather than as designed, and a neutral ramp leaves the
+///   data colours as the only elements on screen with a colour temperature.
+/// * [accent] is white, and black in the light theme. The primary action, the
+///   selected chip and the active tab are all monochrome. Hue is reserved for
+///   elements that carry meaning: a chart series, a record, a deload, a
+///   deletion.
 @immutable
 class DeltoidColors extends ThemeExtension<DeltoidColors> {
   const DeltoidColors({
@@ -62,8 +63,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// Top of the stack: focused input, pressed chip, keypad utility keys.
   final Color surfaceHighest;
 
-  /// Inset dividers inside a card, and outlined empty-state boxes.
-  /// **Not** a card outline — cards have no border.
+  /// Inset dividers within a card, and outlined empty-state boxes. Not a card
+  /// outline: cards have no border.
   final Color border;
 
   /// The strongest hairline: unfilled progress track, focused outline.
@@ -80,14 +81,14 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// Deload identity. Orange, and the only hue in the cycle model — a light
   /// week has to be legible at a glance on the heatmap and in history.
   ///
-  /// It was amber, which sat one notch from the yellow in `series[]` and the
-  /// yellow identity mark; orange separates the one state the cycle model has
-  /// from the palette information is drawn from.
+  /// Orange rather than amber, which sits one notch from the yellow in
+  /// `series[]` and the yellow identity mark: this separates the one state the
+  /// cycle model has from the palette information is drawn from.
   final Color deload;
   final Color deloadMuted;
 
   /// A rule the app is stating: a limit reached, a consequence worth reading
-  /// before you act. Yellow, and its own token rather than a second use of
+  /// before acting. Yellow, and its own token rather than a second use of
   /// [deload] — a light week and a refused action are different facts, and a
   /// token shared between them means neither can be retuned without moving the
   /// other. [warningMuted] is the ground it sits on.
@@ -100,9 +101,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// The first line on a chart, and the only one when there is just one. Not
   /// [accent]: a chart is information, not an action.
   ///
-  /// It was `data`, which named the category rather than the role — every one
-  /// of these is data, so the name distinguished nothing from `info` sitting
-  /// next to it.
+  /// Named for the role rather than the category: `data` would distinguish
+  /// nothing from `info` sitting next to it, since every one of these is
+  /// data.
   final Color seriesPrimary;
 
   /// The second line, the heatmap ramp and identity tiles.
@@ -118,51 +119,49 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// white glyph on them rather than colour on charcoal.
   final List<Color> identity;
 
-  /// A day you did not train, and the empty part of a volume bar's track.
+  /// An untrained day, and the unfilled portion of a volume bar's track.
   ///
-  /// **The same grey as [surfaceHighest], on purpose**, and kept as its own name
-  /// because it is its own job: the heatmap grid and the muscle bars sit one
-  /// above the other on the landing screen and are read as one answer, so a
-  /// rest day and an untrained muscle have to be the same absence. Two greys
-  /// eight points apart there say they are not.
+  /// Deliberately the same grey as [surfaceHighest], retained under its own
+  /// name because it serves a distinct purpose. The heatmap grid and the muscle
+  /// bars are positioned one above the other on the landing screen and are read
+  /// together, so an untrained day and an untrained muscle must represent the
+  /// same absence. Two greys eight points apart would indicate otherwise.
   final Color heatEmpty;
 
-  /// One tone for a day you trained, whatever it held.
+  /// A single tone for any trained day, whatever it contained.
   ///
-  /// It was a four-step ramp on session count, which said the wrong thing
-  /// twice: a day with one session — a full day's work — came out darkest and
-  /// nearly indistinguishable from a rest day, and a day with three read as
-  /// three times the achievement when it is usually just a Saturday. The grid
-  /// answers "did I train", and that is a yes or a no.
+  /// A four-step ramp on session count says the wrong thing twice: a day with
+  /// one session — a full day's work — comes out darkest and nearly
+  /// indistinguishable from a rest day, and a day with three reads as three
+  /// times the achievement when it is usually just a Saturday. The grid answers
+  /// "did I train", and that is a yes or a no.
   final Color heatOn;
 
   /// Kept for the rare surface that genuinely floats above the page (a snack
-  /// bar, a dragged row). Cards, sheets and the nav bar do **not** use it:
-  /// depth in this app is surface colour.
+  /// bar, a dragged row). Cards, sheets and the navigation bar do not use it:
+  /// depth in this application is conveyed by surface colour.
   final Color shadow;
 
-  /// The six hues, named once, and **the same six in both themes**.
+  /// The six hues, defined once and identical in both themes.
   ///
   /// Every semantic colour that is not red is one of these, so a chart series,
   /// a regime's mark and the deload orange are the same tones wherever they
   /// turn up rather than near-misses chosen one screen at a time.
   ///
-  /// These are back where they started, and the round trip is the useful part
-  /// of the record. They were replaced by a saturated set (`#FF6535`, `#F9AC0E`
-  /// …), which read as shouting; then by a set solved for equal contrast on
-  /// charcoal, which fixed the evenness and turned yellow into an ochre —
-  /// `#A0812B` is a number satisfying a constraint, not a yellow. Sampling the
-  /// app we take the language from landed within a few points of this original
-  /// six, on every hue. **A hue has to stay the hue.** Equal contrast is worth
-  /// having only where it does not cost that; yellow is bright because yellow
-  /// is bright.
+  /// Two tempting replacements are both wrong. A saturated set (`#FF6535`,
+  /// `#F9AC0E` …) reads as shouting. A set solved for equal contrast on
+  /// charcoal fixes the evenness and turns yellow into an ochre — `#A0812B` is
+  /// a number satisfying a constraint, not a yellow. Sampling the app we take
+  /// the language from lands within a few points of these, on every hue.
+  /// A hue must remain recognisable as that hue. Equal contrast is worth having
+  /// only where it does not compromise this.
   ///
   /// One set, both themes, for the same reason our reference does it: an
   /// identity mark is the same mark whichever theme it is drawn in, and a
-  /// colour that changes with the phone's setting is a colour you learn twice.
-  /// What made two sets look necessary was a **white** glyph on the fill, which
+  /// colour that varies with the device's theme must be learned twice.
+  /// Two sets appear necessary only under a white glyph on the fill, which
   /// these are too light to carry. The glyph is the fill's own hue taken down
-  /// now (`IconTile.glyphOn`), so the fills are free to be light.
+  /// (`IconTile.glyphOn`), so the fills are free to be light.
   ///
   /// The cost, stated: on a white card `yellow` is 1.4:1 and `orange` 1.9:1.
   /// They are fills and marks on the light theme, never text and never a
@@ -206,13 +205,13 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     series: [cyan, blue, yellow, green, lavender],
     identity: [orange, blue, yellow, green, lavender, cyan],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
-    // #222222 the grid dissolved into the card and the pattern — the whole
-    // point of the section — could only be read where it was filled. It was
-    // #2F2F2F for that reason and is `surfaceHighest` now, which is a step
-    // clearer again and the grey the app already uses for an inert fill.
+    // #222222 the grid dissolves into the card and the pattern — the whole
+    // point of the section — can only be read where it is filled.
+    // `surfaceHighest` clears that, and is the grey the app already uses for an
+    // inert fill.
     heatEmpty: Color(0xFF3A3A3A),
-    // The palette's blue, not a lighter cousin of it. It used to be #6FA8F5,
-    // one nudge off `info`, which is a bug waiting to be noticed.
+    // The palette's blue, not a lighter cousin of it: something like #6FA8F5,
+    // one nudge off `info`, is a bug waiting to be noticed.
     heatOn: blue,
     shadow: Color(0x66000000),
   );
@@ -269,10 +268,11 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
 
   /// The hue a regime owns, by the slot stored on its row.
   ///
-  /// This replaced a hash of the regime id. A hash is stable but not unique —
-  /// with six colours, two regimes collide about a third of the time — and the
-  /// mark is what History and Today are scanned by. Slots are assigned on
-  /// create and handed back on delete; see `Regimes.identityIndex`.
+  /// A stored slot rather than a hash of the regime id: a hash is stable but
+  /// not unique — with six colours, two regimes collide about a third of the
+  /// time — and the mark is what History and Today are scanned by. Slots are
+  /// assigned on create and handed back on delete; see
+  /// `Regimes.identityIndex`.
   ///
   /// The modulo is for a row that predates the column or came back from a
   /// restore written against a longer palette. It never fires in normal use.
@@ -389,23 +389,24 @@ abstract final class Space {
   static const gutter = 16.0;
 
   /// Between one section and the next. Sections are far apart on purpose —
-  /// it is the only thing separating them, now that cards have no borders.
+  /// it is the only thing separating them, cards having no borders.
   static const section = 28.0;
 }
 
-/// Corner radii, named by **what wears them** rather than by size.
+/// Corner radii, named for the component that carries them rather than by
+/// size.
 ///
-/// They used to be `xs … xxl`, the same ladder [Space] uses — and they are not
-/// the same numbers. `Space.md` is 12 and `Radii.md` was 14; `Space.lg` is 16
-/// and `Radii.lg` was 18. Two scales sharing one set of suffixes in one file is
-/// a trap: it invites you to pair `Space.md` padding with `Radii.md` corners on
-/// the assumption they were drawn together, and they never were.
+/// Not `xs … xxl`, the ladder [Space] uses, because the two scales are not the
+/// same numbers: `Space.md` is 12 against a 14 radius, `Space.lg` is 16 against
+/// an 18. Two scales sharing one set of suffixes in one file is a trap — it
+/// invites pairing `Space.md` padding with a `md` corner on the assumption they
+/// were drawn together.
 /// The heights and glyph sizes a control is built from.
 ///
-/// These were three literals in `primitives.dart` and a fourth on the threshold
-/// screen, all of them the same decision made four times. A button is 54 tall
-/// because that is the height a thumb aims at; the compact one is 46 because it
-/// sits in a row with something else; a glyph beside `titleMedium` is 20.
+/// Named once rather than left as literals at each control, which is the same
+/// decision made four times over. A button is 54 tall because that is the
+/// height a thumb aims at; the compact one is 46 because it sits in a row with
+/// something else; a glyph beside `titleMedium` is 20.
 abstract final class Sizes {
   /// A full-width button, and anything that has to line up beside one.
   static const control = 54.0;
@@ -460,8 +461,7 @@ abstract final class Motion {
 }
 
 /// Tabular figures everywhere a number can change — weights, reps, dates,
-/// timers. Without this, digits jitter as you type and the whole log feels
-/// cheap.
+/// timers. Without this, digits shift horizontally during entry.
 const tabular = <FontFeature>[FontFeature.tabularFigures()];
 
 extension DeltoidThemeX on BuildContext {

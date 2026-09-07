@@ -731,9 +731,9 @@ void main() {
     ///
     /// The cursor compares `>=`, so the row stamped exactly on it arrives with
     /// every pull. Writing one back wakes every stream on its table, which
-    /// wakes the engine, which pulls again. Nothing asserted this until now —
-    /// the applier's short-circuit could be disabled outright and the whole
-    /// suite stayed green, because every other test here pulls once.
+    /// wakes the engine, which pulls again. Only this test holds it: every
+    /// other test here pulls once, so the applier's short-circuit could be
+    /// disabled outright and the rest of the suite would stay green.
     test('a second pull applies nothing and rewrites nothing', () async {
       await bothInStep();
 

@@ -65,9 +65,9 @@ void main() {
 
   /// Scrolls until [text] is built, however far down the page it sits.
   ///
-  /// A fixed drag was wrong twice over: the page is short enough now that one
-  /// drag can overshoot a row entirely, and a test that opens the same row
-  /// twice dragged a second time from wherever the first left it.
+  /// A fixed drag is wrong twice over: the page is short enough that one drag
+  /// can overshoot a row entirely, and a test that opens the same row twice
+  /// would drag a second time from wherever the first left it.
   Future<void> scrollTo(WidgetTester tester, String text) async {
     for (var attempt = 0; attempt < 8; attempt++) {
       if (find.text(text).evaluate().isNotEmpty) return;
@@ -76,8 +76,8 @@ void main() {
     }
   }
 
-  /// Opens one of the Training card's rows — which is also what a person does
-  /// now that rest and the unit are a row each rather than a card each.
+  /// Opens one of the Training card's rows — which is also what a person does,
+  /// rest and the unit being a row each rather than a card each.
   Future<void> openRow(WidgetTester tester, String title) async {
     await scrollTo(tester, title);
     // Built is not the same as on screen: a `ListView` builds past the fold,
@@ -476,10 +476,10 @@ void main() {
     });
   });
 
-  /// The log is summarised in SQLite and read a month at a time, so what used
-  /// to be a grouping function is now four queries. Fifty years of daily
-  /// weighing is 18 250 rows: holding them all to show eight month rows was
-  /// what made this screen slow to open.
+  /// The log is summarised in SQLite and read a month at a time — four queries
+  /// rather than a grouping function over the whole table. Fifty years of daily
+  /// weighing is 18 250 rows, and holding them all to show eight month rows is
+  /// what makes this screen slow to open.
   group('the log is summarised, not loaded', () {
     Future<void> log(int dayKey, double kg) => TrainingRepository(db)
         .logBodyweight(dateFromDayKey(dayKey), kg);

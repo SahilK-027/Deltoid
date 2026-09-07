@@ -2,9 +2,9 @@ import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/domain/consistency.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The rate on Today used to be `sessionsInLast29Days / 4`, with both halves
-/// wrong: a fixed four-week denominator regardless of how long you had been
-/// using the app, over a window that was actually 29 days long.
+/// The rate on Today is not `sessionsInLast29Days / 4`: that is wrong in both
+/// halves, a fixed four-week denominator regardless of how long the app has
+/// been in use, over a window that is actually 29 days long.
 void main() {
   final today = DateTime(2026, 7, 30);
 
@@ -19,8 +19,8 @@ void main() {
   test('one session on day two is a count, not a rate', () {
     final c = of([1]);
 
-    // Reported as "0.3 / week" before, which is a fabrication: it divides by
-    // three weeks that have not happened.
+    // "0.3 / week" here would be a fabrication: it divides by three weeks that
+    // have not happened.
     expect(c.perWeek, isNull);
     expect(c.sessions, 1);
     expect(c.historyDays, 2);
@@ -42,7 +42,8 @@ void main() {
 
   test('the window is 28 days, not 29', () {
     // Long history, so the window is the full four weeks. A session 28 days
-    // back falls outside it; the old cutoff let it in and then divided by 4.
+    // back falls outside it; a 29-day cutoff would let it in and then divide
+    // by 4.
     final c = of([200, 28, 27]);
 
     expect(c.windowDays, consistencyWindowDays);

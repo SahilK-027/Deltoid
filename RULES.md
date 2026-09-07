@@ -306,6 +306,34 @@ invisibly, because nothing downstream looks at a row that is not dirty. A cursor
 advanced before the write loses every row in the batch it did not finish. See
 [SYNC.md](SYNC.md).
 
+**Comments are written as documentation, not as narration.** The reasoning
+stays — density is the point, and [§ 7](#a-rule-that-matters-is-a-rule-something-checks)
+says why — but it is written in the register a reader outside this project would
+expect. Four rules:
+
+- **Third person, never second.** A comment describes the code and the caller,
+  not the reader: _"the page currently open does not move mid-session"_, not
+  _"the page you are standing on does not move out from under you"_. The one
+  exception is a **string literal the user reads**, where the second person is
+  the app's own voice ([THEME → The words](THEME.md#the-words)) — `loadBlurb`
+  returns _"The weight you type is the whole load"_ and should. Document the
+  distinction on the function rather than changing the string.
+- **Present tense, and no changelog.** State what the code does and what the
+  alternative would cost, not what a previous build did: _"counting rows hands a
+  new slot a position a surviving one still holds"_, not _"counting rows handed
+  the new slot a position…"_. A comment is not a commit message, and the git
+  history is where a superseded design is recorded.
+- **A full sentence, not an emphasised fragment.** No `**bold**` mid-prose
+  standing in for a topic sentence. _"Raw SQL, because the query is unbounded."_
+  is the same fact as _"**Raw, and unbounded is why.**"_ and survives being read
+  aloud.
+- **A doc comment opens with a summary line.** One sentence naming what the
+  thing is or does, then a blank `///`, then the reasoning — the shape every
+  Dart API doc has, so that the first line is usable on its own.
+
+None of this licenses shortening. A comment that loses the reason it existed has
+been damaged, not tidied: rewrite the sentence, keep the argument.
+
 **Never copy the project to keep an old version around.** No `old-*/`, no
 `*.bak`, no second checkout, no `git worktree` for "reference". Git holds every
 previous state; a copy goes stale the moment it is made, gets edited by mistake,
@@ -553,4 +581,6 @@ guarantees. When you write one, either move the fact into an assert or a test,
 or make it a reference rather than a copy: _"bounded by the range control — see
 the assert below"_ beats _"nothing ever asks for more than a year"_. Comments
 that say why this code is shaped this way do not rot, because the reasoning
-outlives the numbers, and those are worth their density.
+outlives the numbers, and those are worth their density. How that reasoning is
+written down — third person, present tense, a summary line first — is
+[§ 4](#4-code).

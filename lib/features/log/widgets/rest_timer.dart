@@ -29,8 +29,8 @@ class RestTimerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The bar keeps its own clock now that the log screen no longer rebuilds
-    // itself once a second on everyone's behalf.
+    // The bar keeps its own clock: the log screen does not rebuild itself once
+    // a second on everyone's behalf.
     return Ticking(builder: _build);
   }
 
@@ -67,13 +67,13 @@ class RestTimerBar extends StatelessWidget {
                 children: [
                   // **The clock takes what is left, not what it wants.**
                   //
-                  // This was a `Spacer` between two groups of natural size,
-                  // which holds until the row is narrower than the two groups
-                  // together — and on a small screen, with the bar now staying
-                  // up while the keypad is open, it overflowed by a few pixels.
-                  // The striped band that draws over an overflow is not
-                  // something to put under a set. The controls are fixed and
-                  // the words give way instead.
+                  // A `Spacer` between two groups of natural size holds only
+                  // until the row is narrower than the two groups together, and
+                  // the bar stays up while the keypad is open — which on a
+                  // small screen overflows by a few pixels. The striped band
+                  // that draws over an overflow is not something to put under a
+                  // set. The controls are fixed and the words give way
+                  // instead.
                   Expanded(
                     child: Row(
                       children: [

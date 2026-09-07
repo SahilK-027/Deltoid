@@ -13,11 +13,11 @@ class StringListConverter extends TypeConverter<List<String>, String>
   /// in the result set with it. One malformed `form_video_urls` would blank the
   /// catalog, the exercise screen and the log at once, over a list of links.
   ///
-  /// It already refused a value that parsed to something other than a list;
-  /// what it did not survive was a value that is not JSON at all, which is what
-  /// a hand-edited backup or a column written by anything but this app looks
-  /// like. No links is the honest reading of an unreadable list, and it is
-  /// recoverable — the field can simply be filled in again.
+  /// Refusing a value that parses to something other than a list is not enough:
+  /// the value may not be JSON at all, which is what a hand-edited backup or a
+  /// column written by anything but this app looks like. No links is the honest
+  /// reading of an unreadable list, and it is recoverable — the field can
+  /// simply be filled in again.
   @override
   List<String> fromSql(String fromDb) {
     if (fromDb.isEmpty) return const [];

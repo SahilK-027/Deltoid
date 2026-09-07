@@ -1,7 +1,8 @@
-/// How the number you type relates to the load actually moved.
+/// How an entered weight relates to the load actually moved.
 ///
-/// Without this, `22.5` (one dumbbell, two of them) and `73` (a pec deck stack)
-/// are the same value and every comparison downstream is meaningless.
+/// Without this distinction, `22.5` denoting one of a pair of dumbbells and
+/// `73` denoting a machine stack are the same value, and every comparison
+/// downstream is meaningless.
 enum LoadMode {
   /// The entered number is the whole load. Machines, cable stacks, barbells.
   total,
@@ -57,10 +58,10 @@ extension MeasureModeX on MeasureMode {
 
 /// Seconds as a clock: `0:02`, `0:24`, `2:25`.
 ///
-/// A hold is stored as a count of seconds and read as a time. `145` is a
-/// number you have to convert in your head standing up from a plank; `2:25` is
-/// the number the stopwatch was showing when you stopped it, and the two have
-/// to match or the log disagrees with the clock that wrote it.
+/// A hold is stored as a count of seconds and displayed as a time. `145`
+/// requires mental conversion, whereas `2:25` is the value the stopwatch
+/// displayed when it was stopped. The two must correspond, or the log
+/// contradicts the clock that produced it.
 String formatClock(int seconds) {
   final m = seconds ~/ 60;
   final s = seconds % 60;
@@ -89,10 +90,11 @@ enum Equipment { barbell, dumbbell, machine, cable, bodyweight, band, other }
 /// half of them, and being wrong about the bar makes every plate on the screen
 /// wrong.
 ///
-/// [BarKind.none] is the default and means "not loaded on a bar" — machines,
-/// cables, dumbbells and every bodyweight movement. It is also the right answer
-/// for a barbell whose weight you have not said yet: no bar weight, no plate
-/// maths, rather than plates computed off a guess.
+/// [BarKind.none] is the default and denotes a movement not loaded on a bar:
+/// machines, cables, dumbbells and every bodyweight movement. It is also the
+/// correct value for a barbell whose weight has not yet been specified, giving
+/// no bar weight and no plate calculation rather than plates derived from an
+/// assumed value.
 enum BarKind { none, olympic, womens, ez, trap }
 
 extension BarKindX on BarKind {
@@ -192,8 +194,8 @@ extension SetTypeX on SetType {
 
 enum WorkoutStatus { planned, inProgress, completed, abandoned }
 
-/// A skipped exercise is data, not an absence. Recording why turns a gap into
-/// a pattern you can actually see.
+/// A skipped exercise is recorded data rather than an absence. Recording the
+/// reason converts a gap in the log into an observable pattern.
 enum SkipReason { none, failed, equipmentBusy, shortOnTime, injury, other }
 
 extension SkipReasonX on SkipReason {

@@ -27,9 +27,9 @@ class AppFailure {
 
 /// Where every failure the user should hear about is announced.
 ///
-/// **The app had no such channel, and the hole it left was the worst kind.**
-/// The log screen writes without awaiting — it has to, the keypad cannot block
-/// on a disk — so a write that threw dropped its error on the floor. The tick
+/// Without such a channel, failures are lost silently. The log screen writes
+/// without awaiting, as the keypad cannot block on disk, so a write that throws
+/// discards its error. The tick
 /// stayed on screen because the tick came from the local buffer, the rest timer
 /// started, the summary counted the set, and the number simply was not in the
 /// database. You would find out weeks later, looking at a chart with a hole in
@@ -40,7 +40,7 @@ class AppFailure {
 /// installed in `main` is not in the tree at all, and both have to be able to
 /// speak without knowing who is listening.
 ///
-/// Deliberately **not** an error-reporting service. Nothing announced here
+/// Deliberately not an error-reporting service. Nothing announced here
 /// leaves the phone: sync sends rows to an account and never a failure, a log
 /// line or a stack trace. It exists so the screen can say "that did not save",
 /// which is the whole of the requirement.

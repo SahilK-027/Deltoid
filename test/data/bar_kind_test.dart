@@ -10,10 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// **Which bar, and when the answer is allowed to change.**
 ///
-/// Bar weight used to be one number on the catalog row, read live by the plate
-/// diagram every time it drew. Two things were wrong with that at once: the
-/// same movement cannot be loaded differently in two training days, and
-/// changing it silently redrew the plates of every session ever logged.
+/// One number on the catalog row, read live by the plate diagram every time it
+/// draws, is wrong two ways at once: the same movement cannot then be loaded
+/// differently in two training days, and changing it silently redraws the
+/// plates of every session ever logged.
 ///
 /// So there are two columns. `session_exercises.bar_kind` is the decision, per
 /// day, null meaning "follow the catalog". `workout_exercises.bar_kind` is the
@@ -257,7 +257,7 @@ void main() {
     );
     expect(second, isNot(first.id));
 
-    // And the reads that used to throw all answer instead.
+    // And every read answers rather than throwing.
     expect(
       await repo.restTargetFor(
           exerciseId: exercise.id, sessionId: push1.id),

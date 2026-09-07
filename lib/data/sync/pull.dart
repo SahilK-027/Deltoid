@@ -15,7 +15,7 @@ import '../../domain/table_labels.dart';
 /// `app_settings` key holding how far this device has read the account.
 ///
 /// Local bookkeeping about a server, like `device_id` beside it, and never
-/// synced. It moves **only after the batch that earned it has committed**
+/// synced. It advances only after the batch that produced it has committed
 /// ([SYNC.md § 15](SYNC.md#15-what-sync-may-never-do) rule 6): a cursor advanced
 /// before the write loses every row in the batch it did not finish, silently and
 /// for good.
@@ -36,12 +36,12 @@ typedef PullReport = ({int applied, int kept, int skipped, int unchanged});
 /// `domain/sync_merge.dart` — this file is the input and the output: read the
 /// scope, ask the domain, write the answer.
 ///
-/// **Pull before push.** A conflict is resolved before it is propagated, and a
+/// Pull precedes push. A conflict is resolved before it is propagated, and a
 /// local row that wins one stays dirty so the push that follows sends it. That
 /// ordering is the whole of what makes the two devices converge rather than
 /// trade the same row forever.
 ///
-/// **Three things this never does.** It never writes a pulled row through the
+/// Three things this never does. It never writes a pulled row through the
 /// ordinary write path — that would stamp every applied row as locally owed and
 /// push them all straight back
 /// ([§ 17](SYNC.md#17-the-architecture)). It never hard-deletes: a tombstone
@@ -63,8 +63,8 @@ class PullService {
   /// sign-in, where a decade of training arrives down a slower path than a
   /// restore reads a file ([SYNC.md § 16](SYNC.md#16-still-to-decide)). Every
   /// other pull is a background drain nobody is waiting on and passes nothing —
-  /// **a spinner on a background job is a spinner that teaches the user to
-  /// wait** ([§ 2](SYNC.md#2-the-three-states)).
+  /// a progress indicator on a background job trains the user to wait for it
+  /// ([§ 2](SYNC.md#2-the-three-states)).
   ///
   /// [expectedRows] is what the account said it holds, so the bar has a
   /// denominator. Null leaves it indeterminate rather than inventing one, and a
@@ -134,7 +134,8 @@ class PullService {
       }
     }
 
-    // **After every table, not after every batch.** There is one cursor and the
+    // After every table rather than after every batch. There is one cursor and
+    // the
     // tables are walked in turn, so advancing it while `set_logs` was still
     // unread would put the read past rows nothing had applied. Killed halfway,
     // the cursor has not moved and the whole pass is re-read — which costs
@@ -146,7 +147,7 @@ class PullService {
     // CHECKs were added for: `healOrphanedSnapshots` is what answers § 12 row 8,
     // where one device deletes a workout the other was still adding sets to.
     //
-    // **`seed: false`, and that is not an optimisation.** A pull that landed
+    // `seed: false`, which is not an optimisation. A pull that landed
     // only a bodyweight row onto a phone with no catalog would otherwise seed
     // one — 120 exercises under ids the account has never heard of, which is
     // the exact two-catalog split [§ 10](SYNC.md#10-adoption) exists to
@@ -162,7 +163,7 @@ class PullService {
     // merge is known to produce, and this is what says whether anything else
     // got through.
     //
-    // **Reported, never thrown**, which is the opposite of the restore's
+    // Reported rather than thrown, which is the opposite of the restore's
     // answer to the same question and for two reasons. Rolling a batch back
     // would strand the account — the cursor has not advanced, so the next pull
     // reads the same rows, fails the same rule and rolls back again, forever.
@@ -233,7 +234,7 @@ class PullService {
               unchanged++;
           }
         } on Object catch (error, stack) {
-          // **One bad row never stops a restore** — § 15 rule 9. Named rather
+          // One bad row never stops a restore (§ 15 rule 9). Named rather
           // than counted, because a row that cannot land is a row the user's
           // other phone believes is backed up.
           skipped++;
@@ -276,13 +277,13 @@ class PullService {
     final local = await _localRow(spec, id);
 
     if (local != null) {
-      // **This row is already here, and untouched since.** The cursor compares
+      // The row is already present and unmodified since. The cursor compares
       // `>=`, so the row stamped exactly on it arrives with every pull — and
       // writing it back would wake every stream on that table, which wakes the
       // engine, which pulls again. A phone that had finished syncing would
       // never stop.
       //
-      // **The stamp pair is not an identity, so the values are compared too.**
+      // The stamp pair is not an identity, so the values are compared as well.
       // It reads like one — every local write stamps both columns, so no *edit*
       // can land on the pair a pulled row carries. What can is a second install
       // writing under the first one's `device_id`: that column is minted once
@@ -314,7 +315,7 @@ class PullService {
       if (verdict == RowVerdict.keepLocal) return _Outcome.keptLocal;
     }
 
-    // **A pulled row is not a local write.** It keeps the server's `updatedAt`
+    // A pulled row is not a local write. It retains the server's `updatedAt`
     // and the writing device's `deviceId`, and it lands settled — anything else
     // pushes every applied row straight back and the two phones trade the same
     // rows forever, each arrival reading as news.
@@ -329,7 +330,7 @@ class PullService {
       hadLocal: local != null,
     );
 
-    // **Every column, nulls included** — which is why this is not an upsert.
+    // Every column, including nulls, which is why this is not an upsert.
     //
     // `insertOnConflictUpdate` builds its `DO UPDATE SET` from
     // `toColumns(nullToAbsent: true)`, so a null field is left out of the
@@ -464,8 +465,8 @@ class PullService {
   // last-write-wins cannot resolve because the conflict is not between two
   // versions of one row.
   //
-  // Every resolution below writes through the same rule: **no merge may ever
-  // delete logged work.** Re-slot, re-flag or re-number. The deciding is in
+  // Every resolution below follows the same rule: no merge may delete logged
+  // work. It may re-slot, re-flag or re-number. The decision is made in
   // `domain/sync_merge.dart` and tested there; what is here is the scope query
   // and the write.
   // ---------------------------------------------------------------------------
@@ -510,8 +511,8 @@ class PullService {
   /// Moves every row this batch is about to reposition out of the way, before
   /// a single row of it is applied.
   ///
-  /// **A reorder is a permutation, and a permutation cannot be applied one row
-  /// at a time.** Move the second row to the front and the first write lands on
+  /// A reorder is a permutation, and a permutation cannot be applied one row at
+  /// a time. Moving the second row to the front puts the first write on
   /// a position the row already there still holds; SQLite refuses it
   /// mid-statement. `renumber` solves this inside one device by going through a
   /// scratch range nothing is standing in, and this is the same two passes at
@@ -527,7 +528,7 @@ class PullService {
   /// minute to reach, which is precisely the collision the design document
   /// anticipated in the abstract and got wrong in the particular.
   ///
-  /// Only rows that are **genuinely moving** are parked: a row whose incoming
+  /// Only rows that are actually moving are parked: a row whose incoming
   /// version has the same value, or is not a new version at all, is left alone.
   /// So the ordinary batch — nothing reordered — parks nothing and costs one
   /// read per row that it was going to do anyway.
@@ -579,7 +580,7 @@ class PullService {
   /// unique by definition and, at 37 characters with its marker, inside the
   /// column's CHECK of 60.
   ///
-  /// **The whole id, not a prefix of it.** Ids are UUID v7, so rows created in
+  /// The whole id rather than a prefix. Ids are UUID v7, so rows created in
   /// the same millisecond share their leading characters — two sessions renamed
   /// in one breath parked onto the same scratch name and the second one was
   /// refused by the very index this exists to get out of the way of.
@@ -650,14 +651,14 @@ class PullService {
     );
   }
 
-  /// A pulled row this device had to change, stamped as **its own write**.
+  /// A pulled row this device had to modify, stamped as its own write.
   ///
   /// The counterpart to [SYNC.md § 17](SYNC.md#17-the-architecture)'s rule that
   /// a pulled row is never re-stamped: a row that arrived and was then re-slotted
   /// is no longer the account's row, it is a version only this phone holds. It
   /// therefore takes this phone's `deviceId`, a fresh `updatedAt` and `dirty`.
   ///
-  /// **The stamp is not decoration.** `updatedAt` and `deviceId` together are
+  /// The stamp is load-bearing. `updatedAt` and `deviceId` together are
   /// what identify a version, and the applier skips a row whose pair already
   /// matches locally. Keeping the server's pair on a row whose values had
   /// changed made two different rows indistinguishable, and the second one was
@@ -730,12 +731,12 @@ class PullService {
   }) async {
     final id = row['id'] as String;
     final parentId = row[jsonKeyOf(parent)];
-    // **The whole live scope, this row's own copy included.** The free slot has
+    // The whole live scope, including this row's own copy. The free slot has
     // to be free of that too: the incoming row has not been written yet, so its
-    // local version is still standing on its old position, and a scope that
-    // left it out handed the occupant a slot that was already taken — which the
-    // unique index refused, and which the fuzz reproduced as an unsyncable
-    // cycle within a dozen operations.
+    // local version is still standing on its previous position, so a scope
+    // that left it out would hand the occupant a slot that is already taken —
+    // which the unique index refuses, and which the fuzz reproduces as an
+    // unsyncable cycle within a dozen operations.
     final scope = await _db
         .customSelect(
           'SELECT id, $position AS pos FROM $table '
@@ -819,7 +820,7 @@ class PullService {
   /// both phones agree on, so both reach the same answer whatever order the
   /// rows arrived in.
   ///
-  /// **Nothing here is stamped.** The flag is derived, and minting a version
+  /// Nothing here is stamped. The flag is derived, and minting a version
   /// for it would make a merge's own bookkeeping outrank a real edit — a
   /// programme one phone had deleted came back that way once, because a
   /// deactivation written a millisecond later beat the delete. It is safe to
@@ -864,7 +865,7 @@ class PullService {
     var resolved = row;
     final id = row['id'] as String;
 
-    // **The flag is never taken from the wire.** Which regime is active is a
+    // The flag is never taken from the wire. Which regime is active is a
     // singleton across the account, so it is decided for all of them at once by
     // [_reconcileActiveRegime] once the batch has landed — not row by row on
     // the way in, which is what made two phones reach opposite answers and stay
@@ -979,7 +980,7 @@ class PullService {
     return _ours(resolved, {'completedAt': nowMs()});
   }
 
-  /// Both phones had a session in progress. The older is **completed**, never
+  /// Both devices had a session in progress. The older is completed, never
   /// discarded — its sets are real work.
   Future<Map<String, dynamic>> _resolveWorkout(Map<String, dynamic> row) async {
     if (row['status'] != WorkoutStatus.inProgress.name) return row;
@@ -1063,7 +1064,7 @@ class PullService {
     for (final spec in tableSpecs(_db)) spec.name: spec,
   };
 
-  /// Writes a local row the merge had to move, **and stamps it**.
+  /// Writes a local row the merge had to move, and stamps it.
   ///
   /// The counterpart to everything above: a pulled row is not a local write and
   /// gets no stamp, but a row this device re-slotted *is* one. The account has
@@ -1071,10 +1072,11 @@ class PullService {
   /// The other device computes the same resolution from the same values, so the
   /// two versions agree before either is sent.
   ///
-  /// **`updates` names the table it wrote.** A `customUpdate` with an empty set
+  /// `updates` names the table it wrote. A `customUpdate` with an empty set
   /// changes rows and wakes nothing: every screen watching that table keeps
-  /// showing the row where it used to be, until something else happens to write
-  /// there. A merge is precisely the write nobody is looking at when it lands.
+  /// showing the row as it was before the write, until something else happens
+  /// to write there. A merge is precisely the write nobody is looking at when
+  /// it lands.
   Future<void> _restamp(
     String table,
     String id,

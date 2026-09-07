@@ -8,11 +8,11 @@ import '../../../domain/enums.dart';
 /// Where you are in the workout, and how much of it is left.
 ///
 /// Monogram tiles, not names and not bare numbers. Printing every name here
-/// while the header below printed the current one again was the same words
-/// twice on one screen — and the rail was the copy you couldn't read, since it
-/// was ellipsised to fit. Plain numbers fixed the duplication but made the
-/// tiles say nothing at all. Initials do both jobs: `BP` is recognisable once
-/// you know the session, and it costs a fifth of the width of the name.
+/// while the header below prints the current one again is the same words twice
+/// on one screen, and the rail is the copy you cannot read, being ellipsised to
+/// fit. Plain numbers undo the duplication and leave the tiles saying nothing
+/// at all. Initials do both jobs: `BP` is recognisable once you know the
+/// session, and it costs a fifth of the width of the name.
 ///
 /// This is the reference's photo-thumbnail rail with the photo removed — it
 /// falls back to exactly this when an exercise has no image, and every one of

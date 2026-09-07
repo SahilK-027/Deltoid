@@ -41,9 +41,9 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
 /// like any other. Returns the new regime's id.
 ///
 /// Catalog rows are matched on the starter key they were seeded with — falling
-/// back to the name for rows that predate it — and created when missing. Name
-/// matching alone meant renaming a starter exercise and then applying a
-/// template created a duplicate under the old name.
+/// back to the name for rows that predate it — and created when missing. On
+/// name matching alone, renaming a starter exercise and then applying a
+/// template creates a duplicate under the original name.
 Future<String> createRegimeFromTemplate(
   AppDatabase db,
   RegimeTemplate template, {
@@ -84,10 +84,9 @@ Future<String> createRegimeFromTemplate(
             isActive: Value(activate),
             identityIndex: Value(slot),
             // The flag is local and derived; this is the fact both phones read
-            // it from. A template is a regime like any other, and the second
-            // writer of `is_active` is exactly where this was forgotten once —
-            // the other phone found no candidate and showed no active
-            // programme at all.
+            // it from. A template is a regime like any other, and a second
+            // writer of `is_active` that omits the stamp leaves the other phone
+            // with no candidate and no active programme at all.
             activatedAt: Value(activate ? nowMs() : null),
           ),
         );
@@ -232,8 +231,8 @@ Future<void> backfillIdentityIndexes(AppDatabase db) async {
         identityIndex: Value(i % identitySlots),
         // Stamped like any other write. This changes a value the row carries,
         // so the row is not the one the file said it was — and a restore that
-        // left it unmarked would hand another device the old colour back, which
-        // is the collision this backfill exists to undo.
+        // left it unmarked would hand another device the superseded colour
+        // back, which is the collision this backfill exists to undo.
         deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),

@@ -14,8 +14,8 @@ import '../integrity/invariant_oracle.dart';
 
 /// What a write leaves behind when it is not the only one happening.
 ///
-/// Two shapes of the same fault, both of which used to be reachable with a
-/// thumb rather than with a debugger:
+/// Two shapes of the same fault, both reachable with a thumb rather than with
+/// a debugger:
 ///
 /// * **A position taken from a count.** Every "append" here read the number of
 ///   live rows and used it as the next `orderIndex`. Deletes are tombstones and
@@ -114,7 +114,8 @@ void main() {
 
     test('undoing a removed slot after another was added still finds a free '
         'position', () async {
-      // The undo action is the only revival that kept the row's old position.
+      // The undo action is the only revival that keeps the row's buried
+      // position.
       // It only collides when the tombstone held the *highest* index, because
       // that is the one the append behind it then takes: remove the last slot
       // and the next append lands exactly where the buried row is pointing.
@@ -418,9 +419,10 @@ void main() {
     test('a reorder that omits a live row is refused rather than colliding',
         () async {
       // A partial list is not a permutation. The second pass brings the rows it
-      // was handed down to 0..n-1, and a row it never saw is still standing in
-      // that range — so today this dies on the unique index, several writes into
-      // a transaction, with a message about nothing the caller did wrong.
+      // is handed down to 0..n-1, and a row it never saw is still standing in
+      // that range — which without the guard dies on the unique index, several
+      // writes into a transaction, with a message about nothing the caller did
+      // wrong.
       final session = await sessionNamed('Push 1');
       final live = await (db.select(db.sessionExercises)
             ..where((t) => t.sessionId.equals(session.id) & t.deletedAt.isNull())
@@ -513,10 +515,11 @@ void main() {
 
   group('a write says who wrote it and when', () {
     test('an update re-stamps the device, not just the insert', () async {
-      // `clientDefault` only fires on an insert, so this column used to name
-      // the row's creator for the rest of its life — and last-write-wins breaks
-      // a same-millisecond tie on it, so both devices compared the same
-      // originating id, found it equal, and each kept its own copy.
+      // `clientDefault` only fires on an insert, so left to it this column
+      // would name the row's creator for the rest of its life — and
+      // last-write-wins breaks a same-millisecond tie on it, so both devices
+      // would compare the same originating id, find it equal, and each keep
+      // its own copy.
       final session = await sessionNamed('Push 1');
       await db
           .customStatement("UPDATE sessions SET device_id = 'another-phone'");
@@ -553,9 +556,9 @@ void main() {
       expect(await repo.completeWorkout(workoutId), isTrue);
 
       await repo.deleteWorkout(workoutId);
-      // Deleted from History while its own log was open. `getSingle` threw
-      // here, which died in the gesture handler; returning nothing at all sent
-      // the caller on to open a summary of a session that does not exist.
+      // Deleted from History while its own log was open. A throw here dies in
+      // the gesture handler; returning nothing at all sends the caller on to
+      // open a summary of a session that does not exist.
       expect(await repo.completeWorkout(workoutId), isFalse);
       expect(await repo.completeWorkout('no-such-workout'), isFalse);
     });
@@ -626,14 +629,12 @@ void main() {
   /// and filters `deleted_at`. These are live rows carrying `dirty`, which is
   /// what the first sync push sends, and no tombstone will ever follow them.
   group('a tombstoned parent leaves nothing live beneath it', () {
-    /// The five counts this group used to carry privately now live in
-    /// `test/integrity/invariant_oracle.dart`, alongside the positions and the
-    /// single-open rows, because a fuzz harness needs one judge it can call
-    /// after any operation rather than a helper inside one test file. The
-    /// oracle asserts strictly more than the helper did — every structural rule
-    /// rather than the five cascade ones — which is what makes the swap worth
-    /// making here: these sequences are now checked for collisions they were
-    /// never watched for.
+    /// The five cascade counts live in `test/integrity/invariant_oracle.dart`,
+    /// alongside the positions and the single-open rows, rather than privately
+    /// here: a fuzz harness needs one judge it can call after any operation,
+    /// not a helper inside one test file. The oracle asserts strictly more —
+    /// every structural rule rather than the five cascade ones — so these
+    /// sequences are checked for collisions as well.
     ///
     /// The qualifier on the workout/cycle count is documented there, and it is
     /// load-bearing: a deleted programme keeps its workouts and loses its

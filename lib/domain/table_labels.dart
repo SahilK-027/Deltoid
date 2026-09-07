@@ -1,29 +1,30 @@
-/// What a table is called on screen.
+/// User-facing names for database tables.
 ///
-/// Table names are the wire format. `tableLabel` used to strip the underscore
-/// and stop there, and its own comment said the names "are the wire format,
-/// not English" — which was true before the replace and still true after it. A
-/// restore that fell short told the user it had found "412 set logs and only
-/// 380", a failed pull said "one set logs entry could not be saved", and the
-/// progress sheet counted through "workout exercises" and "bodyweight logs".
-/// Those are the names of tables, offered to somebody who has never seen one.
+/// Table names are a wire format rather than English, and removing the
+/// underscore does not change that. Without translation, a restore that falls
+/// short would report finding "412 set logs and only 380", a failed pull would
+/// report that "one set logs entry could not be saved", and the progress sheet
+/// would enumerate "workout exercises" and "bodyweight logs". These are table
+/// names presented to a reader who has never seen the schema.
 ///
-/// So each table gets a noun the app already uses for it elsewhere: a
-/// `session` is a training day in the Regimes tab, a `workout` is what you
-/// logged, and a `set_log` is a set. Two forms, because the sentences need
-/// both — "one set could not be saved" and "412 sets".
+/// Each table is therefore given a noun the application already uses for it
+/// elsewhere: a `session` is a training day in the Regimes tab, a `workout` is
+/// a logged session, and a `set_log` is a set. Both singular and plural forms
+/// are provided, because the surrounding sentences require each — "one set
+/// could not be saved" and "412 sets".
 ///
-/// It is domain because it turns data into a string, which is where RULES § 4
-/// puts every formatter, and for the reason this file exists: there were two
-/// copies of the underscore-stripper, one in `core/progress.dart` and one
-/// private to `data/sync/pull.dart`, and neither knew about the other.
+/// This belongs in the domain layer because it converts data into a string,
+/// which is where RULES § 4 places every formatter, and because a label needed
+/// in two places is a label that will be duplicated. The underscore-stripping
+/// implementation this replaces existed in both `core/progress.dart` and
+/// privately within `data/sync/pull.dart`, with neither aware of the other.
 library;
 
-/// The plural noun for a table: `set_logs` → `sets`.
+/// Returns the plural noun for a table, such as `sets` for `set_logs`.
 ///
-/// An unknown name falls back to the old behaviour rather than throwing. A
-/// table added without a label here reads a little worse; it does not take a
-/// restore down with it.
+/// An unrecognised name falls back to the table name with underscores replaced
+/// by spaces rather than throwing. A table added without a label here reads
+/// less well, but does not cause a restore to fail.
 String tableLabel(String table) => switch (table) {
   'exercises' => 'exercises',
   'regimes' => 'regimes',
@@ -38,7 +39,7 @@ String tableLabel(String table) => switch (table) {
   _ => table.replaceAll('_', ' '),
 };
 
-/// The singular noun for a table: `set_logs` → `set`.
+/// Returns the singular noun for a table, such as `set` for `set_logs`.
 String tableLabelOne(String table) => switch (table) {
   'exercises' => 'exercise',
   'regimes' => 'regime',

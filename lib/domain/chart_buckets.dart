@@ -1,26 +1,29 @@
-/// Folding a log into the marks a chart can actually draw.
+/// Aggregation of logged rows into the marks a chart can render.
 ///
-/// Every chart in the app answers the same question about its own data — *what
-/// happened over this stretch of time* — and every one of them hits the same
-/// wall: fifty years of daily entries is eighteen thousand marks across a phone,
-/// which is not a chart, it is a texture. So no chart plots raw rows. It picks a
-/// [Granularity], folds its rows into buckets, and draws one mark per bucket.
+/// Every chart in the application answers the same question about its own data,
+/// namely what occurred over a given period, and each encounters the same
+/// limit: fifty years of daily entries is eighteen thousand marks across a
+/// phone display, which is not legible as a chart. No chart therefore plots raw
+/// rows. Each selects a [Granularity], aggregates its rows into buckets, and
+/// renders one mark per bucket.
 ///
-/// The rules that make that honest rather than merely tidy:
+/// Three rules govern that aggregation.
 ///
-/// - **A measurement averages; a count totals.** Bodyweight in March is the mean
-///   of the weigh-ins in March — the mean of measurements is a measurement. Sets
-///   in March is their sum, because "4.2 sets in March" is a lie about March and
-///   "62 sets in March" is not. Which one a series is, is [BucketFold], and the
-///   caller has to say.
-/// - **An empty bucket is not a zero, except when it is.** A month you did not
-///   weigh yourself has no weight — the line breaks. A month you did not train
-///   has zero sets — the bar sits on the baseline. Same absence, two different
-///   truths, so [bucketize] reports empties and lets the caller decide.
-/// - **Buckets are walked as calendar dates, never as day arithmetic.** Adding
-///   seven days to a local `DateTime` crosses a daylight-saving change
-///   correctly; adding `7 * 86400` seconds does not, and `difference().inDays`
-///   across one is 6 or 8.
+/// - A measurement is averaged; a count is summed. Bodyweight in March is the
+///   mean of that month's weigh-ins, since the mean of measurements is itself a
+///   measurement. Sets in March is their sum, because "4.2 sets in March" would
+///   misreport the month whereas "62 sets in March" does not. Which of the two
+///   applies to a series is given by [BucketFold] and must be supplied by the
+///   caller.
+/// - An empty bucket is not necessarily zero. A month with no weigh-in has no
+///   weight, and the line breaks. A month with no training has zero sets, and
+///   the bar rests on the baseline. The same absence carries two different
+///   meanings, so [bucketize] reports empty buckets and leaves the
+///   interpretation to the caller.
+/// - Buckets are advanced as calendar dates rather than by day arithmetic.
+///   Adding seven days to a local `DateTime` crosses a daylight-saving
+///   transition correctly; adding `7 * 86400` seconds does not, and
+///   `difference().inDays` across such a transition yields 6 or 8.
 ///
 /// Pure, and tested without a database (RULES § 7).
 library;
@@ -65,13 +68,14 @@ class Bucket {
   /// First calendar day the bucket covers, at midnight local.
   final DateTime start;
 
-  /// Last calendar day it covers, inclusive — so a readout can name a span
-  /// rather than a boundary.
+  /// The last calendar day the bucket covers, inclusive, so that a readout can
+  /// state a span rather than a boundary.
   final DateTime end;
 
-  /// The folded value, or null when nothing fell in this bucket. **Null is not
-  /// zero**: a line breaks here, a bar sits on the baseline, and only the chart
-  /// knows which of those its own data means.
+  /// The aggregated value, or null when no rows fell within this bucket.
+  ///
+  /// Null is not zero. A line chart breaks at a null, a bar chart rests on the
+  /// baseline, and only the calling chart knows which its data implies.
   final double? value;
 
   /// How many rows were folded into it. What makes an average readable as
@@ -103,13 +107,14 @@ DateTime nextBucket(DateTime start, Granularity by) => switch (by) {
       Granularity.yearly => DateTime(start.year + 1),
     };
 
-/// The same ceiling applied to marks **already in hand** rather than to a span
-/// somebody else measured.
+/// Applies the same ceiling to marks already produced, rather than to a
+/// measured span.
 ///
-/// A window and its data can disagree for a frame — the range says `All` before
-/// the query that knows where `All` starts has come back — and in that frame a
-/// chart can be handed every week of fifty years to draw in a card the width of
-/// a thumb. This is the backstop: whatever arrives, it is coarsened until it
+/// A window and its data may disagree for a single frame: the range reports
+/// `All` before the query that determines where `All` begins has returned. In
+/// that frame a chart may be supplied with every week of fifty years to render
+/// in a narrow card. This is the safeguard: whatever arrives is coarsened until
+/// it
 /// fits, and never refined below the fold it already has.
 Granularity autoGranularityFor(int marks, Granularity of, {int ceiling = 60}) {
   final days = switch (of) {
@@ -125,12 +130,12 @@ Granularity autoGranularityFor(int marks, Granularity of, {int ceiling = 60}) {
 /// How many marks a span would draw at each granularity, and therefore which
 /// one a chart should open at.
 ///
-/// **The target is a mark you can see, not a mark that fits.** Anything past
-/// about sixty on a phone is a comb — the marks touch, and the shape you came
-/// for is hidden inside the points it is made of. So the coarsest granularity is
-/// not chosen; the *finest one that stays under the ceiling* is, which is what
-/// makes a week open on days and fifty years open on years without either being
-/// special-cased.
+/// The target is a legible mark rather than merely a mark that fits. Beyond
+/// approximately sixty marks on a phone display the marks touch, and the shape
+/// being examined is obscured by the points composing it. The coarsest
+/// granularity is therefore not selected; the finest one remaining below the
+/// ceiling is. This is what causes a week to open at daily granularity and
+/// fifty years to open at yearly, without either being special-cased.
 Granularity autoGranularity(int spanDays, {int ceiling = 60}) {
   if (spanDays <= ceiling) return Granularity.daily;
   if (spanDays / 7 <= ceiling) return Granularity.weekly;
@@ -140,19 +145,20 @@ Granularity autoGranularity(int spanDays, {int ceiling = 60}) {
 
 /// The averaging levels that mean anything over [spanDays].
 ///
-/// **A level you cannot see is not a choice**, and that cuts one way only.
-/// Yearly over a month is a chart of a single dot — the picker must not offer
-/// it, because there is no reading of "average by year" that a month can
-/// satisfy. Going the other way is different: monthly over fifty years is six
-/// hundred marks, which is dense rather than impossible, and you can pinch into
-/// it. So the floor is hard — at least two marks, always — and the [ceiling] is
-/// the *drawing's* limit rather than the fold's: a line carries thousands of
-/// points, a bar needs a point of width to be a bar at all, so the two pass
-/// different numbers.
+/// A level that cannot be rendered is not a valid choice, and the constraint
+/// applies asymmetrically. Yearly granularity over a month produces a single
+/// point, so the picker must not offer it: no interpretation of "average by
+/// year" can be satisfied by one month of data. The converse differs. Monthly
+/// granularity over fifty years produces six hundred marks, which is dense but
+/// legible, and can be examined by zooming. The floor is therefore absolute —
+/// at least two marks in all cases — while the [ceiling] is a limit on
+/// rendering rather than on aggregation: a line chart carries thousands of
+/// points whereas a bar requires measurable width, so the two supply different
+/// values.
 ///
-/// This is deliberately far looser than [autoGranularity]'s ~60, which is about
-/// what opens by default. What you can ask for and what you are given unasked
-/// are two questions.
+/// This is deliberately far looser than the approximate ceiling of 60 applied
+/// by [autoGranularity], which governs the default. What may be selected and
+/// what is applied by default are separate questions.
 ///
 /// Always at least one: a span too short for anything is still drawn daily,
 /// because a chart of one day is a chart of one day and the picker should say
@@ -172,8 +178,8 @@ double _marksIn(int spanDays, Granularity by) => switch (by) {
       Granularity.yearly => spanDays / 365.25 + 1,
     };
 
-/// The averaging actually in force: what you picked, if the range can still
-/// show it, and otherwise the automatic one.
+/// The granularity in force: the selected value where the range can still
+/// render it, and the automatic value otherwise.
 ///
 /// A choice survives a change of range whenever it can — picking Monthly and
 /// then widening to a year should keep monthly, not silently revert. What it
@@ -200,12 +206,13 @@ Granularity resolveGranularity(
 
 /// Folds dated values into one bucket per period.
 ///
-/// [rows] are `(dayKey, value)` in any order. [from] and [to] are inclusive
-/// calendar days and decide the span: the result runs from the bucket containing
-/// [from] to the bucket containing [to], **with the empty ones in their places**,
-/// so a chart can tell a gap from a shortage of data. Rows outside the span are
-/// dropped rather than trusted — a caller that widens its query without widening
-/// its span cannot silently add a bucket.
+/// [rows] are `(dayKey, value)` pairs in any order. [from] and [to] are
+/// inclusive calendar days and determine the span: the result runs from the
+/// bucket containing [from] to the bucket containing [to], with empty buckets
+/// retained in position, so that a chart can distinguish a gap from an absence
+/// of data. Rows outside the span are discarded rather than accepted, so that a
+/// caller widening its query without widening its span cannot silently
+/// introduce a bucket.
 ///
 /// Linear in the rows plus the buckets, with one pass over each: the fold is
 /// done into a pre-allocated pair of lists indexed by bucket, because looking up

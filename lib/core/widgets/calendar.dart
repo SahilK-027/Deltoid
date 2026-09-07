@@ -17,15 +17,15 @@ import 'primitives.dart';
 /// [first]..[last] are shown but not tappable: a month with holes in it says
 /// *why* the day cannot be picked, where a month that simply stops does not.
 ///
-/// [marks] rings the days you trained, keyed by `dayKey` — `heatOn` blue for a
+/// [marks] rings the trained days, keyed by `dayKey`: `heatOn` blue for a
 /// session, `deload` orange for a light week. A calendar of identical white
 /// numbers cannot answer the question it is opened with, which is *which day
 /// did I miss*.
 ///
-/// A dialog, not a sheet: this is a grid you read before you tap, the one
-/// picker in the app that is looked at rather than scrolled, and a sheet put it
-/// under your thumb at the bottom of the screen with the month you are reading
-/// furthest from your eyes.
+/// A dialog rather than a sheet. This is a grid that is read before it is
+/// tapped, the one picker in the application that is examined rather than
+/// scrolled. A sheet would place it at the bottom of the screen, positioning
+/// the month being read furthest from the reader.
 Future<DateTime?> pickDay(
   BuildContext context, {
   required DateTime initial,
@@ -134,10 +134,10 @@ class _CalendarCardState extends State<_CalendarCard> {
             expanded: _pickingYear,
           ),
           const SizedBox(height: Space.md),
-          // One height for every month and for the year grid alike. It used to
-          // take the height of whatever it was showing, so a 5-week month and a
-          // 6-week one were different dialogs and paging between them resized
-          // the card under your thumb.
+          // One height for every month and for the year grid alike. Taking the
+          // height of whatever is showing makes a 5-week month and a 6-week one
+          // different dialogs, and paging between them resizes the card under
+          // the point of contact.
           SizedBox(
             height: _MonthGrid.height,
             child: _pickingYear
@@ -281,7 +281,7 @@ class _MonthBar extends StatelessWidget {
 }
 
 /// A month step. Disabled at the ends of the range rather than hidden: a
-/// control that disappears makes the row re-centre as you page through it.
+/// control that is removed causes the row to re-centre while paging.
 class _Arrow extends StatelessWidget {
   const _Arrow({
     required this.icon,
@@ -328,7 +328,7 @@ class _MonthGrid extends StatelessWidget {
   static const _weekStart = DateTime.monday;
 
   /// Six rows, always. A month needs four, five or six depending on where its
-  /// first day falls, and sizing to the month made every page turn a resize.
+  /// first day falls, so sizing to the month makes every page turn a resize.
   static const _rows = 6;
   static const _rowHeight = 44.0;
 
@@ -396,8 +396,8 @@ class _MonthGrid extends StatelessWidget {
 /// One day.
 ///
 /// Three states stack on one circle, and they are ranked so none of them hides
-/// another: a **ring in the day's own colour** for a day you trained (`heatOn`
-/// blue, `deload` orange), the **`accent` fill** for the day currently chosen,
+/// another: a ring in the day's own colour for a trained day (`heatOn`
+/// blue, `deload` orange), the `accent` fill for the day currently selected,
 /// and the `textTertiary` ring for today. A trained day that is also selected
 /// keeps its coloured ring around the white fill — the whole point of the ring
 /// is that it survives being looked at.
@@ -478,8 +478,8 @@ class _YearGrid extends StatelessWidget {
     final c = context.c;
     final years = [for (var y = last; y >= first; y--) y];
     // Scrolls, because a history that starts in 1976 is fifty years of pills
-    // and the card's height is fixed. It was a plain `Column`, which overflowed
-    // the moment the log outgrew a decade.
+    // and the card's height is fixed. A plain `Column` overflows the moment the
+    // log outgrows a decade.
     return SingleChildScrollView(
       child: Column(
         children: [

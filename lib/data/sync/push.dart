@@ -18,20 +18,22 @@ typedef PushReport = ({int rows, int batches});
 ///
 /// [SYNC.md § 6](SYNC.md#6-push), which is the whole of this file:
 ///
-/// * **Every row where `dirty = true`, oldest `updatedAt` first.**
-/// * **Parents before children** — the registry order, which a restore already
+/// * Every row where `dirty = true`, oldest `updatedAt` first.
+/// * Parents before children, in registry order, which a restore already
 ///   depends on — so foreign keys hold server-side at every intermediate point.
 ///   The server declares none, deliberately, but a pull on the *other* phone
 ///   applies what it finds and a child that arrives before its parent is a row
 ///   `healOrphanedSnapshots` then tombstones.
-/// * **Batched upserts on `id`.** Idempotent, so a phone killed mid-push
+/// * Batched upserts on `id`. These are idempotent, so a device terminated
+///   mid-push
 ///   retries for free — edge case 12.
-/// * **`dirty` cleared only against an unchanged `updatedAt`.** A row edited
+/// * `dirty` is cleared only against an unchanged `updatedAt`. A row edited
 ///   while its own push was in flight is still owed, and clearing it on the
 ///   response would strand that edit on the phone forever — invisibly, because
 ///   nothing downstream ever looks at a row that is not dirty.
 ///
-/// **Three transactions, never one** ([SYNC.md § 17](SYNC.md#17-the-architecture)).
+/// Three transactions rather than one
+/// ([SYNC.md § 17](SYNC.md#17-the-architecture)).
 /// Read the batch and close; call the network holding nothing; write the result
 /// and close. There is one connection with `busy_timeout = 5000`, and a
 /// transaction held across a round trip is a screen frozen on a background job
@@ -68,7 +70,8 @@ class PushService {
 
         rows += batch.length;
         batches++;
-        // **Keyset, not a re-read from the start.** A row cleared by this pass
+        // Keyset paging rather than re-reading from the start. A row cleared
+        // by this pass
         // leaves the `dirty` set, but one edited mid-flight does not — and
         // re-reading from the beginning would hand it back forever while the
         // user kept typing. The cursor only ever moves forward, so a drain

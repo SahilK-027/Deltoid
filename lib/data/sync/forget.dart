@@ -12,7 +12,8 @@ import 'push.dart';
 /// [§ 10](#10-adoption), which clears the phone before pulling the account
 /// over it.
 ///
-/// **The one place in the app that hard-deletes outside a restore**, and the
+/// The only place in the application that hard-deletes outside a restore, and
+/// the
 /// rule both callers obey is the same: the confirmation naming what is about to
 /// go, or the backup file, comes first. Nothing here asks.
 ///

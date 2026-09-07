@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'invariant_oracle.dart';
 
 /// A seeded random-operation harness, driving the real database against a model
-/// too stupid to be wrong in the same direction.
+/// too simple to be wrong in the same direction.
 ///
 /// `invariant_oracle.dart` judges what
 /// must be true of *any* database; this file judges what must be true of *this*
@@ -730,9 +730,9 @@ void main() {
   //
   // A `kill -9` cannot be staged from inside the test process: `flutter test`
   // runs on `flutter_tester`, and spawning it to run a script boots an engine
-  // and hangs. What *can* be staged is the state a kill
-  // leaves on disk — a transaction that never committed, and a connection that
-  // was never closed — which is the thing the invariants have to survive.
+  // and hangs. What *can* be staged is the state a kill leaves on disk — an
+  // uncommitted transaction and an unclosed connection — which is the thing the
+  // invariants have to survive.
   group('the database survives an unclean shutdown', () {
     late Directory dir;
 

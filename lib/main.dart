@@ -10,9 +10,7 @@ import 'core/failure.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Nothing used to catch anything.
-  //
-  // Between them these two cover the ways a failure reaches the top without a
+  // Between them these two cover every way a failure reaches the top without a
   // handler: `FlutterError.onError` takes what the framework catches inside
   // build, layout and gesture callbacks, and `PlatformDispatcher.onError` takes
   // what an async gap drops — a repository call awaited inside an `onTap` that
@@ -20,9 +18,9 @@ void main() {
   // is *entirely* invisible: the handler that was running simply stops, so the
   // visible symptom is a button that does nothing at all.
   //
-  // Both still do what they did before as well. `presentError` keeps the red
-  // screen and the console trace in debug, and returning false from the
-  // platform handler leaves the error to the runtime rather than swallowing it.
+  // Neither handler takes the error away from the runtime. `presentError`
+  // keeps the red screen and the console trace in debug, and returning false
+  // from the platform handler leaves the error to be reported as usual.
   final presentError = FlutterError.onError;
   FlutterError.onError = (details) {
     presentError?.call(details);

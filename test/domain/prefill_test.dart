@@ -141,8 +141,8 @@ void main() {
 
     test('never scales a light week again', () {
       // 80% of 80% is 64%. A deload is a fraction of your working weight, not
-      // of the last time you already backed off — reachable now that a deload
-      // can be forced two cycles running from the regime screen.
+      // of the last time you already backed off — reachable by forcing a
+      // deload two cycles running from the regime screen.
       final result = resolvePrefill(
         candidates: [
           perf(

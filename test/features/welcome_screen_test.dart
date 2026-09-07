@@ -31,10 +31,10 @@ void main() {
 
   /// A few frames, rather than `pumpAndSettle`.
   ///
-  /// The screen does settle now that the drawing holds one fixed hue, so this
-  /// is no longer forced — it stays because these tests care about the screen
-  /// being *reachable* part-way through its 620ms entrance, not about the frame
-  /// after it finishes.
+  /// The screen does settle, the drawing holding one fixed hue, so this is not
+  /// forced. It stays because these tests care about the screen being
+  /// *reachable* part-way through its 620ms entrance, not about the frame after
+  /// it finishes.
   Future<void> beats(WidgetTester tester, [int n = 6]) async {
     for (var i = 0; i < n; i++) {
       await tester.pump(const Duration(milliseconds: 120));
@@ -115,7 +115,7 @@ void main() {
 
     test('and the repairs still run over the empty database', () async {
       // The rest of the list is not conditional. It has to survive a database
-      // with no catalog in it, because that is now a state a launch can be in.
+      // with no catalog in it, which is a state a launch can be in.
       await expectLater(repairDatabase(db, seed: false), completes);
     });
 

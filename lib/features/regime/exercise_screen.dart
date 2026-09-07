@@ -31,11 +31,10 @@ final exerciseByIdProvider =
 
 /// **One screen for an exercise, wherever you came from.**
 ///
-/// There were two shapes doing this job: a read-only slot screen whose
-/// `General` section listed the exercise and handed off to an `Edit` sheet, and
-/// that sheet — a stack of dropdowns and text fields with its own header and
-/// its own Save. So editing a movement looked nothing like looking at one, and
-/// creating a movement looked like neither. Three UIs for one noun.
+/// One shape, not three. A read-only slot screen that hands off to an `Edit`
+/// sheet — a stack of dropdowns and text fields with its own header and its own
+/// Save — makes editing a movement look nothing like looking at one, and
+/// creating a movement look like neither: three UIs for one noun.
 ///
 /// This is the noun's screen. It is the same page every time:
 ///
@@ -43,9 +42,8 @@ final exerciseByIdProvider =
 ///   are true of this exercise *in that day*, which is the one section that has
 ///   no meaning anywhere else.
 /// * **General**, always — the catalog row itself, as ordinary rows you tap,
-///   not a form. It conforms to the rule the old edit sheet broke: every screen
-///   in this app edits by opening one question at a time (THEME →
-///   Components), and each row here opens exactly one.
+///   not a form. Every screen in this app edits by opening one question at a
+///   time (THEME → Components), and each row here opens exactly one.
 ///
 /// Existing rows **save as you go**, like every other settings surface here. A
 /// new one holds a draft until `Create`, because a half-filled exercise
@@ -84,8 +82,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   // truth for itself and is written to on every change.
   late String _name = widget.initialName.trim();
   // Null until chosen. A new exercise answers every one of these before it can
-  // be created — see [_complete]. They were pre-set to chest / machine / total
-  // load, which is a guess wearing the clothes of an answer: tap Create without
+  // be created — see [_complete]. Pre-set to chest / machine / total load they
+  // would be a guess wearing the clothes of an answer: tap Create without
   // reading and you have filed a cable fly under chest-machine-total, and load
   // mode is the field that decides how every set you ever log against it is
   // read.
@@ -203,11 +201,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           // header — the centred title has room for a name, not for a name and
           // the day it sits in (THEME → Components).
           //
-          // The muscle used to sit here too, and it was the same word as the
-          // `Muscle` row's own value a few hundred pixels below it — a fact
-          // stated twice on one screen (rule 6), and the copy that could not be
-          // tapped. Opened from the catalog there is now nothing to say up here
-          // at all, so the block goes rather than shrinking to one word.
+          // Not the muscle: that is the same word as the `Muscle` row's own
+          // value a few hundred pixels below it — a fact stated twice on one
+          // screen (rule 6), in the copy that cannot be tapped. Opened from the
+          // catalog there is nothing to say up here at all, so the block goes
+          // rather than shrinking to one word.
           if (widget.fromDay) ...[
             Container(
               width: double.infinity,
@@ -566,14 +564,14 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     );
   }
 
-  /// Equipment is just equipment now.
+  /// Equipment is only equipment: picking one does not pre-fill the load mode
+  /// or the bar.
   ///
-  /// Picking one used to pre-fill the load mode and the bar — dumbbell meant
-  /// per-side, barbell meant an Olympic bar. Helpful, and wrong for a screen
-  /// where every field is an answer: a guess that fills a required field is
-  /// indistinguishable from an answer once the sheet closes, and load mode is
-  /// the field that decides how every set ever logged is read. Each question is
-  /// asked once and answered once.
+  /// Inferring them — dumbbell means per-side, barbell means an Olympic bar —
+  /// is helpful and wrong for a screen where every field is an answer. A guess
+  /// that fills a required field is indistinguishable from an answer once the
+  /// sheet closes, and load mode is the field that decides how every set ever
+  /// logged is read. Each question is asked once and answered once.
   void _setEquipment(Exercise? exercise, Equipment value) =>
       _apply(exercise, equipment: value);
 
@@ -804,9 +802,9 @@ String _loadModeName(LoadMode mode) => switch (mode) {
 /// The same shape as the deload rows below, and for the same reason: a null
 /// column means "use the default", the steps start from whatever that default
 /// is, and one row clears the override again. Three minutes for a heavy
-/// compound and sixty seconds for a cable fly is the whole point — it was only
-/// ever settable by nudging the ± on a timer that was already running, which
-/// meant it could not be decided while planning the day.
+/// compound and sixty seconds for a cable fly is the whole point, and it has to
+/// be settable here: nudging the ± on a running timer is the only other way to
+/// say it, which cannot be done while planning the day.
 ///
 /// The default itself is in Settings, not here: a number that is true of every
 /// exercise does not belong on one exercise's screen.
@@ -922,10 +920,9 @@ class _BarRow extends ConsumerWidget {
   }
 }
 
-/// Per-slot deload overrides. The columns have existed since the first
-/// migration and never had a screen: a movement that is already light does not
-/// need the same cut as a heavy compound, and until now the only way to say so
-/// was to change it for the whole regime.
+/// Per-slot deload overrides. A movement that is already light does not need
+/// the same cut as a heavy compound, and without these rows the only way to say
+/// so is to change it for the whole regime.
 ///
 /// A null column means "follow the regime", which is what the row prints. The
 /// steps start from whatever the regime says, so overriding is a nudge rather

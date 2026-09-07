@@ -3,14 +3,12 @@ import 'table_spec.dart';
 
 /// One judge of the whole database, callable after any mutation.
 ///
-/// The structural rules were all asserted somewhere before this file existed —
-/// four tombstone counts and a live-cycle count inside one test's private
-/// helper, the unique positions and the single-open rows as partial indexes,
-/// `day_key` against `started_at` as a CHECK. What did not exist was a single
-/// thing that could be *called*, and that is the whole difference: a fuzz
-/// harness cannot run "the index would have refused it" after every operation,
-/// and neither can a restore, a heal, or any path that writes rows the schema
-/// did not vet.
+/// The structural rules are asserted elsewhere too — the unique positions and
+/// the single-open rows as partial indexes, `day_key` against `started_at` as a
+/// CHECK — but scattered like that none of them can be *called*, and that is
+/// the whole difference: a fuzz harness cannot run "the index would have
+/// refused it" after every operation, and neither can a restore, a heal, or any
+/// path that writes rows the schema did not vet.
 ///
 /// So every rule here is re-derived in SQL rather than delegated to the
 /// constraint that normally enforces it. That is deliberate duplication. A
@@ -23,15 +21,17 @@ import 'table_spec.dart';
 /// exist, so a violation is reported as a number and a name rather than as an
 /// exception from four layers down.
 ///
-/// **The model is not in here.** This asserts what must be true of *any*
+/// The model is deliberately not included here. This asserts what must be true
+/// of any
 /// database, whatever operations produced it. What a specific sequence of
 /// operations should have produced is the fuzz harness's own oracle, and mixing
 /// the two would make this file a second copy of the repository.
 ///
-/// **In `lib/` rather than in `test/`, because the three writers named above
-/// all ship.** A rule that only runs in CI judges the databases the tests
-/// build and never the one on the phone; the restore and the pull applier call
-/// it now, which is the only reason any of this is worth writing twice.
+/// Placed in `lib/` rather than `test/`, because the three writers named above
+/// are all shipped. A rule that runs only in CI judges the databases the
+/// tests
+/// build and never the one on the phone. The restore and the pull applier call
+/// it, which is the only reason any of this is worth writing twice.
 
 /// A rule that was broken, named so a failure says which one.
 class InvariantViolation {
@@ -144,12 +144,12 @@ const _rules = <String, String>{
       AND (SELECT COUNT(*) FROM regimes
            WHERE is_active = 1 AND deleted_at IS NULL) > 1
   ''',
-  // **The flag is derived from the stamp, so the stamp has to be there.**
+  // The flag is derived from the stamp, so the stamp must be present.
   // `is_active` is local and recomputed; `activated_at` is what the other phone
   // reads and what both derive the flag from. An active regime with no stamp is
   // a regime the other phone has no candidate for, so it shows no active
-  // programme at all — which is how a second writer of `is_active` (the
-  // template path, which set the flag and not the fact) got caught.
+  // programme at all. This is what catches a writer that sets the flag without
+  // the fact behind it.
   'an active regime carries no activation stamp': '''
     SELECT id AS detail FROM regimes
     WHERE is_active = 1 AND deleted_at IS NULL AND activated_at IS NULL
@@ -196,8 +196,8 @@ const _rules = <String, String>{
 /// is not a minute of drift but a phone that stamped the year 2099 — after a
 /// flat battery, a manual change, a hand-edited file. That row wins every
 /// conflict it is ever part of, against every device, until real time catches
-/// up with it, and `resolveRow` never revisits a verdict. Nothing in the app
-/// could see it before this rule existed.
+/// up with it, and `resolveRow` never revisits a verdict. This rule is the only
+/// thing in the app that can see it.
 const stampSkewToleranceMs = 24 * 60 * 60 * 1000;
 
 /// The rules about the five columns `SyncColumns` adds, one name each.
@@ -213,8 +213,9 @@ const rowNamesNoDevice = 'a row names no device';
 
 /// The sync-column rules, as SQL over every table that carries those columns.
 ///
-/// **These are about the columns a merge decides on, and nothing else looks at
-/// them.** The structural rules above judge shapes the app's own writers could
+/// These concern the columns a merge resolves on, which nothing else inspects.
+/// The structural rules above judge shapes the application's own writers
+/// could
 /// produce; `updated_at` and `device_id` are only ever compared — by
 /// `resolveRow`, on a phone that has no way to say the number it is reading is
 /// absurd. A schema CHECK cannot help: `updated_at > 0` would refuse a row from
@@ -250,19 +251,18 @@ Map<String, String> _syncRules(AppDatabase db) {
 
 /// The rules a repair can put right, and which repair does it.
 ///
-/// **Not a lesser class of wrong.** Every rule here describes a database the
+/// Not a lesser class of fault. Every rule here describes a database the
 /// app should never be in; the difference is only whether `repairDatabase`
 /// knows a move that fixes it without asking. That distinction is what lets a
 /// restore refuse a file whole instead of clearing every table and then
 /// discovering it cannot put anything back — see the two checks in
 /// `backup_service.dart`.
 ///
-/// A backup file really does carry these. `healOrphanedSnapshots` exists
-/// because discarding a session used to tombstone the workout and leave its
-/// snapshots alive underneath, and a tombstone is a column rather than a
-/// foreign key, so nothing in the schema refuses one on the way in. Refusing
-/// those files would be refusing histories the app has always been able to
-/// straighten out on the next launch.
+/// A backup file really does carry these: `healOrphanedSnapshots` exists for
+/// the snapshots an older build left alive under a tombstoned workout, and a
+/// tombstone is a column rather than a foreign key, so nothing in the schema
+/// refuses one on the way in. Refusing those files would be refusing histories
+/// the app has always been able to straighten out on the next launch.
 const healableInvariants = <String, String>{
   'live sets under a dead slot': 'healOrphanedSnapshots',
   'live snapshots under a dead workout': 'healOrphanedSnapshots',

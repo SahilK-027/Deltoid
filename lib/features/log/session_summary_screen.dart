@@ -16,13 +16,12 @@ import '../../domain/session_name.dart';
 
 /// Changes ticked in the summary's programme section but not yet written.
 ///
-/// The ticks used to live only in [_ChangesSectionState], and only that
-/// section's own button ever wrote them. `Done` — the white button at the
-/// bottom of the screen, and the obvious way off it — popped straight back to
-/// Today and threw the selection away without a word, which is the worst
-/// possible answer: the user has said what the programme should do from now on
-/// and been told nothing about it not happening. Leaving the screen honours the
-/// ticks instead.
+/// Held above [_ChangesSectionState] so that leaving the screen honours them.
+/// Kept inside that section, only its own button would write them, and `Done` —
+/// the white button at the bottom of the screen, and the obvious way off it —
+/// would pop back to Today and throw the selection away without a word. That is
+/// the worst possible answer: the user has said what the programme should do
+/// from now on, and been told nothing about it not happening.
 final _pendingChangesProvider =
     StateProvider<({String sessionId, List<SessionChange> changes})?>(
   (ref) => null,
@@ -31,9 +30,9 @@ final _pendingChangesProvider =
 /// The last screen of a session: what it came to, and the only place a note can
 /// be written while the session is still in your head.
 ///
-/// It exists because finishing used to drop straight back to Today, which meant
-/// the note — the one thing you can only write now — was reachable only by
-/// going and finding the day again in History.
+/// It exists because dropping straight back to Today on finish leaves the
+/// note — the one thing you can only write now — reachable only by going and
+/// finding the day again in History.
 ///
 /// It sits *after* the write: the workout is already completed when this opens,
 /// so there is nothing to confirm and no way to fail out of it. The finish

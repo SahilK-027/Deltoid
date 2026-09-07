@@ -6,10 +6,11 @@
 /// is the right default: an app that quietly rewrote the programme every time a
 /// bench was busy would have no programme left by March.
 ///
-/// It is the wrong *only* option, though. Adding hanging leg raises to Push 1
-/// for the fourth week running and re-adding it by hand every week is the app
-/// making you do its filing. So the end of a session offers the diff, one line
-/// per change, and you pick which ones stick.
+/// It is, however, the wrong sole option. Adding the same movement to a session
+/// for the fourth consecutive week, and re-entering it manually each time,
+/// requires the user to perform the application's bookkeeping. The end of a
+/// session therefore presents the diff, one line per change, and the user
+/// selects which are applied to the programme.
 ///
 /// Pure: no database, no drift types. Tested in `test/domain`.
 library;

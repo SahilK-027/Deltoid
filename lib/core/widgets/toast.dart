@@ -8,12 +8,12 @@ import '../theme/tokens.dart';
 /// own four-second dwell, neither of which is this app's. A toast here is the
 /// same object every card and sheet is: a `surfaceHighest` fill, a hairline
 /// border, `Radii.control`, and body text at the size the rest of the screen reads
-/// at. It is also **short** — long enough to read six words, not long enough to
-/// still be covering the log when you go back to it. Anything that needs
+/// at. It is also brief: long enough to read six words, not long enough to
+/// still be covering the log on return to it. Anything requiring
 /// longer than that is not a toast, it is a sheet.
 ///
 /// The queue is cleared on every call. Two of these stacking up means the
-/// second one is what you want to know and the first is in its way.
+/// second is the relevant one and the first obstructs it.
 void showToast(
   BuildContext context,
   String message, {

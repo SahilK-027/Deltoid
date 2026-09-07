@@ -32,7 +32,8 @@ import '../../core/failure.dart';
 /// True between tapping Start and the log screen appearing.
 ///
 /// Starting a workout writes a row per set before it returns; a second tap in
-/// that window used to open a parallel session that could never be finished.
+/// that window would otherwise open a parallel session that could never be
+/// finished.
 final _startingProvider = StateProvider<bool>((ref) => false);
 
 /// Creates the workout and opens the log, once.
@@ -40,8 +41,8 @@ final _startingProvider = StateProvider<bool>((ref) => false);
 /// Everything after the first `await` goes through the [ProviderContainer]
 /// rather than the caller's `ref`: creating the workout swaps this card for the
 /// resume card, disposing the widget that started it. Clearing the flag through
-/// a dead `ref` throws, and the button stays disabled for the rest of the
-/// session — which is how this was found.
+/// a dead `ref` throws, leaving the button disabled for the rest of the
+/// session.
 Future<void> _startSession(
   BuildContext context,
   WidgetRef ref, {
@@ -138,7 +139,8 @@ class _SessionPickRow extends StatelessWidget {
 ///
 /// The cycle is an order, not a rota: the hero names the first session not yet
 /// trained, and this is how you say "not that one, this one". Two taps, which
-/// is what the always-on session list under the hero used to cost.
+/// is what an always-on session list under the hero would cost in vertical
+/// space.
 Future<void> _trainAnotherSession(
   BuildContext context,
   WidgetRef ref, {
@@ -193,9 +195,10 @@ Future<void> _trainAnotherSession(
 /// answer. The day is chosen first and stays on screen while you pick, because
 /// the day is the part that makes this different from starting a session now.
 ///
-/// `dayKey` used to be stamped once from `DateTime.now()` and never again, so
-/// forgetting to log Monday left Wednesday's entry permanently wrong, and
-/// delete-and-redo didn't help because the redo was stamped today too.
+/// `dayKey` is stamped from the chosen day and carried through every write
+/// that follows. Stamping it from `DateTime.now()` instead would leave
+/// Wednesday's entry for a forgotten Monday permanently wrong, with
+/// delete-and-redo no help because the redo would be stamped today too.
 Future<void> _logPastSession(
   BuildContext context,
   WidgetRef ref, {
@@ -297,8 +300,8 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   ///
   /// Read in `build`, not in the handler that opens the picker: `fullHeatmapProvider`
   /// is `autoDispose`, so watching it from a callback subscribes at the moment
-  /// of the tap and hands back the loading value — which is how the rings and
-  /// the already-logged prompt shipped doing nothing at all.
+  /// of the tap and hands back the loading value, leaving the rings and the
+  /// already-logged prompt with nothing to work from.
   Map<int, HeatDay> _logged = const {};
 
   Future<void> _pickDate() async {
@@ -440,10 +443,10 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
 /// The screen reads top to bottom as one thought: where you stand, the one
 /// thing to do about it, then the record.
 ///
-/// It used to draw the cycle twice — a row of labelled bars inside the hero
-/// card, then the same sessions again as a tappable list — which is what pushed
-/// the consistency grid off the bottom of the screen. The hero's track is the
-/// only rendering of cycle progress now; the sessions live in a sheet.
+/// The hero's track is the only rendering of cycle progress, and the sessions
+/// live in a sheet. Drawing the cycle twice — labelled bars inside the hero
+/// card and the same sessions again as a tappable list — pushes the consistency
+/// grid off the bottom of the screen.
 class WorkoutsScreen extends ConsumerWidget {
   const WorkoutsScreen({super.key});
 
@@ -453,10 +456,10 @@ class WorkoutsScreen extends ConsumerWidget {
     // while a reload runs, so a write on another tab never blanks this one.
     final today = ref.watch(workoutsProvider).valueOrNull;
     // Warmed here, drawn two screens away. `Consistency` and the backfill
-    // calendar both read every day ever logged, and both used to *start* that
-    // query when they opened — so both opened empty and filled in. Workouts is
-    // where you are before you go to either, and this costs one aggregated
-    // query per change to `workouts`.
+    // calendar both read every day ever logged, and starting that query when
+    // they open means both open empty and fill in. Workouts is where you are
+    // before you go to either, and this costs one aggregated query per change
+    // to `workouts`.
     ref.watch(fullHeatmapProvider);
     // **Warmed here for the same reason, and it is the stronger case.** This
     // one is drawn *on this screen*, and watching it only where it is drawn
@@ -504,10 +507,10 @@ class WorkoutsScreen extends ConsumerWidget {
         // 16pt below a band it matched exactly. The band is also the answer to
         // why this block, alone on the screen, had no section header over it:
         // it is not a section, it is the header.
-        // The band is pinned and the record scrolls under it. It used to be the
-        // first item in the list, so the one thing you came for — the session,
-        // and the button that starts it — slid off the top the moment you
-        // looked at the heatmap.
+        // The band is pinned and the record scrolls under it. As the first
+        // item in the list it would slide off the top the moment you looked at
+        // the heatmap, taking the one thing you came for with it — the session,
+        // and the button that starts it.
         (_, _, final r?, false) => Column(
           children: [
             _WorkoutsHeader(
@@ -587,12 +590,12 @@ class WorkoutsScreen extends ConsumerWidget {
                         // question one level down: the heatmap says whether you
                         // turned up, this says what you trained when you did.
                         //
-                        // Not gated on history. It used to appear only once
-                        // something was logged, which made the section arrive
-                        // out of nowhere on the day of the first workout — the
-                        // screen changing shape underneath you at the one
-                        // moment you are reading it. The zero state carries it
-                        // too, so the page is the same page before and after.
+                        // Not gated on history. Appearing only once something
+                        // was logged would make the section arrive out of
+                        // nowhere on the day of the first workout — the screen
+                        // changing shape underneath you at the one moment you
+                        // are reading it. The zero state carries it too, so the
+                        // page is the same page before and after.
                         const SizedBox(height: Space.section),
                         _VolumeCard(volume: volume!),
                         if (today.lastCompleted != null) ...[
@@ -614,26 +617,25 @@ class WorkoutsScreen extends ConsumerWidget {
 
 /// The masthead, shared by every state this screen can be in.
 ///
-/// The empty states used to skip it and centre a lone card on a blank page,
-/// which read as a different screen than the one the tab bar said you were on —
-/// and, on a fresh install, left no way to reach Settings, which is where
-/// restoring a backup lives. Settings is always here for that reason; anything
-/// that needs sessions to exist is passed in by the caller.
+/// The empty states carry it too. Centring a lone card on a blank page instead
+/// reads as a different screen than the one the tab bar says you are on, and on
+/// a fresh install leaves no way to reach Settings, which is where restoring a
+/// backup lives. Settings is always here for that reason; anything that needs
+/// sessions to exist is passed in by the caller.
 ///
-/// The title is the screen's name, with the date as its eyebrow. It was the
-/// other way round — the date as the title, on the grounds that the nav bar
-/// already named the screen — and that made the one screen you land on the only
-/// one whose masthead never says where you are. The nav label is 11sp at the
-/// far end of the screen; a masthead is not.
+/// The title is the screen's name, with the date as its eyebrow, rather than
+/// the other way round: the nav label is 11sp at the far end of the screen, and
+/// a masthead is not, so titling by date would leave the one screen you land on
+/// the only one whose masthead never says where you are.
 ///
 /// It is pinned, and the record below it scrolls: the session and the button
-/// that starts it are the reason the screen exists, and they used to slide away
-/// the moment you looked at the heatmap.
+/// that starts it are the reason the screen exists, and they would otherwise
+/// slide away the moment you looked at the heatmap.
 ///
 /// The rest gap stays a quiet line under it. It answers the question the app is
 /// opened with, but it is not the page's name and does not want title type:
-/// `NO SESSIONS YET` at 27sp was the loudest thing on a screen whose whole
-/// message was that nothing had happened yet.
+/// `NO SESSIONS YET` at 27sp is the loudest thing on a screen whose whole
+/// message is that nothing has happened yet.
 class _WorkoutsHeader extends StatelessWidget {
   const _WorkoutsHeader({required this.last, this.actions = const []});
 
@@ -645,26 +647,23 @@ class _WorkoutsHeader extends StatelessWidget {
     final now = DateTime.now();
     return HeaderBand(
       child: PageHeader(
-        // The screen names itself, like every other destination. It used to be
-        // titled with the date on the grounds that the nav bar already said
-        // "Today" — but the nav label is 11sp at the bottom of the screen, and
-        // a masthead that never says where you are makes the one screen you
-        // land on the only one you have to identify by inference. The date is
-        // still here, over it.
+        // The screen names itself, like every other destination. The nav label
+        // is 11sp at the bottom of the screen, so titling this with the date
+        // instead would leave the one screen you land on the only one you have
+        // to identify by inference. The date sits over the title.
         title: 'Workouts',
         eyebrow: DateFormat('EEEE d MMMM').format(now),
         // Tight to the date: the rest gap is a line about it, not the next
         // thing on the page.
         belowGap: Space.xs,
         // The band is the masthead and nothing else — name, date, and when you
-        // last trained. The session used to live in here too, sharing the
-        // band's surface, which made the header half the screen tall and left
-        // the first real section starting somewhere down the page with no
-        // boundary to mark it.
+        // last trained. Putting the session in here too, on the band's own
+        // surface, would make the header half the screen tall and leave the
+        // first real section starting somewhere down the page with no boundary
+        // to mark it.
         below: _RestGap(last: last),
-        // The cog went with the rename: Settings is a destination on the nav
-        // bar now, and a screen reachable two ways is a screen you have to
-        // decide about twice.
+        // No cog: Settings is a destination on the nav bar, and a screen
+        // reachable two ways is a screen you have to decide about twice.
         actions: actions,
       ),
     );
@@ -859,12 +858,12 @@ class _NoSessionsState extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // **The same page it will be once the regime has days in it**, which is the
-    // rule the sibling state above already follows and this one used to break:
-    // a lone centred card, with Consistency, This week and Last session gone.
-    // Those sections are not about the regime — a heatmap and a week's volume
-    // are read off logged work, and a regime with no sessions yet says nothing
-    // about whether there is any. Dropping them made adding the first session
-    // look like it built three cards, when all it did was fill one.
+    // rule the sibling state above follows too. Consistency, This week and Last
+    // session are not about the regime — a heatmap and a week's volume are read
+    // off logged work, and a regime with no sessions yet says nothing about
+    // whether there is any. Dropping them for a lone centred card would make
+    // adding the first session look like it built three cards, when all it does
+    // is fill one.
     //
     // Titled `Your split` rather than `Today's session` to match
     // [_NoRegimeState]: both are the same sentence at different depths — there
@@ -930,10 +929,9 @@ class _NoSessionsState extends ConsumerWidget {
 /// log to a locked phone screen would be unforgivable, so resuming is the
 /// loudest thing on the screen.
 ///
-/// The clock inside it used to read `DateTime.now()` once during `build` with
-/// nothing to rebuild it, so a session started an hour ago still said "0m".
-/// [Ticking] wraps the clock alone: the card around it has no reason to repaint
-/// every second.
+/// [Ticking] wraps the clock alone, so it keeps counting without the card
+/// around it repainting every second. Reading `DateTime.now()` once during
+/// `build` would leave a session started an hour ago still saying "0m".
 class _ResumeHero extends ConsumerWidget {
   const _ResumeHero({
     required this.workout,
@@ -1000,11 +998,11 @@ class _ResumeHero extends ConsumerWidget {
     // a stopwatch reading 51 hours is not a useful thing to put on a screen.
     final stale = DateTime.now().difference(started).inHours >= 24;
     // A session is the heatmap's blue, whatever programme it belongs to, and a
-    // deload is orange. The tile used to take the regime's identity hue, which
-    // meant the one distinction worth seeing here — light week or not — was
-    // invisible on an orange regime and competing with the mark on every other
-    // one. Which programme a workout came from is on the row in words; whether
-    // it was a deload is only ever said by this tile.
+    // deload is orange. Taking the regime's identity hue instead would make the
+    // one distinction worth seeing here — light week or not — invisible on an
+    // orange regime and competing with the mark on every other one. Which
+    // programme a workout came from is on the row in words; whether it was a
+    // deload is only ever said by this tile.
     final mark = workout.isDeload ? c.deload : c.heatOn;
 
     // No accent fill: what makes this loud is the pulse, the label and a
@@ -1015,10 +1013,10 @@ class _ResumeHero extends ConsumerWidget {
     // line, the session name at display size, the exercise preview, then the
     // one action. Only the middle band differs — the cycle track answers
     // "which session next", which is not a question a session in progress has.
-    // Everything else it used to drop (the regime's identity mark, the
-    // exercise list, the section's own type scale) was true the whole time and
-    // is worth keeping, so that starting a session no longer redraws the
-    // screen out from under you.
+    // Everything else — the regime's identity mark, the exercise list, the
+    // section's own type scale — is as true here as it is there, and keeping it
+    // is what stops starting a session from redrawing the screen out from under
+    // you.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1316,10 +1314,10 @@ class _NextUpHero extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Three bands, each with one job: who this is, where the cycle
-        // stands, what to do. The row used to hold four elements in four type
-        // roles — tile, regime name in `body`, the cycle fraction in
-        // `titleSmall`, and a loose grey deload label floating at the right —
-        // which is why it read as assembled rather than composed.
+        // stands, what to do. Four elements in four type roles — tile, regime
+        // name in `body`, the cycle fraction in `titleSmall`, and a loose grey
+        // deload label floating at the right — read as assembled rather than
+        // composed.
         Row(
           children: [
             IconTile(
@@ -1371,8 +1369,8 @@ class _NextUpHero extends ConsumerWidget {
         if (preview.isNotEmpty) ...[
           const SizedBox(height: Space.xs),
           // One line, not two. This is a glance — "yes, that's the session I
-          // meant" — and the second line it used to wrap onto was the last
-          // 18px above the bottom of a 844pt phone.
+          // meant" — and a second line would wrap into the last 18px above the
+          // bottom of a 844pt phone.
           Text(
             preview.take(3).join('  ·  ') +
                 (preview.length > 3 ? '  ·  +${preview.length - 3} more' : ''),
@@ -1420,7 +1418,7 @@ class _NextUpHero extends ConsumerWidget {
         // The hero names the first session not yet trained, which is a
         // description and not an instruction — training Legs before Pull is
         // normal. One tap to open the picker, one to start: the same two taps
-        // the old always-on session list cost, without a six-row block
+        // an always-on session list would cost, without a six-row block
         // claiming to be a plan for the day.
         if (sessions.length > 1) ...[
           const SizedBox(height: Space.sm),
@@ -1466,9 +1464,9 @@ class _NextUpHero extends ConsumerWidget {
 
 /// Progress through the cycle as one hairline track, segment per session.
 ///
-/// Not a return of the labelled bars this hero used to carry: those repeated
-/// the session list underneath it, name for name. This is unlabelled and 5pt
-/// tall — it says "two of five" faster than the words next to it can.
+/// Unlabelled and 5pt tall — it says "two of five" faster than the words next
+/// to it can. Labelled bars would repeat the session list underneath it, name
+/// for name.
 class _CycleTrack extends StatelessWidget {
   const _CycleTrack({required this.status, required this.mark});
 
@@ -1534,8 +1532,8 @@ class _ConsistencyCard extends StatelessWidget {
         // six of them sit in a header-less grid, and here the section heading
         // above the card already names it. Two headings, one card.
         //
-        // It used to be a grid over a three-fact sentence, which is a shape no
-        // other card in the app has.
+        // A grid over a three-fact sentence would be a shape no other card in
+        // the app has.
         AppCard(
           padding: const EdgeInsets.all(Space.lg),
           onTap: !hasHistory
@@ -1662,20 +1660,15 @@ class _ConsistencyCard extends StatelessWidget {
 ///
 /// A section on the page you already open rather than a screen you navigate to
 /// — a volume dashboard came off the non-goals list on exactly that condition,
-/// and the hero pager that was going to carry it did not survive the test that
-/// a landing screen you have to swipe to use is a landing screen that failed.
+/// and a hero pager carrying it fails the test that a landing screen you have
+/// to swipe to use is a landing screen that failed.
 ///
-/// Its own `ConsumerWidget` so the query that feeds it rebuilds this card and
-/// not the screen: it watches `set_logs`, which changes on every tick of every
-/// set you log.
-/// **Handed its numbers rather than watching for them.**
-///
-/// It used to read [weeklyVolumeProvider] itself, which is what made it the one
-/// section on this screen that arrived late: a provider starts when something
-/// first watches it, and nothing watched this one until the card was already
-/// being built — after the snapshot it should have been racing. The screen
-/// starts both reads in the same frame now and does not draw until it has both,
-/// so there is nothing left here to be absent.
+/// **Handed its numbers rather than watching for them.** A provider starts when
+/// something first watches it, so reading [weeklyVolumeProvider] here would
+/// start it only once the card is being built — after the snapshot it should
+/// have been racing, which is what makes a section arrive late. The screen
+/// starts both reads in the same frame and does not draw until it has both, so
+/// there is nothing here to be absent.
 class _VolumeCard extends StatelessWidget {
   const _VolumeCard({required this.volume});
 
@@ -1704,10 +1697,10 @@ class _VolumeCard extends StatelessWidget {
         AppCard(
           padding: const EdgeInsets.all(Space.md),
           onTap: volume.isEmpty ? null : openHistory,
-          // Just the bars. The sentence that used to sit under them restated
-          // what every row already prints — a total, a count of trained
-          // regions, and the window named in the heading — and no other card in
-          // the app explains its own chart in prose.
+          // Just the bars. A sentence under them would restate what every row
+          // already prints — a total, a count of trained regions, and the
+          // window named in the heading — and no other card in the app explains
+          // its own chart in prose.
           child: VolumeBars(volume: volume),
         ),
       ],

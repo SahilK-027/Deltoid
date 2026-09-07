@@ -10,10 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Creating an exercise answers every question, because the defaults it used to
-/// ship with were guesses wearing the clothes of answers — a movement filed
-/// under chest / machine / total load by nobody, and load mode decides how
-/// every set ever logged against it is read.
+/// Creating an exercise answers every question, because a default here is a
+/// guess wearing the clothes of an answer — a movement filed under chest /
+/// machine / total load by nobody, where load mode decides how every set ever
+/// logged against it is read.
 void main() {
   late AppDatabase db;
   late ProviderContainer container;

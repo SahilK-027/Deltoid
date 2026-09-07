@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// `ClampingScrollPhysics`: a list stops dead at the end of its content and a
 /// flick decelerates on a curve tuned for a stretch indicator to do the rest of
 /// the talking. It is not *wrong*, it just feels like furniture being pushed —
-/// and this is an app you scroll one-handed with a bar in your other hand.
+/// and this application is scrolled one-handed while training.
 /// `BouncingScrollPhysics` carries the flick, resists at the edges and settles,
 /// which is the difference between a list that stops and a list that arrives.
 ///
@@ -30,7 +30,7 @@ class AppScrollBehavior extends MaterialScrollBehavior {
       child;
 
   /// A trackpad drag scrolls, which it does not by default — this matters on
-  /// the desktop builds used to develop the thing.
+  /// the desktop builds this app is developed on.
   @override
   Set<PointerDeviceKind> get dragDevices => const {
         PointerDeviceKind.touch,

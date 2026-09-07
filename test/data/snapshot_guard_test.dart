@@ -12,10 +12,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// `WorkoutExercise` and `SetLog` are snapshots — [CLAUDE.md](CLAUDE.md)
 /// rule 2, and [RULES.md § 2](RULES.md#2-data).
 ///
-/// The invariant was held by inspection: someone walked every writer of the two
-/// tables and found none of them reachable from a programme edit. That is a
-/// reading of the code as it was on the day it was read, and a rule this
-/// central should not depend on anyone remembering to walk it again.
+/// Held by inspection, this rule is only as good as the last walk of every
+/// writer of the two tables — a reading of the code as it stood on the day it
+/// was read. A rule this central should not depend on anyone remembering to
+/// walk it again.
 ///
 /// This is the executable form. Log a session, freeze the two tables, run every
 /// mutator the programme side has, and assert nothing moved — not a value, not

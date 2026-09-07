@@ -39,8 +39,10 @@ class VolumeWeek {
   /// Monday of the week, at midnight local.
   final DateTime start;
 
-  /// Hard sets in it. **Zero is a real value, not a gap** — a week you skipped
-  /// has to hold its place in the list or its absence cannot be seen.
+  /// The hard sets performed in the week.
+  ///
+  /// Zero is a value rather than a gap: an untrained week must retain its
+  /// position in the list or its absence is not visible.
   final int sets;
 
   /// The last day the week covers, for a readout that names a span.
@@ -70,9 +72,9 @@ class VolumeBar {
   /// The last day the bar covers.
   final DateTime end;
 
-  /// How many weeks were folded in — **including the ones you did nothing in**,
-  /// for the reason [VolumeSeries.averagePerWeek] gives. Never zero: a bar with
-  /// no weeks in it is not drawn.
+  /// The number of weeks aggregated into this bar, including untrained weeks,
+  /// for the reason given by [VolumeSeries.averagePerWeek]. Never zero: a bar
+  /// covering no weeks is not rendered.
   final int weeks;
 
   final int totalSets;
@@ -80,9 +82,10 @@ class VolumeBar {
   /// What the bar's height means.
   double get setsPerWeek => weeks == 0 ? 0 : totalSets / weeks;
 
-  /// Whether anything at all was trained in it. A bar of nothing still draws —
-  /// as its full-height empty track — because a stretch you skipped that closes
-  /// up is a stretch you cannot see.
+  /// Whether any training was recorded in the period.
+  ///
+  /// An empty bar is still rendered, as its full-height empty track, because an
+  /// untrained period that collapses is not visible.
   bool get isEmpty => totalSets == 0;
 }
 
@@ -156,10 +159,10 @@ class VolumeSeries {
 
   /// Sets per week across the span.
   ///
-  /// Divided by **every** week in the span, including the ones with nothing in
-  /// them — that is what makes it an average rather than an average of the
-  /// weeks you happened to train. Skipping the zeros would report a hamstring
-  /// trained twice in three months as `6.0 per week`.
+  /// Divided by every week in the span, including untrained weeks. This is what
+  /// makes the figure an average over the period rather than an average over
+  /// the weeks that happened to contain training. Excluding zero weeks would
+  /// report a muscle trained twice in three months as `6.0 per week`.
   double get averagePerWeek {
     if (weeks.isEmpty) return 0;
     return totalSets / weeks.length;
@@ -169,13 +172,13 @@ class VolumeSeries {
 
   /// Weeks with anything in them.
   ///
-  /// The honest companion to [averagePerWeek]: `4.0 per week` over thirteen
-  /// weeks is a different training block depending on whether it was every week
-  /// or three heavy ones and ten of nothing, and the average alone cannot tell
-  /// you which.
+  /// The necessary companion to [averagePerWeek]. `4.0 per week` over thirteen
+  /// weeks describes a different training block depending on whether it was
+  /// distributed across every week or concentrated in three, and the average
+  /// alone does not distinguish them.
   int get weeksTrained => weeks.where((w) => w.sets > 0).length;
 
-  /// The most recent week, which is the one you are standing in.
+  /// The most recent week, which is the one currently in progress.
   VolumeWeek? get latest => weeks.isEmpty ? null : weeks.last;
 
   /// The tallest week, which the bars are drawn against.
@@ -211,8 +214,8 @@ class VolumeHistory {
   /// itself is.
   final List<DateTime> weekStarts;
 
-  /// All six regions, always, in [MuscleRegion] order — a region you have never
-  /// trained is a card reading `0.0` rather than a card that isn't there.
+  /// All six regions, in [MuscleRegion] order. An untrained region is rendered
+  /// as a card reading `0.0` rather than omitted.
   final Map<MuscleRegion, VolumeSeries> byRegion;
 
   /// Every muscle that rolls into a region, in [MuscleGroup] order.

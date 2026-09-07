@@ -14,7 +14,7 @@ import 'sync_backend.dart';
 ///
 /// [SYNC.md § 6](SYNC.md#6-push): debounced after a write settles, on app
 /// resume, on connectivity regained, and on a long idle timer as a backstop.
-/// **Never on the frame of a keystroke** — every trigger here goes through a
+/// Never on the frame of a keystroke: every trigger here passes through a
 /// timer, and the drain itself only ever awaits, so nothing on this path can
 /// stand between a thumb and a set.
 ///
@@ -30,7 +30,7 @@ import 'sync_backend.dart';
 /// ([SYNC.md § 17](SYNC.md#17-the-architecture)).
 /// Why the last attempt did not land, for the one screen that says so.
 ///
-/// **Not an error channel.** Everything reportable already goes through
+/// Not an error channel. Everything reportable already passes through
 /// `core/failure.dart` and says itself once ([SYNC.md § 13](SYNC.md#13-when-it-fails));
 /// this is the standing answer to *why is this still pending*, which is a
 /// different question with a different lifetime — a toast is gone in four
@@ -178,7 +178,7 @@ class SyncEngine {
     try {
       do {
         _again = false;
-        // **Pull before push**, always. A conflict is resolved before it is
+        // Pull always precedes push. A conflict is resolved before it is
         // propagated ([SYNC.md § 7](SYNC.md#7-pull)): a local row that wins one
         // stays dirty, and the push immediately behind this is what tells the
         // account about it. The other order sends a version that has not met
@@ -216,7 +216,8 @@ class SyncEngine {
     _failures++;
     final permanent = error is SyncTransportFailure && !error.transient;
     _setTrouble(permanent ? SyncTrouble.refused : SyncTrouble.offline);
-    // **Once per run of failures, not once per retry.** § 13's column says *the
+    // Once per run of failures rather than once per retry. § 13's column
+    // specifies that the
     // failure channel says it once*, and a rejection that repeats every thirty
     // seconds for an hour would say it a hundred and twenty times, over
     // whatever screen the user is on. The streak resets on the next success.

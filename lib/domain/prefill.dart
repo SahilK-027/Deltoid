@@ -90,8 +90,8 @@ class PastPerformance {
 }
 
 enum PrefillSource {
-  /// Last time you did this exercise *in this session*. The default and the
-  /// whole point.
+  /// The most recent performance of this exercise within this session. The
+  /// default source, and the behaviour the feature exists to provide.
   sameSession,
 
   /// Only a deload performance exists for this session.
@@ -144,14 +144,14 @@ class PrefillResult {
 /// 20kg; each session must keep its own progression or the whole point of
 /// progressive overload is lost.
 ///
-/// **A session with no history of its own opens blank.** It used to borrow the
-/// most recent performance from anywhere, labelled — and a label is not enough
-/// to make that number mean what a prefill means. "Borrowed from Leg 1" reads
-/// as *where this movement was last done*, and it is not: it is the most recent
-/// performance anywhere, which for a movement trained in two sessions is
-/// whichever came round last. Train Leg 1 for the first time on Monday and Leg
-/// 2 for the first time on Friday, and every plate in Friday's session is
-/// filled from Monday's — from a day that says nothing about what belongs here.
+/// **A session with no history of its own opens blank.** Borrowing the most
+/// recent performance from anywhere is not made safe by labelling it: "Borrowed
+/// from Leg 1" reads as *where this movement was last done*, and it is not — it
+/// is the most recent performance anywhere, which for a movement trained in two
+/// sessions is whichever came round last. Train Leg 1 for the first time on
+/// Monday and Leg 2 for the first time on Friday, and every plate in Friday's
+/// session would be filled from Monday's, from a day that says nothing about
+/// what belongs here.
 /// A first time is a first time, and the plate is blank for it.
 ///
 /// What survives is the knowledge, not the number: the other session's
@@ -211,10 +211,10 @@ PrefillResult resolvePrefill({
 
   if (pick == null) return const PrefillResult.empty();
 
-  // Never scale a light week again. If the only history for this slot is
-  // itself a deload, 80% of 80% is 64% — a deload is 80% of your working
-  // weight, not 80% of the last time you backed off. Reachable as soon as a
-  // deload can be forced two cycles running from the UI.
+  // A light week is never scaled a second time. Where the only history for
+  // this slot is itself a deload, 80% of 80% yields 64%: a deload is 80% of the
+  // working weight rather than 80% of the previous reduction. This is reachable
+  // whenever a deload is forced for two consecutive cycles.
   final scale = targetIsDeload && !pick.isDeload;
 
   final sets = scale
@@ -244,9 +244,9 @@ List<PastSet> applyDeload(
   required int setDelta,
   required int weightPct,
 
-  /// A scaled load has to be a weight you can actually load on a bar, and
-  /// which weights those are depends on whether the plates are kilos or
-  /// pounds. Storage stays kg either way.
+  /// A scaled load must be loadable on a bar, and which weights qualify depends
+  /// on whether the plates are calibrated in kilograms or pounds. Storage
+  /// remains in kilograms in either case.
   WeightUnit unit = WeightUnit.kg,
 }) {
   final warmups = sets.where((s) => s.type == SetType.warmup).toList();

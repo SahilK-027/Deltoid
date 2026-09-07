@@ -38,12 +38,12 @@ class WorkoutsData {
 
 /// Every day ever logged, for the full-history heatmap behind the Workouts grid.
 ///
-/// **Kept alive, and warmed while Workouts is on screen.** It was `autoDispose`,
-/// on the grounds that a year-by-year view is worth a query when it is opened —
-/// but "when it is opened" is precisely the moment there is nothing to draw,
-/// and the screen rendered blank until the query came back. The data is on
-/// local disk and it is one row per day: it should be sitting there before the
-/// route animation finishes, not started by it.
+/// **Kept alive, and warmed while Workouts is on screen.** `autoDispose` would
+/// argue that a year-by-year view is worth a query when it is opened — but
+/// "when it is opened" is precisely the moment there is nothing to draw, and
+/// the screen renders blank until the query comes back. The data is on local
+/// disk and it is one row per day: it should be sitting there before the route
+/// animation finishes, not started by it.
 final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);
@@ -83,8 +83,8 @@ final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
 /// reason [weeklyVolumeProvider] is one: `todaySnapshot` does not watch
 /// `set_logs`, and must not, or every keystroke in a live session would re-run
 /// the whole screen's read. But the resume card counts sets and the stale
-/// session's prompts promise how many would be lost, and all three were reading
-/// a number frozen at the moment Start was tapped — "0 of 18 sets" over two
+/// session's prompts promise how many would be lost, and a number frozen at the
+/// moment Start was tapped leaves all three wrong — "0 of 18 sets" over two
 /// that were logged, and "nothing was logged in it, so nothing is lost" over
 /// work that discarding does delete.
 ///

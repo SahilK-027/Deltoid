@@ -1,46 +1,51 @@
-/// Two seeded catalogs into one.
+/// Consolidation of two independently seeded exercise catalogs.
 ///
-/// [SYNC.md § 10](SYNC.md#10-adoption). Install with no signal, train for a
-/// month, sign in afterwards: the phone seeded a catalog of its own before it
-/// ever met the account's, and the account's was seeded on another phone long
-/// ago. Same `starterKey`s, different ids — roughly 120 exercises twice, "Bench
-/// Press" under two ids, and a history split across both. That last part is not
-/// cosmetic: per-session progression is keyed to an exercise id, which is the
-/// one thing this app exists for.
+/// See [SYNC.md § 10](SYNC.md#10-adoption). A device installed without network
+/// access seeds a catalog of its own before it first contacts the account,
+/// whose catalog was seeded earlier on another device. The two share
+/// `starterKey` values but not ids, producing roughly 120 duplicated exercises,
+/// "Bench Press" under two ids, and a training history divided between them.
+/// The divided history is the significant consequence: per-session progression
+/// is keyed to an exercise id.
 ///
-/// **Only rows the app seeded are deduplicated.** A row the user created
-/// carries no `starterKey` and is never matched by name: two exercises both
-/// called `Cable fly` may be two different movements, and only the user knows.
+/// Only rows seeded by the application are deduplicated. A row created by the
+/// user carries no `starterKey` and is never matched by name, because two
+/// exercises both named `Cable fly` may be distinct movements and only the user
+/// can determine that.
 library;
 
-/// What the dedup needs to know about one catalog row.
+/// The fields of a catalog row required by the deduplication.
 typedef CatalogRow = ({String id, String? starterKey, int? deletedAt});
 
-/// Which duplicate becomes which, and which rows are left tombstoned.
+/// The planned outcome: which duplicates map to which survivor, and which rows
+/// are to be tombstoned.
 typedef CatalogMerge = ({
-  /// Duplicate exercise id → the id every reference to it moves to.
+  /// A map from each duplicate exercise id to the id every reference to it is
+  /// moved to.
   ///
-  /// Never contains a key that is also a value: the survivor is not repointed
-  /// at itself, and a chain cannot form.
+  /// No key is also a value: a survivor is never repointed at itself, so chains
+  /// cannot form.
   Map<String, String> repoint,
 
-  /// The duplicates, in the order they were found. Each is tombstoned once its
-  /// references have moved.
+  /// The duplicate ids, in discovery order. Each is tombstoned once its
+  /// references have been moved.
   List<String> tombstone,
 });
 
-/// Plans the merge of one catalog that holds each starter movement twice.
+/// Plans the consolidation of a catalog containing each starter movement twice.
 ///
-/// **The survivor is the smallest id among the live rows sharing a key**, which
-/// under UUID v7 is the oldest — the one more history is likely already
-/// pointing at. Deterministic is the load-bearing half, not oldest: both phones
-/// run this over the same union and must reach the same answer without asking
-/// each other, or each tombstones the other's survivor and the catalog empties.
+/// The survivor is the smallest id among the live rows sharing a key, which
+/// under UUID v7 is the oldest and therefore the one more history is likely to
+/// reference. Determinism rather than age is the essential property: both
+/// devices run this over the same union and must reach the same result
+/// independently, otherwise each tombstones the other's survivor and the
+/// catalog is emptied.
 ///
-/// Tombstones are ignored on the way in. A movement the user deleted on one
-/// phone is not a duplicate of the live one on the other — it is the same row's
-/// own delete, and [SYNC.md § 8](SYNC.md#8-conflict--two-versions-of-one-row)
-/// has already decided that on `id`.
+/// Tombstoned rows are excluded from consideration. A movement deleted on one
+/// device is not a duplicate of the live row on the other; it is the same row's
+/// own deletion, which
+/// [SYNC.md § 8](SYNC.md#8-conflict--two-versions-of-one-row) has already
+/// resolved on `id`.
 CatalogMerge planCatalogMerge(Iterable<CatalogRow> rows) {
   final byKey = <String, List<String>>{};
   for (final row in rows) {

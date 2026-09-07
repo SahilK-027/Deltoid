@@ -12,7 +12,7 @@ import '../theme/tokens.dart';
 ///
 /// Scale reads instantly and works identically on a 26pt chip and a full-width
 /// card, because in both cases the whole thing moves. It is the wrong feedback
-/// for a **row** — 1% of a full-width strip is invisible — which is what
+/// for a row, where 1% of a full-width strip is imperceptible. That is what
 /// [InkRow] is for, and the only place this app inks.
 class Pressable extends StatefulWidget {
   const Pressable({
@@ -52,10 +52,10 @@ class _PressableState extends State<Pressable> {
   Widget build(BuildContext context) {
     // A `Pressable` with nothing to do is not a `Pressable` — it is its child.
     //
-    // It used to build the detector anyway, opaque, which made it a hole in
-    // whatever it sat inside: `LinkAction('Change')` inside a tappable row
-    // swallowed every tap that landed on the word `Change`, so the one part of
-    // the row that names the action was the one part that did not perform it.
+    // Building the detector anyway, opaque, makes it a hole in whatever it
+    // sits inside: `LinkAction('Change')` inside a tappable row would swallow
+    // every tap that landed on the word `Change`, leaving the one part of the
+    // row that names the action as the one part that does not perform it.
     if (!_enabled) return widget.child;
 
     return GestureDetector(
@@ -95,12 +95,11 @@ class _PressableState extends State<Pressable> {
 /// inside the header band. One per screen, and the only uppercase on it.
 ///
 /// Eyebrow and title are one block, and the actions sit beside it — the title's
-/// baseline is the header's baseline. The actions were briefly moved up onto
-/// the eyebrow's line to buy the title the full page width; it bought room the
-/// title did not need and left the buttons floating against a 13sp line. A
-/// third line was briefly added *inside* the block, which re-centred the
-/// buttons against three lines and dragged them below the date. Both reverted:
-/// the buttons align to the eyebrow-and-title pair, and nothing else.
+/// baseline is the header's baseline. The buttons align to the eyebrow-and-title
+/// pair and to nothing else: moved up onto the eyebrow's line they buy the title
+/// a full page width it does not need and float against a 13sp line, and a third
+/// line *inside* the block re-centres them against three lines and drags them
+/// below the date.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
@@ -162,11 +161,11 @@ class PageHeader extends StatelessWidget {
                       const SizedBox(height: Space.xs),
                     ],
                     Text(
-                      // Sentence case. Uppercase was doing the work of size and
-                      // weight, which `pageTitle` already has at 30/800 — and
-                      // it cost every title its word shapes, which is what you
-                      // actually read a heading by. It also made a long session
-                      // name ellipsize sooner, for nothing.
+                      // Sentence case. Uppercase does the work of size and
+                      // weight, which `pageTitle` already has at 30/800, and it
+                      // costs every title its word shapes — what a heading is
+                      // actually read by. It also ellipsizes a long session
+                      // name sooner, for nothing.
                       title,
                       style: context.t.displayLarge,
                       maxLines: 1,
@@ -210,13 +209,13 @@ class HeaderBand extends StatelessWidget {
 /// one small figure on the right. Sits on the page background — never inside a
 /// card.
 ///
-/// **Every heading on a page background is this widget**, so that the type, the
+/// Every heading on a page background uses this widget, so that the type, the
 /// 12 under it and the alignment of whatever sits on its right are decided in
-/// one place. History's month headings were a hand-rolled `Row` of
-/// `headlineSmall` plus a count for exactly as long as it took for its padding
-/// to drift from everyone else's.
+/// one place. A hand-rolled `Row` of `headlineSmall` plus a count — which is
+/// what a month heading wants to be — drifts off everyone else's padding within
+/// a week.
 ///
-/// **One line.** There is no subtitle slot: a heading that carries a sentence
+/// A single line. There is no subtitle slot: a heading carrying a sentence
 /// is a different height than the heading above it, so no two sections on a
 /// page start at the same distance from their content. What the sentence says
 /// belongs to the thing it describes — inside the card, where it is read with
@@ -272,11 +271,10 @@ class SectionHeader extends StatelessWidget {
 /// Tertiary action: primary-colour text with a small chevron. Not a coloured
 /// link — colour is data, and "See all" is not data.
 ///
-/// No underline. Some of these were underlined and some weren't, depending on
-/// whether the screen used this widget or wrote its own `Text`, and a rule
-/// under a word is the one decoration in the app that has to be perfectly
-/// consistent to read as anything but a mistake. The chevron says "goes
-/// somewhere" without needing to be.
+/// No underline. A rule under a word is the one decoration in the app that has
+/// to be perfectly consistent to read as anything but a mistake, and it will
+/// not be while some screens use this and others write their own `Text`. The
+/// chevron says "goes somewhere" without needing to be.
 class LinkAction extends StatelessWidget {
   const LinkAction(this.label, {super.key, this.onTap});
 
@@ -315,10 +313,10 @@ class LinkAction extends StatelessWidget {
   }
 }
 
-// `SectionLabel` — an uppercase eyebrow over a group — was here, unused by any
-// screen, and it contradicted the rule the type scale is built on: uppercase
-// appears in exactly two places, the page title and the page eyebrow
-// (THEME → Type). A component nothing calls is a second answer to a question
+// There is deliberately no `SectionLabel` — an uppercase eyebrow over a group.
+// It contradicts the rule the type scale is built on: uppercase appears in
+// exactly two places, the page title and the page eyebrow (THEME → Type). A
+// component nothing calls is also a second answer to a question
 // [SectionHeader] already answers.
 
 /// The one search box. Three screens filter a list of exercises and each one
@@ -372,8 +370,8 @@ const searchFieldPadding = EdgeInsets.fromLTRB(
 
 // ─── Surfaces ───────────────────────────────────────────────────────────────
 
-/// The standard grouped container: one lifted surface, one radius, **no border
-/// and no shadow**. Depth in this app is surface colour.
+/// The standard grouped container: one raised surface, one radius, no border
+/// and no shadow. Depth in this application is conveyed by surface colour.
 ///
 /// A card is a grouping device, not a frame. A page of six cards has no
 /// hierarchy — prefer one [ListCard] holding rows.
@@ -487,9 +485,9 @@ class AppRow extends StatelessWidget {
   /// Sits at the head of the subtitle line, before [subtitle] — a dense
   /// [AppChip] for the one word in the description that is also a filter.
   ///
-  /// It takes its own taps, so the row's [onTap] is not the only thing you can
-  /// do to it: the muscle on an exercise row selects that muscle in the strip
-  /// above the list, rather than opening the exercise.
+  /// It handles its own taps, so the row's [onTap] is not the only available
+  /// action: the muscle chip on an exercise row selects that muscle in the
+  /// filter strip above the list rather than opening the exercise.
   final Widget? subtitleLeading;
 
   /// A bare glyph. Colour it only to mark something semantic (a destructive
@@ -540,9 +538,9 @@ class AppRow extends StatelessWidget {
           else if (icon != null)
             SizedBox(
               width: 40,
-              // Flush left in its column, not centred in it. Centred, the glyph
-              // stood 9pt in from the gutter the title above it starts at, and
-              // left only 9pt of gap before the text — the icon looked both
+              // Flush left in its column, not centred in it. Centred, the
+              // glyph stands 9pt in from the gutter the title above it starts
+              // at and leaves only 9pt of gap before the text, which looks both
               // indented and crowded at once.
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -673,7 +671,8 @@ class InkRow extends StatelessWidget {
 
 /// A spinner sized to sit where a row's glyph or chevron was.
 ///
-/// **Busy is not disabled, and it is not empty either.** A row that drops its
+/// A busy state is neither a disabled state nor an empty one. A row that drops
+/// its
 /// chevron and changes its title has told the user something happened; only a
 /// moving thing tells them it is still happening. Sized inside the glyph box
 /// rather than filling it, so it carries the same weight as the mark it stands
@@ -722,10 +721,10 @@ class PrimaryButton extends StatelessWidget {
 
   /// The width of its own words, 46 tall, rather than the width of the screen.
   ///
-  /// **For an action that adds one more of something**, not for one that ends a
+  /// For an action that adds a further item, rather than one that concludes a
   /// flow. Full width is a commitment — *this is what the screen is for* — and
-  /// spending it on "New exercise" under a list of eighty of them put the
-  /// loudest shape on the page under the quietest intention, and made a
+  /// spending it on "New exercise" under a list of eighty of them puts the
+  /// loudest shape on the page under the quietest intention, making a
   /// three-word label look like a banner. Finishing a session, saving an
   /// exercise, confirming a delete: those stay full width.
   final bool compact;
@@ -829,12 +828,12 @@ class SecondaryButton extends StatelessWidget {
 /// A circular icon control. A bare `IconButton` floating on charcoal has no
 /// edges and reads as decoration.
 ///
-/// [tooltip] is **required**, and it is the control's name rather than a hint:
+/// [tooltip] is required, and states the control's name rather than a hint:
 /// a glyph on its own is the one kind of control that cannot say what it does.
-/// It was optional, and six of the thirteen call sites left it off — the ✕ on
-/// three different sheets among them — so the label is now the thing that has
-/// to be written for the code to compile, the same argument `formatWeight`
-/// makes for its unit.
+/// Optional, it gets left off: six of thirteen call sites did, the ✕ on three
+/// different sheets among them. Required, the label is the thing that has to be
+/// written for the code to compile — the same argument `formatWeight` makes for
+/// its unit.
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     super.key,
@@ -1057,8 +1056,9 @@ class SegmentedPill<T> extends StatelessWidget {
 
 /// Tabs with a white underline under the live one (THEME → Components).
 ///
-/// A strip, not a list: a training day is a context you switch, not an item you
-/// scroll past. It scrolls horizontally and bleeds off the right edge, so the
+/// A strip rather than a list: a training day is a context to switch between
+/// rather than an item to scroll past. It scrolls horizontally and extends past
+/// the right edge, so the
 /// clipped tab is the affordance — the same rule the chip rows follow.
 ///
 /// [trailing] is a tab that is not one of the choices: `Add day +`, always last.
@@ -1093,7 +1093,7 @@ class _UnderlineTabsState extends State<UnderlineTabs> {
   }
 
   /// A day added at the end, or selected off-screen, has to come into view by
-  /// itself — otherwise adding your sixth day looks like nothing happened.
+  /// itself; otherwise adding a further day appears to have no effect.
   void _reveal() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = _keys[widget.index]?.currentContext;
@@ -1114,8 +1114,8 @@ class _UnderlineTabsState extends State<UnderlineTabs> {
       height: 48,
       // Full width, or the strip is only as wide as the tabs in it — and a
       // `Column` centres a child narrower than itself, so a regime with one day
-      // put `Legs` and `Add day +` in the middle of the band while a regime
-      // with six had them against the gutter like everything else.
+      // would put `Legs` and `Add day +` in the middle of the band while a
+      // regime with six had them against the gutter like everything else.
       width: double.infinity,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -1249,13 +1249,14 @@ class IconTile extends StatelessWidget {
     );
   }
 
-  /// The glyph is **the fill's own hue, taken down** — not white, not black.
+  /// The glyph takes the fill's own hue, darkened, rather than white or
+  /// black.
   ///
-  /// White was the rule for a long time and broke outright on the old saturated
-  /// yellow (1.9:1). Swapping to near-black fixed the ratio and lost the point:
-  /// a tile is one colour with a shape cut out of it, and a black shape makes it
-  /// two. Same hue, same saturation, less light — the mark stays "the green one"
-  /// at arm's length, which is the only job it has.
+  /// White breaks outright on a saturated yellow (1.9:1), and near-black fixes
+  /// the ratio at the cost of the point: a tile is one colour with a shape cut
+  /// out of it, and a black shape makes it two. Same hue, same saturation, less
+  /// light — the mark stays "the green one" at arm's length, which is the only
+  /// job it has.
   ///
   /// Solved rather than multiplied. A fixed `× 0.4` lands between 2.9:1 and
   /// 3.7:1 depending on where a hue sits, which is the uneven-set problem again
@@ -1311,7 +1312,7 @@ class RowValue extends StatelessWidget {
   /// An unanswered question, while a new exercise is being drafted: the word
   /// `Choose` in `textTertiary` where the value will go. Not a dash — a dash is
   /// for a measurement that should exist and doesn't (rule 4), and this is a
-  /// question waiting on you.
+  /// question awaiting an answer.
   const RowValue.orChoose(String? value, {super.key})
       : text = value ?? 'Choose',
         pending = value == null;
@@ -1380,13 +1381,14 @@ class AppRadio extends StatelessWidget {
 
 /// One number and what it means. Built for a row of siblings, so captions line
 /// up across tiles even when one wraps.
-/// **Rule 5, as a widget**: a value with its unit beside it, one step down and
+/// Rule 5 expressed as a widget: a value with its unit beside it, one step
+/// down and
 /// in grey, sharing a baseline.
 ///
-/// It was hand-built seven times — the summary's rows, the bodyweight header,
-/// Today's elapsed clock, two volume widgets — each deciding for itself whether
-/// the unit was `bodyMedium` or `bodySmall` and whether the pair shared a
-/// baseline or a centre line. The rule is THEME → Value and unit; this is the
+/// Hand-built, it is built seven ways — the summary's rows, the bodyweight
+/// header, Today's elapsed clock, two volume widgets — each deciding for itself
+/// whether the unit is `bodyMedium` or `bodySmall` and whether the pair shares
+/// a baseline or a centre line. The rule is THEME → Value and unit; this is the
 /// one place that implements it.
 ///
 /// [dense] is the row form: `labelLarge` against a trailing edge, where the
@@ -1507,9 +1509,10 @@ class Pill extends StatelessWidget {
 /// The header every sheet wears: title centred, subtitle under it, ✕ on the
 /// right, hairline beneath.
 ///
-/// The ✕ is on the **right** and larger than a row's glyph: it is the one
-/// control on the sheet that is not one of the choices, and on the left it read
-/// as the first item in the list rather than as the way out.
+/// The ✕ is placed on the right and is larger than a row's glyph, being the
+/// one
+/// control on the sheet that is not one of the choices, and on the left it
+/// reads as the first item in the list rather than as the way out.
 ///
 /// The subtitle is not optional in spirit: two sheets that both list session
 /// names are indistinguishable without one line saying which question is being
@@ -1540,9 +1543,9 @@ class SheetHeader extends StatelessWidget {
         ),
         Padding(
           // Equal room above and below the title — 16 from the handle, 16 to
-          // the hairline. The gap above used to be the handle's margin plus a
-          // header inset, which made it wider than the one below for no reason
-          // anyone could name.
+          // the hairline. The handle's margin plus a header inset would make
+          // the gap above wider than the one below for no reason anyone could
+          // name.
           padding: const EdgeInsets.fromLTRB(
             Space.sm,
             Space.lg,
@@ -1550,10 +1553,11 @@ class SheetHeader extends StatelessWidget {
             Space.lg,
           ),
           // A stack, not a row: the ✕ is a 48pt tap target and the title on its
-          // own is 26 tall, so in a row the button set the header's height and
-          // left 22pt of dead charcoal under a one-line title. Out of the flow,
-          // the text decides how tall the header is and the target overhangs it
-          // into the handle's gap, where there is nothing to collide with.
+          // own is 26 tall, so in a row the button sets the header's height and
+          // leaves 22pt of dead charcoal under a one-line title. Out of the
+          // flow, the text decides how tall the header is and the target
+          // overhangs it into the handle's gap, where there is nothing to
+          // collide with.
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.topCenter,
@@ -1563,8 +1567,8 @@ class SheetHeader extends StatelessWidget {
                 // sheet rather than on what is left of it.
                 padding: const EdgeInsets.symmetric(horizontal: 48),
                 // Full width on purpose: a `Stack` takes its size from its
-                // largest unpositioned child, so a shrink-wrapped title made
-                // the stack as narrow as the words in it and `right: 0` landed
+                // largest unpositioned child, so a shrink-wrapped title makes
+                // the stack as narrow as the words in it and lands `right: 0`
                 // beside the title instead of at the sheet's edge.
                 child: SizedBox(
                   width: double.infinity,
@@ -1591,8 +1595,8 @@ class SheetHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              // Centred on the title's line — it closes the sheet, and centring
-              // it on the whole block dragged it down beside a subtitle it has
+              // Centred on the title's line — it closes the sheet, and centred
+              // on the whole block it drags down beside a subtitle it has
               // nothing to do with.
               Positioned(
                 right: 0,
@@ -1643,10 +1647,10 @@ class AppSheet extends StatelessWidget {
     // The sheet rides above the keyboard, and it is this component's job rather
     // than each caller's.
     //
-    // Four sheets did it themselves and every other one did not, so anything
-    // with a field in it that was not on that list — a set note, a rep target,
-    // a session name typed from the wrong screen — opened the keyboard straight
-    // over its own Save button. Reserving the inset here also shortens the
+    // Left to each caller, some sheets reserve it and the rest do not, so
+    // anything with a field in it — a set note, a rep target, a session name
+    // typed from the wrong screen — opens the keyboard straight over its own
+    // Save button. Reserving the inset here also shortens the
     // scroll area rather than pushing it off the bottom, so a long sheet with
     // the keyboard up scrolls instead of overflowing.
     // And it clears the gesture bar under it, in the same reservation.
@@ -1655,9 +1659,9 @@ class AppSheet extends StatelessWidget {
     // two never overlap: `padding` is what the system chrome covers that the
     // keyboard does not, so with the keyboard up the gesture bar is already
     // excluded from it and the sum is just the keyboard. Taking the larger of
-    // the two instead — which this briefly did — reserves nothing at all on a
-    // phone whose `viewPadding` is reported as zero, and the last row of the
-    // sheet lands behind the navigation bar.
+    // the two instead reserves nothing at all on a phone whose `viewPadding` is
+    // reported as zero, and the last row of the sheet lands behind the
+    // navigation bar.
     final media = MediaQuery.of(context);
 
     return Padding(
@@ -1708,13 +1712,12 @@ class AppSheet extends StatelessWidget {
 
 /// Writes a note. The one text-entry surface in the app, and a sheet.
 ///
-/// Every note used to be typed into a centred `AlertDialog` with Material's own
-/// buttons on it — the one surface the rebrand never reached, and the one used
-/// most. It also opened in the middle of the screen while the row that summoned
-/// it sat at the bottom, and it fought the keyboard for the same space.
+/// A sheet rather than a centred `AlertDialog`, which would carry Material's
+/// own buttons, open in the middle of the screen while the row that summoned it
+/// sits at the bottom, and fight the keyboard for the same space.
 ///
-/// Returns the trimmed text, or null if dismissed. **Empty is a valid answer**:
-/// a note you can write and never clear is a note you stop writing.
+/// Returns the trimmed text, or null if dismissed. An empty string is a valid
+/// answer: a note that cannot be cleared is one that ceases to be used.
 Future<String?> promptForNote(
   BuildContext context, {
   required String title,
@@ -1787,8 +1790,8 @@ class _NoteSheetState extends State<_NoteSheet> {
           minLines: 3,
           maxLength: widget.maxLength,
           // `120 / 500` — the convention, and the only form that says what the
-          // limit *is* before you hit it. "60 left" answers a question you can
-          // only ask once you are already near the end.
+          // limit is before it is reached. "60 left" answers a question that
+          // only arises once the limit is already close.
           buildCounter:
               (
                 context, {
@@ -1809,9 +1812,9 @@ class _NoteSheetState extends State<_NoteSheet> {
           cursorColor: c.textPrimary,
           // Fill, radius, focused outline and padding all come from
           // `inputDecorationTheme` — `surfaceHigh` for the fill, and a white
-          // 2px outline when focused. This field was on `surfaceSunken` once,
-          // the keypad's bed, which on a `surface` sheet read as a hole rather
-          // than as somewhere to type.
+          // 2px outline when focused. Not `surfaceSunken`, the keypad's bed,
+          // which on a `surface` sheet reads as a hole rather than as somewhere
+          // to type.
           decoration: InputDecoration(hintText: widget.hint),
         ),
       ],
@@ -1823,7 +1826,8 @@ class _NoteSheetState extends State<_NoteSheet> {
 ///
 /// Bottom-anchored, not a centred alert, and never two equal text buttons in a
 /// row: the dangerous option is the loud one and the safe option is the quiet
-/// one. The message says what happens, never "are you sure".
+/// one. The message states what will happen rather than asking for
+/// confirmation in the abstract.
 Future<bool> confirmAction(
   BuildContext context, {
   required String title,
@@ -1946,10 +1950,11 @@ class _ConfirmMessage extends StatelessWidget {
 
 /// A stated limit or consequence, in `warning` yellow on its own tinted ground.
 ///
-/// The one shape in the app for "this is why you can't". It exists because a
-/// grey [EmptyBox] above a stack of greyed-out cards is indistinguishable from
-/// the greyed-out cards: everything on the screen was off, and nothing on it
-/// said which part was the reason.
+/// The single component used to state why an action is unavailable. A grey
+/// [EmptyBox]
+/// above a stack of greyed-out cards is indistinguishable from the greyed-out
+/// cards: everything on the screen is off, and nothing on it says which part is
+/// the reason.
 ///
 /// Yellow rather than red: `negative` is for destroying something, and a limit
 /// destroys nothing. Its own token rather than `deload`'s amber, so a light

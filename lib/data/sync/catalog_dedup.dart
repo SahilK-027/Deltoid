@@ -6,7 +6,7 @@ import '../db/database.dart';
 
 /// Folds two seeded catalogs into one, on `starterKey`.
 ///
-/// **Run after every pull, not only at sign-in.** Adoption is where two
+/// Run after every pull rather than only at sign-in. Adoption is where two
 /// catalogs usually meet ([SYNC.md § 10](SYNC.md#10-adoption)), but it is not
 /// the only way: a sign-in whose pull failed halfway seeds locally and meets
 /// the account's catalog on the next drain instead. Deterministic and
@@ -17,7 +17,7 @@ import '../db/database.dart';
 /// every reference to a duplicate moves to the survivor, and the duplicate is
 /// tombstoned.
 ///
-/// **`workout_exercises.muscle` is never touched.** It is a snapshot of what
+/// `workout_exercises.muscle` is never modified. It is a snapshot of what
 /// the movement trained on the day it was logged, and repointing a row at
 /// another exercise does not change what the user did that day
 /// ([RULES § 2](RULES.md)). The same goes for every other snapshot column on

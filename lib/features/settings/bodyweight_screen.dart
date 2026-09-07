@@ -32,13 +32,13 @@ String monthLabel(int ym) =>
 
 /// Every month with a weigh-in in it, newest first, averaged **in SQLite**.
 ///
-/// This screen used to hold the entire table in memory and group it in Dart:
-/// one row per day for as long as you have owned the app. At fifty years that
-/// is 18 250 rows — a hundred milliseconds to fetch and map, and another
-/// hundred to group, because grouping formatted a month label *per row*. Both
-/// ran on the UI isolate, both re-ran on every weigh-in, and together they are
-/// what made opening this screen a wait. `GROUP BY` does the same work in
-/// eight, and the count and average are exactly what a closed month shows.
+/// Holding the whole table in memory and grouping it in Dart means one row per
+/// day for as long as the app has been owned. At fifty years that is 18 250
+/// rows — a hundred milliseconds to fetch and map, and another hundred to
+/// group, because grouping formats a month label *per row*. Both would run on
+/// the UI isolate and re-run on every weigh-in, which is a wait every time this
+/// screen opens. `GROUP BY` does the same work in eight, and the count and
+/// average are exactly what a closed month shows.
 ///
 /// A month's *days* are a separate query, made when the month is opened
 /// ([bodyweightMonthProvider]).
@@ -89,10 +89,10 @@ final bodyweightSummaryProvider = StreamProvider<BodyweightSummary>((ref) {
 /// Every weigh-in, oldest first — the log, not the window.
 ///
 /// **Not keyed on the window, deliberately.** A `.family` per [TrendWindow]
-/// made changing range a *different provider*, so the chart card lost its
-/// data for a frame and `TrendChart` was unmounted and rebuilt — which threw
-/// away the zoom in [TrendChart.didUpdateWidget] that every other chart in the
-/// app gets. One provider, filtered in Dart, keeps the same chart on screen
+/// makes changing range a *different provider*, so the chart card loses its
+/// data for a frame and `TrendChart` is unmounted and rebuilt — throwing away
+/// the zoom in [TrendChart.didUpdateWidget] that every other chart in the app
+/// gets. One provider, filtered in Dart, keeps the same chart on screen
 /// across a range change, exactly as `exercise_trend.dart` does.
 ///
 /// It reads the two columns the chart plots positionally off a `QueryRow`
@@ -199,18 +199,18 @@ class BodyweightScreen extends ConsumerWidget {
 
 /// The log, as a shape rather than as a scroll.
 ///
-/// It was one row per weighing, newest first, forever: a year of daily weights
-/// is 365 rows, and the question you open this screen with — "where is it
-/// going" — was the one thing 365 dated numbers could not answer. The trend is
-/// on top now, and the past is a month at a time, collapsed: `March 2026 ·
-/// 76.4 avg · −0.8`, opening to its days when you want one.
+/// One row per weighing, newest first, forever, is 365 rows for a year of daily
+/// weights — and the question this screen is opened with, "where is it going",
+/// is the one thing 365 dated numbers cannot answer. So the trend sits on top,
+/// and the past is a month at a time, collapsed: `March 2026 · 76.4 avg ·
+/// −0.8`, opening to its days when you want one.
 /// How far back the bodyweight chart looks, and how it averages.
 ///
-/// Providers rather than `State`, because the route is what was wrong: both
-/// lived in `_MonthListState`, so picking 1M and coming back to the screen
-/// later drew 3M again — the widget had been disposed and rebuilt from its
-/// initialiser. A range is a way of looking at the log, and it should still be
-/// how you are looking at it when you return.
+/// Providers rather than `State`, because the route is what disposes it: held
+/// in `_MonthListState`, picking 1M and coming back to the screen later draws
+/// 3M again, the widget having been rebuilt from its initialiser. A range is a
+/// way of looking at the log, and it should still be how you are looking at it
+/// when you return.
 ///
 /// Not shared with `chartRangeProvider`: a bodyweight range and an exercise's
 /// range are two questions, and moving one to move the other is a surprise.
@@ -371,11 +371,11 @@ class _MonthListState extends ConsumerState<_MonthList> {
 
 /// A month's days, opened.
 ///
-/// On `surfaceHigh` and indented, because as plain rows in the same card they
-/// were indistinguishable from the months around them: `July 2026` and
-/// `Fri 31 Jul` in the same type, on the same ground, with the same divider
-/// between them, so a list of five months and twenty days read as twenty-five
-/// peers. A child has to look like a child.
+/// On `surfaceHigh` and indented: as plain rows in the same card they are
+/// indistinguishable from the months around them — `July 2026` and `Fri 31 Jul`
+/// in the same type, on the same ground, with the same divider between them, so
+/// a list of five months and twenty days reads as twenty-five peers. A child
+/// has to look like a child.
 /// Its days are queried when it opens and dropped when it closes, so the cost
 /// of this screen is the months you are looking at rather than every weighing
 /// you have ever recorded. Nothing is drawn until they arrive: a month is
@@ -877,10 +877,10 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _save(),
             // `valueSm`, the size every other number you type in this app is
-            // entered at — the set row's load and reps, the rest seconds. It
-            // was `value` (22), the size a number is *displayed* at once it is
-            // a fact on a card, and a field wearing a readout's type reads as a
-            // headline you are somehow editing.
+            // entered at — the set row's load and reps, the rest seconds. Not
+            // `value` (22), the size a number is *displayed* at once it is a
+            // fact on a card: a field wearing a readout's type reads as a
+            // headline being edited.
             style: context.t.labelLarge,
             cursorColor: c.textPrimary,
             // The app's only suffix, and the second named exception in

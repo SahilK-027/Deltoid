@@ -286,9 +286,9 @@ void main() {
 
     test('a set with no load does not outrank one that has a load', () {
       // The one real disagreement between the two rankers. A `total` exercise has
-      // no belt, so `addedWeight` is not load on it — but the old ranking read
-      // `weight ?? addedWeight`, so the second set here sorted as 100 kg while
-      // the chart scored it as having no weight at all. One set, two answers.
+      // no belt, so `addedWeight` is not load on it — but a ranking reading
+      // `weight ?? addedWeight` sorts the second set here as 100 kg while the
+      // chart scores it as having no weight at all. One set, two answers.
       //
       // Ranked by effectiveLoad, set 1 has no load and set 0 has 50 kg.
       final sets = [

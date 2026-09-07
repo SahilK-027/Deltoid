@@ -28,10 +28,10 @@ const backupFormatVersion = 1;
 /// `this` holds an `AppDatabase` wrapping an FFI handle that cannot cross an
 /// isolate boundary — `Isolate.run` fails at the send, not at the JSON.
 ///
-/// Only the *read* side needs this now. Encoding used to come through here too,
-/// which meant the entire history crossed the port twice — out as rows and back
-/// as a 70 MB string — to save a freeze that [BackupService.writeBackup] avoids
-/// by never building either one.
+/// Only the *read* side needs this. Sending encoding through here as well would
+/// put the entire history across the port twice — out as rows and back as a
+/// 70 MB string — to save a freeze that [BackupService.writeBackup] avoids by
+/// never building either one.
 Future<Map<String, dynamic>> _decodeOffIsolate(String json) =>
     Isolate.run(() => jsonDecode(json) as Map<String, dynamic>);
 
@@ -87,11 +87,11 @@ class _TableCodec {
   ///
   /// A page rather than the whole table, because the export writes as it reads:
   /// `set_logs` alone is 168k rows at fifty years, and turning all of them into
-  /// maps before a byte reaches the disk is most of what an export used to cost.
+  /// maps before a byte reaches the disk is most of what an export would cost.
   /// Ordered by id so the windows tile exactly — ids are UUID v7, so this is
   /// also creation order.
   ///
-  /// **Keyset, not offset.** See [BackupService._pageOf].
+  /// Keyset paging rather than offset paging. See [BackupService._pageOf].
   final Future<List<Map<String, dynamic>>> Function(int limit, String? after)
       page;
 
@@ -134,7 +134,8 @@ const backedUpSettingKeys = {'units'};
 /// Whole-database export and restore.
 ///
 /// Deliberately separate from cloud sync: sync propagates whatever state the
-/// app is in, bugs included. A file you hold is the only backup that survives
+/// application is in, including defects. A file held locally is the only backup
+/// that survives
 /// the app corrupting its own data, and it is what makes moving to a new phone
 /// a copy rather than a migration.
 class BackupService {
@@ -151,8 +152,9 @@ class BackupService {
 
   /// Run after every page the export reads, before the next one is asked for.
   ///
-  /// **A test seam, and the only way to stand in the gap this class is built
-  /// around.** The export deliberately yields between pages — that is what
+  /// A test seam, and the only means of interposing in the gap this class is
+  /// designed around. The export deliberately yields between pages, which is
+  /// what
   /// keeps the app usable while it runs — so the interesting states are the
   /// ones where a write lands in that gap. Null in every production path.
   final Future<void> Function()? betweenPages;
@@ -194,17 +196,17 @@ class BackupService {
 
   /// One page of [table] as JSON, ordered by id, resuming after [after].
   ///
-  /// **Keyset, and for the reason [CLAUDE.md](CLAUDE.md) rule 6 gives.** Offset
+  /// Keyset paging, for the reason [CLAUDE.md](CLAUDE.md) rule 6 gives. Offset
   /// paging is only correct over a table nothing is writing, and this one is
   /// read across minutes while the app stays usable — that is the whole point
   /// of the flush between pages. Under `..limit(n, offset: k)` any row that
   /// appears or disappears *behind* the cursor renumbers everything after it:
   ///
   /// - a row inserted behind the cursor shifts the rest one place forward, and
-  ///   the row on the boundary is read a **second** time. A restore refuses the
+  ///   the row on the boundary is read a second time. A restore refuses the
   ///   duplicate on the primary key, so the file is simply unusable.
   /// - a row hard-deleted behind the cursor shifts the rest one place back, and
-  ///   the row on the boundary is **stepped over**. It is absent from the file
+  ///   the row on the boundary is skipped. It is absent from the file
   ///   with nothing said, and that is found out on the new phone, after the old
   ///   one has been wiped.
   ///
@@ -212,12 +214,13 @@ class BackupService {
   /// UUID v7, so a locally created row always sorts *after* every existing one,
   /// and nothing outside the restore's own `clear()` closures hard-deletes.
   /// Both of those are properties of other files, neither is written down as
-  /// load-bearing, and **the first stops being true the day sync lands** — a row
+  /// load-bearing, and the first ceases to hold once sync is present: a row
   /// merged from the other phone was created there, earlier, and carries that
   /// earlier time in its leading bits. A cursor cannot be renumbered, so this
   /// stops depending on either.
   ///
-  /// **Not wrapped in a transaction, deliberately.** That is the other way to
+  /// Deliberately not wrapped in a transaction. That is the alternative means
+  /// of obtaining
   /// get a stable read, and here it is the wrong one: drift serialises on one
   /// connection, so a transaction spanning a minutes-long export blocks every
   /// write the app makes for its whole duration — exactly the freeze the paging
@@ -282,7 +285,8 @@ class BackupService {
   static const _defaultPageSize = 2000;
 
   /// The whole database as one map. Kept for the tests and the seed tool, which
-  /// want a payload in hand; **the app writes files with [writeBackup]**, which
+  /// require a payload in memory. The application writes files with
+  /// [writeBackup], which
   /// never holds one.
   Future<Map<String, dynamic>> buildPayload({ProgressReport? onProgress}) async {
     final data = <String, dynamic>{};
@@ -325,13 +329,12 @@ class BackupService {
 
   /// Writes the whole database to [file] as JSON, a page of rows at a time.
   ///
-  /// **Nothing here ever holds the backup.** The export used to build every row
-  /// of every table as a map, send that structure across an isolate port to be
-  /// encoded, take a 70 MB string back across the port, and hand it to
-  /// `writeAsString`, which encoded it to UTF-8 a third time — several hundred
-  /// megabytes of peak heap to produce a file the disk was going to receive in
-  /// 64 kB pieces anyway. It ran unasked after every session, which made it the
-  /// most expensive thing the app did and the one nobody had asked for.
+  /// Nothing here holds the backup in memory. Building every row of every table
+  /// as a map, sending that structure across an isolate port to be encoded,
+  /// taking a 70 MB string back across the port and handing it to
+  /// `writeAsString` — which encodes it to UTF-8 a third time — is several
+  /// hundred megabytes of peak heap to produce a file the disk receives in
+  /// 64 kB pieces anyway.
   ///
   /// So the structure is written by hand and only the *rows* go through
   /// `jsonEncode`. Awaiting the sink between pages hands the frame back, so a
@@ -340,13 +343,13 @@ class BackupService {
   /// The shape is byte-identical to what [buildPayload] produces, which is what
   /// the round-trip tests hold it to.
   ///
-  /// **The file appears whole or not at all.** It streamed straight into its
-  /// final name, which meant a crash, a kill, a full disk or an OOM halfway
-  /// through left a truncated `.json` sitting under a legitimate backup
-  /// filename — indistinguishable from a good one until the day it was needed,
-  /// and the restore's own counts check is the thing that would eventually say
-  /// so, months later. [autoExport] made it worse: it prunes by filename, so a
-  /// run of half-written files would evict the last complete one.
+  /// The file appears complete or not at all. Streamed directly into its final
+  /// name, a crash, a kill, a full disk or an OOM halfway through leaves a
+  /// truncated `.json` sitting under a legitimate backup filename —
+  /// indistinguishable from a good one until the day it is needed, with the
+  /// restore's own counts check the thing that eventually says so, months
+  /// later. [autoExport] compounds it: it prunes by filename, so a run of
+  /// half-written files evicts the last complete one.
   ///
   /// So the rows go to a sibling `.part` and the finished file arrives by
   /// rename, which is atomic within a filesystem — a reader sees the old file
@@ -421,9 +424,9 @@ class BackupService {
 
   /// Where backups live: a `Deltoid` folder the user can actually open.
   ///
-  /// Temp storage was fine for handing a file to the share sheet and useless
-  /// for everything else — the file was gone by the next boot, and a backup you
-  /// cannot find in a file manager is one you have to take on faith. External
+  /// Temp storage covers handing a file to the share sheet and nothing else —
+  /// it is removed on the next boot, and a backup that cannot be located in a
+  /// file manager cannot be verified. External
   /// app storage is visible over USB and to any file browser, and needs no
   /// permission on any Android version this app supports.
   Future<Directory> backupDirectory() async {
@@ -438,8 +441,8 @@ class BackupService {
   /// sheet — and still there afterwards, whether it was shared or not.
   ///
   /// Streamed row by row through [writeBackup]: the file is never a string, and
-  /// the indent is gone with it — nothing reads this by eye, and pretty
-  /// printing a decade of sets doubled both the time and the file.
+  /// there is no indent — nothing reads this by eye, and pretty printing a
+  /// decade of sets doubles both the time and the file.
   Future<File> exportToFile({ProgressReport? onProgress}) async {
     final dir = await backupDirectory();
     final name =
@@ -507,11 +510,10 @@ class BackupService {
   /// prompt can say exactly what is about to be written.
   ///
   /// Prefer [decode] + [summarise] on anything user-facing: this parses the
-  /// whole file on the calling isolate, and a restore used to do it **three
-  /// times** — once here for the prompt, once inside `restore`, and once more
-  /// off-isolate to actually read the rows. On fifty years of training that is
-  /// three full parses of a multi-megabyte string, two of them on the thread
-  /// trying to draw the confirmation dialog.
+  /// whole file on the calling isolate. Calling it as well as `restore` parses
+  /// the file twice over, and on fifty years of training that is two full
+  /// parses of a multi-megabyte string, one of them on the thread trying to
+  /// draw the confirmation dialog.
   BackupSummary inspect(String json) => summarise(_decode(json));
 
   /// Parses a backup off the UI isolate. The result feeds both [summarise] and
@@ -524,9 +526,10 @@ class BackupService {
   /// Reading a backup with `utf8.decode(await file.readAsBytes())` costs the
   /// file twice over and the second copy is the expensive one: Dart strings are
   /// UTF-16, so a 67 MB export asks Android for a single 134 MB allocation on
-  /// top of the bytes it was decoded from. It threw `OutOfMemoryError` and took
-  /// the process down before the restore had written a row — on the one screen
-  /// that exists to get a history back. The chunked decoders below walk the
+  /// top of the bytes it was decoded from. That throws `OutOfMemoryError` and
+  /// takes the process down before the restore has written a row — on the one
+  /// screen that exists to get a history back. The chunked decoders below walk
+  /// the
   /// file instead, so the peak is the parsed rows and nothing else.
   Future<Map<String, dynamic>> decodeStream(Stream<List<int>> bytes) async {
     final Object? decoded;
@@ -571,9 +574,9 @@ class BackupService {
       );
     }
 
-    // The schema the file was written against, which until now was recorded
-    // and never read. Older is fine and is the case the default map under each
-    // restored row exists for. *Newer* is not: a column this build has never
+    // The schema the file was written against, recorded on write and checked
+    // here. Older is fine, and is the case the default map under each restored
+    // row exists for. *Newer* is not: a column this build has never
     // heard of is dropped silently, and an enum value it cannot parse throws
     // halfway through the write — after the tables have been cleared, inside a
     // transaction, with the user's only copy in the file picker. Refusing is
@@ -591,7 +594,7 @@ class BackupService {
     return BackupSummary(
       // The counts are a header, not the data — they say what the restore is
       // about to write so the prompt can quote a number. A cast straight to
-      // `num` threw a raw `TypeError` on a file whose counts were anything
+      // `num` throws a raw `TypeError` on a file whose counts are anything
       // else, which is not the `FormatException` this method's callers handle
       // by name. A count that cannot be read is a count this file does not
       // have; the rows themselves are still checked properly on the way in.
@@ -706,15 +709,14 @@ class BackupService {
 
       // Every row the header promised is on disk, or none of them are.
       //
-      // The `counts` header was written from `codec.count()` **before** a
-      // single row was streamed (see [writeBackup]), and until now it was read
-      // only to size a progress bar — the comment in [summarise] says so
-      // outright. So a file whose body is short restored silently, *after*
-      // these tables had already been cleared, and the screen said it worked.
-      // Three ways to be holding one: an export that skipped a row, a hand
-      // edit, and — once the pull applier exists — a merge.
+      // The `counts` header was written from `codec.count()` before a
+      // single row was streamed (see [writeBackup]). Read only to size a
+      // progress bar, it would let a file whose body is short restore
+      // silently, *after* these tables have been cleared, with the screen
+      // saying it worked. Three ways to be holding one: an export that
+      // skipped a row, a hand edit, and a merge.
       //
-      // **`landed < declared`, not `!=`.** The header is counted before the
+      // `landed < declared` rather than `!=`. The header is counted before the
       // pages are read, so a set logged while the export was running makes the
       // body honestly longer than the header. That file is complete and must
       // not be refused.
@@ -737,13 +739,13 @@ class BackupService {
       // does carry slots is left alone: they are the colours the user has been
       // looking at.
       //
-      // **Inside the transaction**, because it is part of restoring rather than
-      // a tidy-up after it. It ran after the commit, which left a window — a
-      // crash, a kill, a battery — where the restore had landed and every
-      // regime in it was wearing the same hue, with `nextIdentitySlot` then
-      // handing slot 1 to the next new regime while five sat on 0. That is the
-      // exact collision the column was added to prevent, reached through the
-      // one screen that exists to put a history back.
+      // Inside the transaction, because it is part of the restore rather than
+      // a tidy-up after it. After the commit it would leave a window — a crash,
+      // a kill, a battery — where the restore has landed and every regime in it
+      // is wearing the same hue, with `nextIdentitySlot` then handing slot 1 to
+      // the next new regime while five sit on 0. That is the exact collision
+      // the column exists to prevent, reached through the one screen that
+      // exists to put a history back.
       final regimeRows = data['regimes'];
       final needsSlots = regimeRows is List &&
           regimeRows.any((row) =>
@@ -761,16 +763,16 @@ class BackupService {
       // not necessarily export, under `defer_foreign_keys`, and a partial
       // index says nothing about a file that arrived already wrong.
       //
-      // **Only the rules no repair can fix.** A backup legitimately carries
-      // the healable ones — `healOrphanedSnapshots` exists because a discarded
-      // session used to leave live snapshots under a tombstoned workout, and
-      // nothing in the schema refuses one on the way in. Refusing those files
+      // Only the rules no repair can address. A backup legitimately carries
+      // the healable ones — `healOrphanedSnapshots` exists for the live
+      // snapshots an older build left under a tombstoned workout, and nothing
+      // in the schema refuses one on the way in. Refusing those files
       // would be refusing histories the app has always straightened out on the
       // next launch. What is left is the states nothing knows a move for: two
       // workouts in progress, a day carrying two bodyweights, a workout filed
       // under one day and ringed on another.
       //
-      // **Inside the transaction, unlike `repairDatabase` below**, and the
+      // Inside the transaction, unlike `repairDatabase` below, and the
       // distinction is the one that comment already draws. A repair is a
       // judgement about rows that are legitimately there, so a healer failing
       // must not take a correctly restored history down with it. This is not a
@@ -796,14 +798,14 @@ class BackupService {
     // A restore is the one moment the database goes from empty to a decade in
     // a single act, so the planner statistics gathered at open describe a
     // database that no longer exists — and the screens the user looks at next
-    // are planned against them. `beforeOpen` would fix it on the following
-    // launch; this fixes it now.
+    // are planned against them. `beforeOpen` would put it right on the
+    // following launch, which is a launch too late.
     await db.customStatement('ANALYZE');
 
     // The same list a launch runs, and deliberately the same list rather than a
     // second one written here.
     //
-    // **After the commit, not inside it.** The transaction above is the
+    // After the commit rather than inside it. The transaction above is the
     // all-or-nothing guarantee a restore rests on: what it holds is that the
     // *file* landed whole. A repair is a judgement about the rows once they are
     // there, and folding it in would mean a healer failing took the user's

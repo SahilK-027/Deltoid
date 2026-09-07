@@ -82,7 +82,7 @@ class _ProgressSheet extends StatelessWidget {
                     JobPhase.reading => 'Reading ${current!.detail}',
                     // Named rather than left as a stalled bar: this is the
                     // phase that takes the longest and reports nothing, and
-                    // silence here is what made the whole thing look hung.
+                    // silence here is what makes the whole thing look hung.
                     JobPhase.encoding =>
                       'Writing ${current!.detail} to the backup file',
                     JobPhase.decoding =>
@@ -129,9 +129,9 @@ class _ProgressSheet extends StatelessWidget {
 
 /// The latest weight, and one tap to log today's.
 ///
-/// One row, not a card with a 30sp figure in it: this is a number you glance
-/// at on the way to logging the next one, and at display size it took the same
-/// vertical room as the whole Data section under it.
+/// One row rather than a card carrying a 30sp figure. This value is read in
+/// passing on the way to recording the next one, and at display size it
+/// occupies the same vertical space as the entire Data section beneath it.
 ///
 /// Tapping opens the log sheet on today — prefilled when today already has an
 /// entry, so a second weighing corrects rather than duplicates (the table is

@@ -5,14 +5,13 @@ import 'primitives.dart';
 
 /// Puts a short list in a new order, by dragging it.
 ///
-/// This was a pair of ⌃ / ⌄ buttons per row, and the note explaining why said
-/// that `ReorderableDragStartListener` is an immediate vertical drag which,
-/// nested in a scrollable, competed with the page and lost. That is true of a
-/// drag started from *anywhere on the row*. It is not true of one started from
-/// a **handle**: the handle owns the vertical gesture, the rest of the row
-/// still scrolls, and `ReorderableListView` brings its own auto-scroll to
-/// carry a row past the fold. So the buttons are gone and the affordance is
-/// the thing every list in every other app uses.
+/// Not a pair of ⌃ / ⌄ buttons per row. The argument for those is that
+/// `ReorderableDragStartListener` is an immediate vertical drag which, nested
+/// in a scrollable, competes with the page and loses — true of a drag started
+/// from anywhere on the row, and not true of one started from a handle:
+/// the handle owns the vertical gesture, the rest of the row still scrolls, and
+/// `ReorderableListView` brings its own auto-scroll to carry a row past the
+/// fold. So the affordance is the thing every list in every other app uses.
 ///
 /// The order is committed on Save, not per move: a reorder is one decision made
 /// out of several movements, and writing each one would push a stream update
@@ -98,7 +97,7 @@ class _ReorderSheetState extends State<_ReorderSheet> {
             key: ValueKey(_order[i].id),
             title: _order[i].label,
             // The number is the point of a re-order screen: it says what the
-            // list will *be*, before you commit it.
+            // list will become, before it is committed.
             leading: SizedBox(
               width: 28,
               child: Text(

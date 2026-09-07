@@ -152,9 +152,9 @@ void main() {
     await logDays(3);
 
     // Every other slot of the session was on screen for three days and holds
-    // no sets. It still counts as a session trained — you turned up and the row
-    // was there — but there is nothing to draw a card from, and one printed
-    // "Nothing logged" over a dash where the weight goes.
+    // no sets. It still counts as a session trained — you turned up and the
+    // row was there — but there is nothing to draw a card from, and a card
+    // would print "Nothing logged" over a dash where the weight goes.
     final untouched = (await repo.exercisesWithHistory())
         .firstWhere((e) => e.exercise.id != workedExerciseId);
     expect(untouched.timesPerformed, 3);

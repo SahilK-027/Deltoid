@@ -1,10 +1,11 @@
 /// Which half of a long job is running, so the screen can say something more
 /// useful than "working".
 ///
-/// **One vocabulary, three jobs.** An export, a restore and a first pull are
-/// the same shape from a user's side — thousands of rows moving while the app
-/// must not look hung — so they report through one type and one sheet rather
-/// than three that drift apart ([SYNC.md § 16](SYNC.md#16-still-to-decide)).
+/// One vocabulary covering three operations. An export, a restore and a first
+/// pull present identically to the user — thousands of rows being processed
+/// while the application must not appear to have stopped responding — so they
+/// report through a single type and a single sheet rather than through three
+/// that diverge ([SYNC.md § 16](SYNC.md#16-still-to-decide)).
 enum JobPhase {
   /// Rows coming off this device's disk.
   reading,

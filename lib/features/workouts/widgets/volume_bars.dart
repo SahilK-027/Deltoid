@@ -228,9 +228,9 @@ class _Parts extends StatelessWidget {
 /// shows its full width, so an untrained muscle is a row rather than a gap
 /// (THEME rule 4).
 ///
-/// That track and the heatmap's unworked day are the same grey — `heatEmpty`
-/// was moved onto `surfaceHighest` rather than the bars being moved onto it.
-/// The two graphics sit one above the other on this screen and are read as one
+/// That track and the heatmap's unworked day are the same grey: `heatEmpty` is
+/// `surfaceHighest`, rather than the bars carrying a grey of their own. The two
+/// graphics sit one above the other on this screen and are read as one
 /// answer: a rest day and an untrained muscle are the same absence, and two
 /// greys eight points apart say they are not.
 ///

@@ -13,11 +13,10 @@ bool get canSaveToDownloads => !kIsWeb && Platform.isAndroid;
 
 /// Copies [file] into `Downloads/Deltoid_Backup`, returning where it landed.
 ///
-/// The share sheet was the only way out of the app, and sharing a backup to
-/// yourself is a strange thing to have to do — every other app that produces a
-/// file puts it in Downloads. The copy is made on the platform side straight
-/// from the path, so a decade of training does not cross a method channel as
-/// one string.
+/// A destination of its own, because sharing a backup to yourself is a strange
+/// thing to have to do and every other app that produces a file puts it in
+/// Downloads. The copy is made on the platform side straight from the path, so
+/// a decade of training does not cross a method channel as one string.
 ///
 /// Throws [BackupSaveException] when the platform refuses; the caller says so
 /// rather than reporting a save that did not happen.
@@ -44,13 +43,15 @@ Future<String> saveToDownloads(File file) async {
   }
 }
 
-/// Asks the system picker for a backup and returns a **file on disk**, or null
+/// Requests a backup through the system picker and returns a file on disk, or
+/// null
 /// if the picker was dismissed.
 ///
 /// The platform copies the chosen document into the app's cache and hands back
-/// a path. `file_selector` hands back the contents instead, and a long history
-/// killed the process on the way through the codec — a 67 MB file is a 134 MB
-/// array on the main thread, thrown before the restore had written a row. The
+/// a path. `file_selector` hands back the contents instead, which kills the
+/// process on the way through the codec for a long history — a 67 MB file is a
+/// 134 MB array on the main thread, thrown before the restore has written a
+/// row. The
 /// export side has always avoided that (see [saveToDownloads]); this is the
 /// same rule inbound, and it means the file can then be read a chunk at a time.
 ///

@@ -153,11 +153,11 @@ final regionExercisesProvider = StreamProvider.autoDispose.family<
 /// **`autoDispose`, and that is the point.** `set_logs` is the hot table during
 /// a session — one write per set ticked — and this query folds the whole
 /// selected span, which on `All` is the whole log. Kept alive, opening this
-/// screen once meant every set you ticked for the rest of the app's life
-/// re-queried and re-folded that history on the UI isolate, for a screen you
-/// were not looking at. `exerciseProgressProvider` had the same bug; this is
-/// the same fix, and `volume_provider_lifetime_test.dart` is why it cannot come
-/// back.
+/// screen once would leave every set ticked for the rest of the app's life
+/// re-querying and re-folding that history on the UI isolate, for a screen
+/// nobody is looking at. `exerciseProgressProvider` is `autoDispose` for the
+/// same reason, and `volume_provider_lifetime_test.dart` is what holds both
+/// shut.
 final volumeHistoryProvider = StreamProvider.autoDispose<VolumeHistory>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);

@@ -11,10 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Searching History for an exercise you have not trained yet used to answer
-/// "no such exercise", because the index is built by joining the catalog to
-/// completed workouts. An exercise you added this morning is not missing — it
-/// is untrained, and those are different sentences.
+/// The index is built by joining the catalog to completed workouts, so
+/// searching History for an exercise not trained yet must not answer "no such
+/// exercise". An exercise added this morning is not missing — it is untrained,
+/// and those are different sentences.
 void main() {
   late AppDatabase db;
   late TrainingRepository repo;
