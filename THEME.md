@@ -836,13 +836,31 @@ own type scale, ripples and framework accent and makes every screen asking
 The one picker **read before it is tapped**, which is why it is not a sheet: a
 sheet puts the month you are reading under your thumb.
 
-`‹ March 2026 ›` in `title` across the top, the name opening a year grid;
-weekday initials in `label` `textTertiary`; 38dp day circles; **six rows
-always**, so a page turn is not a resize. Three states stack on one circle,
-ranked so none hides another: a **ring in the day's own colour** for a day with
-something in it, an **`accent` fill** for the day chosen, a **`textTertiary`
-ring** for today. A day outside the range is shown and dead rather than removed,
-so the month keeps its shape and the hole says why.
+**The grid is on top and its controls are underneath**, in the order the card
+is used: the month is read first, and the thumb is already at the foot of the
+dialog. Weekday initials in `label` `textTertiary` sit under the grid with the
+controls, as a legend rather than a heading. Below them, `‹ ›` as one pill, then
+the month, then the year — two pills, two lists, one tap each, where a single
+`March 2026` label made a year six back into a month tapped, a grid read and a
+month re-picked.
+
+38dp day circles, **six rows always**, so a page turn is not a resize — and the
+month list and year list are held in the same box for the same reason.
+
+Four facts stack on one circle, ranked so none hides another. The **ring says
+whether the day holds anything**: the day's own colour when it does, `heatEmpty`
+when it does not. Both are drawn — logged and unlogged are read against each
+other, and a ring against a bare number is two states one of which looks like
+nothing rendered. **Today carries a dot** under its number whichever ring it
+has, so the present is marked without spending the ring on it. The **`accent`
+fill** is the day chosen, and a marked day keeps its ring around that fill.
+
+**A day outside the range has no ring at all** — the shape of a day that holds
+nothing and can hold nothing — and it is shown rather than removed, so the month
+keeps its shape. Tapping one **states why** in a line over the foot of the grid,
+drawn over the grid rather than under it so the card is the same height before
+and after the tap. Not a toast: a toast belongs to the `ScaffoldMessenger` under
+the route and would arrive behind the dialog's own barrier.
 
 ### Mastheads and app bars
 
