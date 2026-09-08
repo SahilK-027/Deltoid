@@ -10,6 +10,22 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.6.1 — 2026-09-08
+
+### Fixed
+
+- **Turning the month no longer draws both months at once.** The month being
+  swiped away was meant to disappear on the first frame and did not disappear at
+  all: it sat at full opacity under the one arriving for the whole transition,
+  so every date had another date on top of it. This was the bug 1.6.0 claimed to
+  have fixed.
+
+### Changed
+
+- The new month fades in and nothing slides. A grid entering from the edge reads
+  as one page being dragged over another, and this is one grid replaced in
+  place.
+
 ## 1.6.0 — 2026-09-08
 
 ### Added
