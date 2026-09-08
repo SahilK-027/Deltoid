@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**930 tests and nine pgTAP tests, analyzer clean.**
+**938 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -57,7 +57,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 - [x] Backup export, restore and auto-export after a session, on an isolate, round-trip tested.
 - [x] Settings: units, three themes drawn as miniatures, adaptive launcher icon.
-- [x] One day picker for backfill, bodyweight and re-dating. A ring on every day in range — its own colour when something is logged there, grey when nothing is — a dot on today, nothing on a day that cannot be picked, and a stated reason when one is tapped.
+- [x] One day picker for backfill, bodyweight and re-dating. A ring on every day in range — its own colour when something is logged there, grey when nothing is — a dot on today, nothing on a day that cannot be picked, and a stated reason when one is tapped. Six full rows with the neighbouring months drawn back, turned by a drag or by either end of the month bar.
 - [x] Backfill asks for the day first and keeps it on screen.
 - [x] The system bars take their appearance from the app's own theme, said again once the launch window lifts — in the light theme the status bar had been white on white.
 

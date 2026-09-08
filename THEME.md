@@ -836,22 +836,34 @@ own type scale, ripples and framework accent and makes every screen asking
 The one picker **read before it is tapped**, which is why it is not a sheet: a
 sheet puts the month you are reading under your thumb.
 
-**The grid is on top and its controls are underneath**, in the order the card
-is used: the month is read first, and the thumb is already at the foot of the
-dialog. Weekday initials in `label` `textTertiary` sit under the grid with the
-controls, as a legend rather than a heading. Below them, `‹ ›` as one pill, then
-the month, then the year — two pills, two lists, one tap each, where a single
-`March 2026` label made a year six back into a month tapped, a grid read and a
-month re-picked.
+**The card reads top to bottom in the order its parts depend on each other**:
+the title, the day currently chosen under it in `body`, a full-width hairline,
+then the month, then the weekday letters, then the dates. Nothing labels
+something above it. The strip of initials sat *under* the grid once, a legend
+for a thing already read, and that one inversion was what made the card feel
+disordered.
 
-38dp day circles, **six rows always**, so a page turn is not a resize — and the
-month list and year list are held in the same box for the same reason.
+The month bar is **a step at each end with two chips between them** — the month
+and the year, each opening its own list, `AppChip` with a caret like every other
+control in the app that opens a picker. One `March 2026` label made a year six
+back into a month tapped, a grid read and a month re-picked; two chips make it
+one tap each. **The month is also turned by dragging the grid**, which is how a
+month turns everywhere else on a phone. The arrows stay: a gesture nothing
+announces cannot be the only way to reach a month.
+
+38dp day circles, **six rows always** — forty-two cells, so the days either side
+of the month fill the head and the foot rather than leaving them ragged. A page
+turn is then never a resize, and the month list and the year list are held in
+the same box for the same reason. **The neighbouring month is drawn back**, ring
+and number together at a little under half, so the rows are full without those
+rows competing with the month being read.
 
 Four facts stack on one circle, ranked so none hides another. The **ring says
 whether the day holds anything**: the day's own colour when it does, `heatEmpty`
-when it does not. Both are drawn — logged and unlogged are read against each
-other, and a ring against a bare number is two states one of which looks like
-nothing rendered. **Today carries a dot** under its number whichever ring it
+when it does not, and the logged one is the heavier of the two — 2 against 1.5,
+so the shape says it before the colour is read. Both are drawn — logged and
+unlogged are read against each other, and a ring against a bare number is two
+states one of which looks like nothing rendered. **Today carries a dot** under its number whichever ring it
 has, so the present is marked without spending the ring on it. The **`accent`
 fill** is the day chosen, and a marked day keeps its ring around that fill.
 
@@ -861,6 +873,13 @@ keeps its shape. Tapping one **states why** in a line over the foot of the grid,
 drawn over the grid rather than under it so the card is the same height before
 and after the tap. Not a toast: a toast belongs to the `ScaffoldMessenger` under
 the route and would arrive behind the dialog's own barrier.
+
+**Nothing in a day animates.** The mark, the selection, today and the range are
+all fixed while the card is open, so the only tween a day circle ever ran was
+across a month change — where the cell is reused for a different date and the
+animation drags the old ring onto the new one. The grid that arrives on a page
+turn slides in; the one being left drops out at once, because two grids at half
+opacity put a 2 beside every 3.
 
 ### Mastheads and app bars
 
