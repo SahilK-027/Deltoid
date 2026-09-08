@@ -10,6 +10,19 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.4.1 — 2026-09-08
+
+### Fixed
+
+- **Logging a weight no longer removes another one.** Opening the weight sheet
+  over a day already weighed and then correcting the date moved the entry
+  instead of adding one, so logging Monday's weight after Tuesday's deleted
+  Tuesday's. Each day now stands on its own, and a day is cleared only by
+  deleting it.
+- The weigh-in calendar rings the days already weighed, as the session pickers
+  have always done. It was the one calendar in the app that could not show the
+  day you were looking for.
+
 ## 1.4.0 — 2026-09-06
 
 ### Added
