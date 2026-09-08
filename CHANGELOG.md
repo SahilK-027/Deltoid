@@ -10,6 +10,44 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.6.0 — 2026-09-08
+
+### Added
+
+- **The month turns with a swipe.** Drag the grid sideways, the way a month
+  turns everywhere else on a phone. The arrows are still there: a gesture
+  nothing announces cannot be the only way to reach a month.
+- **The card says which day it is sitting on**, under its title. The filled
+  circle was the only sign before, and it is one of forty-two.
+- **Every month is six full rows**, with the days either side of it filling the
+  head and the foot rather than leaving them ragged. They are drawn back, so the
+  rows are full without competing with the month you are reading.
+
+### Changed
+
+- **The day picker reads downwards.** The weekday letters sat under the grid,
+  labelling seven columns that had already been read, and the month sat under
+  that. Title, then the day chosen, then the month, then the letters, then the
+  dates — nothing labels something above it any more.
+- The month and year are the app's own chips now, at the height and padding
+  every other chip wears. The pair this screen had rolled for itself was 46 tall
+  on 8 of side padding.
+- A logged day's ring is heavier than an empty one, so the shape says a day
+  holds something before the colour does.
+- **A session can be backfilled to any day, not only to days after the log
+  starts.** The picker took the first day ever logged as its earliest, which
+  meant a session done the week before the app was installed could not be
+  entered at all.
+
+### Fixed
+
+- A grey ring no longer flickers on days that have not happened when you page
+  onto the current month.
+- `September` is no longer cut to `Septem…` on a 384dp phone — an ordinary
+  width, and narrower than the emulator the bar was drawn on.
+- Turning the month no longer draws both months on top of each other for a
+  fifth of a second.
+
 ## 1.5.0 — 2026-09-08
 
 ### Changed
