@@ -878,8 +878,10 @@ the route and would arrive behind the dialog's own barrier.
 all fixed while the card is open, so the only tween a day circle ever ran was
 across a month change — where the cell is reused for a different date and the
 animation drags the old ring onto the new one. The grid that arrives on a page
-turn slides in; the one being left drops out at once, because two grids at half
-opacity put a 2 beside every 3.
+turn fades in and nothing moves sideways: a grid sliding in from the edge reads
+as one page dragged over another, where this is one grid replaced in place. The
+month being left drops out on the first frame — two grids drawn over each other
+put a 2 beside every 3 and a ring around every ring.
 
 ### Mastheads and app bars
 

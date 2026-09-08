@@ -703,4 +703,41 @@ void main() {
       reason: 'there is no month after the range to turn to',
     );
   });
+
+  testWidgets('the month being left is never drawn over the one arriving',
+      (tester) async {
+    // Both June and July have a 15th, and for one fifth of a second 1.6.0 drew
+    // both of them, in the same cell, at full opacity: `switchOutCurve` was a
+    // `Threshold(0)`, and that curve is `t < threshold ? 0 : 1`, so at zero it
+    // returns 1 for every t there is. The grid being left has to be gone on the
+    // frame the new one starts.
+    await open(
+      tester,
+      initial: DateTime(2026, 6, 15),
+      first: DateTime(2015),
+      last: DateTime(2026, 8, 2),
+    );
+
+    double fadeOn(Finder day) {
+      if (day.evaluate().isEmpty) return 0;
+      return tester
+          .widget<FadeTransition>(
+            find.ancestor(of: day, matching: find.byType(FadeTransition)).first,
+          )
+          .opacity
+          .value;
+    }
+
+    await tester.fling(cell(2026, 6, 15), const Offset(-300, 0), 1000);
+    await tester.pump();
+
+    for (var frame = 0; frame < 8; frame++) {
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(fadeOn(cell(2026, 6, 15)), 0,
+          reason: 'June is still being painted over July');
+    }
+
+    await tester.pumpAndSettle();
+    expect(find.text('July'), findsOneWidget);
+  });
 }

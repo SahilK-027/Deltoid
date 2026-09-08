@@ -145,7 +145,6 @@ class _CalendarCardState extends State<_CalendarCard> {
       _month.isBefore(DateTime(widget.last.year, widget.last.month));
 
   void _shift(int months) => setState(() {
-    _forward = months > 0;
     _month = DateTime(_month.year, _month.month + months);
     _clearRefusal();
   });
@@ -176,10 +175,6 @@ class _CalendarCardState extends State<_CalendarCard> {
     _refusalTimer?.cancel();
     super.dispose();
   }
-
-  /// Which way the month last moved, so the incoming grid slides in from the
-  /// side it came from rather than always from the right.
-  bool _forward = true;
 
   void _swipe(DragEndDetails details) {
     // Velocity, not distance: a month is turned with a flick, and a slow drag
@@ -269,32 +264,29 @@ class _CalendarCardState extends State<_CalendarCard> {
                                 behavior: HitTestBehavior.opaque,
                                 onHorizontalDragEnd: _swipe,
                                 child: AnimatedSwitcher(
-                                  duration: Motion.base,
-                                  switchInCurve: Motion.emphasized,
-                                  // The month being left drops out at once
-                                  // rather than fading through the one
-                                  // arriving. Two grids at half opacity on top
-                                  // of each other put a 2 next to every 3 and a
-                                  // ring around every ring — for a fifth of a
-                                  // second the calendar is unreadable.
-                                  switchOutCurve: const Threshold(0),
-                                  transitionBuilder: (child, animation) {
-                                    final incoming =
-                                        child.key == ValueKey(_monthKey);
-                                    final from = incoming == _forward
-                                        ? 1.0
-                                        : -1.0;
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: SlideTransition(
-                                        position: Tween(
-                                          begin: Offset(from * 0.12, 0),
-                                          end: Offset.zero,
-                                        ).animate(animation),
+                                  duration: Motion.fast,
+                                  // A fade, and nothing else. The month used to
+                                  // slide in from the side it came from, which
+                                  // read as a page being dragged over another
+                                  // page — a stack, for what is one grid being
+                                  // replaced by another in the same frame.
+                                  //
+                                  // The month being left drops out on the first
+                                  // frame rather than fading through the one
+                                  // arriving: two grids over each other put a 2
+                                  // beside every 3 and a ring around every ring.
+                                  // `Threshold(1)`, not `Threshold(0)` — the
+                                  // curve is `t < threshold ? 0 : 1`, so at 0 it
+                                  // returns 1 for every t there is, a no-op that
+                                  // held the old month at full opacity for the
+                                  // whole transition. That is the version that
+                                  // shipped in 1.6.0.
+                                  switchOutCurve: const Threshold(1),
+                                  transitionBuilder: (child, animation) =>
+                                      FadeTransition(
+                                        opacity: animation,
                                         child: child,
                                       ),
-                                    );
-                                  },
                                   child: _MonthGrid(
                                     key: ValueKey(_monthKey),
                                     month: _month,
