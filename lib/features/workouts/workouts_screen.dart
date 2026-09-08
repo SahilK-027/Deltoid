@@ -307,17 +307,15 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   Future<void> _pickDate() async {
     final c = context.c;
     final logged = _logged;
-    // Back to the first day ever logged, not to a constant. The floor was
-    // 2015, which silently refused every day of a history that starts before
-    // it — and a picker that cannot reach the data is worse than no picker.
-    final earliest = logged.keys.isEmpty
-        ? null
-        : dateFromDayKey(logged.keys.reduce((a, b) => a < b ? a : b));
 
     final picked = await pickDay(
       context,
       initial: _date,
-      first: earliest,
+      // No floor of its own. The picker reaches back to 2015, or further if
+      // something is marked before it — which is the rule every picker in the
+      // app wants. Passing the first day ever logged, as this once did, made
+      // the log its own floor: a session done the week before the app was
+      // installed could not be backfilled, and backfill is what this is for.
       last: DateTime.now(),
       title: 'When did you train it?',
       // Blue for a day you trained, orange for a light week — the same two
