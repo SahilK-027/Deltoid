@@ -10,6 +10,32 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.5.0 — 2026-09-08
+
+### Changed
+
+- **The day picker says what every day is, not only the logged ones.** A day
+  with something on it has always worn a ring in its own colour; a day with
+  nothing on it wore nothing at all, which reads as a number that failed to
+  render rather than as an answer. Both are rings now — the day's colour when
+  something is logged there, grey when nothing is — so the calendar is scanned
+  by comparing shapes instead of hunting for gaps.
+- **Today is a dot under the number** rather than a ring of its own, which
+  leaves the ring free to carry the only fact worth a colour.
+- **A day that cannot be picked says why.** Days outside the range have no ring,
+  and tapping one states the reason over the foot of the grid instead of doing
+  nothing at all.
+- **The month is read at the top of the card and driven from the bottom.** The
+  weekday initials move down beside the controls, and `March 2026` becomes a
+  month pill and a year pill, each opening its own list: a month two years back
+  is two taps rather than four.
+
+### Fixed
+
+- The picker no longer overflows on a phone set to a large system type size.
+  The day circles and the weekday strip were both reserved as flat figures, and
+  neither of them is one.
+
 ## 1.4.1 — 2026-09-08
 
 ### Fixed
