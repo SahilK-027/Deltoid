@@ -732,6 +732,15 @@ Future<void> logBodyweightPrompt(
   double? initial,
 }) async {
   final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+  final repo = ref.read(trainingRepositoryProvider);
+
+  // The days already weighed, so the picker can say which they are. The same
+  // series the chart plots — two columns per day, read before the sheet opens
+  // rather than from inside it, because the picker is a dialog over a sheet and
+  // a day that appears once its query lands is a grid that changes under the
+  // thumb.
+  final logged = {for (final p in await repo.bodyweightSeries()) p.dayKey};
+  if (!context.mounted) return;
 
   final result = await showModalBottomSheet<_BodyweightResult>(
     // The route holds the system bars: a sheet that sizes itself can
@@ -744,31 +753,24 @@ Future<void> logBodyweightPrompt(
       unit: unit,
       date: date,
       initial: initial,
+      logged: logged,
     ),
   );
   if (result == null) return;
-
-  final repo = ref.read(trainingRepositoryProvider);
 
   if (result.delete) {
     await repo.deleteBodyweight(dayKeyOf(date!));
     return;
   }
 
-  // Moving an entry to another date is a delete plus a re-log, since the day is
-  // this table's key — and the two halves go down as **one write**. Run as two
-  // calls they were two transactions with a gap between them, and a crash in
-  // that gap took the weight off the day it was on without putting it on the
-  // day it was moved to. Nothing says a day is missing: the readings either
-  // side are simply interpolated across the hole, quietly rescoring every
-  // bodyweight lift in between.
+  // The day the sheet was opened over has no bearing on the day it saves to.
+  // Correcting the date used to *move* the entry, so opening the sheet over
+  // today's weight and picking yesterday deleted today's — and a missing
+  // weigh-in shows up nowhere, it is simply interpolated across, quietly
+  // rescoring every bodyweight lift around it. A day is cleared by deleting it.
   //
   // Typed in whatever this phone shows, stored in kilograms.
-  await repo.logBodyweight(
-    result.day,
-    unit.toKg(result.value),
-    replacing: date,
-  );
+  await repo.logBodyweight(result.day, unit.toKg(result.value));
 }
 
 /// Past this and it is a typo, not a bodyweight. Matches the check on
@@ -784,11 +786,15 @@ class _BodyweightSheet extends StatefulWidget {
     required this.unit,
     required this.date,
     required this.initial,
+    required this.logged,
   });
 
   final WeightUnit unit;
   final DateTime? date;
   final double? initial;
+
+  /// The day keys already weighed, marked in the picker.
+  final Set<int> logged;
 
   @override
   State<_BodyweightSheet> createState() => _BodyweightSheetState();
@@ -836,6 +842,12 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
       context,
       initial: _day,
       title: 'When was this weight?',
+      // The same marking the session pickers use. A weigh-in calendar is opened
+      // to find the day that was missed, and a grid of identical white numbers
+      // is the one thing that cannot answer that.
+      marks: {
+        for (final key in widget.logged) key: context.c.heatOn,
+      },
     );
     if (picked != null) setState(() => _day = picked);
   }

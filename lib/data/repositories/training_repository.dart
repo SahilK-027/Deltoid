@@ -2039,27 +2039,19 @@ class TrainingRepository {
   /// is not a visible duplicate: the screen displays whichever the query
   /// returns first, and every bodyweight-scored lift on that day reads the
   /// other one half the time.
-  /// [replacing] moves an entry to another day, which is a delete plus a re-log
-  /// because the day is this table's key, and must therefore be a single
-  /// operation.
-  /// Run as two calls it is two transactions with a gap between them, and a
-  /// crash or a kill in that gap leaves the weight gone from the day it was on
-  /// and never written to the day it was moved to. That loss is silent twice over:
-  /// nothing on the bodyweight screen says a day is missing, and the reading
-  /// either side is simply interpolated across the hole, quietly rescoring every
-  /// pull-up and dip in between.
-  Future<void> logBodyweight(DateTime date, double kg, {DateTime? replacing}) =>
-      db.transaction(() => _logBodyweight(date, kg, replacing: replacing));
+  ///
+  /// Writing a weight never removes one from another day. This method once took
+  /// a `replacing` day and moved the entry, which meant that correcting the
+  /// date on a sheet opened over today's weight deleted today's weight. A day
+  /// is cleared by [deleteBodyweight] and by nothing else, because a lost
+  /// weigh-in is silent twice over: nothing on the bodyweight screen says a day
+  /// is missing, and the readings either side are simply interpolated across
+  /// the hole, quietly rescoring every pull-up and dip in between.
+  Future<void> logBodyweight(DateTime date, double kg) =>
+      db.transaction(() => _logBodyweight(date, kg));
 
-  Future<void> _logBodyweight(
-    DateTime date,
-    double kg, {
-    DateTime? replacing,
-  }) async {
+  Future<void> _logBodyweight(DateTime date, double kg) async {
     final key = dayKeyOf(date);
-    if (replacing != null && dayKeyOf(replacing) != key) {
-      await _deleteBodyweight(dayKeyOf(replacing));
-    }
     final existing = await (db.select(db.bodyweightLogs)
           ..where((t) => t.dayKey.equals(key) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)])

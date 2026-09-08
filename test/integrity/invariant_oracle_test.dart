@@ -132,13 +132,15 @@ void main() {
       await expectInvariants(db, after: 'deleteRegime');
     });
 
-    test('bodyweight logged, moved and deleted', () async {
+    test('bodyweight logged, corrected and deleted', () async {
       await repo.logBodyweight(DateTime(2026, 3, 1), 80);
       await expectInvariants(db, after: 'logBodyweight');
 
-      await repo.logBodyweight(DateTime(2026, 3, 2), 81,
-          replacing: DateTime(2026, 3, 1));
-      await expectInvariants(db, after: 'logBodyweight replacing');
+      await repo.logBodyweight(DateTime(2026, 3, 2), 81);
+      await expectInvariants(db, after: 'logBodyweight another day');
+
+      await repo.logBodyweight(DateTime(2026, 3, 2), 82);
+      await expectInvariants(db, after: 'logBodyweight same day');
     });
 
     test('a cycle advanced by training through a whole rotation', () async {

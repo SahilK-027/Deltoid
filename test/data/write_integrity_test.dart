@@ -466,45 +466,47 @@ void main() {
     });
   });
 
-  group('a bodyweight moved to another day', () {
-    test('leaves nothing behind on the day it left', () async {
-      final from = DateTime(2026, 3, 1);
-      final to = DateTime(2026, 3, 2);
-      await repo.logBodyweight(from, 80);
+  group('a bodyweight written to another day', () {
+    test('leaves the day it was opened over untouched', () async {
+      final logged = DateTime(2026, 3, 1);
+      final corrected = DateTime(2026, 2, 28);
+      await repo.logBodyweight(logged, 80);
 
-      await repo.logBodyweight(to, 80, replacing: from);
+      // The sheet opens over the newest weigh-in and carries its date. Picking
+      // an earlier day is a second weighing, never a move: the version that
+      // moved it deleted the day the sheet had been opened over.
+      await repo.logBodyweight(corrected, 79);
 
       final live = await (db.select(db.bodyweightLogs)
-            ..where((t) => t.deletedAt.isNull()))
+            ..where((t) => t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.dayKey)]))
           .get();
-      expect(live.length, 1, reason: 'one entry, not two and not none');
-      expect(live.single.dayKey, dayKeyOf(to));
-      expect(live.single.weightKg, 80);
+      expect(live.length, 2, reason: 'both days survive');
+      expect(live.first.dayKey, dayKeyOf(corrected));
+      expect(live.last.dayKey, dayKeyOf(logged));
+      expect(live.last.weightKg, 80, reason: 'the first weighing is unchanged');
     });
 
-    test('is one write, so it cannot half-happen', () async {
-      final from = DateTime(2026, 3, 1);
-      await repo.logBodyweight(from, 80);
+    test('a weight the column refuses leaves the log as it was', () async {
+      final day = DateTime(2026, 3, 1);
+      await repo.logBodyweight(day, 80);
 
-      // A move onto a day that cannot hold the weight fails at the insert,
-      // *after* the delete has run. Both have to come back together, or the
-      // reading is gone from the day it was on and never arrived anywhere.
       await expectLater(
-        repo.logBodyweight(DateTime(2026, 3, 2), 900, replacing: from),
+        repo.logBodyweight(DateTime(2026, 3, 2), 900),
         throwsA(isA<SqliteException>()),
       );
 
       final live = await (db.select(db.bodyweightLogs)
             ..where((t) => t.deletedAt.isNull()))
           .get();
-      expect(live.single.dayKey, dayKeyOf(from),
-          reason: 'the failed move put it back where it was');
+      expect(live.single.dayKey, dayKeyOf(day));
+      expect(live.single.weightKg, 80);
     });
 
-    test('re-logging the same day is an edit, not a move', () async {
+    test('re-logging the same day is an edit, not a second row', () async {
       final day = DateTime(2026, 3, 1);
       await repo.logBodyweight(day, 80);
-      await repo.logBodyweight(day, 81, replacing: day);
+      await repo.logBodyweight(day, 81);
 
       final live = await (db.select(db.bodyweightLogs)
             ..where((t) => t.deletedAt.isNull()))
