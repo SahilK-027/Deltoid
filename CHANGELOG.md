@@ -10,6 +10,17 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.6.2 — 2026-09-09
+
+### Fixed
+
+- **The value axis prints its numbers in full.** A chart whose numbers reached
+  into the two hundreds dropped the last digit off some of them, so the axis
+  read `20` where it meant `205`. The gutter holding the labels was measured
+  against the top and bottom of the axis only, and the numbers in between can be
+  wider than both — `1` is a narrower character than `0`. It is measured against
+  every number the axis prints now.
+
 ## 1.6.1 — 2026-09-08
 
 ### Fixed
