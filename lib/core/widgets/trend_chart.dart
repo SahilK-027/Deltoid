@@ -736,7 +736,7 @@ class _TrendChartState extends State<TrendChart>
                     interval: step,
                     reservedSize: _yGutter(
                       context,
-                      [formatValue(minY), formatValue(maxY)],
+                      _yTicks(minY, maxY, step).map(formatValue),
                     ),
                     getTitlesWidget: (value, meta) => _edgeSafe(
                       value,
@@ -951,7 +951,8 @@ class EmptyTrendChart extends StatelessWidget {
                     // Held open even when there is nothing to write in it, so
                     // the plot does not widen the moment data lands.
                     reservedSize: _yGutter(context, [
-                      if (formatValue case final f?) ...[f(minY), f(maxY)],
+                      if (formatValue case final f?)
+                        ..._yTicks(minY, maxY, step).map(f),
                     ]),
                     getTitlesWidget: (value, meta) {
                       final format = formatValue;
@@ -1012,12 +1013,20 @@ class EmptyTrendChart extends StatelessWidget {
 /// A constant sized for the widest value a chart might print, such as 52 or 36,
 /// causes every chart printing `70` and `102` to surrender a third of that
 /// gutter, and the time axis beneath it loses the corresponding width. Laying
-/// out the two extreme labels costs one text measurement per build and returns
-/// the unused width to the plot.
+/// out the labels costs one text measurement each per build and returns the
+/// unused width to the plot.
 ///
 /// Stable rather than intrinsic: it is derived from the axis bounds, so it
 /// changes when the chart rescales and not when a value within it moves. The
 /// plot therefore cannot shift horizontally while a line is being updated.
+///
+/// **Measured over every tick, not the two bounds.** Inter's figures are
+/// proportional — `1` is 833 units where `0` is 1292 — so a label is not as
+/// wide as its digit count. An axis running 185 to 215 measures its gutter on
+/// bounds that both contain a `1`, then prints `200` and `205`, which do not,
+/// into a box a quarter of an em too small. A side title is clipped rather than
+/// reported as overflowing, so the axis quietly reads `20` and nothing raises a
+/// word about it. See [_yTicks].
 double _yGutter(BuildContext context, Iterable<String> labels) {
   final style = context.t.bodySmall;
   var widest = 0.0;
@@ -1031,6 +1040,31 @@ double _yGutter(BuildContext context, Iterable<String> labels) {
   // The label, the gap `_edgeSafe` puts before it, and a point of air so a
   // rounded glyph does not touch the card's padding.
   return widest + Space.xs + 2;
+}
+
+/// Every value the y axis will label, so the gutter can be measured against
+/// what is actually printed in it.
+///
+/// `fl_chart` walks the ticks from the lower bound in steps of `interval`, and
+/// [_edgeSafe] then drops the two sitting on the bounds; the labels that survive
+/// are the interior ones — precisely the set a gutter measured on the bounds
+/// does not account for. The bounds are included anyway: they cost one
+/// measurement each, and a gutter a glyph too wide is invisible where one a
+/// glyph too narrow is the defect this exists to prevent.
+///
+/// A step that cannot divide the band — zero, negative, or so fine the axis
+/// would carry hundreds of ticks — falls back to the bounds rather than
+/// looping. Nothing in the app produces one, and an axis is not the place to
+/// discover otherwise.
+List<double> _yTicks(double minY, double maxY, double step) {
+  if (!step.isFinite || step <= 0 || maxY < minY) return [minY, maxY];
+  final count = (maxY - minY) / step;
+  if (!count.isFinite || count > 64) return [minY, maxY];
+  return [
+    for (var i = 0; i <= count.ceil(); i++)
+      if (minY + step * i <= maxY) minY + step * i,
+    maxY,
+  ];
 }
 
 /// A tick at the very edge has half a line of room and ends up printed over
