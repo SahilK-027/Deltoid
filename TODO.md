@@ -80,7 +80,6 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 5 · The Regime cluster.
 - [x] 6 · Settings, bodyweight log, all-time heatmap.
 - [x] Feel — ink, folds, damped scrolling, no spinner over existing content.
-- [ ] 7 · Reconciliation — light theme checked on five **empty** screens only, plus the system bars, which are fixed. Unchecked, and all of it needs a populated log: chart lines, heatmap ramp, volume bars, a second regime's identity mark, deload orange, the log itself, and motion in either theme.
 
 ### Hardening
 
