@@ -522,8 +522,18 @@ history, and one of them is wrong. One emoji per type:
 
 A release commit carries `chore(release): <version>+<build>` and a body saying
 what kind of release it is and why. `CHANGELOG.md` is written in the same
-commit, in the user's terms rather than the diff's, and is the record a person
-reads — the release commit's body is the record a maintainer reads.
+commit, to the template in its own header — Keep a Changelog sections, an
+`**Area:**` on every user-facing bullet, one line per bullet — and states what
+changed in behaviour rather than what the diff touched. It is the record a
+person reads; the release commit's body is the record a maintainer reads.
+
+The GitHub release is the changelog entry, never a second text written beside
+it:
+
+```bash
+dart tool/release_notes.dart <version> > notes.md
+gh release create v<version> <apk> --title v<version> --notes-file notes.md
+```
 
 ### A rule that matters is a rule something checks
 
@@ -546,6 +556,7 @@ rather than shape. Where the checks live now:
 | A query's row count is bounded                                                          | an `assert` at the boundary, or a comment saying why it does not grow — `training_repository.dart`                                                                                                                                                                                                                                                                                                                                                                                                 |
 | A painter never clamps to a bound it computed                                           | `test/core/clamp_bounds_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Every sheet opens through one route, with the safe area on it                           | `test/core/sheet_safe_area_test.dart` — any other call to `showModalBottomSheet` fails                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Every changelog entry follows the one template                                          | `test/tools/changelog_format_test.dart` — headings, section order, area prefixes, no hard wraps, link references                                                                                                                                                                                                                                                                                                                                                                                   |
 | A screen you left stops querying                                                        | `test/features/volume_provider_lifetime_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | An exception to THEME or RULES is written into the document                             | `test/core/documented_exceptions_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | The light ramp is legible                                                               | `test/core/light_theme_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
