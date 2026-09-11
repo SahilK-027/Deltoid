@@ -270,13 +270,8 @@ class _RegimeRow extends ConsumerWidget {
 
   Future<void> _showActions(BuildContext context, WidgetRef ref) {
     final active = summary.regime.isActive;
-    return showModalBottomSheet<void>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
+    return showAppSheet<void>(
+      context,
       builder: (sheet) => AppSheet(
         title: summary.regime.name,
         contentPadding: const EdgeInsets.only(bottom: Space.md),

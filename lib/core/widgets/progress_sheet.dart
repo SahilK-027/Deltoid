@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../progress.dart';
 import '../theme/tokens.dart';
+import 'primitives.dart';
 
 /// Runs a long job behind a sheet that says what it is doing.
 ///
@@ -25,14 +26,9 @@ Future<T?> withProgressSheet<T>(
   final navigator = Navigator.of(context);
 
   unawaited(
-    showModalBottomSheet<void>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      showDragHandle: false,
+    showAppSheet<void>(
+      context,
+      dismissible: false,
       builder: (_) => PopScope(
         canPop: false,
         child: _ProgressSheet(title: title, step: step),

@@ -752,11 +752,8 @@ Future<T?> _pick<T>(
   required String Function(T) labelOf,
   String Function(T)? helperOf,
 }) {
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
-    useSafeArea: true,
+  return showAppSheet<T>(
+    context,
     // Capped, and this is what stops `Muscle` reading as a drawer rather than a
     // sheet. Twelve rows at 56 plus a header is taller than the phone, so an
     // uncapped sheet opened edge to edge over the status bar with the page it
@@ -764,9 +761,7 @@ Future<T?> _pick<T>(
     // has almost no distance left to travel, so its entrance and its exit both
     // looked like a cut. Two thirds leaves the screen behind it visible, which
     // is the thing that makes the movement legible.
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.of(context).size.height * 0.66,
-    ),
+    maxHeightFraction: 0.66,
     builder: (sheet) => AppSheet(
       title: title,
       contentPadding: const EdgeInsets.only(bottom: Space.md),
@@ -1017,13 +1012,8 @@ Future<void> showTargetEditor(
   SessionExercise slot,
   Exercise exercise,
 ) {
-  return showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     builder: (sheet) => _TargetSheet(slot: slot, exercise: exercise),
   );
 }

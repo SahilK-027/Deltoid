@@ -414,13 +414,8 @@ class _FeedFilterBar extends ConsumerWidget {
     List<LoggedSession> sessions,
     HistoryFilter filter,
   ) async {
-    final chosen = await showModalBottomSheet<String>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
+    final chosen = await showAppSheet<String>(
+      context,
       builder: (sheet) => AppSheet(
         title: 'Training day',
         subtitle: 'Days you have actually logged',

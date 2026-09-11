@@ -19,17 +19,11 @@ Future<AdoptionChoice?> showAdoptionSheet(
   BuildContext context,
   AdoptionSurvey survey,
 ) {
-  return showModalBottomSheet<AdoptionChoice>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
+  return showAppSheet<AdoptionChoice>(
+    context,
     // Two histories and one of them is about to go. Not something to lose by
     // brushing the scrim.
-    isDismissible: false,
-    enableDrag: false,
-    showDragHandle: false,
+    dismissible: false,
     builder: (_) => _AdoptionSheet(survey: survey),
   );
 }

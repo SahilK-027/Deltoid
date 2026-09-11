@@ -23,14 +23,8 @@ Future<void> showReorderSheet(
   required List<({String id, String label})> items,
   required ValueChanged<List<String>> onCommit,
 }) {
-  return showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     builder: (_) => _ReorderSheet(
       title: title,
       subtitle: subtitle,

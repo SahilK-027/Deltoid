@@ -161,14 +161,8 @@ class SettingsScreen extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final box = context.findRenderObject() as RenderBox?;
 
-    final destination = await showModalBottomSheet<_ExportTo>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      isScrollControlled: true,
-      // `SheetHeader` draws its own grab handle, tighter than the framework's.
-      showDragHandle: false,
+    final destination = await showAppSheet<_ExportTo>(
+      context,
       builder: (sheet) => AppSheet(
         title: 'Export backup',
         subtitle: 'Every workout, in one file',
@@ -528,11 +522,8 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
   /// destructive one is last because red is where a list ends (THEME → Sheets).
   Future<void> _openAccountSheet(BuildContext context, WidgetRef ref) async {
     final c = context.c;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      // `AppSheet` draws its own grab handle, tighter than the framework's.
-      showDragHandle: false,
+    final choice = await showAppSheet<String>(
+      context,
       builder: (sheet) => AppSheet(
         title: 'Account',
         contentPadding: EdgeInsets.zero,
@@ -719,11 +710,8 @@ class _UnitRow extends ConsumerWidget {
     WidgetRef ref,
     WeightUnit current,
   ) async {
-    final picked = await showModalBottomSheet<WeightUnit>(
-      context: context,
-      useSafeArea: true,
-      // `AppSheet` draws its own grab handle, tighter than the framework's.
-      showDragHandle: false,
+    final picked = await showAppSheet<WeightUnit>(
+      context,
       builder: (sheet) => AppSheet(
         title: 'Weight units',
         contentPadding: EdgeInsets.zero,
@@ -1081,12 +1069,8 @@ class _RestRow extends ConsumerWidget {
 
 /// The rest settings, with room for each one to say what it governs.
 Future<void> showRestSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     builder: (sheet) => Consumer(
       builder: (context, ref, _) {
         final prefs =

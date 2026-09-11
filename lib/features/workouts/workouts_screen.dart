@@ -148,14 +148,8 @@ Future<void> _trainAnotherSession(
   required List<Session> sessions,
   required CycleStatus status,
 }) async {
-  final chosen = await showModalBottomSheet<Session>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  final chosen = await showAppSheet<Session>(
+    context,
     builder: (sheet) => AppSheet(
       title: 'Start a session',
       subtitle: 'Cycle ${status.cycleIndex}',
@@ -211,14 +205,8 @@ Future<void> _logPastSession(
     return;
   }
 
-  final picked = await showModalBottomSheet<_BackfillResult>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  final picked = await showAppSheet<_BackfillResult>(
+    context,
     builder: (sheet) => _BackfillSheet(sessions: sessions),
   );
   if (picked == null || !context.mounted) return;
@@ -351,13 +339,8 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   /// True to open what is there, false to log another, null to back out.
   Future<bool?> _confirmTrainedDay(DateTime day, HeatDay logged) {
     final count = logged.workouts;
-    return showModalBottomSheet<bool>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
+    return showAppSheet<bool>(
+      context,
       builder: (sheet) => AppSheet(
         title: DateFormat('EEEE d MMMM').format(day),
         subtitle: count == 1

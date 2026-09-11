@@ -365,12 +365,8 @@ class TrendRangeBar extends StatelessWidget {
       window.year != null ? const TrendWindow.calendar(-1) : window;
 
   Future<void> _pickGranularity(BuildContext context) async {
-    final picked = await showModalBottomSheet<Object>(
-      // The route holds the system bars: a sheet that sizes itself can
-      // otherwise run under the status bar. See [pickExercise].
-      useSafeArea: true,
-      context: context,
-      showDragHandle: false,
+    final picked = await showAppSheet<Object>(
+      context,
       builder: (sheet) => AppSheet(
         title: 'Average by',
         contentPadding: const EdgeInsets.fromLTRB(
@@ -402,22 +398,13 @@ class TrendRangeBar extends StatelessWidget {
   static const _auto = Object();
 
   Future<void> _pickYear(BuildContext context) async {
-    final picked = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
-      // The sheet keeps itself inside the system's insets rather than relying
-      // on the one inside it: `isScrollControlled` lets a long list grow to the
-      // full height of the window, which on an edge-to-edge Android device
-      // exceeds the visible screen.
-      useSafeArea: true,
-      // And it never takes the whole of it. Twenty years of training is a list
+    final picked = await showAppSheet<int>(
+      context,
+      // Capped. Twenty years of training is a list
       // longer than a phone, and a sheet that fills the screen is a screen
       // wearing a sheet's clothes — the barrier above it is what says this is a
       // question that can be dismissed.
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.7,
-      ),
+      maxHeightFraction: 0.7,
       builder: (sheet) => AppSheet(
         title: 'Which year?',
         // The default padding, minus the top the header already provides.

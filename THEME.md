@@ -424,6 +424,12 @@ goes in the trailing slot, on the title's line.
 
 ### Sheets — the default for any choice
 
+**Every sheet opens through `showAppSheet`.** The route is written once — safe
+area, scroll control, no framework drag handle — and a caller chooses only
+whether the sheet can be dismissed and how much of the screen it may take.
+`test/core/sheet_safe_area_test.dart` fails on any other call to
+`showModalBottomSheet`.
+
 **A sheet reserves the gesture bar itself, and `SafeArea` is not how.** The route
 consumes the bottom padding before the builder runs, so a `SafeArea` inside sees
 zero and adds nothing — every sheet had its last row under the system nav bar

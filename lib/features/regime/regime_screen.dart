@@ -260,13 +260,8 @@ Future<void> _showCycleSheet(
     return 'A session';
   }
 
-  return showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     builder: (sheet) => AppSheet(
       title: 'Cycle ${status.cycleIndex}',
       subtitle: '${status.done} of ${status.total} days trained',
@@ -662,13 +657,8 @@ Future<String?> promptForText(
   String? Function(String value)? validate,
   int maxLength = 60,
 }) {
-  return showModalBottomSheet<String>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<String>(
+    context,
     builder: (sheet) => _NamePromptSheet(
       title: title,
       hint: hint,

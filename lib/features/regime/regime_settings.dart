@@ -22,13 +22,8 @@ Future<void> showRegimeSettings(
   WidgetRef ref,
   Regime regime,
 ) {
-  return showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     // The screen's context, kept for the rows that close this sheet and open
     // the next thing: a sheet's own context is dead the moment it pops, and
     // `Reorder days` would then open on nothing.
@@ -115,13 +110,8 @@ Future<void> showDeloadSettings(
   BuildContext context,
   String regimeId,
 ) {
-  return showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<void>(
+    context,
     builder: (_) => _DeloadSheet(regimeId: regimeId),
   );
 }

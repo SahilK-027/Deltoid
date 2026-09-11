@@ -1618,6 +1618,47 @@ class SheetHeader extends StatelessWidget {
   }
 }
 
+/// Opens a sheet. The one way the app opens one, so every sheet sits on the
+/// same route and none can come out different from its neighbours.
+///
+/// **The route holds the system bars, not the sheet.** `useSafeArea` defaults
+/// to false, and with `isScrollControlled` that lets the sheet take the whole
+/// screen — the status bar included, which is where `Exercises` once ended up
+/// drawn across the clock and the battery. It cannot be answered inside the
+/// sheet: a modal route reports both `padding` and `viewPadding` as zero to its
+/// own child — measured on a phone, not assumed — so the inset is the route's
+/// to know.
+///
+/// Scroll-controlled always, so a sheet sizes to its content rather than to
+/// the framework's nine-sixteenths cap, and without the framework's drag
+/// handle, because [SheetHeader] draws its own, tighter one.
+///
+/// [dismissible] false holds the sheet open against the scrim and the drag,
+/// for a question that must be answered. [maxHeightFraction] caps a sheet
+/// whose content can outgrow the phone, so the screen behind it stays in
+/// sight.
+Future<T?> showAppSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+  bool dismissible = true,
+  double? maxHeightFraction,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: false,
+    isDismissible: dismissible,
+    enableDrag: dismissible,
+    constraints: maxHeightFraction == null
+        ? null
+        : BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * maxHeightFraction,
+          ),
+    builder: builder,
+  );
+}
+
 /// Wraps sheet content: header, scrollable body, safe area.
 class AppSheet extends StatelessWidget {
   const AppSheet({
@@ -1726,13 +1767,8 @@ Future<String?> promptForNote(
   String? hint,
   int maxLength = 500,
 }) {
-  return showModalBottomSheet<String>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  return showAppSheet<String>(
+    context,
     // The keyboard is `AppSheet`'s business — see the inset it reserves.
     builder: (sheet) => _NoteSheet(
       title: title,
@@ -1837,13 +1873,8 @@ Future<bool> confirmAction(
   bool destructive = true,
   List<String> highlight = const [],
 }) async {
-  final answer = await showModalBottomSheet<bool>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  final answer = await showAppSheet<bool>(
+    context,
     builder: (ctx) {
       final c = ctx.c;
       return SafeArea(

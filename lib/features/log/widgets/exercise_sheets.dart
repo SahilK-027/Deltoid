@@ -52,14 +52,8 @@ Future<void> showExerciseInfo(
   // answer here would state one fact twice on one screen, differently (rule 6).
   final bar = entry.workoutExercise.barKind ?? exercise.barKind;
 
-  await showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  await showAppSheet<void>(
+    context,
     builder: (sheetContext) => AppSheet(
       title: exercise.name,
       contentPadding: const EdgeInsets.only(bottom: Space.md),
@@ -182,14 +176,8 @@ Future<void> showExerciseMenu(
   );
   if (!context.mounted) return;
 
-  await showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  await showAppSheet<void>(
+    context,
     builder: (sheetContext) => AppSheet(
       title: entry.exercise.name,
       // Actions only. The cue, the videos and where today's numbers came from
@@ -388,14 +376,8 @@ Future<void> showSetActions(
 }) async {
   final repo = ref.read(trainingRepositoryProvider);
 
-  await showModalBottomSheet<void>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  await showAppSheet<void>(
+    context,
     builder: (sheetContext) => AppSheet(
       title: _setTitle(set.setType, label, leg),
       contentPadding: const EdgeInsets.only(bottom: Space.md),
@@ -471,14 +453,8 @@ Future<void> showSetActions(
 
 Future<SkipReason?> _pickSkipReason(BuildContext context) {
   final reasons = SkipReason.values.where((r) => r != SkipReason.none).toList();
-  return showModalBottomSheet<SkipReason>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  return showAppSheet<SkipReason>(
+    context,
     builder: (ctx) => AppSheet(
       title: 'Why skipped?',
       contentPadding: const EdgeInsets.only(bottom: Space.md),
@@ -513,21 +489,8 @@ Future<Exercise?> pickExercise(
   WidgetRef ref, {
   Set<String> alreadyIn = const {},
 }) {
-  return showModalBottomSheet<Exercise>(
-    context: context,
-    isScrollControlled: true,
-    // **The route holds the system bars, not the sheet.** `useSafeArea`
-    // defaults to false, and with `isScrollControlled` that lets the sheet take
-    // the whole screen — the status bar included, which is where `Exercises`
-    // ended up drawn across the clock and the battery.
-    //
-    // It cannot be answered inside the sheet. A modal route reports **both**
-    // `padding` and `viewPadding` as zero to its own child — measured on a
-    // phone, not assumed: `padding=(t0.0,b0.0) viewPadding=(t0.0,b0.0)` with
-    // the keyboard up. So every arithmetic version reads `max(0, 0)` and
-    // reserves nothing. The inset is the route's to know.
-    useSafeArea: true,
-    showDragHandle: false,
+  return showAppSheet<Exercise>(
+    context,
     builder: (_) => _ExercisePicker(alreadyIn: alreadyIn),
   );
 }
@@ -592,8 +555,8 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
     final reserved = media.viewInsets.bottom + media.padding.bottom;
 
     // No top term. Both `padding.top` and `viewPadding.top` read zero inside a
-    // modal route, so there is nothing here to subtract — `useSafeArea` on the
-    // route is what keeps this sheet off the status bar, and it is the only
+    // modal route, so there is nothing here to subtract — the safe area `showAppSheet`
+    // puts on the route is what keeps this sheet off the status bar, and it is the only
     // thing that can.
     final available = media.size.height - reserved;
     return Padding(

@@ -742,13 +742,8 @@ Future<void> logBodyweightPrompt(
   final logged = {for (final p in await repo.bodyweightSeries()) p.dayKey};
   if (!context.mounted) return;
 
-  final result = await showModalBottomSheet<_BodyweightResult>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: false,
+  final result = await showAppSheet<_BodyweightResult>(
+    context,
     builder: (sheet) => _BodyweightSheet(
       unit: unit,
       date: date,

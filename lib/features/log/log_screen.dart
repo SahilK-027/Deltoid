@@ -2263,14 +2263,8 @@ Future<_FinishChoice?> _confirmEarlyFinish(
   required int total,
   required List<({String name, int done, int total})> unfinished,
 }) {
-  return showModalBottomSheet<_FinishChoice>(
-    // The route holds the system bars: a sheet that sizes itself can
-    // otherwise run under the status bar. See [pickExercise].
-    useSafeArea: true,
-    context: context,
-    isScrollControlled: true,
-    // `AppSheet` draws its own grab handle, tighter than the framework's.
-    showDragHandle: false,
+  return showAppSheet<_FinishChoice>(
+    context,
     builder: (sheet) {
       final c = sheet.c;
       return AppSheet(
