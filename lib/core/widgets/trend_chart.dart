@@ -123,6 +123,10 @@ class TrendWindow {
 
 // ─── The time axis ──────────────────────────────────────────────────────────
 
+/// A gridline's dash: four points drawn, four left out. One pattern for every
+/// chart, line or bar, since THEME has them share their gridlines.
+const gridlineDash = <int>[4, 4];
+
 /// How many date labels a chart draws, whatever it is showing.
 ///
 /// Seven, always. It is enough to read a year by its months and few enough that
@@ -708,7 +712,7 @@ class _TrendChartState extends State<TrendChart>
                 drawVerticalLine: false,
                 horizontalInterval: step,
                 getDrawingHorizontalLine: (_) =>
-                    FlLine(color: c.border, strokeWidth: 1, dashArray: [4, 4]),
+                    FlLine(color: c.border, strokeWidth: 1, dashArray: gridlineDash),
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
@@ -925,7 +929,7 @@ class EmptyTrendChart extends StatelessWidget {
                 drawVerticalLine: false,
                 horizontalInterval: step,
                 getDrawingHorizontalLine: (_) =>
-                    FlLine(color: c.border, strokeWidth: 1, dashArray: [4, 4]),
+                    FlLine(color: c.border, strokeWidth: 1, dashArray: gridlineDash),
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(

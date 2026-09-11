@@ -654,8 +654,8 @@ resolution.
 - Y bounds are the data plus air, snapped to a round step, and **never anchored
   at zero** unless zero is in the data — anchoring draws a year of bodyweight as
   a flat line an inch off the bottom.
-- Dashed horizontal gridlines only, in `border`. **No vertical gridlines, no
-  chart border.**
+- Dashed horizontal gridlines only, in `border`, **4 drawn and 4 left out** on
+  every chart. **No vertical gridlines, no chart border.**
 - Y labels **right** at `label` size; X labels below the baseline.
 - A series is a 2px line with open circle markers, filled `bg`, stroked in the
   series colour. Sparklines drop the axes entirely.

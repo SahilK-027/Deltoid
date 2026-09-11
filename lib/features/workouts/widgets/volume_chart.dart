@@ -207,8 +207,14 @@ class _Gridlines extends CustomPainter {
       final y = size.height - size.height * (tick / max);
       // Dashed, drawn by hand: `Canvas` has no dash, and a solid rule at every
       // step turns the plot into a grid you read instead of bars.
-      for (var x = 0.0; x < size.width; x += 6) {
-        canvas.drawLine(Offset(x, y), Offset(x + 3, y), paint);
+      final on = gridlineDash[0].toDouble();
+      final step = on + gridlineDash[1];
+      for (var x = 0.0; x < size.width; x += step) {
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(math.min(x + on, size.width), y),
+          paint,
+        );
       }
     }
   }
