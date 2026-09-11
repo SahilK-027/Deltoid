@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/theme/tokens.dart';
+import 'package:deltoid/core/widgets/primitives.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -152,7 +153,7 @@ void main() {
               children: [
                 Text('Push 1', style: Theme.of(context).textTheme.titleLarge),
                 const TextField(decoration: InputDecoration(hintText: 'Name')),
-                FilledButton(onPressed: () {}, child: const Text('Start')),
+                PrimaryButton(label: 'Start', onPressed: () {}),
               ],
             ),
           ),

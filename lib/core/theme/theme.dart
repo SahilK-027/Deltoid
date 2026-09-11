@@ -162,20 +162,6 @@ ThemeData buildTheme(Brightness brightness) {
       titleTextStyle: text.headlineSmall,
       contentTextStyle: text.bodyLarge?.copyWith(color: c.textSecondary),
     ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: c.accent,
-        foregroundColor: c.onAccent,
-        disabledBackgroundColor: c.surfaceHigh,
-        disabledForegroundColor: c.textTertiary,
-        minimumSize: const Size.fromHeight(54),
-        textStyle: text.titleMedium,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.control),
-        ),
-      ),
-    ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: c.textPrimary,
