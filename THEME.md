@@ -800,6 +800,9 @@ as pressed. A pad that captions itself covers what it is captioning.
   one rep for a count, half a minute for a time (`+0:30`, never `+30`).
 - **On an empty buffer, a step starts from last time** — "one plate more than
   last time" is the most common intent there is.
+- **No "Last time" button.** The ghost in the cell already shows last time's
+  number and the advance key adopts it when nothing is typed, so a button
+  repeating it is the same number printed twice.
 - **A ceiling is on the value, not the digit count.** Counting characters lets
   `999.99` through and refuses `1000.5` for being long rather than wrong.
 - **The advance key names what it does** — `Next`, `Done`, or a question when

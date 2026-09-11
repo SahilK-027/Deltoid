@@ -1191,12 +1191,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
       // asked for.
       partial: _partialShownFor == target.setId,
       onTogglePartial: canBePartial ? () => _togglePartial(set) : null,
-      // Last time's number is a full-rep number. Offering it while the digits
-      // are going into the partial count would file it as halves.
-      hint: hint.isEmpty || _partialField ? null : hint,
-      onUseHint: hint.isEmpty || _partialField
-          ? null
-          : () => _commit(hint, target),
       nextLabel: needsReps
           ? (entry.exercise.measureMode.isHold ? 'Enter time' : 'Enter reps')
           : isLast

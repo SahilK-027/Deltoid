@@ -53,8 +53,7 @@ String formatDigits(String digits) =>
 ///
 /// The system keyboard is the wrong tool with chalky hands mid-set: small
 /// targets, a layout that shifts, and no notion of "add 2.5kg". This one keeps
-/// the log visible above it and puts the two things you actually want — last
-/// time's numbers and a plate increment — one tap away.
+/// the log visible above it and puts a plate increment one tap away.
 class SetKeypad extends StatelessWidget {
   const SetKeypad({
     super.key,
@@ -64,8 +63,6 @@ class SetKeypad extends StatelessWidget {
     required this.onKey,
     required this.onNext,
     required this.onDismiss,
-    this.hint,
-    this.onUseHint,
     this.nextLabel = 'Next',
     this.barKg,
     this.isTime = false,
@@ -91,9 +88,6 @@ class SetKeypad extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onDismiss;
 
-  /// Last time's value for this field, if any.
-  final String? hint;
-  final VoidCallback? onUseHint;
   final String nextLabel;
 
   /// Empty bar weight, when this movement is loaded on one. Drives the plate
@@ -133,27 +127,13 @@ class SetKeypad extends StatelessWidget {
               // the digits land in that field as they are pressed. A keypad
               // that captions itself is a keypad covering the thing it is
               // captioning.
-              Row(
-                children: [
-                  if (hint != null && onUseHint != null)
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: Space.md,
-                        ),
-                        side: BorderSide(color: c.borderStrong),
-                        foregroundColor: c.textSecondary,
-                      ),
-                      onPressed: onUseHint,
-                      child: Text(
-                        'Last time '
-                        '${isTime ? formatDigits(hint!) : hint}',
-                      ),
-                    ),
-                  const Spacer(),
-                  PadDismissButton(onPressed: onDismiss),
-                ],
+              // No "Last time" button either. The ghost in the cell being
+              // typed into already shows last time's number, and `Next` adopts
+              // it when nothing is typed, so a button repeating it was the same
+              // number printed twice.
+              Align(
+                alignment: Alignment.centerRight,
+                child: PadDismissButton(onPressed: onDismiss),
               ),
               // The plate view grows in and collapses to nothing, rather than
               // sitting in a reserved slot: an empty 60pt band above the digits
