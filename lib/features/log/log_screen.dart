@@ -2192,8 +2192,9 @@ class _ExercisePage extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: Space.sm),
                 child: Row(
                   children: [
-                    _RoundButton(
-                      icon: Icons.add_rounded,
+                    _addButton(
+                      context,
+                      tooltip: 'Add a set',
                       onTap: () => ref
                           .read(trainingRepositoryProvider)
                           .addSet(entry.workoutExercise.id),
@@ -2516,8 +2517,9 @@ class _SetGroup extends ConsumerWidget {
                     //
                     // Long-press is that leg's own actions: its cell is spoken
                     // for, and every other row in this column opens a sheet.
-                    _ when k == last => _RoundButton(
-                      icon: Icons.add_rounded,
+                    _ when k == last => _addButton(
+                      context,
+                      tooltip: 'Add a leg',
                       onTap: addLeg,
                       onLongPress: () => _openActions(context, ref, k),
                     ),
@@ -2558,7 +2560,7 @@ class _SetGroup extends ConsumerWidget {
               _IndexCell(
                 spine: _Spine.bottom,
                 height: _footHeight,
-                child: _RoundButton(icon: Icons.add_rounded, onTap: addLeg),
+                child: _addButton(context, tooltip: 'Add a leg', onTap: addLeg),
               ),
             ],
           ),
@@ -2657,37 +2659,6 @@ class _IndexCell extends StatelessWidget {
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({
-    required this.icon,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  /// The width of the index column, so a capsule's foot closes on its edge.
-  static const size = SetRow.indexColumn;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Pressable(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: c.surfaceHigh, shape: BoxShape.circle),
-        child: Icon(icon, size: size * 0.6, color: c.textSecondary),
-      ),
-    );
-  }
-}
-
 /// A drop leg's index cell. The capsule already says the row belongs to the set
 /// above it, so this is only a mark that something is here to press — and, like
 /// every other chip in this column, the way into that row's type, note and
@@ -2761,3 +2732,23 @@ class _InfoButton extends StatelessWidget {
     );
   }
 }
+
+/// The `+` in the set table's index column: the width of the column, so a
+/// capsule's foot closes on its edge, and quieter than a header's buttons
+/// because it sits among the set numbers rather than above them.
+Widget _addButton(
+  BuildContext context, {
+  required String tooltip,
+  required VoidCallback onTap,
+  VoidCallback? onLongPress,
+}) =>
+    CircleIconButton(
+      icon: Icons.add_rounded,
+      tooltip: tooltip,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      size: SetRow.indexColumn,
+      glyphScale: 0.6,
+      pressScale: 0.97,
+      tint: context.c.textSecondary,
+    );

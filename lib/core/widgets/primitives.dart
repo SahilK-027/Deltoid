@@ -968,13 +968,20 @@ class CircleIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     required this.tooltip,
+    this.onLongPress,
     this.tint,
     this.fill,
     this.size = 40,
+    this.glyphScale = 0.45,
+    this.pressScale = 0.92,
   });
 
   final IconData icon;
   final VoidCallback? onTap;
+
+  /// A second action on the same button. Takes the long press, so the tooltip
+  /// stands down and the name is carried by `Semantics` alone.
+  final VoidCallback? onLongPress;
 
   /// What this button does, in one or two words.
   final String tooltip;
@@ -982,12 +989,20 @@ class CircleIconButton extends StatelessWidget {
   final Color? fill;
   final double size;
 
+  /// The glyph as a share of [size]. The `+` in the set table's index column
+  /// is drawn larger, at 0.6, because the column is narrower than the button.
+  final double glyphScale;
+
+  /// How far it presses, as [Pressable.scale].
+  final double pressScale;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final button = Pressable(
       onTap: onTap,
-      scale: 0.92,
+      onLongPress: onLongPress,
+      scale: pressScale,
       child: Container(
         width: size,
         height: size,
@@ -996,7 +1011,11 @@ class CircleIconButton extends StatelessWidget {
           color: fill ?? c.surfaceHigh,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: size * 0.45, color: tint ?? c.textPrimary),
+        child: Icon(
+          icon,
+          size: size * glyphScale,
+          color: tint ?? c.textPrimary,
+        ),
       ),
     );
     // Named as well as tipped: a tooltip needs a long press to appear, which is
@@ -1005,7 +1024,9 @@ class CircleIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: tooltip,
-      child: Tooltip(message: tooltip, child: button),
+      child: onLongPress == null
+          ? Tooltip(message: tooltip, child: button)
+          : button,
     );
   }
 }
