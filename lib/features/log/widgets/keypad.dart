@@ -152,16 +152,7 @@ class SetKeypad extends StatelessWidget {
                       ),
                     ),
                   const Spacer(),
-                  SizedBox(
-                    height: 28,
-                    width: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: const Icon(Icons.keyboard_hide_outlined),
-                      onPressed: onDismiss,
-                    ),
-                  ),
+                  PadDismissButton(onPressed: onDismiss),
                 ],
               ),
               // The plate view grows in and collapses to nothing, rather than
@@ -315,42 +306,110 @@ class _Key extends StatelessWidget {
   final int flex;
 
   @override
+  Widget build(BuildContext context) => Expanded(
+        flex: flex,
+        child: PadKey(
+          label: label ?? '',
+          icon: icon,
+          onTap: onTap,
+          muted: muted,
+          accent: accent,
+        ),
+      );
+}
+
+/// One key on a pad: the set keypad's digits and its `Next`, and the stopwatch
+/// pad's Start and Stop. One key, so the two pads under the same thumb are the
+/// same height, the same corner and the same ink.
+///
+/// An [icon] with an empty [label] is a glyph key; both is a glyph leading its
+/// word. [accent] is the key that ends the entry. With no [onTap] the key keeps
+/// its slot and draws nothing.
+class PadKey extends StatelessWidget {
+  const PadKey({
+    super.key,
+    this.label = '',
+    this.icon,
+    required this.onTap,
+    this.muted = false,
+    this.accent = false,
+    this.haptic = true,
+  });
+
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onTap;
+  final bool muted;
+  final bool accent;
+
+  /// A selection tick under the thumb on every key typed. The stopwatch's
+  /// Start and Stop pass false, because they give their own heavier one — and
+  /// Stop gives none for a mis-tap inside the first second.
+  final bool haptic;
+
+  @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final bg = accent ? c.accent : (muted ? c.surfaceHigh : c.surfaceHigh);
+    final bg = accent ? c.accent : c.surfaceHigh;
     final fg = accent ? c.onAccent : (muted ? c.textSecondary : c.textPrimary);
+    final text = Text(
+      label,
+      style: context.t.titleMedium?.copyWith(
+        color: fg,
+        fontFeatures: tabular,
+      ),
+    );
 
-    return Expanded(
-      flex: flex,
-      child: SizedBox(
-        height: Sizes.key,
-        child: Material(
-          color: onTap == null ? Colors.transparent : bg,
+    return SizedBox(
+      height: Sizes.key,
+      child: Material(
+        color: onTap == null ? Colors.transparent : bg,
+        borderRadius: BorderRadius.circular(Radii.control),
+        child: InkWell(
           borderRadius: BorderRadius.circular(Radii.control),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(Radii.control),
-            onTap: onTap == null
-                ? null
-                : () {
-                    HapticFeedback.selectionClick();
-                    onTap!();
-                  },
-            child: Center(
-              child: icon != null
-                  ? Icon(icon, size: 20, color: fg)
-                  : Text(
-                      label ?? '',
-                      style: context.t.titleMedium?.copyWith(
-                        color: fg,
-                        fontFeatures: tabular,
-                      ),
-                    ),
-            ),
+          onTap: onTap == null
+              ? null
+              : () {
+                  if (haptic) HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          child: Center(
+            child: switch ((icon, label.isEmpty)) {
+              (final glyph?, true) => Icon(glyph, size: 20, color: fg),
+              (final glyph?, false) => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(glyph, size: 20, color: fg),
+                    const SizedBox(width: Space.sm),
+                    text,
+                  ],
+                ),
+              (null, _) => text,
+            },
           ),
         ),
       ),
     );
   }
+}
+
+/// The ⌄ that puts a pad away, top right of both pads.
+class PadDismissButton extends StatelessWidget {
+  const PadDismissButton({super.key, required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 28,
+        width: 28,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          iconSize: 18,
+          icon: const Icon(Icons.keyboard_hide_outlined),
+          onPressed: onPressed,
+        ),
+      );
 }
 
 /// Switches the digits between a set's full reps and its partials.

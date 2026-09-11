@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/ticking.dart';
+import 'keypad.dart' show PadDismissButton, PadKey;
 
 /// The keypad's replacement for a timed hold: a stopwatch, not ten digits.
 ///
@@ -133,28 +134,23 @@ class _HoldPadState extends State<HoldPad> {
                       ),
                     ),
                   const Spacer(),
-                  SizedBox(
-                    height: 28,
-                    width: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: const Icon(Icons.keyboard_hide_outlined),
-                      onPressed: widget.onDismiss,
-                    ),
-                  ),
+                  PadDismissButton(onPressed: widget.onDismiss),
                 ],
               ),
               // Only the clock ticks. Everything else here is static, and the
               // set table above it must not repaint once a second.
               Ticking(builder: _clock),
               const SizedBox(height: Space.md),
-              SizedBox(
-                height: Sizes.key,
-                child: _Primary(
-                  running: _startedAt != null,
-                  onTap: _startedAt == null ? _start : _stop,
-                ),
+              // Stop is the accent key, in the place the keypad's `Next` sits:
+              // the action that ends the set is the action under your thumb.
+              PadKey(
+                icon: _startedAt != null
+                    ? Icons.stop_rounded
+                    : Icons.play_arrow_rounded,
+                label: _startedAt != null ? 'Stop' : 'Start hold',
+                accent: _startedAt != null,
+                haptic: false,
+                onTap: _startedAt == null ? _start : _stop,
               ),
               const SizedBox(height: Space.sm),
             ],
@@ -223,47 +219,5 @@ class _HoldPadState extends State<HoldPad> {
     final m = seconds ~/ 60;
     final s = seconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
-  }
-}
-
-class _Primary extends StatelessWidget {
-  const _Primary({required this.running, required this.onTap});
-
-  final bool running;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    // Stop is the accent key, in the place the keypad's `Next` sits: the
-    // action that ends the set is the action under your thumb.
-    final bg = running ? c.accent : c.surfaceHigh;
-    final fg = running ? c.onAccent : c.textPrimary;
-
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(Radii.control),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.control),
-        onTap: onTap,
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                running ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                size: 20,
-                color: fg,
-              ),
-              const SizedBox(width: Space.sm),
-              Text(
-                running ? 'Stop' : 'Start hold',
-                style: context.t.titleMedium?.copyWith(color: fg),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
