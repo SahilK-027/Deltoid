@@ -44,7 +44,7 @@ class VolumeChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final gutter = _yAxisWidth(context, _Axis.of(series.peakPerWeek(by)).max);
+    final gutter = _yAxisWidth(context, _Axis.of(series.peakPerWeek(by)));
     // Coarsened against the weeks in hand — see [autoGranularityFor]. A window
     // and its data disagree for a frame when the range changes, and that frame
     // must not ask for two and a half thousand bars in a phone's width.
@@ -145,10 +145,20 @@ class VolumeChart extends StatelessWidget {
 /// ink. The room comes off the plot and therefore off the date labels under it,
 /// which are the ones short of space.
 ///
-/// Fixed rather than intrinsic: it is derived from the axis *maximum*, so it
-/// changes when the chart rescales and not as bars move under it.
-double _yAxisWidth(BuildContext context, int max) =>
-    axisGutter(context, ['$max'], gap: 0);
+/// Fixed rather than intrinsic: it is derived from the axis, so it changes
+/// when the chart rescales and not as bars move under it.
+///
+/// **Measured over every label, not the maximum alone** — the line chart's
+/// gutter learned this in 1.6.2. The figures are proportional, so `100` is
+/// wider than `110`, and an axis topping out at 110 printed its 100 into a box
+/// sized for the narrower number, where it was clipped rather than reported.
+/// The maximum is measured too, though it is never printed, so the gutter is
+/// never narrower than it was.
+double _yAxisWidth(BuildContext context, _Axis axis) => axisGutter(
+      context,
+      ['${axis.max}', for (final tick in axis.ticks) '$tick'],
+      gap: 0,
+    );
 
 /// A y axis: a round maximum at or above the peak, and the rules to draw inside
 /// it.
