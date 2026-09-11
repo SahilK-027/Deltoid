@@ -99,4 +99,81 @@ void main() {
       expect(changes.single.kind, SessionChangeKind.added);
     });
   });
+
+  group('diffSetCounts', () {
+    SetTarget target(String id, int sets) =>
+        (exerciseId: id, name: id, targetSets: sets);
+    SetTally tally(String id, int done, {bool skipped = false}) =>
+        (exerciseId: id, workingDone: done, skipped: skipped);
+
+    test('fewer working sets than programmed are offered as a count', () {
+      final changes = diffSetCounts(
+        template: [target('deadlift', 3), target('row', 3)],
+        logged: [tally('deadlift', 1), tally('row', 3)],
+        isDeload: false,
+      );
+      expect(changes, hasLength(1));
+      expect(changes.single.kind, SessionChangeKind.setCount);
+      expect(changes.single.exerciseIds, ['deadlift']);
+      expect(changes.single.setCount, 1);
+      expect(changes.single.label, 'Did 1 of 3 working sets of deadlift');
+    });
+
+    test('more working sets than programmed are not offered', () {
+      // They carry forward already: the next workout mirrors last time's
+      // shape, and the template's count is only a floor.
+      expect(
+        diffSetCounts(
+          template: [target('deadlift', 3)],
+          logged: [tally('deadlift', 4)],
+          isDeload: false,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a deload asks for fewer sets and is never offered', () {
+      expect(
+        diffSetCounts(
+          template: [target('deadlift', 3)],
+          logged: [tally('deadlift', 2)],
+          isDeload: true,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a skip, or no working set at all, is not a count', () {
+      expect(
+        diffSetCounts(
+          template: [target('deadlift', 3), target('row', 3)],
+          logged: [tally('deadlift', 1, skipped: true), tally('row', 0)],
+          isDeload: false,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a movement the day runs twice is not offered', () {
+      expect(
+        diffSetCounts(
+          template: [target('squat', 3), target('squat', 2)],
+          logged: [tally('squat', 1), tally('squat', 1)],
+          isDeload: false,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a movement added today has no programmed count', () {
+      expect(
+        diffSetCounts(
+          template: [target('deadlift', 3)],
+          logged: [tally('deadlift', 3), tally('curl', 1)],
+          isDeload: false,
+        ),
+        isEmpty,
+      );
+    });
+  });
 }

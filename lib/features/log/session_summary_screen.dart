@@ -334,6 +334,15 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
     final changes =
         ref.watch(sessionChangesProvider(widget.workoutId)).valueOrNull ??
             const [];
+    // The changes come from this workout, so every exercise they name is on it.
+    final names = {
+      for (final e in ref
+              .watch(workoutDetailProvider(widget.workoutId))
+              .valueOrNull
+              ?.entries ??
+          const <ExerciseEntry>[])
+        e.exercise.id: e.exercise.name,
+    };
 
     // Answered first, empty second. Applying a change makes the diff empty by
     // definition, so testing `changes.isEmpty` before `_saved` meant the
@@ -392,7 +401,7 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
                 AppRow(
                   title: changes[i].label,
                   subtitle: _picked.contains(i)
-                      ? _kept(changes[i].kind, widget.sessionName)
+                      ? _kept(changes[i], widget.sessionName, names)
                       : 'Today only',
                   leading: Icon(
                     _picked.contains(i)
@@ -454,11 +463,22 @@ class _ChangesSectionState extends ConsumerState<_ChangesSection> {
 
   /// What a ticked row promises, named so the row reads as a sentence with its
   /// title: "Added Hanging leg raise / In Push 1 from now on".
-  static String _kept(SessionChangeKind kind, String session) =>
-      switch (kind) {
+  ///
+  /// A set count names its exercise, because its title's subject is the count:
+  /// "1 working set in Push 1" read as the whole day being one set.
+  static String _kept(
+    SessionChange change,
+    String session,
+    Map<String, String> names,
+  ) =>
+      switch (change.kind) {
         SessionChangeKind.added => 'In $session from now on',
         SessionChangeKind.removed => 'Out of $session from now on',
         SessionChangeKind.reordered => '$session opens in this order',
+        SessionChangeKind.setCount =>
+          '${change.setCount} working set${change.setCount == 1 ? '' : 's'} '
+              'of ${names[change.exerciseIds.single]} in $session from now '
+              'on',
       };
 }
 

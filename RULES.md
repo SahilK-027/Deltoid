@@ -106,11 +106,18 @@ Editing the second must never reach the first: the snapshot row is a copy for
 exactly this reason.
 
 **Improvising is a snapshot edit, and stays one.** Adding a movement
-mid-session, dropping one or running the day out of order changes today and
-nothing else. The end-of-session screen then _offers_ each change back to the
+mid-session, dropping one, running the day out of order or ticking fewer working
+sets than the day programmes changes today and nothing else. The end-of-session screen then _offers_ each change back to the
 template (`domain/session_diff.dart`), one at a time, and `applySessionChanges`
 writes `session_exercises` and only that — so keeping a change never rewrites a
 logged workout.
+
+A lower set count is offered because the next workout cannot tell a plan
+changed from a session cut short: it mirrors last time's shape and pads to the
+template's count as a floor. The floor stays, since removing it lets one short
+session shrink the exercise for good, and the question at the end of the
+session is how the other case is answered. It is never asked in a deload, for a
+skip, for a movement with no working set ticked, or for one the day runs twice.
 
 ---
 

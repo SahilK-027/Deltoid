@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../data/repositories/training_repository.dart';
+import '../../domain/enums.dart';
 import '../../domain/prefill.dart';
 import '../../domain/session_diff.dart';
 
@@ -32,18 +33,38 @@ final sessionChangesProvider =
   final sessionId = detail?.workout.sessionId;
   if (detail == null || sessionId == null) return const [];
 
-  final template =
-      await ref.watch(trainingRepositoryProvider).sessionTemplate(sessionId);
+  final repo = ref.watch(trainingRepositoryProvider);
+  final template = await repo.sessionTemplate(sessionId);
+  final targets = await repo.sessionSetTargets(sessionId);
 
-  return diffSession(
-    template: template,
-    // Everything on the workout, skips included: a skip is a decision about one
-    // day, not a request to drop the movement from the programme.
-    logged: [
-      for (final e in detail.entries)
-        (exerciseId: e.exercise.id, name: e.exercise.name),
-    ],
-  );
+  return [
+    ...diffSession(
+      template: template,
+      // Everything on the workout, skips included: a skip is a decision about
+      // one day, not a request to drop the movement from the programme.
+      logged: [
+        for (final e in detail.entries)
+          (exerciseId: e.exercise.id, name: e.exercise.name),
+      ],
+    ),
+    ...diffSetCounts(
+      template: targets,
+      logged: [
+        for (final e in detail.entries)
+          (
+            exerciseId: e.exercise.id,
+            workingDone: e.sets
+                .where((s) =>
+                    s.isDone &&
+                    s.setType == SetType.working &&
+                    s.parentSetId == null)
+                .length,
+            skipped: e.workoutExercise.skipReason != SkipReason.none,
+          ),
+      ],
+      isDeload: detail.workout.isDeload,
+    ),
+  ];
 });
 
 /// Ticks when the shape of history changes — a workout deleted or backdated,

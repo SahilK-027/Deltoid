@@ -25,6 +25,16 @@ enum SessionChangeKind {
 
   /// Same movements, different order.
   reordered,
+
+  /// Fewer working sets ticked than the day programmes for a movement.
+  ///
+  /// Offered because the workout that follows cannot tell a plan changed from
+  /// a session cut short. It opens on last time's shape with the template's
+  /// count as a floor, so a deadlift done as three warm-ups and one top set
+  /// comes back with two empty working sets padded on the end. The floor is
+  /// right for the day that ran out of time, and only the person who trained
+  /// knows which day this was.
+  setCount,
 }
 
 class SessionChange {
@@ -32,6 +42,7 @@ class SessionChange {
     required this.kind,
     required this.exerciseIds,
     required this.label,
+    this.setCount,
   });
 
   final SessionChangeKind kind;
@@ -44,6 +55,10 @@ class SessionChange {
   /// consequence of keeping it is the UI's line to write, because only the UI
   /// knows what the session is called.
   final String label;
+
+  /// The working-set count a [SessionChangeKind.setCount] change would write
+  /// to the day. Null for every other kind.
+  final int? setCount;
 
   @override
   String toString() => '$kind: $label';
@@ -120,4 +135,60 @@ bool _sameOrder(List<String> a, List<String> b) {
     if (a[i] != b[i]) return false;
   }
   return true;
+}
+
+/// One movement as the day programmes it: how many working sets it asks for.
+typedef SetTarget = ({String exerciseId, String name, int targetSets});
+
+/// One movement as it was trained: how many working sets were ticked, and
+/// whether it was skipped.
+typedef SetTally = ({String exerciseId, int workingDone, bool skipped});
+
+/// The movements where fewer working sets were ticked than the day asks for.
+///
+/// Only ever fewer. More sets already carry forward, because the next workout
+/// mirrors last time's shape and the template's count is only a floor.
+///
+/// Silent in the cases where writing the count back would be wrong or
+/// ambiguous:
+///
+/// - **A deload**, which asks for fewer sets on purpose. The count trained is
+///   the deload's answer, not the programme's.
+/// - **A skip**, which is a decision about one day. So is a movement with no
+///   working set ticked at all: that is a dropped movement or an unfinished
+///   one, and a day cannot programme zero sets.
+/// - **A movement the day runs twice**, in the template or in the workout.
+///   Nothing says which occurrence a count belongs to.
+///
+/// Working sets are counted the way the next workout counts them when it pads
+/// to the floor: `working` rows that are not drop legs.
+List<SessionChange> diffSetCounts({
+  required List<SetTarget> template,
+  required List<SetTally> logged,
+  required bool isDeload,
+}) {
+  if (isDeload) return const [];
+
+  int occurrences(Iterable<String> ids, String id) =>
+      ids.where((e) => e == id).length;
+  final templateIds = [for (final t in template) t.exerciseId];
+  final loggedIds = [for (final l in logged) l.exerciseId];
+
+  return [
+    for (final t in template)
+      if (occurrences(templateIds, t.exerciseId) == 1 &&
+          occurrences(loggedIds, t.exerciseId) == 1)
+        for (final l in logged)
+          if (l.exerciseId == t.exerciseId &&
+              !l.skipped &&
+              l.workingDone > 0 &&
+              l.workingDone < t.targetSets)
+            SessionChange(
+              kind: SessionChangeKind.setCount,
+              exerciseIds: [t.exerciseId],
+              label: 'Did ${l.workingDone} of ${t.targetSets} working sets '
+                  'of ${t.name}',
+              setCount: l.workingDone,
+            ),
+  ];
 }

@@ -1220,6 +1220,100 @@ void main() {
       expect(after.length, before.length, reason: 'nothing was dropped');
     });
 
+    test('keeping a lower set count stops the next workout padding it',
+        () async {
+      // The reported case: three programmed sets done as warm-ups and one top
+      // set. Without the change kept, the next workout mirrors the warm-ups
+      // and the one working set, then pads two empty working sets on the end
+      // to reach the template's count.
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+
+      Future<List<SetType>> shapeOfFirst(String workoutId) async => [
+            for (final s in (await repo.workoutDetail(workoutId))!
+                .entries
+                .first
+                .sets)
+              s.setType,
+          ];
+
+      Future<String> trainWarmupsAndOneTopSet() async {
+        final id =
+            await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+        final entry = (await repo.workoutDetail(id))!.entries.first;
+        final sets = entry.sets;
+        for (var k = 0; k < sets.length; k++) {
+          await repo.updateSet(sets[k].id,
+              setType: const Value(SetType.warmup),
+              weight: const Value(40),
+              reps: const Value(5),
+              isDone: const Value(true));
+        }
+        final top = await repo.addSet(entry.workoutExercise.id);
+        await repo.updateSet(top,
+            weight: const Value(100),
+            reps: const Value(3),
+            isDone: const Value(true));
+        await repo.completeWorkout(id);
+        return id;
+      }
+
+      final first = await trainWarmupsAndOneTopSet();
+      final entry = (await repo.workoutDetail(first))!.entries.first;
+      final changes = diffSetCounts(
+        template: await repo.sessionSetTargets(push1.id),
+        logged: [
+          for (final e in (await repo.workoutDetail(first))!.entries)
+            (
+              exerciseId: e.exercise.id,
+              workingDone: e.sets
+                  .where((s) =>
+                      s.isDone &&
+                      s.setType == SetType.working &&
+                      s.parentSetId == null)
+                  .length,
+              skipped: e.workoutExercise.skipReason != SkipReason.none,
+            ),
+        ],
+        isDeload: false,
+      );
+      final count = changes.singleWhere(
+          (c) => c.exerciseIds.single == entry.exercise.id);
+      expect(count.setCount, 1);
+
+      // Not kept: the floor pads the next workout back to three working sets.
+      final padded =
+          await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      expect(
+        (await shapeOfFirst(padded)).where((t) => t == SetType.working),
+        hasLength(3),
+      );
+      await repo.abandonWorkout(padded);
+
+      // Kept: the day now programmes one, and the next workout opens on
+      // exactly the shape that was trained.
+      await repo.applySessionChanges(sessionId: push1.id, changes: [count]);
+      final slot = await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(push1.id) &
+                t.exerciseId.equals(entry.exercise.id) &
+                t.deletedAt.isNull()))
+          .getSingle();
+      expect(slot.targetSets, 1);
+
+      final next =
+          await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      expect(await shapeOfFirst(next), [
+        for (final s in entry.sets.where((s) => s.isDone)) s.setType,
+      ]);
+      expect(
+        (await repo.workoutDetail(first))!.entries.first.workoutExercise
+            .targetSets,
+        3,
+        reason: 'the finished workout keeps the target it was trained against',
+      );
+    });
+
     test('a change that was not ticked is not applied', () async {
       final push1 = await sessionNamed('Push 1');
       final before = await slotNames(push1.id);

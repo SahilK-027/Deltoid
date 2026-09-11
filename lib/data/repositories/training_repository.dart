@@ -1212,6 +1212,27 @@ class TrainingRepository {
     ];
   }
 
+  /// How many working sets each slot of the day programmes, in template order.
+  /// Read against today's ticked sets by `diffSetCounts`.
+  Future<List<SetTarget>> sessionSetTargets(String sessionId) async {
+    final rows = await (db.select(db.sessionExercises).join([
+      innerJoin(db.exercises,
+          db.exercises.id.equalsExp(db.sessionExercises.exerciseId)),
+    ])
+          ..where(db.sessionExercises.sessionId.equals(sessionId) &
+              db.sessionExercises.deletedAt.isNull())
+          ..orderBy([OrderingTerm(expression: db.sessionExercises.orderIndex)]))
+        .get();
+    return [
+      for (final r in rows)
+        (
+          exerciseId: r.readTable(db.sessionExercises).exerciseId,
+          name: r.readTable(db.exercises).name,
+          targetSets: r.readTable(db.sessionExercises).targetSets,
+        ),
+    ];
+  }
+
   /// Writes today's improvisation back into the programme — only the parts of
   /// it that were ticked.
   ///
@@ -1292,6 +1313,27 @@ class TrainingRepository {
                   .write(
                 SessionExercisesCompanion(
                   deletedAt: Value(nowMs()),
+                  deviceId: Value(currentDeviceId),
+                  updatedAt: Value(nowMs()),
+                  dirty: const Value(true),
+                ),
+              );
+            }
+
+          case SessionChangeKind.setCount:
+            // `diffSetCounts` offers this only for a movement the day runs
+            // once, so the update names exactly one slot.
+            final count = change.setCount;
+            if (count == null || count < 1) break;
+            for (final exerciseId in change.exerciseIds) {
+              await (db.update(db.sessionExercises)
+                    ..where((t) =>
+                        t.sessionId.equals(sessionId) &
+                        t.exerciseId.equals(exerciseId) &
+                        t.deletedAt.isNull()))
+                  .write(
+                SessionExercisesCompanion(
+                  targetSets: Value(count),
                   deviceId: Value(currentDeviceId),
                   updatedAt: Value(nowMs()),
                   dirty: const Value(true),
