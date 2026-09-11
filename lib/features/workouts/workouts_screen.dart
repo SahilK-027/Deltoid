@@ -92,16 +92,8 @@ class _SessionPickRow extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         scale: 0.98,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.lg,
-            vertical: Space.md,
-          ),
-          decoration: BoxDecoration(
-            color: c.surfaceHigh,
-            borderRadius: BorderRadius.circular(Radii.control),
-            border: isNext ? Border.all(color: c.accent, width: 2) : null,
-          ),
+        child: InsetPanel(
+          outline: isNext ? BorderSide(color: c.accent, width: 2) : null,
           child: Row(
             children: [
               Expanded(
@@ -385,15 +377,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
         Pressable(
           onTap: _pickDate,
           scale: 0.98,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.lg,
-              vertical: Space.md,
-            ),
-            decoration: BoxDecoration(
-              color: c.surfaceHigh,
-              borderRadius: BorderRadius.circular(Radii.control),
-            ),
+          child: InsetPanel(
             child: Row(
               children: [
                 Icon(Icons.event_rounded, size: 18, color: c.textPrimary),

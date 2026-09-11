@@ -483,14 +483,10 @@ class _NoteBox extends StatelessWidget {
       scale: 0.99,
       // `surfaceHigh`, the app's input fill — not `surfaceSunken`, which is the
       // keypad's bed and reads as a hole cut in the page.
-      child: Container(
+      child: InsetPanel(
         width: double.infinity,
-        constraints: const BoxConstraints(minHeight: 76),
+        minHeight: 76,
         padding: const EdgeInsets.all(Space.lg),
-        decoration: BoxDecoration(
-          color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(Radii.control),
-        ),
         child: Text(
           text ?? 'Slept badly, everything felt heavy',
           style: text == null

@@ -372,6 +372,12 @@ therefore none.
 grouping device, not a frame — a page of six cards has no hierarchy. Prefer one
 card holding rows over six cards holding one row each.
 
+**An inset panel is not a card.** Something set *into* a card or a sheet — a
+session to pick, the date of a past session, the day's note — is `surfaceHigh`
+at radius 14, the material of a field, so it reads as part of the panel it sits
+in. Padding 16 by 12 unless its content says otherwise; the one that is next or
+chosen takes the 2px `accent` outline. `InsetPanel`, and nothing else draws it.
+
 ### List card and rows
 
 The workhorse. One `surface` card, rows inside, **inset hairline dividers** that

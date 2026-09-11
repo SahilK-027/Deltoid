@@ -169,17 +169,12 @@ class _Parts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    return Container(
+    return InsetPanel(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: Space.xs),
       padding: const EdgeInsets.symmetric(
         horizontal: Space.sm,
         vertical: Space.xs,
-      ),
-      decoration: BoxDecoration(
-        color: c.surfaceHigh,
-        borderRadius: BorderRadius.circular(Radii.control),
       ),
       child: Column(
         children: [

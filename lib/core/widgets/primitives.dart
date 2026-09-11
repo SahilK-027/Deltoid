@@ -429,6 +429,57 @@ class AppCard extends StatelessWidget {
   }
 }
 
+/// A block set into a card or a sheet: `surfaceHigh` at the control radius,
+/// the material of a field or a quiet button, so it reads as part of the panel
+/// it sits in rather than as a second card on top of it.
+///
+/// The session list on Workouts, the date row of a past session, the day's note
+/// on the summary, the muscles a bar-list row opens onto.
+class InsetPanel extends StatelessWidget {
+  const InsetPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: Space.lg,
+      vertical: Space.md,
+    ),
+    this.margin,
+    this.width,
+    this.minHeight,
+    this.outline,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
+
+  /// `double.infinity` for a panel that spans its column whatever it holds.
+  final double? width;
+  final double? minHeight;
+
+  /// The choice-card state: 2px [DeltoidColors.accent] on the one that is
+  /// next or chosen.
+  final BorderSide? outline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      margin: margin,
+      constraints: minHeight == null
+          ? null
+          : BoxConstraints(minHeight: minHeight!),
+      padding: padding,
+      decoration: BoxDecoration(
+        color: context.c.surfaceHigh,
+        borderRadius: BorderRadius.circular(Radii.control),
+        border: outline == null ? null : Border.fromBorderSide(outline!),
+      ),
+      child: child,
+    );
+  }
+}
+
 /// A card that holds rows, with the hairlines between them inset to the text.
 /// The workhorse: settings, session lists, exercise lists, menus.
 class ListCard extends StatelessWidget {
