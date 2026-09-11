@@ -382,6 +382,42 @@ void main() {
     );
   });
 
+  test('a catalog muscle change moves the open session and not the past',
+      () async {
+    // The muscle is snapshotted the same way as the bar, and had the same
+    // gap: the session in progress kept counting toward the old muscle.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final exercise = await shared();
+    final before = exercise.muscle;
+    final after = MuscleGroup.values.firstWhere((m) => m != before);
+
+    Future<MuscleGroup?> loggedMuscle(String workoutId) async =>
+        (await (db.select(db.workoutExercises)
+                  ..where((t) =>
+                      t.workoutId.equals(workoutId) &
+                      t.exerciseId.equals(exercise.id) &
+                      t.deletedAt.isNull())
+                  ..limit(1))
+                .getSingle())
+            .muscle;
+
+    final done =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(done);
+    final open =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    await regimes.updateExercise(exercise.id, muscle: Value(after));
+
+    expect(await loggedMuscle(open), after);
+    expect(
+      await loggedMuscle(done),
+      before,
+      reason: 'what was trained in a finished session is a fact about it',
+    );
+  });
+
   test('a completed workout is untouched by a later change to its day',
       () async {
     // The acceptance criterion stated on its own, because it is the one that

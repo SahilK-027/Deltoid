@@ -819,7 +819,40 @@ class RegimeRepository {
       if (barKind.present) {
         await _followCatalogBarInOpenWorkouts(id, barKind.value);
       }
+      if (muscle.present) {
+        await _followCatalogMuscleInOpenWorkouts(id, muscle.value);
+      }
     });
+  }
+
+  /// The muscle equivalent of [_followCatalogBarInOpenWorkouts], simpler
+  /// because a day cannot override the muscle. The session in progress counts
+  /// toward the muscle just named; completed workouts keep the one they were
+  /// logged with, which is what `WorkoutExercises.muscle` exists to preserve.
+  Future<void> _followCatalogMuscleInOpenWorkouts(
+    String exerciseId,
+    MuscleGroup muscle,
+  ) async {
+    final open = await (db.select(db.workouts)
+          ..where((t) =>
+              t.status.equalsValue(WorkoutStatus.inProgress) &
+              t.deletedAt.isNull()))
+        .get();
+    if (open.isEmpty) return;
+
+    await (db.update(db.workoutExercises)
+          ..where((t) =>
+              t.workoutId.isIn([for (final w in open) w.id]) &
+              t.exerciseId.equals(exerciseId) &
+              t.deletedAt.isNull()))
+        .write(
+      WorkoutExercisesCompanion(
+        muscle: Value(muscle),
+        deviceId: Value(currentDeviceId),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
   }
 
   /// Carries a catalog bar change into every workout still in progress, for

@@ -311,9 +311,10 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       field: 'muscle',
                       from: muscle?.label ?? 'nothing',
                       to: picked.label,
-                      consequence: 'Its sets move to that muscle in the '
-                          'weekly volume, and it is filed there in the '
-                          'catalog.',
+                      consequence: 'It is filed there in the catalog, and '
+                          'sets from the session in progress onwards count '
+                          'toward that muscle. Finished sessions keep the '
+                          'muscle they were logged with.',
                     )) {
                       return;
                     }
