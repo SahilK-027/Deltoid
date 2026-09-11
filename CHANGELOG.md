@@ -15,6 +15,22 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-11
+
+Minor release removing the keypad's last-time button and correcting how an exercise edited mid-session reaches the session in progress.
+
+### Removed
+
+- **Keypad:** The "Last time" button above the digits is gone. The cell being typed into already shows last time's number, and `Next` adopts it when nothing is typed.
+
+### Fixed
+
+- **Log:** Changing an exercise's bar while a session is in progress now updates that session's plate view. It previously kept breaking weights over the bar the session opened with, for example a 20 kg bar after the exercise was changed to the 16 kg women's bar.
+  - A training day that names its own bar for the movement keeps it, and finished sessions keep the bar they were logged on.
+- **Log:** Changing an exercise's muscle while a session is in progress now counts that session's sets toward the new muscle. Finished sessions keep the muscle they were logged with.
+- **Log:** The log redraws as soon as an exercise is edited. A new name, load mode, or measure mode previously appeared only after the next set was written.
+- **Exercises:** The confirmation for a muscle change now states that finished sessions keep their muscle. It previously claimed every set would move.
+
 ## [1.6.3] - 2026-09-11
 
 Patch release consolidating duplicated UI components and correcting the visual inconsistencies between them.
@@ -251,7 +267,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...v1.7.0
 [1.6.3]: https://github.com/SahilK-027/Deltoid/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/SahilK-027/Deltoid/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/SahilK-027/Deltoid/compare/v1.6.0...v1.6.1
