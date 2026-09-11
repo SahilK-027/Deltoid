@@ -1,338 +1,267 @@
 # Changelog
 
-What changed in each release, in terms of what the app does rather than what
-the code does. The format follows [Keep a Changelog](https://keepachangelog.com),
-and versions follow [semantic versioning](https://semver.org): a minor release
-changes what the app decides or adds something to it, a patch release only
-fixes what it already did.
+All notable changes to Deltoid are documented in this file.
 
-Every release is an Android APK installed by hand. The build number is Android's
-`versionCode` and always increases, because a build whose code has not moved
-will not install over the one already on the phone.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). A minor release adds behaviour or changes a decision the app makes; a patch release only corrects existing behaviour.
 
-## 1.6.3 — 2026-09-11
+Each entry follows the same template:
 
-### Fixed
+- A heading, `## [x.y.z] - YYYY-MM-DD`, then a one-line summary naming the release type.
+- Sections in this order, each included only when it has entries: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**, **Internal** (changes with no user-facing effect), and **Upgrade notes** (anything required before or after installing).
+- In the user-facing sections, every bullet opens with the area it affects in bold, as `**Area:**`. Supporting detail goes in a nested bullet.
+- One line per bullet and per paragraph, with no hard wrapping, so each entry can be pasted into a GitHub release unchanged. `test/tools/changelog_format_test.dart` enforces the template.
 
-- **Long lists in a sheet stop at the same height.** The year picker under a
-  chart stopped at 70% of the screen and the muscle and equipment pickers on an
-  exercise at 66%, so the same kind of sheet opened to two different lines. Both
-  stop at 70% now.
-- **The volume chart's gridlines are dashed like every other chart's.** They
-  were drawn in a finer pattern than the lines on the bodyweight and exercise
-  charts beside them. All charts now use the same dash.
-- **The button on an empty Bodyweight page presses like every other button.**
-  It rippled where every other primary button in the app scales down under your
-  thumb.
-- **The add buttons in the set table are named for screen readers.** The `+`
-  under the set numbers now reads as "Add a set", or "Add a leg" on a drop set.
-- **The year heatmap follows a change of theme.** Switching between light and
-  dark could leave a year already on screen in the colours it was first drawn
-  in.
-- **The volume chart prints its numbers in full.** An axis reaching past 100
-  sets a week could cut a digit off its labels — the same fault 1.6.2 fixed in
-  the other charts.
+Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
-## 1.6.2 — 2026-09-09
+## [Unreleased]
+
+## [1.6.3] - 2026-09-11
+
+Patch release consolidating duplicated UI components and correcting the visual inconsistencies between them.
 
 ### Fixed
 
-- **The value axis prints its numbers in full.** A chart whose numbers reached
-  into the two hundreds dropped the last digit off some of them, so the axis
-  read `20` where it meant `205`. The gutter holding the labels was measured
-  against the top and bottom of the axis only, and the numbers in between can be
-  wider than both — `1` is a narrower character than `0`. It is measured against
-  every number the axis prints now.
+- **Sheets:** Long pickers now share a single maximum height of 70% of the screen. The chart year picker stopped at 70% and the exercise muscle and equipment pickers at 66%.
+- **Charts:** The weekly volume chart's gridlines now use the same dash pattern as the line charts (4 pt drawn, 4 pt gap, previously 3 pt and 3 pt).
+- **Charts:** The volume chart no longer truncates value labels when the axis exceeds 100 sets per week. The label gutter is now measured against every printed label rather than the axis maximum alone.
+- **Heatmap:** The year heatmap now repaints when the theme changes. A year already on screen could retain the previous theme's colours.
+- **Bodyweight:** The empty-state button now uses the standard primary button and its press feedback, replacing a Material ripple.
+- **Accessibility:** The add buttons in the set table now carry screen-reader labels: "Add a set", and "Add a leg" on a drop set.
 
-## 1.6.1 — 2026-09-08
+### Internal
+
+- All bottom sheets open through a single `showAppSheet` helper. A test fails on any direct call to `showModalBottomSheet`.
+- Introduced `InsetPanel`, `PadKey` and `PadDismissButton`, replacing five hand-built panels and the duplicated keys of the set keypad and hold pad.
+- `StepperRow` moved into the shared primitives; redundant `Divider` arguments removed in favour of the theme.
+- Chart axis helpers (`axisLabelCount`, `axisDateFormat`, `axisGutter`, `gridlineDash`) and heatmap colours (`heatColourIn`) are shared between charts.
+- Added the `Radii.bar`, `Radii.heatCell` and `Sizes.key` tokens and removed the unused filled-button theme.
+
+## [1.6.2] - 2026-09-09
+
+Patch release fixing truncated value-axis labels.
 
 ### Fixed
 
-- **Turning the month no longer draws both months at once.** The month being
-  swiped away was meant to disappear on the first frame and did not disappear at
-  all: it sat at full opacity under the one arriving for the whole transition,
-  so every date had another date on top of it. This was the bug 1.6.0 claimed to
-  have fixed.
+- **Charts:** Value-axis labels in the two hundreds are no longer truncated (for example, `205` rendered as `20`).
+  - The label gutter was sized from the axis bounds only. Inter's figures are proportional, so interior labels can be wider than either bound. The gutter is now measured against every tick.
+
+## [1.6.1] - 2026-09-08
+
+Patch release completing the month-transition fix from 1.6.0.
 
 ### Changed
 
-- The new month fades in and nothing slides. A grid entering from the edge reads
-  as one page being dragged over another, and this is one grid replaced in
-  place.
+- **Calendar:** The incoming month now fades in place instead of sliding in from the edge.
 
-## 1.6.0 — 2026-09-08
+### Fixed
+
+- **Calendar:** The outgoing month no longer remains visible beneath the incoming one during a month change. The 1.6.0 fix used `Threshold(0)`, which has no effect; it now uses `Threshold(1)`.
+
+## [1.6.0] - 2026-09-08
+
+Minor release reworking the day picker used by backfill, weigh-ins and session re-dating.
 
 ### Added
 
-- **The month turns with a swipe.** Drag the grid sideways, the way a month
-  turns everywhere else on a phone. The arrows are still there: a gesture
-  nothing announces cannot be the only way to reach a month.
-- **The card says which day it is sitting on**, under its title. The filled
-  circle was the only sign before, and it is one of forty-two.
-- **Every month is six full rows**, with the days either side of it filling the
-  head and the foot rather than leaving them ragged. They are drawn back, so the
-  rows are full without competing with the month you are reading.
+- **Calendar:** Swipe horizontally to change month. The arrow controls remain.
+- **Calendar:** The selected day is shown beneath the picker title.
+- **Calendar:** Every month is laid out as six full rows, with adjacent-month days shown at reduced emphasis.
 
 ### Changed
 
-- **The day picker reads downwards.** The weekday letters sat under the grid,
-  labelling seven columns that had already been read, and the month sat under
-  that. Title, then the day chosen, then the month, then the letters, then the
-  dates — nothing labels something above it any more.
-- The month and year are the app's own chips now, at the height and padding
-  every other chip wears. The pair this screen had rolled for itself was 46 tall
-  on 8 of side padding.
-- A logged day's ring is heavier than an empty one, so the shape says a day
-  holds something before the colour does.
-- **A session can be backfilled to any day, not only to days after the log
-  starts.** The picker took the first day ever logged as its earliest, which
-  meant a session done the week before the app was installed could not be
-  entered at all.
+- **Calendar:** The layout now reads top to bottom: title, selected day, month, weekday letters, then dates.
+- **Calendar:** The month and year selectors use the standard chip component.
+- **Calendar:** Rings on logged days are heavier than those on empty days.
+- **Backfill:** A session can be backfilled to any date, including dates before the first logged session.
 
 ### Fixed
 
-- A grey ring no longer flickers on days that have not happened when you page
-  onto the current month.
-- `September` is no longer cut to `Septem…` on a 384dp phone — an ordinary
-  width, and narrower than the emulator the bar was drawn on.
-- Turning the month no longer draws both months on top of each other for a
-  fifth of a second.
+- **Calendar:** A grey ring no longer flickers on future days when paging to the current month.
+- **Calendar:** `September` is no longer truncated on 384 dp-wide screens.
+- **Calendar:** Both months were briefly drawn on top of each other during a month change. This fix was incomplete; see 1.6.1.
 
-## 1.5.0 — 2026-09-08
+## [1.5.0] - 2026-09-08
+
+Minor release making every day in the day picker state whether it holds data.
 
 ### Changed
 
-- **The day picker says what every day is, not only the logged ones.** A day
-  with something on it has always worn a ring in its own colour; a day with
-  nothing on it wore nothing at all, which reads as a number that failed to
-  render rather than as an answer. Both are rings now — the day's colour when
-  something is logged there, grey when nothing is — so the calendar is scanned
-  by comparing shapes instead of hunting for gaps.
-- **Today is a dot under the number** rather than a ring of its own, which
-  leaves the ring free to carry the only fact worth a colour.
-- **A day that cannot be picked says why.** Days outside the range have no ring,
-  and tapping one states the reason over the foot of the grid instead of doing
-  nothing at all.
-- **The month is read at the top of the card and driven from the bottom.** The
-  weekday initials move down beside the controls, and `March 2026` becomes a
-  month pill and a year pill, each opening its own list: a month two years back
-  is two taps rather than four.
+- **Calendar:** Every selectable day now carries a ring: in the day's colour when something is logged, grey when nothing is.
+- **Calendar:** Today is marked with a dot beneath the date instead of a ring.
+- **Calendar:** Tapping a day outside the permitted range shows the reason instead of doing nothing.
+- **Calendar:** The month is shown at the top of the card, with the weekday initials and controls at the bottom. Month and year are now separate selectors.
 
 ### Fixed
 
-- The picker no longer overflows on a phone set to a large system type size.
-  The day circles and the weekday strip were both reserved as flat figures, and
-  neither of them is one.
+- **Calendar:** The picker no longer overflows at large system font sizes.
 
-## 1.4.1 — 2026-09-08
+## [1.4.1] - 2026-09-08
+
+Patch release fixing the loss of a weigh-in when changing an entry's date.
 
 ### Fixed
 
-- **Logging a weight no longer removes another one.** Opening the weight sheet
-  over a day already weighed and then correcting the date moved the entry
-  instead of adding one, so logging Monday's weight after Tuesday's deleted
-  Tuesday's. Each day now stands on its own, and a day is cleared only by
-  deleting it.
-- The weigh-in calendar rings the days already weighed, as the session pickers
-  have always done. It was the one calendar in the app that could not show the
-  day you were looking for.
+- **Bodyweight:** Changing the date on the weight sheet no longer deletes the entry it was opened from. Each day is now written independently and is cleared only by deleting it.
+- **Bodyweight:** The weigh-in calendar now marks days that already have an entry.
 
-## 1.4.0 — 2026-09-06
+### Upgrade notes
+
+- Weigh-ins lost to this defect cannot be recovered by this build. They were soft-deleted, so a backup taken before the loss still contains them.
+
+## [1.4.0] - 2026-09-06
+
+Minor release rebuilding Settings and making three device behaviours optional.
 
 ### Added
 
-- **Vibration, the session notification and keeping the screen on are now
-  choices.** All three used to happen whether you wanted them or not. The buzz
-  at the end of a rest is its own switch rather than half of the tone's — the
-  tone is what carries over a gym, and the buzz is what a phone lying face down
-  on a bench still reports.
-- Turning the session notification off stops the ongoing line entirely, because
-  Android will not run the background service behind it without one. The
-  end-of-rest alert is a scheduled alarm rather than part of that service, so it
-  still arrives; what is lost is the clock counting down while the screen is
-  off. The row says so.
+- **Settings:** Rest-end vibration can be switched off independently of the rest tone.
+- **Settings:** The ongoing session notification can be switched off.
+  - Without the notification Android does not run the background service, so the rest bar stops updating while the screen is off. The rest-end alert is a scheduled alarm and still fires.
+- **Settings:** Keeping the screen on during a session is now optional.
 
 ### Changed
 
-- **Settings is rebuilt.** It was six sections and thirteen rows, several of
-  them explaining themselves in a column too narrow to finish a sentence. Rows
-  now state their answer — `Rest time & alert`, `Weight units · Kilograms` —
-  and the explanation lives in the sheet the row opens, where it has the width
-  to be a whole sentence. Account and backup are one section, rest and units
-  another.
-- **Signing out is one row that opens both ways out**, each with room to say
-  what it does. Side by side they read as the same action twice: both titles
-  began "Sign out", and the difference between them was whether years of
-  training stayed on the phone.
-- **About names the version.** It read a paragraph set smaller than everything
-  around it, with no version anywhere — which is the one thing an About section
-  exists to answer.
-- A set logged on a pair of dumbbells reads `20 kg each × 10`. `×` used to mean
-  both "a pair" and "for this many reps", and printed both at once as
-  `20 kg × 2 × 10`. Worse, the compressed form on an exercise's own history
-  never carried the pair, so the same set looked like half the load on one
-  screen and twice it on another.
+- **Settings:** Reorganised from six sections and thirteen rows into four sections. Rows state their current value, and explanations moved into the sheets they open.
+- **Account:** "Sign out" and "Sign out and delete data" are now presented in a single sheet, each with a description of its effect.
+- **Settings:** The About section now shows the app version.
+- **Log:** Dumbbell sets read `20 kg each × 10` instead of `20 kg × 2 × 10`, and the compact history format now includes the pair.
 
 ### Fixed
 
-- **Every rest helper was being cut mid-sentence.** A stepper's ± controls and
-  its readout take the width the description was sharing, so "The default for an
-  exercise that has not been given…" is all that ever fit. The sentence now runs
-  the full width beneath the row, here and in a regime's deload settings.
-- The bodyweight chart keeps the range you picked. Choosing 1M and coming back
-  to the screen later drew 3M again.
-- The automatic backup row says whether it has ever run, rather than only
-  describing when it would.
+- **Settings:** Rest helper text is no longer truncated beside stepper controls; it now spans the full width beneath the row.
+- **Bodyweight:** The chart now retains the selected range after leaving the screen.
+- **Backup:** The automatic backup row states whether a backup has ever run.
 
-## 1.3.1 — 2026-09-06
+### Upgrade notes
 
-### Fixed
+- On Android 8 and later, vibration is fixed per notification channel, so the app may list up to four channels in the system notification settings.
+- The three new preferences are stored on the device and are not synced.
 
-- **The end-of-rest alert has a sound again, on every release build.** The tone
-  the system plays when a rest ends is an Android resource, and the release
-  build's resource shrinker had been deleting it from the APK for want of a
-  reference it could see. Every release ever installed has been missing it. The
-  tone that plays with the app open is a different file, which is why the alert
-  worked in front of you and never from a pocket, and why this looked for so
-  long like a problem with alarms.
-- **The session notification appears at all.** 1.3.0 gave it a new status bar
-  icon, the shrinker removed that too, and a notification whose icon does not
-  exist cannot be posted — so the line describing the workout never appeared,
-  and the phone reported that the app had never sent a notification.
-- The rest clock stays on screen while the keypad is open. It used to be taken
-  away the moment you tapped a cell, which is the moment you are most likely to
-  be looking at it.
-- On a narrow screen the rest bar no longer overflows its row.
-- `BW` is drawn in the same size as the weight beside it, so `BW + 10` reads as
-  one value rather than a superscript and a number.
+## [1.3.1] - 2026-09-06
+
+Patch release restoring notifications and the rest-end alert sound in release builds.
+
+### Added
+
+- **Log:** For a movement not yet trained in the current session, the exercise information sheet shows what was done in the other session. Values are still not prefilled.
 
 ### Changed
 
-- The notification for a session in progress reads as a tracker: "Currently
-  tracking Push 1", the movement and the set you are on under it, and the rest
-  clock in front of that while one is running. It carries the app's own
-  charcoal, and how long you have been training sits beside the app's name the
-  way it does on any other ongoing notification.
-
-### Added
-
-- The exercise information sheet folds open on what was done in the other
-  session, for a movement this session has not trained before. The numbers are
-  still not filled in anywhere — a first time here starts blank — but they are
-  one tap away instead of gone.
-
-## 1.3.0 — 2026-09-06
-
-### Added
-
-- The notification for a session in progress now says what the workout looks
-  like: the movement you are on, the set count beside the app name, and the
-  rest clock draining a second at a time under it. It runs as a foreground
-  service, which is what lets the bar keep counting once the screen is off.
-  Grant the notification permission and reinstall rather than updating in place
-  if the line looks stale.
+- **Notifications:** The session notification reads "Currently tracking" with the session name, current movement and set, rest countdown and elapsed time, and uses the app's own accent colour.
 
 ### Fixed
 
-- **The end-of-rest alert now arrives on Android 12 and below.** The exact-alarm
-  permission the app was asking for only exists from Android 13, so on older
-  phones the system refused every alarm the app scheduled and nothing said so.
-- **A session with no history of its own now opens blank.** It used to fill
-  itself from the most recent performance of the same movement in any session,
-  so a first Leg 2 arrived carrying a first Leg 1's numbers. Sessions keep
-  separate progressions, and this was that rule failing at the one moment it
-  matters most.
-- **A set that is stronger by estimated 1RM now reads as a win** even when it
-  traded reps for weight. 72 kg × 12 followed by 100 kg × 8 is progress, and it
-  was being marked as a trade-off.
-- **The set sheet no longer claims warm-ups are ignored by last-time.** They
-  never were: a warm-up is mirrored into next week's rows and carries its own
-  reference like any other set. Only the description of it was wrong, and it
-  was wrong for long enough to be believed.
-- The log no longer scrolls to reveal a set row that is already on screen.
-  Tapping a cell moved the page under your thumb even when every set was in
-  view.
-- The launcher icon's mark no longer runs to the edge of its own tile.
+- **Notifications:** The rest-end alert plays its tone in release builds. The resource shrinker had removed the sound from every release APK.
+- **Notifications:** The session notification is posted again. The shrinker had also removed its status-bar icon in 1.3.0.
+- **Log:** The rest clock remains visible while the keypad is open.
+- **Log:** The rest bar no longer overflows on narrow screens.
+- **Log:** `BW` is drawn at the same size as the weight beside it.
 
-## 1.2.1 — 2026-09-04
+## [1.3.0] - 2026-09-06
 
-### Fixed
+Minor release adding a live session notification and correcting prefill.
 
-- **The status bar's icons follow the app's theme.** In the light theme they
-  were white on white, and stayed that way until the app was backgrounded and
-  brought forward again.
-
-## 1.2.0 — 2026-09-04
+> **Known issue:** the APK attached to this release cannot post notifications, because the resource shrinker removed the notification icon. Install 1.3.1 instead.
 
 ### Added
 
-- **A bar is a property of the day, and of the set you logged.** A movement can
-  sit on a different bar in different sessions — off the rack on one day, a
-  lighter bar on another — and the plate diagram now follows the day rather
-  than one answer held in the catalog. Sets already logged keep the bar they
-  were lifted on, so changing a bar today no longer redraws every session in
-  your history.
-
-### Fixed
-
-- **A day that runs the same movement twice no longer breaks.** Opening the ⋯
-  menu, adding an exercise, and swapping one all failed on such a day, and
-  running a lift early and again as a burnout is a supported thing to do.
-- The exercise information sheet showed the catalog's bar while the keypad
-  below it drew plates for the day's.
-
-## 1.1.0 — 2026-09-04
-
-### Added
-
-- **Rest is configurable.** Each exercise in a session can carry its own rest
-  target — a heavy compound wants three minutes and a cable fly wants sixty
-  seconds — with a default in Settings behind it. The pause between two
-  exercises is its own number, because the walk to the next machine is a
-  property of the gym rather than of the lift. The alert tone can be turned off
-  without losing the buzz.
+- **Notifications:** The session notification shows the current movement, the set count and a draining rest bar. It runs as a foreground service so the bar keeps updating with the screen off.
 
 ### Changed
 
-- **A rest target is a decision, not a measurement.** The app used to infer one
-  from however long you happened to take last time, which meant the timer opened
-  on a different number most weeks with nothing on screen to explain it. Rests
-  are still recorded against every set; they no longer set the target.
+- **Prefill:** A session with no history of its own now opens blank instead of borrowing the most recent performance from another session. The information sheet still names where the movement was last performed.
+- **Log:** A set with a higher estimated 1RM than the previous one is marked as progress even when reps were traded for weight, using a 2.5% margin.
 
 ### Fixed
 
-- **The end-of-rest alert now fires.** It had never reached a phone whose screen
-  was off.
+- **Notifications:** The rest-end alert now fires on Android 12 and earlier. `SCHEDULE_EXACT_ALARM` is declared for API 32 and below, and a refused exact alarm falls back to an inexact one.
+- **Log:** The set sheet no longer states that warm-ups are ignored by the previous-performance reference.
+- **Log:** Focusing a set cell scrolls only when the row is out of view.
+- **App:** The launcher icon's mark no longer runs to the edge of its tile.
 
-## 1.0.0 — 2026-09-01
+### Upgrade notes
 
-First release.
+- Adds a foreground service and two permissions. Install over the existing app so both are registered.
 
-Deltoid is an offline-first training log. Every screen reads from the phone,
-nothing waits on a server, and the app works in full with no account.
+## [1.2.1] - 2026-09-04
 
-- **Sessions keep separate progressions.** Push 1 and Push 2 each remember their
-  own history for the same movement, so what a session offers you is what that
-  session did last time — not what the exercise did most recently somewhere
-  else. This is the reason the app exists.
-- **Regimes, cycles and deloads.** Any number of sessions in any order; one pass
-  through them is a cycle. A scheduled deload lightens weights and cuts sets for
-  a cycle, with per-exercise overrides.
-- **A log screen built for a gym floor.** One exercise per page, a keypad that
-  fills from last time, plate diagrams for what to load on the bar, warm-up and
-  drop sets, partial reps, isometric holds timed rather than counted, and a rest
-  timer that survives the screen going off.
-- **History that stays true to the day.** A logged workout is a snapshot, so
-  editing a programme never rewrites a past session. Every day, every movement,
-  and every set is browsable, with notes at the session, exercise and set level.
-- **Charts and volume.** Estimated 1RM and heaviest weight over time, split by
-  the session each set was trained in; weekly hard sets by muscle; a
-  year-at-a-time consistency heatmap; bodyweight with a trend.
-- **Backup and restore.** One file holding every workout, written automatically
-  after each finished session and exportable to Downloads or any app that takes
-  a file.
-- **Cloud backup, optional.** Sign in with Google and the phone keeps a copy in
-  your own account, so a lost phone is not a lost history. Asked once, at first
-  launch, with declining given equal standing — and the app behaves exactly as
-  it did before sync existed if you never sign in.
-- Kilograms or pounds, light or dark, and a font that follows the system size.
+Patch release fixing status-bar icon contrast in the light theme.
+
+### Fixed
+
+- **Theme:** Status-bar icons now follow the app theme. In the light theme they were white on white until the app was backgrounded and resumed.
+
+## [1.2.0] - 2026-09-04
+
+Minor release making the bar a property of the training day and of each logged set.
+
+### Added
+
+- **Log:** The exercise menu in a session opens the exercise's settings, with the day's overrides, without leaving the session.
+
+### Changed
+
+- **Log:** The bar is set per training day rather than once in the catalog, and every logged set records the bar it was performed on. Changing a bar no longer alters the plate diagrams of past sessions.
+
+### Fixed
+
+- **Log:** A training day containing the same movement twice no longer breaks the exercise menu, adding an exercise, or swapping one.
+- **Log:** The exercise information sheet shows the day's bar, matching the keypad's plate diagram.
+
+### Upgrade notes
+
+- **Schema change.** Adds `bar_kind` to `session_exercises` and `workout_exercises`. The local schema migrates from version 3 to 4 on first launch.
+- Apply the server migration (`supabase db push`) before installing on a synced device. Until the server has the new columns, every push fails.
+
+## [1.1.0] - 2026-09-04
+
+Minor release making rest durations configurable.
+
+### Added
+
+- **Rest:** Each exercise in a training day can carry its own rest target.
+- **Settings:** Default rest, rest between exercises, and a rest-tone switch.
+
+### Changed
+
+- **Rest:** The rest target is no longer inferred from the previous rest taken. Exercises without their own target open on the default of two minutes.
+
+### Fixed
+
+- **Notifications:** The rest-end alert now fires with the screen off. The alarm is scheduled when the rest starts, not when the app is backgrounded.
+- **Notifications:** The lock-screen countdown no longer runs past zero.
+- **Notifications:** When the tone cannot play, for example during a call, the alert falls back to the notification.
+
+### Upgrade notes
+
+- The new preferences are stored on the device and are not synced.
+
+## [1.0.0] - 2026-09-01
+
+Initial release of Deltoid, an offline-first training log for Android.
+
+### Added
+
+- **Programmes:** Regimes, sessions and cycles, with scheduled deloads and per-exercise overrides.
+- **Prefill:** Progression is scoped to the session, not the exercise, so Push 1 and Push 2 keep separate histories for the same movement.
+- **Log:** One exercise per page, with a keypad prefilled from the previous session, plate diagrams, warm-up and drop sets, partial reps, timed isometric holds, and a rest timer that runs with the screen off.
+- **History:** Logged workouts are snapshots, so editing a programme never rewrites a past session. Notes at the session, exercise and set level.
+- **Charts:** Estimated 1RM and heaviest weight over time by session, weekly hard sets by muscle, a yearly consistency heatmap, and a bodyweight trend.
+- **Backup:** Export and restore of a single backup file, written automatically after each finished session.
+- **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
+- **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
+
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...HEAD
+[1.6.3]: https://github.com/SahilK-027/Deltoid/compare/v1.6.2...v1.6.3
+[1.6.2]: https://github.com/SahilK-027/Deltoid/compare/v1.6.1...v1.6.2
+[1.6.1]: https://github.com/SahilK-027/Deltoid/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/SahilK-027/Deltoid/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/SahilK-027/Deltoid/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/SahilK-027/Deltoid/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/SahilK-027/Deltoid/compare/v1.3.1...v1.4.0
+[1.3.1]: https://github.com/SahilK-027/Deltoid/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/SahilK-027/Deltoid/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/SahilK-027/Deltoid/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/SahilK-027/Deltoid/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/SahilK-027/Deltoid/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/SahilK-027/Deltoid/releases/tag/v1.0.0
