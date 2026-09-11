@@ -129,7 +129,10 @@ class TrendWindow {
 /// a phone can print them without collision, and holding it constant is what
 /// makes changing range read as a zoom rather than as a different chart: the
 /// labels stay where they are and only their words change.
-const _axisTicks = 7;
+///
+/// Public because the bar charts print the same seven, so both kinds of chart
+/// are read at the same rhythm.
+const axisLabelCount = 7;
 
 /// The x axis of a window: where it starts, where it ends, and where the labels
 /// go.
@@ -165,7 +168,7 @@ class TimeAxis {
     final to = _x(end);
     final span = (to - from).abs();
     final visible = zoom > 1 ? span / zoom : span;
-    final step = visible <= 0 ? 1.0 : visible / (_axisTicks - 1);
+    final step = visible <= 0 ? 1.0 : visible / (axisLabelCount - 1);
     return TimeAxis(
       minX: from - step / 2,
       maxX: to + step / 2,
@@ -174,7 +177,7 @@ class TimeAxis {
       // doc. `fl_chart` phases its ticks against `baselineX`, so this is the
       // one number that decides whether today gets a label.
       baseline: to,
-      format: _axisFormat(visible),
+      format: axisDateFormat(visible),
     );
   }
 
@@ -750,7 +753,7 @@ class _TrendChartState extends State<TrendChart>
                       meta,
                       Text(
                         axis?.label(value) ??
-                            DateFormat(_axisFormat(spanDays)).format(
+                            DateFormat(axisDateFormat(spanDays)).format(
                               DateTime.fromMillisecondsSinceEpoch(
                                 (value * 86400000).round(),
                               ),
@@ -1070,9 +1073,7 @@ Widget _edgeSafe(double value, TitleMeta meta, Widget child) {
 /// Public because the bar charts read their labels by the same rule. Two kinds
 /// of chart may draw different marks; they may not name the same fortnight two
 /// different ways (THEME → Charts).
-String axisDateFormat(double spanDays) => _axisFormat(spanDays);
-
-String _axisFormat(double spanDays) {
+String axisDateFormat(double spanDays) {
   if (spanDays <= 8) return 'EEE';
   if (spanDays <= 45) return 'd MMM';
   if (spanDays <= 400) return 'MMM';

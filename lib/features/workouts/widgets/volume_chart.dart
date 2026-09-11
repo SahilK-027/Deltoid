@@ -155,10 +155,6 @@ double _yAxisWidth(BuildContext context, int max) {
   return painter.width + 2;
 }
 
-/// How many date labels the strip prints at most — the same seven the line
-/// charts keep, so both kinds of chart are read at the same rhythm.
-const _axisLabels = 7;
-
 /// A y axis: a round maximum at or above the peak, and the rules to draw inside
 /// it.
 class _Axis {
@@ -270,7 +266,7 @@ class _Months extends StatelessWidget {
     // At most seven, and never more than there are bars: four bars get four
     // labels rather than seven crowded onto four positions.
     final n = bars.length;
-    final count = n < _axisLabels ? n : _axisLabels;
+    final count = n < axisLabelCount ? n : axisLabelCount;
 
     // **The line chart's geometry, exactly.** Its axis pads half a step either
     // side and then ticks every step, which puts label *k* at `(k + ½) / count`
