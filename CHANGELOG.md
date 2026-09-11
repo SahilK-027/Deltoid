@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-11
+
+Minor release letting the end of a session lower a movement's programmed set count.
+
+### Added
+
+- **Session summary:** When fewer working sets were ticked than the day programmes, the summary offers the lower count to the programme, for example "Did 1 of 3 working sets of Deadlift". Ticking it means the next workout opens on the shape that was trained, without empty working sets added to reach the old count.
+  - Left unticked, nothing changes: the next workout adds the missing working sets back, as before.
+  - Not offered in a deload week, for a skipped exercise, for an exercise with no working set ticked, or for an exercise the day runs twice.
+
 ## [1.7.0] - 2026-09-11
 
 Minor release removing the keypad's last-time button and correcting how an exercise edited mid-session reaches the session in progress.
@@ -267,7 +277,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...v1.7.0
 [1.6.3]: https://github.com/SahilK-027/Deltoid/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/SahilK-027/Deltoid/compare/v1.6.1...v1.6.2
