@@ -799,17 +799,74 @@ class RegimeRepository {
     if (name.present && name.value.trim().isEmpty) {
       throw const BlankNameException('exercise');
     }
-    await (db.update(db.exercises)..where((t) => t.id.equals(id))).write(
-      ExercisesCompanion(
-        name: name,
-        muscle: muscle,
-        equipment: equipment,
-        loadMode: loadMode,
-        barKind: barKind,
-        measureMode: measureMode,
-        formVideoUrls: videos,
-        notes: notes,
-        archived: archived,
+    await db.transaction(() async {
+      await (db.update(db.exercises)..where((t) => t.id.equals(id))).write(
+        ExercisesCompanion(
+          name: name,
+          muscle: muscle,
+          equipment: equipment,
+          loadMode: loadMode,
+          barKind: barKind,
+          measureMode: measureMode,
+          formVideoUrls: videos,
+          notes: notes,
+          archived: archived,
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+      if (barKind.present) {
+        await _followCatalogBarInOpenWorkouts(id, barKind.value);
+      }
+    });
+  }
+
+  /// Carries a catalog bar change into every workout still in progress, for
+  /// the reason [setSessionExerciseBarKind] gives: the open session is the
+  /// current run, and the bar just named is the one in use. Without this the
+  /// plate view went on breaking weights over the bar the session opened
+  /// with, however many times the exercise was corrected.
+  ///
+  /// Only rows that follow the catalog are patched. A workout whose day names
+  /// its own bar for this movement keeps it, since the catalog was never its
+  /// answer; a workout from no template, or a movement added mid-session, has
+  /// no slot and so has only the catalog to follow. Completed workouts are not
+  /// touched.
+  Future<void> _followCatalogBarInOpenWorkouts(
+    String exerciseId,
+    BarKind barKind,
+  ) async {
+    final open = await (db.select(db.workouts)
+          ..where((t) =>
+              t.status.equalsValue(WorkoutStatus.inProgress) &
+              t.deletedAt.isNull()))
+        .get();
+    if (open.isEmpty) return;
+
+    final overridden = <String>{
+      for (final slot in await (db.select(db.sessionExercises)
+            ..where((t) =>
+                t.exerciseId.equals(exerciseId) &
+                t.barKind.isNotNull() &
+                t.deletedAt.isNull()))
+          .get())
+        slot.sessionId,
+    };
+    final following = [
+      for (final w in open)
+        if (w.sessionId == null || !overridden.contains(w.sessionId)) w.id,
+    ];
+    if (following.isEmpty) return;
+
+    await (db.update(db.workoutExercises)
+          ..where((t) =>
+              t.workoutId.isIn(following) &
+              t.exerciseId.equals(exerciseId) &
+              t.deletedAt.isNull()))
+        .write(
+      WorkoutExercisesCompanion(
+        barKind: Value(barKind),
         deviceId: Value(currentDeviceId),
         updatedAt: Value(nowMs()),
         dirty: const Value(true),

@@ -272,6 +272,77 @@ void main() {
     );
   });
 
+  test('changing the catalog bar mid-session moves the open session with it',
+      () async {
+    // The reported case: a squat finished on the Olympic bar in week 1, then
+    // the exercise corrected to the women's bar with week 2 open. The plate
+    // view went on counting a 20 kg bar, because only the per-day row patched
+    // the session in progress and the catalog row did not.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final exercise = await shared();
+    await regimes.updateExercise(exercise.id,
+        barKind: const Value(BarKind.olympic));
+
+    final week1 =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.completeWorkout(week1);
+
+    final week2 =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    expect(await loggedBar(week2, exercise.id), BarKind.olympic);
+
+    await regimes.updateExercise(exercise.id,
+        barKind: const Value(BarKind.womens));
+
+    expect(await loggedBar(week2, exercise.id), BarKind.womens);
+    expect(
+      await loggedBar(week1, exercise.id),
+      BarKind.olympic,
+      reason: 'a finished session holds what was actually on the bar',
+    );
+  });
+
+  test('a catalog bar change reaches a movement added mid-session', () async {
+    // A brand-new exercise has no slot and no history, so this is the same
+    // bug without any prefill involved.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final fresh = await regimes.createExercise(
+      name: 'Box squat',
+      muscle: MuscleGroup.values.first,
+      equipment: Equipment.values.first,
+      loadMode: LoadMode.total,
+      barKind: BarKind.olympic,
+    );
+    await repo.addExerciseToWorkout(id, fresh);
+    expect(await loggedBar(id, fresh), BarKind.olympic);
+
+    await regimes.updateExercise(fresh, barKind: const Value(BarKind.womens));
+    expect(await loggedBar(id, fresh), BarKind.womens);
+  });
+
+  test('a catalog bar change leaves a day with its own bar alone', () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final exercise = await shared();
+
+    final slot = await slotOf(push1.id, exercise.id);
+    await regimes.setSessionExerciseBarKind(slot.id, BarKind.trap);
+    final open =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    await regimes.updateExercise(exercise.id,
+        barKind: const Value(BarKind.ez));
+    expect(
+      await loggedBar(open, exercise.id),
+      BarKind.trap,
+      reason: 'the day names its own bar, so the catalog was never its answer',
+    );
+  });
+
   test('a completed workout is untouched by a later change to its day',
       () async {
     // The acceptance criterion stated on its own, because it is the one that
