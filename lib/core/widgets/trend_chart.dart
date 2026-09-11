@@ -724,7 +724,7 @@ class _TrendChartState extends State<TrendChart>
                   sideTitles: SideTitles(
                     showTitles: true,
                     interval: step,
-                    reservedSize: _yGutter(
+                    reservedSize: axisGutter(
                       context,
                       _yTicks(minY, maxY, step).map(formatValue),
                     ),
@@ -940,7 +940,7 @@ class EmptyTrendChart extends StatelessWidget {
                     interval: step,
                     // Held open even when there is nothing to write in it, so
                     // the plot does not widen the moment data lands.
-                    reservedSize: _yGutter(context, [
+                    reservedSize: axisGutter(context, [
                       if (formatValue case final f?)
                         ..._yTicks(minY, maxY, step).map(f),
                     ]),
@@ -1017,7 +1017,16 @@ class EmptyTrendChart extends StatelessWidget {
 /// into a box a quarter of an em too small. A side title is clipped rather than
 /// reported as overflowing, so the axis quietly reads `20` and nothing raises a
 /// word about it. See [_yTicks].
-double _yGutter(BuildContext context, Iterable<String> labels) {
+///
+/// Public because the bar chart measures its gutter the same way. [gap] is the
+/// room a chart puts between the plot and its labels: `fl_chart`'s side title
+/// spends `Space.xs` of the reserved size on it, and the bar chart lays the
+/// same gap out beside the gutter rather than inside it, so passes none.
+double axisGutter(
+  BuildContext context,
+  Iterable<String> labels, {
+  double gap = Space.xs,
+}) {
   final style = context.t.bodySmall;
   var widest = 0.0;
   for (final label in labels) {
@@ -1027,9 +1036,9 @@ double _yGutter(BuildContext context, Iterable<String> labels) {
     )..layout();
     if (painter.width > widest) widest = painter.width;
   }
-  // The label, the gap `_edgeSafe` puts before it, and a point of air so a
-  // rounded glyph does not touch the card's padding.
-  return widest + Space.xs + 2;
+  // The label, the gap before it, and a point of air so a rounded glyph does
+  // not touch the card's padding.
+  return widest + gap + 2;
 }
 
 /// Every value the y axis will label, so the gutter can be measured against

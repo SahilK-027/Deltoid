@@ -147,13 +147,8 @@ class VolumeChart extends StatelessWidget {
 ///
 /// Fixed rather than intrinsic: it is derived from the axis *maximum*, so it
 /// changes when the chart rescales and not as bars move under it.
-double _yAxisWidth(BuildContext context, int max) {
-  final painter = TextPainter(
-    text: TextSpan(text: '$max', style: context.t.bodySmall),
-    textDirection: Directionality.of(context),
-  )..layout();
-  return painter.width + 2;
-}
+double _yAxisWidth(BuildContext context, int max) =>
+    axisGutter(context, ['$max'], gap: 0);
 
 /// A y axis: a round maximum at or above the peak, and the rules to draw inside
 /// it.
