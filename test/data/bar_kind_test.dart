@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
@@ -340,6 +342,43 @@ void main() {
       await loggedBar(open, exercise.id),
       BarKind.trap,
       reason: 'the day names its own bar, so the catalog was never its answer',
+    );
+  });
+
+  test('the open log redraws when its exercise is edited', () async {
+    // The log screen reads the catalog row live for everything it does not
+    // snapshot — the name, the load mode, the measure mode — so a stream that
+    // did not watch the catalog kept drawing the exercise as it was before the
+    // edit, until the next set written happened to wake it.
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final exercise = await shared();
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+
+    final names = <String>[];
+    final first = Completer<void>();
+    final renamed = Completer<void>();
+    final sub = repo.watchWorkoutDetail(id).listen((d) {
+      final name = d!.entries
+          .firstWhere((e) => e.exercise.id == exercise.id)
+          .exercise
+          .name;
+      names.add(name);
+      if (!first.isCompleted) first.complete();
+      if (name == 'Renamed press' && !renamed.isCompleted) renamed.complete();
+    });
+    addTearDown(sub.cancel);
+
+    // The edit lands after the screen has drawn, which is when a person
+    // makes it.
+    await first.future;
+    expect(names.single, exercise.name);
+
+    await regimes.updateExercise(exercise.id,
+        name: const Value('Renamed press'));
+    await renamed.future.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => fail('the log kept drawing ${names.last}'),
     );
   });
 

@@ -2596,9 +2596,18 @@ class TrainingRepository {
   }
 
   Stream<WorkoutDetail?> watchWorkoutDetail(String workoutId) {
-    // Any write to these three tables invalidates the view.
+    // Every table [workoutDetail] reads. The catalog and the day are read
+    // live for whatever is not snapshotted (the exercise's name, load mode
+    // and measure mode, and the day's name), so an edit made with the log
+    // open has to redraw it rather than wait for the next set written.
     return db.watchQuery(
-      [db.workouts, db.workoutExercises, db.setLogs],
+      [
+        db.workouts,
+        db.workoutExercises,
+        db.setLogs,
+        db.exercises,
+        db.sessions,
+      ],
       () => workoutDetail(workoutId),
     );
   }
