@@ -442,7 +442,6 @@ class ListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -451,7 +450,7 @@ class ListCard extends StatelessWidget {
             if (i > 0)
               Padding(
                 padding: EdgeInsets.only(left: inset),
-                child: Divider(color: c.border, height: 1),
+                child: const Divider(),
               ),
             children[i],
           ],
@@ -1690,7 +1689,7 @@ class SheetHeader extends StatelessWidget {
             ],
           ),
         ),
-        Divider(color: c.border, height: 1),
+        const Divider(),
       ],
     );
   }

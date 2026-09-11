@@ -217,7 +217,7 @@ class _CalendarCardState extends State<_CalendarCard> {
                   DateFormat('EEE d MMM yyyy').format(widget.initial),
             ),
           ),
-          Divider(height: 1, thickness: 1, color: c.border),
+          const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               Space.lg,

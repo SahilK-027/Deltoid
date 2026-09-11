@@ -460,7 +460,7 @@ Future<SkipReason?> _pickSkipReason(BuildContext context) {
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
         for (var i = 0; i < reasons.length; i++) ...[
-          if (i > 0) Divider(color: ctx.c.border, height: 1, indent: Space.lg),
+          if (i > 0) const Divider(indent: Space.lg),
           AppRow(
             title: reasons[i].label,
             onTap: () => Navigator.of(ctx).pop(reasons[i]),

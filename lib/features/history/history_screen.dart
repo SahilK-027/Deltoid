@@ -283,7 +283,7 @@ class _WorkoutFeedState extends ConsumerState<_WorkoutFeed> {
               _SummaryRow(:final summary) => Column(
                   children: [
                     if (rows[i - 1] is _SummaryRow)
-                      Divider(height: 1, color: context.c.border),
+                      const Divider(),
                     _WorkoutRow(summary: summary),
                   ],
                 ),
@@ -603,7 +603,6 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
   @override
   Widget build(BuildContext context) {
     final trained = ref.watch(exercisesWithHistoryProvider).valueOrNull;
-    final c = context.c;
     final q = _query.trim().toLowerCase();
 
     if (trained == null) {
@@ -669,7 +668,7 @@ class _ExerciseIndexState extends ConsumerState<_ExerciseIndex> {
                       untrained.length +
                       (matches.isNotEmpty && untrained.isNotEmpty ? 1 : 0),
                   separatorBuilder: (_, _) =>
-                      Divider(height: 1, color: c.border),
+                      const Divider(),
                   itemBuilder: (context, i) {
                     if (i < matches.length) {
                       final e = matches[i];

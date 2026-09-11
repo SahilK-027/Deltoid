@@ -77,7 +77,7 @@ class _VolumeTileState extends State<VolumeTile> {
             onSelected: (w) => setState(() => _week = w),
           ),
           const SizedBox(height: Space.lg),
-          Divider(color: c.border, height: 1),
+          const Divider(),
           const SizedBox(height: Space.md),
           Row(
             children: [

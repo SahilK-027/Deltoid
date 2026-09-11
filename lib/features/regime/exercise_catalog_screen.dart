@@ -189,7 +189,7 @@ class _ExerciseCatalogScreenState extends ConsumerState<ExerciseCatalogScreen> {
                 // Room to scroll the last row clear of the floating button.
                 padding: const EdgeInsets.only(bottom: Space.huge * 2),
                 itemCount: filtered.length,
-                separatorBuilder: (_, _) => Divider(height: 1, color: c.border),
+                separatorBuilder: (_, _) => const Divider(),
                 itemBuilder: (context, i) {
                   final e = filtered[i];
                   return AppRow(

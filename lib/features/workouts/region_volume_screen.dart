@@ -254,7 +254,7 @@ class _Movements extends ConsumerWidget {
           child: Column(
             children: [
               for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0) Divider(color: context.c.border, height: 1),
+                if (i > 0) const Divider(),
                 AppRow(
                   title: rows[i].name,
                   subtitle: total == 0

@@ -1539,7 +1539,7 @@ class _ConsistencyCard extends StatelessWidget {
               const SizedBox(height: Space.lg),
               ConsistencyHeatmap(days: data.days),
               const SizedBox(height: Space.lg),
-              Divider(color: context.c.border, height: 1),
+              const Divider(),
               const SizedBox(height: Space.md),
               // No legend here. It is reference material rather than something
               // you read at a glance, and the screen this card opens carries it

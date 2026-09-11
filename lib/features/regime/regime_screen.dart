@@ -399,7 +399,7 @@ class _DayBody extends ConsumerWidget {
           )
         else
           for (var i = 0; i < slots.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: c.border),
+            if (i > 0) const Divider(),
             _SlotRow(
               regimeId: regimeId,
               sessionId: session.id,

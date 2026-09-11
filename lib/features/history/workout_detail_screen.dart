@@ -154,7 +154,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
                     ),
                   ),
                   for (var i = 0; i < detail.entries.length; i++) ...[
-                    if (i > 0) Divider(height: 1, color: c.border),
+                    if (i > 0) const Divider(),
                     _ExerciseBlock(entry: detail.entries[i]),
                   ],
                 ],
@@ -444,7 +444,7 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                   if (i > 0)
                     Padding(
                       padding: const EdgeInsets.only(left: 60),
-                      child: Divider(height: 1, color: c.border),
+                      child: const Divider(),
                     ),
                   _SetLine(
                     set: done[i],

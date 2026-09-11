@@ -401,7 +401,7 @@ class _MonthDays extends ConsumerWidget {
             if (i > 0)
               Padding(
                 padding: const EdgeInsets.only(left: Space.xxxl),
-                child: Divider(color: c.border, height: 1),
+                child: const Divider(),
               ),
             _WeighInRow(
               entry: entries[i],

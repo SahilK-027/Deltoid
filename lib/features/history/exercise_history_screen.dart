@@ -386,7 +386,7 @@ class _PerformanceCardState extends ConsumerState<_PerformanceCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: Space.md),
-                        Divider(color: c.border, height: 1),
+                        const Divider(),
                         const SizedBox(height: Space.sm),
                         for (var i = 0; i < done.length; i++)
                           _ExpandedSetLine(
