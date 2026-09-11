@@ -1767,6 +1767,9 @@ class SheetHeader extends StatelessWidget {
   }
 }
 
+/// How much of the screen a capped sheet may take. See [showAppSheet].
+const sheetMaxHeight = 0.7;
+
 /// Opens a sheet. The one way the app opens one, so every sheet sits on the
 /// same route and none can come out different from its neighbours.
 ///
@@ -1783,14 +1786,21 @@ class SheetHeader extends StatelessWidget {
 /// handle, because [SheetHeader] draws its own, tighter one.
 ///
 /// [dismissible] false holds the sheet open against the scrim and the drag,
-/// for a question that must be answered. [maxHeightFraction] caps a sheet
-/// whose content can outgrow the phone, so the screen behind it stays in
-/// sight.
+/// for a question that must be answered.
+///
+/// [capped] is for a sheet whose content can outgrow the phone — twelve
+/// muscles, twenty years. Uncapped, it opens edge to edge with the page it
+/// came from nowhere in sight: a screen wearing a sheet's clothes, and a panel
+/// with almost no distance left to travel, so its entrance and exit both read
+/// as a cut. Capped, the page behind stays visible, and the barrier over it is
+/// what says this is a question that can be dismissed. Every capped sheet
+/// stops at the same height, [sheetMaxHeight], so two long lists never open to
+/// two different lines.
 Future<T?> showAppSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   bool dismissible = true,
-  double? maxHeightFraction,
+  bool capped = false,
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -1799,11 +1809,11 @@ Future<T?> showAppSheet<T>(
     showDragHandle: false,
     isDismissible: dismissible,
     enableDrag: dismissible,
-    constraints: maxHeightFraction == null
-        ? null
-        : BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * maxHeightFraction,
-          ),
+    constraints: capped
+        ? BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * sheetMaxHeight,
+          )
+        : null,
     builder: builder,
   );
 }

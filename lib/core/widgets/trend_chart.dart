@@ -403,11 +403,8 @@ class TrendRangeBar extends StatelessWidget {
   Future<void> _pickYear(BuildContext context) async {
     final picked = await showAppSheet<int>(
       context,
-      // Capped. Twenty years of training is a list
-      // longer than a phone, and a sheet that fills the screen is a screen
-      // wearing a sheet's clothes — the barrier above it is what says this is a
-      // question that can be dismissed.
-      maxHeightFraction: 0.7,
+      // Twenty years of training is a list longer than a phone.
+      capped: true,
       builder: (sheet) => AppSheet(
         title: 'Which year?',
         // The default padding, minus the top the header already provides.

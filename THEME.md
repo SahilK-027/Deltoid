@@ -432,7 +432,9 @@ goes in the trailing slot, on the title's line.
 
 **Every sheet opens through `showAppSheet`.** The route is written once — safe
 area, scroll control, no framework drag handle — and a caller chooses only
-whether the sheet can be dismissed and how much of the screen it may take.
+whether the sheet can be dismissed and whether it is capped. A capped sheet —
+one whose list can outgrow the phone — stops at **70% of the screen**, every
+one at the same line, so the page it came from stays in sight.
 `test/core/sheet_safe_area_test.dart` fails on any other call to
 `showModalBottomSheet`.
 

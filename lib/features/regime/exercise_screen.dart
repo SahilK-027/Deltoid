@@ -753,14 +753,8 @@ Future<T?> _pick<T>(
 }) {
   return showAppSheet<T>(
     context,
-    // Capped, and this is what stops `Muscle` reading as a drawer rather than a
-    // sheet. Twelve rows at 56 plus a header is taller than the phone, so an
-    // uncapped sheet opened edge to edge over the status bar with the page it
-    // came from nowhere in sight — and a panel that already fills the screen
-    // has almost no distance left to travel, so its entrance and its exit both
-    // looked like a cut. Two thirds leaves the screen behind it visible, which
-    // is the thing that makes the movement legible.
-    maxHeightFraction: 0.66,
+    // Twelve muscles at 56 plus a header is taller than the phone.
+    capped: true,
     builder: (sheet) => AppSheet(
       title: title,
       contentPadding: const EdgeInsets.only(bottom: Space.md),
