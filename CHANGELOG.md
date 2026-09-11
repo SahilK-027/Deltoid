@@ -10,6 +10,29 @@ Every release is an Android APK installed by hand. The build number is Android's
 `versionCode` and always increases, because a build whose code has not moved
 will not install over the one already on the phone.
 
+## 1.6.3 — 2026-09-11
+
+### Fixed
+
+- **Long lists in a sheet stop at the same height.** The year picker under a
+  chart stopped at 70% of the screen and the muscle and equipment pickers on an
+  exercise at 66%, so the same kind of sheet opened to two different lines. Both
+  stop at 70% now.
+- **The volume chart's gridlines are dashed like every other chart's.** They
+  were drawn in a finer pattern than the lines on the bodyweight and exercise
+  charts beside them. All charts now use the same dash.
+- **The button on an empty Bodyweight page presses like every other button.**
+  It rippled where every other primary button in the app scales down under your
+  thumb.
+- **The add buttons in the set table are named for screen readers.** The `+`
+  under the set numbers now reads as "Add a set", or "Add a leg" on a drop set.
+- **The year heatmap follows a change of theme.** Switching between light and
+  dark could leave a year already on screen in the colours it was first drawn
+  in.
+- **The volume chart prints its numbers in full.** An axis reaching past 100
+  sets a week could cut a digit off its labels — the same fault 1.6.2 fixed in
+  the other charts.
+
 ## 1.6.2 — 2026-09-09
 
 ### Fixed
