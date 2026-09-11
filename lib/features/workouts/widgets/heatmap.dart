@@ -65,7 +65,7 @@ class HeatCell extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: heatCellColor(context, day, isFuture: isFuture),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(Radii.heatCell),
         ),
       ),
     );

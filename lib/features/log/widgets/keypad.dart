@@ -323,7 +323,7 @@ class _Key extends StatelessWidget {
     return Expanded(
       flex: flex,
       child: SizedBox(
-        height: 52,
+        height: Sizes.key,
         child: Material(
           color: onTap == null ? Colors.transparent : bg,
           borderRadius: BorderRadius.circular(Radii.control),
@@ -370,7 +370,7 @@ class _PartialKey extends StatelessWidget {
     final c = context.c;
     return Expanded(
       child: SizedBox(
-        height: 52,
+        height: Sizes.key,
         child: Material(
           color: c.surfaceHigh,
           borderRadius: BorderRadius.circular(Radii.control),

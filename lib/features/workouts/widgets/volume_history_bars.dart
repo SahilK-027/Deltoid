@@ -238,7 +238,7 @@ class _BarsPainter extends CustomPainter {
     // back. A bar is a point of ink or the whole slot, whichever is smaller.
     final barWidth = math.max(slot - gap, math.min(slot, 1.0));
     // A 2pt radius on a 2pt bar is a lozenge, not a bar (THEME → Bar list).
-    final radius = barWidth >= 5 ? const Radius.circular(2) : Radius.zero;
+    final radius = barWidth >= 5 ? const Radius.circular(Radii.bar) : Radius.zero;
 
     // Zooming out reveals weeks that were not on screen before. They fade in
     // rather than sliding in from nowhere fully drawn.

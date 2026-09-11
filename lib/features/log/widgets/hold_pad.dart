@@ -150,7 +150,7 @@ class _HoldPadState extends State<HoldPad> {
               Ticking(builder: _clock),
               const SizedBox(height: Space.md),
               SizedBox(
-                height: 52,
+                height: Sizes.key,
                 child: _Primary(
                   running: _startedAt != null,
                   onTap: _startedAt == null ? _start : _stop,

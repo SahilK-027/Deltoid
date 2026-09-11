@@ -416,9 +416,20 @@ abstract final class Sizes {
 
   /// A glyph inside a control, beside a `titleMedium` label.
   static const glyph = 20.0;
+
+  /// A key on the set keypad and the stopwatch pad — a row of them under the
+  /// thumb, a little shorter than a button because four rows stack.
+  static const key = 52.0;
 }
 
 abstract final class Radii {
+  /// A bar in a chart: the bar list and the weekly bars. Not a pill — a full
+  /// radius eats a short bar (THEME → Bar list).
+  static const bar = 2.0;
+
+  /// A day on the compact heatmap.
+  static const heatCell = 4.0;
+
   /// Small marks: a checkbox, a done square, the delete chip on a set row.
   static const mark = 6.0;
 

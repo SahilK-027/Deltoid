@@ -256,7 +256,7 @@ class _Bar extends StatelessWidget {
     final c = context.c;
     final fraction = max == 0 ? 0.0 : sets / max;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(Radii.bar),
       child: Stack(
         children: [
           Container(height: height, color: c.surfaceHighest),
