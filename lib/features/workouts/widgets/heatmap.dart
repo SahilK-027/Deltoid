@@ -12,8 +12,16 @@ Color heatCellColor(
   BuildContext context,
   HeatDay? day, {
   required bool isFuture,
+}) =>
+    heatColourIn(context.c, day, isFuture: isFuture);
+
+/// [heatCellColor] for a painter, which has no `BuildContext` and resolves the
+/// palette once rather than once per cell.
+Color heatColourIn(
+  DeltoidColors c,
+  HeatDay? day, {
+  required bool isFuture,
 }) {
-  final c = context.c;
   if (isFuture) return c.heatEmpty.withValues(alpha: 0.4);
   if (day == null) return c.heatEmpty;
   // Deload is a solid amber, not an outlined cell. An outline on a 4dp square

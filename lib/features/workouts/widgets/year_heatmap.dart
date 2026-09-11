@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../heatmap_data.dart';
+import 'heatmap.dart' show heatColourIn;
 
 /// One calendar year, drawn rather than built.
 ///
@@ -104,10 +105,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
               // every year sat lower than its top.
               caption: _caption(),
               colours: _Palette(
-                empty: c.heatEmpty,
-                future: c.heatEmpty.withValues(alpha: 0.4),
-                on: c.heatOn,
-                deload: c.deload,
+                days: c,
                 label: c.textSecondary,
                 ring: c.textPrimary,
               ),
@@ -172,23 +170,14 @@ class _Span {
 /// and looking them up per cell was 366 theme lookups a year.
 class _Palette {
   const _Palette({
-    required this.empty,
-    required this.future,
-    required this.on,
-    required this.deload,
+    required this.days,
     required this.label,
     required this.ring,
   });
 
-  final Color empty;
-  final Color future;
-
-  /// One tone for any day that was trained. See `DeltoidColors.heatOn`.
-  final Color on;
-
-  /// Solid, not an outline: at 4dp a stroke is a smudge, and a light week is a
-  /// kind of trained day rather than a trained day with a note on it.
-  final Color deload;
+  /// What a day's cell is filled with, read through [heatColourIn] — the same
+  /// rule the compact grid on Workouts draws with.
+  final DeltoidColors days;
 
   final Color label;
   final Color ring;
@@ -344,10 +333,7 @@ class _YearPainter extends CustomPainter {
       };
 
   Color _colourFor(HeatDay? day, {required bool isFuture}) {
-    if (isFuture) return colours.future;
-    if (day == null) return colours.empty;
-    if (day.isDeload) return colours.deload;
-    return colours.on;
+    return heatColourIn(colours.days, day, isFuture: isFuture);
   }
 
   static String _monthName(int month) => const [
