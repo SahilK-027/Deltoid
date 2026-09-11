@@ -20,7 +20,6 @@ import '../../data/sync/sync_engine.dart';
 import '../../data/sync/sync_state.dart';
 import '../../domain/rest.dart';
 import '../account/sign_in_flow.dart';
-import '../regime/regime_settings.dart' show StepperRow;
 import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';

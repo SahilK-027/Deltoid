@@ -15,7 +15,6 @@ import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import '../history/exercise_history_screen.dart';
 import 'regime_screen.dart';
-import 'regime_settings.dart';
 import '../../core/widgets/toast.dart';
 
 /// One catalog row, watched so an edit made here redraws the screen it was

@@ -669,6 +669,84 @@ class InkRow extends StatelessWidget {
   }
 }
 
+/// A row whose trailing control is a pair of steps around a value. The one
+/// shape in the app for "a small number, changed one notch at a time".
+class StepperRow extends StatelessWidget {
+  const StepperRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
+    this.helper,
+  });
+
+  final String label;
+  final String value;
+  final String? helper;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    // The helper runs the full width **under** the row, never in the
+    // subtitle slot.
+    //
+    // A stepper is 36 + 76 + 36 of controls plus its gaps, so a subtitle
+    // beside one gets about 130pt — nine or ten words over two lines, and
+    // every helper here is longer than that. They were all being cut mid
+    // sentence: "For an exercise that has not been given its own…". Moving
+    // the rows into a sheet did not fix it, because the stepper takes the
+    // same width wherever the row is drawn; only taking the sentence off
+    // that line does.
+    final row = AppRow(
+      title: label,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleIconButton(
+            icon: Icons.remove_rounded,
+            size: 36,
+            tooltip: 'Decrease',
+            tint: onDecrement == null ? c.textTertiary : null,
+            onTap: onDecrement,
+          ),
+          SizedBox(
+            width: 76,
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style: context.t.labelLarge,
+            ),
+          ),
+          CircleIconButton(
+            icon: Icons.add_rounded,
+            size: 36,
+            tooltip: 'Increase',
+            tint: onIncrement == null ? c.textTertiary : null,
+            onTap: onIncrement,
+          ),
+        ],
+      ),
+    );
+
+    if (helper == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        Padding(
+          // Aligned with the title above it, and carrying the row's bottom
+          // padding, the row itself having none to give.
+          padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
+          child: Text(helper!, style: context.t.bodyMedium),
+        ),
+      ],
+    );
+  }
+}
+
 /// A spinner sized to sit where a row's glyph or chevron was.
 ///
 /// A busy state is neither a disabled state nor an empty one. A row that drops
