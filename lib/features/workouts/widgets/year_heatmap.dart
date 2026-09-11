@@ -347,5 +347,11 @@ class _YearPainter extends CustomPainter {
       old.caption != caption ||
       old.days != days ||
       old.cell != cell ||
-      old.weeks != weeks;
+      old.weeks != weeks ||
+      // A theme switch changes nothing above, and without these the grid kept
+      // the colours it was first painted in.
+      old.colours.days != colours.days ||
+      old.colours.label != colours.label ||
+      old.colours.ring != colours.ring ||
+      old.labelStyle != labelStyle;
 }
