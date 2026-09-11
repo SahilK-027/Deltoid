@@ -182,9 +182,9 @@ class BodyweightScreen extends ConsumerWidget {
                   message: 'Needed to score bodyweight and bodyweight-plus '
                       'lifts. Seven pull-ups at your lightest are not the '
                       'same lift as seven at your heaviest.',
-                  action: FilledButton(
+                  action: PrimaryButton(
+                    label: 'Log bodyweight',
                     onPressed: () => logBodyweightPrompt(context, ref),
-                    child: const Text('Log bodyweight'),
                   ),
                 )
               : _MonthList(
