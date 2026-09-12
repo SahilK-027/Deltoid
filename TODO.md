@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**994 tests and nine pgTAP tests, analyzer clean.**
+**1,075 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -52,6 +52,15 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] History's exercise search falls through to the catalog.
 - [x] Every chart folds through `chart_buckets.dart` and shares one control row, one axis and one transition.
 - [x] Workouts arrives whole: every read it draws starts in the same frame, and no section drops in after the page.
+
+### Cycle progress
+
+- [x] The domain: a lift is a session and an exercise, a cycle's point is the mean change across the lifts in it, a deload scores nothing, and every cycle is measured against cycle 1 of its own regime — never against the last deload, and never reset.
+- [x] The read walks a regime through its cycles rather than scanning every workout ever logged, and is watched on the shape of the log rather than on `set_logs`, so a whole regime is not re-scored on every set ticked.
+- [x] The cycle axis on the one trend chart: deload bands, hairlines once `All` thins to blocks, a hollow open cycle, a tap-to-read line and a y band that never anchors at zero.
+- [x] The strength card replaces Last session on Workouts, and carries its three states — trained, a first cycle, nothing trained.
+- [x] The regime screen: the same card, how the number is arrived at folded away, and every lift grouped Stronger, No change and Weaker with the two sets behind each.
+- [x] All time: one year of weeks at a time with two legends, the spells behind a fold, and a card per regime.
 
 ### Around the edges
 

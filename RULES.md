@@ -448,6 +448,19 @@ else has to pass: **no new screen, and no new question asked.**
   business inventing. What stays ruled out is the thing that made it a non-goal:
   a dashboard you navigate to, a feed to scroll, targets to fail against.
 
+- **Cycle progress** is the third, and it takes two pushed screens rather than
+  none — so the test it passed has to be written down. It asks no new question:
+  every number on it is computed from sets already logged, and nothing on any of
+  the three surfaces prompts for anything. What it replaced is the point. The
+  Workouts card took the place of Last session, which repeated the masthead above
+  it and the History tab beside it, so the screen gained an answer without
+  gaining a section. The two screens behind it are the Weekly volume shape
+  exactly: a card on a page you already open, with the detail one tap behind it
+  — the regime's lifts, and the timeline of which programme ran in which week.
+  What stays ruled out is what stayed ruled out there: a dashboard as a
+  destination, targets to fail against, and a score the app invents rather than
+  derives.
+
 **Accounts came off it too, and did _not_ pass that test — so the reason has to
 be written down rather than assumed.** Sync across your own phones needs an
 identity to sync to, and an identity needs somewhere to say who you are, which
@@ -593,6 +606,8 @@ rather than shape. Where the checks live now:
 | Pending says how long it has been pending, and why                                      | `test/features/backup_state_test.dart`, `test/data/sync/sync_state_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Removing the history from this phone leaves no tombstone to push                        | `test/data/sync/forget_test.dart`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | A progress bar never goes backwards, past its end, or invents a denominator             | `test/data/sync/pull_test.dart` — the steps of a first pull                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Every derived number in cycle progress                                                  | `test/domain/cycle_progress_test.dart` — a deload, a switch away and back, a lift added part way, a hold, a bodyweight lift, all against hand-worked literals                                                                                                                                                                                                        |
+| A regime's whole history is read through its cycles, never by scanning every workout    | `test/data/query_planning_test.dart` — the plan for the cycle-progress read finds `idx_cycles_regime` and never scans `workouts`                                                                                                                                                                                                                                    |
 | A control that is busy does not look disabled                                           | `test/features/welcome_screen_test.dart` — the two answers' fills must differ mid-sign-in                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 **A comment that states a fact about other code is the kind that rots** — how

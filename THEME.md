@@ -537,6 +537,23 @@ Never for an error, never dismissible — a notice states a rule that is current
 true. **The copy states the rule, not its cause**; an implementation detail in a
 warning reads as an excuse.
 
+### Collapsible panel
+
+A card whose head is a title, an optional count and a chevron, and whose body is
+folded away until it is asked for. `How is this measured?` and `Regimes in 2026`
+are both this.
+
+- **Closed by default.** The card above it is readable without any of this, and a
+  screen that opens on five paragraphs of method buries the answer under the
+  working.
+- **The fold has a height, so it animates to it** — `AnimatedSize`, and the
+  chevron an `AnimatedRotation` (§ 6).
+- **An explanation carries no worked example.** A sum with invented weights in it
+  is one more thing to read, and the reader has their own numbers on the screen
+  above.
+- **The head's icon is the size of the text beside it.** An icon set larger than
+  what it introduces reads as a warning rather than as a question.
+
 ### Toast
 
 The one transient message. `surfaceHighest` fill, `border` hairline,
@@ -635,6 +652,27 @@ the tiles already agree on.
 chart is scaled against and how many periods it covers — and names the period
 under your finger while scrubbing.
 
+### Strength card
+
+`surface` card, shared by Workouts and the regime screen, answering one
+question: is the programme working. Top to bottom — the regime's name as a
+caption, the figure with its trend pill, the range pill, the readout, the chart,
+its legend, then the row that opens the detail.
+
+- **The caption is the regime's name and nothing else.** A card under a section
+  heading called `Cycle progress` does not need a title repeating it, and on the
+  regime screen the app bar carries the name, so the caption goes.
+- **The figure is the change, and the pill is its direction** — one word,
+  `positive` only for gaining, because that is the colour the app already uses
+  for beating last time. Holding steady is a reading and dropping is not a fault
+  the app is entitled to paint red.
+- **The card opens nothing; the row at its foot does.** Tapping the chart picks
+  a cycle, so a card-wide tap target would fight the gesture the chart needs.
+- **Three states, one card** — trained, a first cycle with nothing to compare,
+  and nothing trained at all. The last two print `——` where the figure goes and
+  keep the chart's height as empty space, so the page does not change shape on
+  the day of the first session.
+
 ### Charts
 
 **One chart and one range control**, both shared. A plot written a second time
@@ -645,7 +683,11 @@ calendar-aware ticks. A chart is a language, not a per-screen widget.
 picker, then the averaging chip. A screen may offer _fewer_ chips than that — a
 week of weekly bars is one bar, so volume starts at `1M` — but never different
 ones, never in a different order, and never a second control of its own
-somewhere else on the page.
+somewhere else on the page. **The one chart this does not govern is the cycle
+axis**, whose x axis is a regime's cycle numbers and has no dates to range over;
+it carries `Last 12 · Last 24 · All` instead, and the rules it keeps and the
+ones it cannot are below, under
+[The cycle axis](#the-cycle-axis).
 
 **No chart ever plots raw rows.** Fifty years of daily entries is eighteen
 thousand marks across a phone — a texture, not a chart. Every chart folds into
@@ -775,6 +817,72 @@ resolution.
   waits: "nothing logged" is a statement about the log, and a frame that has not
   read the log may not make it. A header that collapses while it reads shoves
   the list down a chart's height when it arrives.
+
+### The cycle axis
+
+The one line chart on a second x axis: a regime's own cycle numbers instead of
+dates. Everything under the axis is the trend chart's — the 4-and-4 gridlines,
+the right-hand gutter, the open circle markers, the 2px line, the y band of data
+plus air. Three things are its own, and each is a rule the time axis could not
+state.
+
+- **Cycles are evenly spaced, whatever they took in weeks.** The question is how
+  one cycle compared with the last, not when it happened. A regime resumed after
+  a spell on another programme runs 1, 2, 5, 6 with no gap drawn — the numbers
+  are on the labels, where they belong.
+- **A deload is a band, never a point.** The weights are lighter on purpose, so a
+  point at the floor of the chart would report a planned week as a collapse. The
+  band is `deload` at 14%, and its cycle number under the axis is orange to
+  match. Past 24 cycles, where `All` draws one point per block, the bands become
+  hairlines at 45% — forty bands at four points each is an orange chart.
+- **The open cycle is drawn as unfinished**: a dashed segment to a marker stroked
+  in `textTertiary`. Its point is real and partial, and a solid one would claim a
+  finished cycle two sessions in.
+- **A jump in the line is dashed at 60%** — across a deload, across a spell on
+  another regime, across the cycles a thinned chart does not draw. A solid line
+  between two points claims the training between them.
+- **Zero is not the floor.** A window opening at cycle 13 is a band from +6 to
+  +11; anchoring it draws four cycles of work as a flat line at the top. Zero
+  appears when zero is in the data, which is what cycle 1 is.
+- **The range control is `Last 12 · Last 24 · All` in a segmented pill** — the
+  one chart in the app not driven by the row of date chips above, because a
+  cycle axis has no dates to range over. Every chip stays selectable on a short
+  history: a chip that would draw a perfectly good four-cycle chart and is
+  greyed out instead is a worse answer than the short chart.
+- **It does not pinch.** The range pill already chooses how many cycles are on
+  screen, and two gestures governing one span fight each other.
+- **A tap anywhere reads the nearest cycle**, into the line of prose above the
+  plot — `Cycle 9 · 24 Aug to 30 Aug 2026 · +9.8%`. The cycle everything is
+  measured against prints no percentage of its own: `+0.0%` beside cycle 1 reads
+  as a fact about the training rather than the definition it is.
+- **The empty state is empty space, not an empty axis.** The trend chart draws
+  the time axis of the window you asked for, because that axis exists without
+  data; a cycle axis with no cycles has no numbers to label and no band to
+  scale, so drawing one invents a scale. The card keeps the height.
+
+### Timeline strip
+
+One year of training as one cell per ISO week: the regime's identity colour, the
+deload orange, the `heatEmpty` grey of a week off. A year is chosen with a
+stepper rather than scrolled to, because the alternative is thirty strips drawn
+from thirty queries to answer a question about one of them.
+
+- **A week belongs to whichever regime was trained most in it.** A week
+  straddling a switch is one cell and has to choose; ties go to the one moved to.
+- **Deload beats the regime's own colour.** Both facts cannot occupy one cell,
+  the light week is the one worth seeing, and the regime is legible from the
+  weeks either side.
+- **A week that has not happened is an outline, not a fill.** Filled with the
+  empty grey it reads as a week off, which is a claim about a week nobody has had
+  the chance to train.
+- **Two legends, never one.** A regime's colour and a week's state are different
+  kinds of fact, and one row of swatches invites the reader to take the orange
+  one for a seventh programme. `Regimes` lists only those trained in the year on
+  screen; `Weeks` carries `Deload` and `Week off`, each only when the strip holds
+  one.
+- **A week off does not end a spell.** The run list beneath merges across gaps —
+  a fortnight away from the gym is one run of the same programme with a hole in
+  it, and splitting it in three reports a holiday as a change of plan.
 
 ### Bar list
 
@@ -944,6 +1052,18 @@ turn fades in and nothing moves sideways: a grid sliding in from the edge reads
 as one page dragged over another, where this is one grid replaced in place. The
 month being left drops out on the first frame — two grids drawn over each other
 put a 2 beside every 3 and a ring around every ring.
+
+### Year stepper
+
+`‹ 2026 ›`, centred over the thing it governs.
+
+- **Both arrows keep their place at the ends**, disabled rather than removed, or
+  the year label slides sideways when you reach the first year and the control
+  changes shape as you use it.
+- **It offers the years there are**, from the first trained to the last — a
+  stepper that walks into 2019 on a log starting in 2024 is a row of empty
+  strips. The years are ISO years, because the strip is drawn in ISO weeks: a
+  session on 29 December 2025 is in week 1 of 2026.
 
 ### Mastheads and app bars
 
