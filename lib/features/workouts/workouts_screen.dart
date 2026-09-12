@@ -12,6 +12,7 @@ import '../../core/widgets/calendar.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
+import '../../data/repositories/training_repository.dart';
 import '../../domain/consistency.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/muscle_volume.dart';
@@ -20,11 +21,15 @@ import '../log/log_screen.dart';
 import '../log/widgets/exercise_sheets.dart';
 import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
+import 'all_time_screen.dart';
+import 'cycle_progress_providers.dart';
+import 'regime_progress_screen.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'workouts_providers.dart';
 import 'volume_history_screen.dart';
 import 'widgets/heatmap.dart';
+import 'widgets/strength_card.dart';
 import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/failure.dart';
@@ -439,6 +444,10 @@ class WorkoutsScreen extends ConsumerWidget {
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;
     final open = today?.openWorkout;
+    // Watched here rather than inside the card, so the score is already in hand
+    // when the page is built. Created by the card's first build instead, the
+    // section draws empty and pops a chart into itself a frame later.
+    final cycles = ref.watch(activeRegimeProgressProvider);
 
     return Scaffold(
       body: switch ((today, volume, regime, sessions.isEmpty)) {
@@ -476,6 +485,11 @@ class WorkoutsScreen extends ConsumerWidget {
         // item in the list it would slide off the top the moment you looked at
         // the heatmap, taking the one thing you came for with it — the session,
         // and the button that starts it.
+        // Loading, not errored: the page waits for the score the way it waits
+        // for the snapshot and the volume, so it arrives whole. A score that
+        // *failed* is a different case — the page renders and the section is
+        // absent, rather than the whole screen being held hostage by one query.
+        (_, _, _?, false) when cycles.isLoading => const SizedBox.shrink(),
         (_, _, final r?, false) => Column(
           children: [
             _WorkoutsHeader(
@@ -563,9 +577,12 @@ class WorkoutsScreen extends ConsumerWidget {
                         // page is the same page before and after.
                         const SizedBox(height: Space.section),
                         _VolumeCard(volume: volume!),
-                        if (today.lastCompleted != null) ...[
+                        if (cycles.valueOrNull case final progress?) ...[
                           const SizedBox(height: Space.section),
-                          _LastSessionCard(last: today.lastCompleted!),
+                          _CycleProgressCard(
+                            regime: progress,
+                            plannedLifts: _plannedLifts(today.snapshot),
+                          ),
                         ],
                       ],
                     ),
@@ -787,10 +804,6 @@ class _NoRegimeState extends ConsumerWidget {
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
-                    if (last != null) ...[
-                      const SizedBox(height: Space.section),
-                      _LastSessionCard(last: last!),
-                    ],
                   ],
                 ),
               ),
@@ -875,10 +888,6 @@ class _NoSessionsState extends ConsumerWidget {
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
-                    if (last != null) ...[
-                      const SizedBox(height: Space.section),
-                      _LastSessionCard(last: last!),
-                    ],
                   ],
                 ),
               ),
@@ -1673,61 +1682,58 @@ class _VolumeCard extends StatelessWidget {
   }
 }
 
-/// The last thing you actually did, and a way back into it. Closes the loop the
-/// rest of the screen opens: everything above is about what happens next.
-class _LastSessionCard extends StatelessWidget {
-  const _LastSessionCard({required this.last});
+/// What the programme is actually doing, and the way into the detail.
+///
+/// It replaces the Last session card, which repeated the masthead above it and
+/// the History tab beside it. The question this answers — is the training
+/// working — is asked nowhere else in the app.
+class _CycleProgressCard extends StatelessWidget {
+  const _CycleProgressCard({required this.regime, this.plannedLifts});
 
-  final ({Workout workout, String? sessionName}) last;
+  final RegimeProgress regime;
+  final int? plannedLifts;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    final w = last.workout;
-    final date = dateFromDayKey(w.dayKey);
-    final duration = _duration(w);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('Last session'),
-        ListCard(
-          children: [
-            AppRow(
-              title: last.sessionName ?? 'Workout',
-              subtitle: [
-                DateFormat('EEE d MMM').format(date),
-                ?duration,
-              ].join('  ·  '),
-              leading: IconTile(
-                w.isDeload ? Icons.trending_down_rounded : Icons.check_rounded,
-                color: w.isDeload ? c.deload : c.positive,
-                size: 40,
-              ),
-              chevron: true,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => WorkoutDetailScreen(workoutId: w.id),
-                ),
-              ),
+        SectionHeader(
+          'Cycle progress',
+          // Nothing to open before anything is logged, and a link into an
+          // empty timeline is a control that does nothing.
+          actionLabel: regime.progress.isEmpty ? null : 'All time',
+          onAction: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AllTimeScreen()),
+          ),
+        ),
+        StrengthCard(
+          regime: regime,
+          plannedLifts: plannedLifts,
+          onOpen: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  RegimeProgressScreen(regimeId: regime.regimeId),
             ),
-          ],
+          ),
         ),
       ],
     );
   }
+}
 
-  /// Null when the workout has no end stamp, or when the two stamps disagree
-  /// about the order of time — a backfilled session carries a made-up start and
-  /// its "duration" would be fiction.
-  static String? _duration(Workout w) {
-    final ended = w.endedAt;
-    if (ended == null || ended <= w.startedAt) return null;
-    final d = Duration(milliseconds: ended - w.startedAt);
-    if (d.inMinutes < 1) return null;
-    if (d.inHours >= 6) return null;
-    return d.inHours > 0
-        ? '${d.inHours}h ${d.inMinutes % 60}m'
-        : '${d.inMinutes} min';
+/// How many lifts the active programme holds: every exercise in every session,
+/// counted once per session it appears in.
+///
+/// Per session rather than per exercise, because that is what a lift is — Push
+/// 1 bench and Push 2 bench are two progressions (CLAUDE.md rule 1), and a
+/// denominator that counted them once would leave `15 of 12 lifts recorded` on
+/// the card.
+int? _plannedLifts(TodaySnapshot snapshot) {
+  if (snapshot.exerciseNamesBySession.isEmpty) return null;
+  var total = 0;
+  for (final names in snapshot.exerciseNamesBySession.values) {
+    total += names.length;
   }
+  return total == 0 ? null : total;
 }
