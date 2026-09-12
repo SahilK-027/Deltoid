@@ -139,13 +139,9 @@ class _StrengthCardState extends State<StrengthCard> {
             onChanged: (r) => setState(() => _range = r),
           ),
           const SizedBox(height: Space.md),
-          Text(
-            cycleReadout(
-              selected,
-              isBaseline: selected.cycleId == baseline?.cycleId,
-            ),
-            style: context.t.bodyMedium,
-            maxLines: 2,
+          _Readout(
+            point: selected,
+            isBaseline: selected.cycleId == baseline?.cycleId,
           ),
           const SizedBox(height: Space.sm),
           CycleAxisChart(
@@ -168,8 +164,13 @@ class _StrengthCardState extends State<StrengthCard> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   ValueUnit(
+                    // Out of what the programme holds, not out of what the
+                    // latest cycle happened to compare: `12 of 15` is a
+                    // sentence about the regime, and a denominator that moved
+                    // with every skipped session would be a different figure
+                    // each week.
                     value: '${progress.liftsImproved} of '
-                        '${progress.liftsCompared}',
+                        '${widget.plannedLifts ?? progress.liftsCompared}',
                     dense: true,
                   ),
                   const SizedBox(width: Space.xs),
@@ -233,15 +234,18 @@ class _StrengthCardState extends State<StrengthCard> {
           // axis with no cycles has no numbers to label and no band to scale,
           // so drawing one invents a scale — and holding the height open for
           // it leaves a card with a hole in it.
-          if (recorded) ...[
-            CycleAxisChart(
-              points: window.points,
-              plotted: window.plotted,
-              formatValue: formatCycleTick,
-              selected: progress.latest?.cycleId,
-            ),
-            const SizedBox(height: Space.md),
-          ],
+          // The axis this regime will have, with what there is on it: one dot
+          // for a first cycle, nothing at all before that. Four slots either
+          // way, so the chart is a chart rather than a dot in the middle of
+          // nothing (THEME → The cycle axis).
+          CycleAxisChart(
+            points: window.points,
+            plotted: window.plotted,
+            formatValue: formatCycleTick,
+            selected: progress.latest?.cycleId,
+            minSlots: _quietSlots,
+          ),
+          const SizedBox(height: Space.md),
           const Divider(),
           const SizedBox(height: Space.md),
           Row(
@@ -268,6 +272,61 @@ class _StrengthCardState extends State<StrengthCard> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// How many positions the axis lays out before there is a cycle to fill them.
+const _quietSlots = 4;
+
+/// The readout: a filled strip under the range pill, naming the cycle in the
+/// primary colour and the rest of the line beside it.
+///
+/// A strip rather than a bare line, because it is the one thing on the card
+/// that changes when the chart is tapped, and a line of grey prose moving is
+/// not visibly an answer to the tap.
+class _Readout extends StatelessWidget {
+  const _Readout({required this.point, required this.isBaseline});
+
+  final CyclePoint point;
+  final bool isBaseline;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final rest = cycleReadout(point, isBaseline: isBaseline)
+        .replaceFirst('Cycle ${point.index}', '');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.md,
+        vertical: Space.sm,
+      ),
+      decoration: BoxDecoration(
+        color: c.surfaceHigh,
+        borderRadius: BorderRadius.circular(Radii.cell),
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'Cycle ${point.index}',
+              style: context.t.bodyMedium?.copyWith(
+                color: c.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextSpan(
+              text: rest,
+              style: point.isDeload
+                  ? context.t.bodyMedium?.copyWith(color: c.deload)
+                  : context.t.bodyMedium,
+            ),
+          ],
+        ),
+        maxLines: 2,
       ),
     );
   }

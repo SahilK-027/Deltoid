@@ -208,11 +208,19 @@ void main() {
     expect(find.byType(Text), findsNothing);
   });
 
-  testWidgets('a window with nothing scored in it draws no chart at all',
-      (tester) async {
+  testWidgets('a window with nothing scored in it is an empty axis, not an '
+      'empty box', (tester) async {
     await tester.pumpWidget(harness([point(1, isDeload: true)]));
 
-    expect(find.byType(LineChart), findsNothing);
+    // The axis this regime will have, with nothing on it: a band from zero,
+    // gridlines, and no marker anywhere.
+    final data = dataOf(tester);
+    expect(data.minY, 0);
+    expect(data.maxY, greaterThan(0));
+    expect(data.lineBarsData.last.spots, isEmpty);
+    // And no cycle numbered under it: a label on an empty chart names a cycle
+    // that drew nothing.
+    expect(find.text('1'), findsNothing);
   });
 
   test('a percentage is printed with a sign and a real minus', () {

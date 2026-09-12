@@ -7,9 +7,9 @@ import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
-import '../../core/widgets/trend_chart.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/cycle_progress.dart';
+import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/set_format.dart';
 import '../../domain/units.dart';
@@ -127,16 +127,7 @@ class RegimeProgressScreen extends ConsumerWidget {
                 regime.labelOf(lift.lift).sessionName,
                 ?_sets(lift, unit),
               ].join('  ·  '),
-              trailing: Text(
-                formatCyclePercent(lift.percent),
-                style: context.t.labelLarge?.copyWith(
-                  color: switch (lift) {
-                    _ when lift.isStronger => context.c.positive,
-                    _ when lift.isWeaker => context.c.textPrimary,
-                    _ => context.c.textSecondary,
-                  },
-                ),
-              ),
+              trailing: _Change(lift: lift, unit: unit),
             ),
         ],
       ),
@@ -264,6 +255,49 @@ class RegimeProgressScreen extends ConsumerWidget {
   }
 }
 
+/// What a lift gained, in the unit it was trained in.
+///
+/// Kilograms rather than a percentage: the row already names the two sets it
+/// is between, and the number a person acts on is the weight. An estimated
+/// one-rep max is what moved, so that is what is differenced — a hold has no
+/// one-rep max and reports the seconds it gained instead.
+class _Change extends StatelessWidget {
+  const _Change({required this.lift, required this.unit});
+
+  final LiftChange lift;
+  final WeightUnit unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final colour = lift.isStronger
+        ? c.positive
+        : (lift.isWeaker ? c.textPrimary : c.textSecondary);
+    final gain = lift.latest - lift.baseline;
+    final sign = lift.isStronger ? '+' : (lift.isWeaker ? '−' : '');
+    final magnitude = lift.measure.isHold
+        ? '${gain.abs().round()}'
+        : formatInUnit(gain.abs(), unit);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          lift.isUnchanged ? '0' : '$sign$magnitude',
+          style: context.t.labelLarge?.copyWith(color: colour),
+        ),
+        const SizedBox(width: Space.xs),
+        Text(
+          lift.measure.isHold ? 's' : unit.label,
+          style: context.t.labelSmall?.copyWith(color: colour),
+        ),
+      ],
+    );
+  }
+}
+
 /// A group's name and how many lifts are in it.
 class _GroupHeading extends StatelessWidget {
   const _GroupHeading({required this.name, required this.count});
@@ -352,11 +386,11 @@ class _HowIsThisMeasuredState extends State<_HowIsThisMeasured> {
         children: [
           Row(
             children: [
-              // The same size as the numerals beside it. An icon set larger
-              // than the text it introduces reads as a warning rather than as
-              // a question.
-              Icon(Icons.help_outline_rounded, size: 20, color: c.textSecondary),
-              const SizedBox(width: Space.sm),
+              // The size of the title beside it. An icon set larger than the
+              // line it introduces reads as a warning rather than as a
+              // question.
+              Icon(Icons.help_outline_rounded, size: 24, color: c.textSecondary),
+              const SizedBox(width: Space.md),
               Expanded(
                 child: Text('How is this measured?', style: context.t.titleMedium),
               ),
@@ -387,12 +421,22 @@ class _HowIsThisMeasuredState extends State<_HowIsThisMeasured> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: 20,
+                            // A numbered badge rather than a bare figure: the
+                            // five points are a sequence to be read in order,
+                            // and a grey digit beside a bold line reads as a
+                            // footnote marker.
+                            Container(
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: c.surfaceHighest,
+                                borderRadius: BorderRadius.circular(Radii.mark),
+                              ),
                               child: Text(
                                 '${i + 1}',
-                                style: context.t.labelMedium
-                                    ?.copyWith(color: c.textTertiary),
+                                style: context.t.labelSmall
+                                    ?.copyWith(color: c.textPrimary),
                               ),
                             ),
                             const SizedBox(width: Space.sm),

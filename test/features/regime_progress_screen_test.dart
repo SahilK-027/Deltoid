@@ -140,13 +140,17 @@ void main() {
     expect(find.text('Stronger'), findsOneWidget);
     expect(find.text('No change'), findsNothing);
     expect(find.text('Weaker'), findsNothing);
-    expect(find.textContaining('+10.0%'), findsWidgets);
     // A lift row names the movement, its session and the two sets behind it.
     // A lift row names the movement, its session and the two sets behind it.
     // The list is long, so the row is scrolled to rather than assumed on
     // screen — a `ListView` builds only what is visible.
     await scrollTo(tester, find.textContaining('50 kg × 10 to 55 kg × 10'));
     expect(find.textContaining('50 kg × 10 to 55 kg × 10'), findsWidgets);
+    // The gain in kilograms, which is what a lift row prints: 50 kg × 10
+    // estimates 66.7 and 55 kg × 10 estimates 73.3, so the row reads +6.5
+    // against the plate increment.
+    expect(find.text('+6.5'), findsWidgets);
+    expect(find.text('kg'), findsWidgets);
   });
 
   testWidgets('a lift that stood still is its own group', (tester) async {

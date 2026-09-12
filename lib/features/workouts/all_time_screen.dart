@@ -122,7 +122,7 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
                 child: Text(
                   '$year',
                   textAlign: TextAlign.center,
-                  style: context.t.titleMedium,
+                  style: context.t.headlineSmall,
                 ),
               ),
               _StepButton(
@@ -192,14 +192,23 @@ class _StepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final enabled = onTap != null;
     return Pressable(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(Space.xs),
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          // Filled while it does something, and a bare glyph when it does not:
+          // a disabled circle still reads as a button at a glance.
+          color: enabled ? c.surfaceHigh : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
         child: Icon(
           icon,
-          size: 24,
-          color: onTap == null ? c.textTertiary : c.textPrimary,
+          size: 20,
+          color: enabled ? c.textPrimary : c.textTertiary,
         ),
       ),
     );
@@ -247,7 +256,7 @@ class _WeekStrip extends StatelessWidget {
     final now = isoWeekOf(today);
 
     return SizedBox(
-      height: 22,
+      height: 28,
       child: Row(
         children: [
           for (final w in weeks)
@@ -274,7 +283,7 @@ class _WeekStrip extends StatelessWidget {
                   // which inside a row is none, and the whole strip drew as a
                   // band of empty space.
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 0.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 0.75),
                     child: SizedBox.expand(
                       child: DecoratedBox(
                         decoration: BoxDecoration(

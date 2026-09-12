@@ -1144,6 +1144,7 @@ class CycleAxisChart extends StatelessWidget {
     this.onSelected,
     this.small = false,
     this.height,
+    this.minSlots,
   });
 
   /// Every cycle on the axis, in regime order — deloads included, because a
@@ -1173,6 +1174,10 @@ class CycleAxisChart extends StatelessWidget {
 
   final double? height;
 
+  /// The fewest positions the axis lays out, so a regime one cycle in draws a
+  /// chart rather than a dot in the middle of nothing.
+  final int? minSlots;
+
   /// How often a cycle number is printed.
   ///
   /// Every cycle up to fourteen, every second up to twenty-six, and every tenth
@@ -1196,26 +1201,28 @@ class CycleAxisChart extends StatelessWidget {
     };
 
     final values = [for (final p in drawn.values) p.value!];
-    if (values.isEmpty) {
-      return SizedBox(height: height ?? (small ? 64 : 150));
-    }
 
-    final lowest = values.reduce(min);
-    final highest = values.reduce(max);
     // Data plus air, and **not** anchored at zero. Zero is where a regime
     // started, so a window that opens at cycle 13 is a band from +6 to +11 and
     // anchoring it would draw four cycles of work as a flat line at the top of
     // the chart. Zero appears when it is in the data, which is what cycle 1 is.
-    final step = _niceStep(max(highest - lowest, 1) / 2);
+    //
+    // A band with nothing in it runs 0 to 2%, which is what a chart of a
+    // programme that has not been trained yet honestly is: the axis it will
+    // have, with no line on it.
+    final lowest = values.isEmpty ? 0.0 : values.reduce(min);
+    final highest = max(values.isEmpty ? 0.0 : values.reduce(max), lowest + 1);
+    final step = _cycleStep(lowest, highest);
     final minY = (lowest / step).floorToDouble() * step;
-    final maxY = minY + step * 2 >= highest ? minY + step * 2 : minY + step * 3;
+    final maxY = minY + step * 2;
 
     // Half a position of air at each end, so the first and last markers are not
     // cut in half by the edge of the plot.
+    final slots = max(n, minSlots ?? 0);
     final minX = -0.5;
-    final maxX = n - 0.5;
+    final maxX = slots - 0.5;
 
-    final every = labelEvery(n);
+    final every = labelEvery(slots);
     final openIndex = drawn.keys.where((i) => points[i].isOpen).firstOrNull;
     final closed = drawn.keys.where((i) => !points[i].isOpen).toList()..sort();
 
@@ -1269,7 +1276,12 @@ class CycleAxisChart extends StatelessWidget {
             ],
           ),
           titlesData: FlTitlesData(
-            topTitles: const AxisTitles(),
+            // Not a title: the room the topmost value label needs, which sits
+            // on the upper bound and would otherwise be drawn half outside the
+            // chart's own box.
+            topTitles: AxisTitles(
+              sideTitles: SideTitles(showTitles: false, reservedSize: small ? 0 : 10),
+            ),
             leftTitles: const AxisTitles(),
             rightTitles: small
                 ? const AxisTitles()
@@ -1281,14 +1293,16 @@ class CycleAxisChart extends StatelessWidget {
                         context,
                         _yTicks(minY, maxY, step).map(formatValue),
                       ),
-                      getTitlesWidget: (value, meta) => _edgeSafe(
-                        value,
-                        meta,
-                        Text(
-                          formatValue(value),
-                          style: context.t.bodySmall,
-                          maxLines: 1,
-                        ),
+                      // Every tick printed, the two on the bounds included.
+                      // The time axis suppresses its edges because its labels
+                      // are dates wide enough to collide; three short
+                      // percentages down a gutter do not, and a band whose top
+                      // and bottom are unlabelled is a scale the reader has to
+                      // infer.
+                      getTitlesWidget: (value, meta) => Text(
+                        formatValue(value),
+                        style: context.t.bodySmall,
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -1300,6 +1314,10 @@ class CycleAxisChart extends StatelessWidget {
                       reservedSize: 24,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
+                        // Nothing scored anywhere: the axis is the one this
+                        // regime will have, and numbering a cycle nothing was
+                        // drawn for labels an empty chart.
+                        if (drawn.isEmpty) return const SizedBox.shrink();
                         final i = value.round();
                         if (i < 0 || i >= n) return const SizedBox.shrink();
                         final cycle = points[i];
@@ -1392,7 +1410,9 @@ class CycleAxisChart extends StatelessWidget {
               ),
             // The open cycle, dashed away from the last closed one: its point
             // is real but partial, and drawing it solid would claim a finished
-            // cycle two sessions in.
+            // cycle two sessions in. A longer dash than a gap's, because the
+            // two say different things — this cycle is still being trained,
+            // against there being no cycle drawn in between.
             if (openIndex != null && closed.isNotEmpty)
               _segment(
                 c,
@@ -1402,6 +1422,7 @@ class CycleAxisChart extends StatelessWidget {
                   drawn[openIndex]!.value!,
                 ),
                 soft: true,
+                open: true,
               ),
             // The markers, on a bar of their own with no line of its own: the
             // segments above already drew the line, and marker styling that
@@ -1441,16 +1462,35 @@ class CycleAxisChart extends StatelessWidget {
     required FlSpot from,
     required FlSpot to,
     required bool soft,
+    bool open = false,
   }) {
     return LineChartBarData(
       spots: [from, to],
       isCurved: false,
-      color: soft ? c.progress.withValues(alpha: 0.6) : c.progress,
+      color: soft
+          ? c.progress.withValues(alpha: open ? 0.7 : 0.6)
+          : c.progress,
       barWidth: 2,
-      dashArray: soft ? const [2, 5] : null,
+      dashArray: soft ? (open ? const [3, 4] : const [2, 5]) : null,
       dotData: const FlDotData(show: false),
     );
   }
+}
+
+/// The step the cycle axis climbs in, so the band is the data plus air and
+/// every gridline lands on a number a person would say.
+///
+/// A ladder of its own rather than [_niceStep]'s: this axis is always a
+/// percentage change and its band is always two steps tall, so the step has to
+/// be the smallest that covers the data from a rounded floor — 2.5% is not a
+/// figure anybody reads a training block in.
+double _cycleStep(double lowest, double highest) {
+  for (final step in const [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 25.0, 50.0]) {
+    if ((lowest / step).floorToDouble() * step + 2 * step >= highest) {
+      return step;
+    }
+  }
+  return 100;
 }
 
 /// A cycle point as a percentage, in the app's own voice: `+9.8%`, `0%`,

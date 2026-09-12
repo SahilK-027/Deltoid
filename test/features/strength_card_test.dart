@@ -89,8 +89,8 @@ void main() {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.byType(CycleAxisChart), findsOneWidget);
-    // Both lifts beat their baseline.
-    expect(find.text('2 of 2'), findsOneWidget);
+    // Both lifts beat their baseline, out of the fifteen the programme holds.
+    expect(find.text('2 of 15'), findsOneWidget);
     expect(find.text('lifts improved'), findsOneWidget);
   });
 
@@ -158,9 +158,8 @@ void main() {
     expect(find.text('——'), findsOneWidget);
     expect(find.text('— of 15'), findsOneWidget);
     expect(find.text('Lifts improved'), findsOneWidget);
-    // Nothing to plot and no height held open for it: a card with a hole in it
-    // reads as a chart that failed to draw.
-    expect(find.byType(CycleAxisChart), findsNothing);
+    // The axis the regime will have, with nothing on it yet.
+    expect(find.byType(CycleAxisChart), findsOneWidget);
   });
 
   testWidgets('changing the range redraws the same card', (tester) async {

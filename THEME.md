@@ -668,6 +668,14 @@ its legend, then the row that opens the detail.
   the app is entitled to paint red.
 - **The card opens nothing; the row at its foot does.** Tapping the chart picks
   a cycle, so a card-wide tap target would fight the gesture the chart needs.
+  The row reads `12 of 15 lifts improved`, counted against **the lifts the
+  programme holds** rather than the lifts the latest cycle happened to compare —
+  a denominator that moved with every skipped session would be a different
+  figure each week.
+- **The readout is a filled strip, not a line of prose.** It is the one thing on
+  the card that changes when the chart is tapped, and grey text quietly
+  rewording itself is not visibly an answer to the tap. The cycle is named in
+  `text` at the head of it; a deload says so in `deload`.
 - **Three states, one card** — trained, a first cycle with nothing to compare,
   and nothing trained at all. The last two print `——` where the figure goes and
   keep the chart's height as empty space, so the page does not change shape on
@@ -844,6 +852,12 @@ state.
 - **Zero is not the floor.** A window opening at cycle 13 is a band from +6 to
   +11; anchoring it draws four cycles of work as a flat line at the top. Zero
   appears when zero is in the data, which is what cycle 1 is.
+- **Three gridlines, all of them labelled.** The band is two steps tall from a
+  rounded floor, in steps of 1, 2, 4, 5, 10, 20, 25 or 50 percentage points —
+  2.5% is not a figure anybody reads a block of training in. The time axis drops
+  the labels on its bounds because dates there collide; three short percentages
+  down a gutter do not, and an unlabelled top and bottom is a scale the reader
+  has to infer.
 - **The range control is `Last 12 · Last 24 · All` in a segmented pill** — the
   one chart in the app not driven by the row of date chips above, because a
   cycle axis has no dates to range over. Every chip stays selectable on a short
@@ -851,14 +865,33 @@ state.
   greyed out instead is a worse answer than the short chart.
 - **It does not pinch.** The range pill already chooses how many cycles are on
   screen, and two gestures governing one span fight each other.
-- **A tap anywhere reads the nearest cycle**, into the line of prose above the
-  plot — `Cycle 9 · 24 Aug to 30 Aug 2026 · +9.8%`. The cycle everything is
+- **A tap, and only a tap, reads a cycle** — into the strip above the plot. The
+  card sits in a scrolling page, and a chart that answers a drag picks whichever
+  cycle the finger crossed on its way past. A tap anywhere reads the nearest
+  one — `Cycle 9 · 24 Aug to 30 Aug 2026 · +9.8%`. The cycle everything is
   measured against prints no percentage of its own: `+0.0%` beside cycle 1 reads
   as a fact about the training rather than the definition it is.
-- **The empty state is empty space, not an empty axis.** The trend chart draws
-  the time axis of the window you asked for, because that axis exists without
-  data; a cycle axis with no cycles has no numbers to label and no band to
-  scale, so drawing one invents a scale. The card keeps the height.
+- **The empty state is an empty axis, not an empty box.** Four positions, a
+  band from zero, the gridlines and the gutter — the axis this regime will have,
+  with nothing on it. One cycle puts one dot on it and no more, because a single
+  point is where you are and the next one is read against it. No cycle numbers
+  are printed under a chart with nothing drawn on it: a label names a cycle that
+  drew nothing.
+
+### Lift row
+
+The regime screen's list: the movement, the session it belongs to and the two
+sets it is between, with what it gained on the right.
+
+- **The gain is in kilograms, not per cent.** The percentage is the card's
+  figure, averaged over every lift; the number a person acts on for one movement
+  is the weight, and it is the estimated one-rep max that moved. A hold has no
+  one-rep max and reports the seconds it gained.
+- **Green for gaining only** — the colour the app already uses for beating last
+  time. Losing ground is `text`, not red: red is deletion, and a lift going
+  backwards is information rather than a fault.
+- **`0 kg`, never `−0 kg` or `+0.0%`.** A lift that stood still is its own group
+  and says so plainly.
 
 ### Timeline strip
 
