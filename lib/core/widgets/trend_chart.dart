@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/chart_buckets.dart';
+import '../../domain/cycle_progress.dart';
 import '../ids.dart';
 import '../theme/tokens.dart';
 import 'primitives.dart';
@@ -1113,4 +1114,351 @@ double _niceDayStep(double raw) {
     if (step >= raw) return step;
   }
   return (raw / 365).ceilToDouble() * 365;
+}
+
+// ─── The cycle axis ─────────────────────────────────────────────────────────
+
+/// The same chart on a different x axis: a regime's own cycle numbers instead
+/// of dates.
+///
+/// Here rather than in a second file, because THEME → Charts says there is one
+/// line chart in this app and gives the reason: written again, a plot comes
+/// back with different gridlines, different markers and a control of its own.
+/// Everything below the axis is shared — the 4-and-4 dash, the right-hand
+/// gutter measured over the ticks actually printed, the open circle markers,
+/// the y band of data plus air.
+///
+/// What a cycle axis does *not* share is time. Cycles are evenly spaced
+/// whatever they took in weeks, because the question is "how did this cycle
+/// compare with the last one", not "when". They are also not zoomed by pinch:
+/// the range control above chooses how many cycles are on screen, and two
+/// gestures that both change the span would fight.
+class CycleAxisChart extends StatelessWidget {
+  const CycleAxisChart({
+    super.key,
+    required this.points,
+    required this.plotted,
+    required this.formatValue,
+    this.isBlocks = false,
+    this.selected,
+    this.onSelected,
+    this.small = false,
+    this.height,
+  });
+
+  /// Every cycle on the axis, in regime order — deloads included, because a
+  /// deload holds its place even though it scores nothing.
+  final List<CyclePoint> points;
+
+  /// Which of [points] carry a marker, by cycle id. See [CycleWindow.plotted].
+  final Set<String> plotted;
+
+  /// A y value as it should be read, unit applied and not printed.
+  final String Function(double value) formatValue;
+
+  /// Whether the chart is drawing one point per block, which turns the deload
+  /// bands into hairlines: forty bands at four pixels each is an orange chart.
+  final bool isBlocks;
+
+  /// The cycle the readout above the chart is describing, by cycle id.
+  final String? selected;
+
+  /// Tapping a cycle. Null leaves the chart untouchable, which is what the
+  /// small variant on a regime card wants.
+  final ValueChanged<CyclePoint>? onSelected;
+
+  /// The sparkline variant: no labels, no gutter, no touch. THEME → Charts
+  /// gives sparklines no axes at all.
+  final bool small;
+
+  final double? height;
+
+  /// How often a cycle number is printed.
+  ///
+  /// Every cycle up to fourteen, every second up to twenty-six, and every tenth
+  /// beyond — a label per cycle on a seventy-cycle regime is a grey band, not
+  /// an axis.
+  static int labelEvery(int slots) =>
+      slots <= 14 ? 1 : (slots <= 26 ? 2 : 10);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final n = points.length;
+    // Positions rather than cycle numbers: a regime resumed after a spell on
+    // another programme has cycles 1, 2, 5, 6, and an axis that honoured the
+    // gap would draw four cycles of training with a hole in the middle of it.
+    // The numbers are printed on the labels, where they belong.
+    final drawn = <int, CyclePoint>{
+      for (var i = 0; i < n; i++)
+        if (points[i].isScored && plotted.contains(points[i].cycleId)) i:
+            points[i],
+    };
+
+    final values = [for (final p in drawn.values) p.value!];
+    if (values.isEmpty) {
+      return SizedBox(height: height ?? (small ? 64 : 150));
+    }
+
+    final lowest = values.reduce(min);
+    final highest = values.reduce(max);
+    // Data plus air, and **not** anchored at zero. Zero is where a regime
+    // started, so a window that opens at cycle 13 is a band from +6 to +11 and
+    // anchoring it would draw four cycles of work as a flat line at the top of
+    // the chart. Zero appears when it is in the data, which is what cycle 1 is.
+    final step = _niceStep(max(highest - lowest, 1) / 2);
+    final minY = (lowest / step).floorToDouble() * step;
+    final maxY = minY + step * 2 >= highest ? minY + step * 2 : minY + step * 3;
+
+    // Half a position of air at each end, so the first and last markers are not
+    // cut in half by the edge of the plot.
+    final minX = -0.5;
+    final maxX = n - 0.5;
+
+    final every = labelEvery(n);
+    final openIndex = drawn.keys.where((i) => points[i].isOpen).firstOrNull;
+    final closed = drawn.keys.where((i) => !points[i].isOpen).toList()..sort();
+
+    return SizedBox(
+      height: height ?? (small ? 64 : 150),
+      child: LineChart(
+        duration: Motion.base,
+        curve: Motion.emphasized,
+        LineChartData(
+          minX: minX,
+          maxX: maxX,
+          minY: minY,
+          maxY: maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: step,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: c.border,
+              strokeWidth: 1,
+              dashArray: gridlineDash,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          // A deload is a band rather than a point on the floor. The weights
+          // are lighter on purpose, so a point at the bottom of the chart would
+          // report a planned week as a collapse — the band says "this week does
+          // not count" without claiming a number for it.
+          rangeAnnotations: RangeAnnotations(
+            verticalRangeAnnotations: [
+              if (!isBlocks)
+                for (var i = 0; i < n; i++)
+                  if (points[i].isDeload)
+                    VerticalRangeAnnotation(
+                      x1: i - 0.4,
+                      x2: i + 0.4,
+                      color: c.deload.withValues(alpha: 0.14),
+                    ),
+            ],
+          ),
+          extraLinesData: ExtraLinesData(
+            verticalLines: [
+              if (isBlocks)
+                for (var i = 0; i < n; i++)
+                  if (points[i].isDeload)
+                    VerticalLine(
+                      x: i.toDouble(),
+                      color: c.deload.withValues(alpha: 0.45),
+                      strokeWidth: 1.5,
+                    ),
+            ],
+          ),
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(),
+            leftTitles: const AxisTitles(),
+            rightTitles: small
+                ? const AxisTitles()
+                : AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: step,
+                      reservedSize: axisGutter(
+                        context,
+                        _yTicks(minY, maxY, step).map(formatValue),
+                      ),
+                      getTitlesWidget: (value, meta) => _edgeSafe(
+                        value,
+                        meta,
+                        Text(
+                          formatValue(value),
+                          style: context.t.bodySmall,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+            bottomTitles: small
+                ? const AxisTitles()
+                : AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        final i = value.round();
+                        if (i < 0 || i >= n) return const SizedBox.shrink();
+                        final cycle = points[i];
+                        final isSelected = cycle.cycleId == selected;
+                        // The first label is always printed, or a thinned axis
+                        // opens with an unlabelled stretch and the reader has
+                        // no anchor to count from.
+                        final show = every == 1 ||
+                            cycle.index % every == 0 ||
+                            i == 0 ||
+                            isSelected;
+                        if (!show) return const SizedBox.shrink();
+                        return Text(
+                          '${cycle.index}',
+                          style: context.t.bodySmall?.copyWith(
+                            // An orange number under an orange band, so the
+                            // axis says which cycle the light week was.
+                            color: cycle.isDeload && !isBlocks
+                                ? c.deload
+                                : isSelected
+                                    ? c.textPrimary
+                                    : c.textSecondary,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+          lineTouchData: onSelected == null
+              ? const LineTouchData(enabled: false)
+              : LineTouchData(
+                  // Every cycle is its own strip of the plot, so a tap anywhere
+                  // reads the nearest one. `fl_chart` matches a spot within ten
+                  // pixels by default, which on a chart whose markers are forty
+                  // pixels apart means most taps land on nothing and the
+                  // readout does not move.
+                  touchSpotThreshold: 10000,
+                  // Tap to read, rather than a tooltip: the readout is a line
+                  // of prose above the chart, where a full date and a
+                  // percentage have room to be printed properly.
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => Colors.transparent,
+                    getTooltipItems: (spots) =>
+                        [for (final _ in spots) null],
+                  ),
+                  getTouchedSpotIndicator: (bar, indices) => [
+                    for (final _ in indices)
+                      TouchedSpotIndicatorData(
+                        FlLine(color: c.border, strokeWidth: 1),
+                        FlDotData(
+                          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
+                            radius: 4.5,
+                            color: c.progress,
+                            strokeWidth: 2,
+                            strokeColor: c.progress,
+                          ),
+                        ),
+                      ),
+                  ],
+                  touchCallback: (event, response) {
+                    if (!event.isInterestedForInteractions) return;
+                    final spot = response?.lineBarSpots?.firstOrNull;
+                    if (spot == null) return;
+                    final cycle = drawn[spot.x.round()];
+                    if (cycle != null) onSelected!(cycle);
+                  },
+                ),
+          lineBarsData: [
+            // One bar per pair, so a stretch the line jumps — a deload, a
+            // spell on another programme, a thinned block — can be drawn
+            // dashed while the rest stays solid. A single bar cannot say that
+            // about one of its segments.
+            for (var k = 1; k < closed.length; k++)
+              _segment(
+                c,
+                from: FlSpot(
+                  closed[k - 1].toDouble(),
+                  drawn[closed[k - 1]]!.value!,
+                ),
+                to: FlSpot(closed[k].toDouble(), drawn[closed[k]]!.value!),
+                soft: closed[k] - closed[k - 1] > 1,
+              ),
+            // The open cycle, dashed away from the last closed one: its point
+            // is real but partial, and drawing it solid would claim a finished
+            // cycle two sessions in.
+            if (openIndex != null && closed.isNotEmpty)
+              _segment(
+                c,
+                from: FlSpot(closed.last.toDouble(), drawn[closed.last]!.value!),
+                to: FlSpot(
+                  openIndex.toDouble(),
+                  drawn[openIndex]!.value!,
+                ),
+                soft: true,
+              ),
+            // The markers, on a bar of their own with no line of its own: the
+            // segments above already drew the line, and marker styling that
+            // differs per point — filled when selected, hollow when open —
+            // belongs to one list rather than to each segment's two ends.
+            LineChartBarData(
+              spots: [
+                for (final i in drawn.keys.toList()..sort())
+                  FlSpot(i.toDouble(), drawn[i]!.value!),
+              ],
+              isCurved: false,
+              color: Colors.transparent,
+              barWidth: 0,
+              dotData: FlDotData(
+                show: !small,
+                getDotPainter: (spot, _, _, _) {
+                  final cycle = drawn[spot.x.round()]!;
+                  final isSelected = cycle.cycleId == selected;
+                  return FlDotCirclePainter(
+                    radius: isSelected ? 4.5 : 3.5,
+                    color: isSelected ? c.progress : c.bg,
+                    strokeWidth: 2,
+                    strokeColor: cycle.isOpen ? c.textTertiary : c.progress,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One two-point segment of the line, solid or dashed.
+  LineChartBarData _segment(
+    DeltoidColors c, {
+    required FlSpot from,
+    required FlSpot to,
+    required bool soft,
+  }) {
+    return LineChartBarData(
+      spots: [from, to],
+      isCurved: false,
+      color: soft ? c.progress.withValues(alpha: 0.6) : c.progress,
+      barWidth: 2,
+      dashArray: soft ? const [2, 5] : null,
+      dotData: const FlDotData(show: false),
+    );
+  }
+}
+
+/// A cycle point as a percentage, in the app's own voice: `+9.8%`, `0%`,
+/// `−2.5%`, with a real minus sign rather than a hyphen.
+String formatCyclePercent(double value, {int decimals = 1}) {
+  final rounded = double.parse(value.toStringAsFixed(decimals));
+  final sign = rounded > 0 ? '+' : (rounded < 0 ? '−' : '');
+  return '$sign${rounded.abs().toStringAsFixed(decimals)}%';
+}
+
+/// The y-axis form of the same number, to no decimal places: `+10%`, `0%`.
+String formatCycleTick(double value) => formatCyclePercent(value, decimals: 0);
+
+/// The same figure without its unit, for a [ValueUnit] that prints the `%`
+/// itself one step down (THEME → Value and unit).
+String formatCycleValue(double value) {
+  final text = formatCyclePercent(value);
+  return text.substring(0, text.length - 1);
 }
