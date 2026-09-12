@@ -15,6 +15,29 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-12
+
+Minor release replacing the Last session card on Workouts with how much stronger the active programme has made you, cycle by cycle.
+
+### Added
+
+- **Workouts:** A Cycle progress card, showing the change in strength across the active regime's cycles as one figure, one word for the direction, and a chart with a point per cycle.
+  - Every cycle is compared with cycle 1 of that regime, and the comparison never restarts. Switching to another programme pauses a regime; coming back carries on from the next cycle number.
+  - A cycle's point is the mean change across the lifts trained in it, where a lift is one exercise in one session — Push 1 bench and Push 2 bench are two lifts, as they are everywhere else in the app.
+  - A deload cycle scores nothing and is drawn as an orange band. The cycle being trained is drawn as a hollow dashed point, because it is not finished.
+  - Tapping a cycle names it under the figure, with the days it covered and what it scored. The range is Last 12, Last 24 or All; past 24 cycles All draws one point per block, the last cycle before each deload.
+  - A regime in its first cycle says so instead of claiming a comparison, and one with nothing logged keeps the card and prints dashes.
+- **Regimes:** A screen behind the card listing every lift the latest cycle compared, grouped into stronger, no change and weaker, each row carrying the best set in cycle 1 and the best set now.
+  - A panel explaining how the figure is arrived at, folded away until it is opened.
+  - In a first cycle the screen lists which lifts are recorded and which are still to train.
+- **Regimes:** An All time screen, reached from the Cycle progress heading: a year of training as one cell per week, coloured by the regime trained, orange for a deload week and grey for a week off, with the year chosen by a stepper.
+  - The regimes trained in that year are legended separately from the two week states, and the spells behind the strip open to name their dates and cycle numbers.
+  - A card per regime with its own chart and figures, the one being trained marked Active.
+
+### Removed
+
+- **Workouts:** The Last session card is gone. The masthead already says when you last trained and History lists the session itself, so the space now answers a question nothing else did.
+
 ## [1.9.0] - 2026-09-12
 
 Minor release giving every colour in the app one meaning, and redrawing the plate view on the keypad.
@@ -297,7 +320,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...v1.7.0
