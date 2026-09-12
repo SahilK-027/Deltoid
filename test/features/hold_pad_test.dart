@@ -25,7 +25,6 @@ void main() {
               current: current,
               onStop: (s) => stopped = s,
               onType: onType ?? () {},
-              onDismiss: () {},
             ),
           ),
         ),
@@ -92,7 +91,6 @@ void main() {
             child: HoldPad(
               onStop: (_) => stops++,
               onType: () {},
-              onDismiss: () {},
             ),
           ),
         ),

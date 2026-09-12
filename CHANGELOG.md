@@ -15,6 +15,26 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-09-12
+
+Minor release giving every colour in the app one meaning, and redrawing the plate view on the keypad.
+
+### Changed
+
+- **Colour:** Orange now means a deload and nothing else, and blue means progress and nothing else — a trained day, and every line on every chart.
+  - The colours that identify a regime or a muscle region are a new set of six, in the order pink, cyan, yellow, lavender, sand, green. Warm and cool alternate, so two bars side by side never read as one.
+  - A rested day in the week strip is grey rather than orange, because a rest day is not a deload.
+  - Drop sets and rest-pause sets are lavender. Warm-up sets stay cyan.
+- **Exercise history:** Each session on an exercise's chart keeps its own colour, blue for the most recent. Where more than seven sessions fall inside the selected range, the seven most recently trained are drawn and the chart says so, for example "Showing 7 of 9 sessions" — rather than two progressions sharing a colour.
+- **Exercise history:** A count of sessions since your best is grey. It was the red the app uses for deleting, which made an ordinary number read as a fault.
+- **Keypad:** The plate view is redrawn as the bar, then what goes on one end, then the bar's own weight, each plate carrying a swatch in the colour it physically is. It replaces a sentence that had to be read like a formula between sets.
+  - Two plates to a column: a third kind starts a column beside the first rather than pushing the keypad down.
+  - A weight the rack cannot make says how much is missing per side, in grey with a warning glyph. It is not an error — no gym has every plate — so it is no longer drawn in red.
+
+### Removed
+
+- **Keypad:** The button that put the keypad away is gone. Back closes the pad, keeping the session open and saving what was typed.
+
 ## [1.8.0] - 2026-09-11
 
 Minor release letting the end of a session lower a movement's programmed set count.
@@ -277,7 +297,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/SahilK-027/Deltoid/compare/v1.6.3...v1.7.0
 [1.6.3]: https://github.com/SahilK-027/Deltoid/compare/v1.6.2...v1.6.3

@@ -97,7 +97,7 @@ ThemeData buildTheme(Brightness brightness) {
     extensions: [c],
     textTheme: text,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: c.seriesSecondary,
+      seedColor: c.progress,
       brightness: brightness,
     ).copyWith(
       surface: c.surface,
@@ -105,7 +105,7 @@ ThemeData buildTheme(Brightness brightness) {
       surfaceContainerHighest: c.surfaceHigh,
       primary: c.accent,
       onPrimary: c.onAccent,
-      secondary: c.seriesPrimary,
+      secondary: c.progress,
       error: c.negative,
       outline: c.border,
       outlineVariant: c.border,

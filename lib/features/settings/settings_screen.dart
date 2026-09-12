@@ -946,13 +946,14 @@ class _ThemeMiniature extends StatelessWidget {
           const SizedBox(height: Space.xs),
           Row(
             children: [
-              // The identity hues, spaced across the six rather than the first
-              // four of `series[]` — which put cyan next to blue and made two
-              // of the four dots read as one colour at 5pt. Big enough to be a
+              // Four of the identity hues, spaced across the six so no two
+              // neighbours read as one colour at this size — and none of the
+              // reserved ones, since a dot of deload orange or progress blue
+              // would be decoration wearing a meaning. Big enough to be a
               // colour: at 5 they were punctuation.
               for (final colour in const [
-                DeltoidColors.orange,
-                DeltoidColors.blue,
+                DeltoidColors.pink,
+                DeltoidColors.cyan,
                 DeltoidColors.lavender,
                 DeltoidColors.green,
               ]) ...[

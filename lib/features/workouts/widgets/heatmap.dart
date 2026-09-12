@@ -31,7 +31,7 @@ Color heatColourIn(
   // One tone, whatever the day held. The ramp made a single session — a full
   // day's work — the darkest thing on the grid, and three sessions read as
   // three times the achievement when it is usually just a Saturday.
-  return c.heatOn;
+  return c.progress;
 }
 
 /// One cell. Square, tooltipped, and told nothing about where it sits.
@@ -244,7 +244,7 @@ class HeatmapLegend extends StatelessWidget {
         const SizedBox(width: Space.xs),
         Text('Rest', style: context.t.labelSmall),
         const SizedBox(width: Space.lg),
-        swatch(c.heatOn),
+        swatch(c.progress),
         const SizedBox(width: Space.xs),
         Text('Trained', style: context.t.labelSmall),
         const SizedBox(width: Space.lg),

@@ -270,3 +270,32 @@ List<Bucket> bucketize({
       ),
   ];
 }
+
+/// Which series a multi-line chart draws when there are more than it has
+/// colours for, and how many there were.
+///
+/// One line per key (a session name, on an exercise's trend), newest first —
+/// ordered by the latest day each key was seen, so the line you trained most
+/// recently is always the first, blue one. At most [max] are kept rather than
+/// cycling the palette: two lines in one colour read as one progression, which
+/// is the mistake a per-session chart exists to avoid. [total] is how many keys
+/// there were, so the caller can say what it left out.
+///
+/// Ties on the latest day keep the order the keys were first seen in, so a
+/// redraw never swaps two lines' colours.
+({List<String> shown, int total}) mostRecentKeys(
+  Iterable<({String key, int dayKey})> rows, {
+  required int max,
+}) {
+  final latest = <String, int>{};
+  for (final r in rows) {
+    final seen = latest[r.key];
+    if (seen == null || r.dayKey > seen) latest[r.key] = r.dayKey;
+  }
+  final order = latest.keys.toList();
+  final keys = [...order]..sort((a, b) {
+      final byDay = latest[b]!.compareTo(latest[a]!);
+      return byDay != 0 ? byDay : order.indexOf(a).compareTo(order.indexOf(b));
+    });
+  return (shown: keys.take(max).toList(), total: keys.length);
+}

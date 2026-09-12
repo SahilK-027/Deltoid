@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/ticking.dart';
-import 'keypad.dart' show PadDismissButton, PadKey;
+import 'keypad.dart' show PadKey;
 
 /// The keypad's replacement for a timed hold: a stopwatch, not ten digits.
 ///
@@ -26,7 +26,6 @@ class HoldPad extends StatefulWidget {
     super.key,
     required this.onStop,
     required this.onType,
-    required this.onDismiss,
     this.current,
     this.previous,
   });
@@ -37,8 +36,6 @@ class HoldPad extends StatefulWidget {
   /// Falls back to the digits, for a hold timed on the gym clock or a set
   /// being corrected hours later.
   final VoidCallback onType;
-
-  final VoidCallback onDismiss;
 
   /// What this set already holds, if anything.
   final int? current;
@@ -133,8 +130,9 @@ class _HoldPadState extends State<HoldPad> {
                         ),
                       ),
                     ),
-                  const Spacer(),
-                  PadDismissButton(onPressed: widget.onDismiss),
+                  // Holds the row's height when the pill goes, so the clock
+                  // below does not jump up the moment the hold starts.
+                  const SizedBox(height: 28),
                 ],
               ),
               // Only the clock ticks. Everything else here is static, and the

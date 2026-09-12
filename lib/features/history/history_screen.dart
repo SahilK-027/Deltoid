@@ -499,7 +499,7 @@ class _WorkoutRow extends StatelessWidget {
     // against six other colours, and invisible against the orange regime. Down
     // a feed the question is which of these days was light, and that is the
     // only thing the colour answers.
-    final mark = summary.workout.isDeload ? c.deload : c.heatOn;
+    final mark = summary.workout.isDeload ? c.deload : c.progress;
 
     // No programme name: the tile already carries it as colour, and spelled
     // out it is long enough to push the line into an ellipsis on a phone.

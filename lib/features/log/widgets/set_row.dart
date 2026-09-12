@@ -30,8 +30,8 @@ export 'keypad.dart'
 /// set stays grey. Without this the only difference between a warm-up and a
 /// top set was one letter in the same colour as everything around it.
 Color setTypeColour(BuildContext context, SetType type) => switch (type) {
-  SetType.warmup => context.c.seriesPrimary,
-  SetType.drop || SetType.restPause => context.c.deload,
+  SetType.warmup => context.c.warmup,
+  SetType.drop || SetType.restPause => context.c.dropSet,
   _ => context.c.textSecondary,
 };
 

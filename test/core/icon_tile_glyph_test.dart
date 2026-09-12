@@ -40,12 +40,12 @@ void main() {
     }
   });
 
-  test('the semantic fills — deload, positive, info — resolve too', () {
+  test('the semantic fills — deload, positive, progress — resolve too', () {
     for (final palette in [DeltoidColors.dark, DeltoidColors.light]) {
       for (final fill in [
         palette.deload,
         palette.positive,
-        palette.seriesSecondary,
+        palette.progress,
         palette.negative,
       ]) {
         expect(_contrast(IconTile.glyphOn(fill), fill),

@@ -89,49 +89,81 @@ Inverts, never tinted. `bg #F4F4F4` · `surface #FFFFFF` · `surfaceHigh #EDEDED
 
 ### The hues
 
-**Six, plus one red.** `orange #FF8660` · `blue #689FFA` · `yellow #FFD15E` ·
-`green #5DBA86` · `lavender #B28DF7` · `cyan #77D4E3`, and `red #F83446`.
+**Eight, plus one red.** `pink #FF7F9F` · `cyan #77D4E3` · `yellow #FFD15E` ·
+`lavender #B28DF7` · `sand #CBA27B` · `green #5DBA86`, which are the six
+identity colours; `blue #689FFA` and `orange #FF8660`, which are reserved; and
+`red #F83446`.
 
 Named on `DeltoidColors` and referenced by name. **Never write a hex at a call
-site**: a chart series, a regime's mark and the deload orange must be the same
-tone everywhere, not near-misses picked one screen at a time.
+site**: progress, a regime's mark and the deload orange must be the same tone
+everywhere, not near-misses picked one screen at a time.
 
-**A hue has to stay the hue.** These run 7.0:1 to 13.0:1 on `bg` — a wide spread
+**Two hues mean one thing each, everywhere.**
+
+- **Blue is progress**: a trained day on the heatmap, the calendar and History,
+  and every line on every chart. A chart with one line is a chart in blue.
+- **Orange is a deload**: the heatmap cell, the band on a chart, the pill, the
+  action that makes a cycle light. Not a warning, not a set type, not a regime.
+
+Neither is lent to an identity, a set type or a decoration, so wherever one of
+them appears it says the same thing. `test/core/palette_test.dart` holds this:
+no identity colour, no chart line after the first and no set type may equal
+`progress`, `deload` or `negative`.
+
+**A hue has to stay the hue.** These run 7.0:1 to 12.9:1 on `bg` — a wide spread
 and the right trade, because yellow is bright. A set solved for equal contrast
 turned yellow into an ochre: a number satisfying a constraint rather than a
 colour.
 
-**The same six in both themes** — a colour that changes with the phone's setting
-is one you learn twice. The cost: on a white card `yellow` measures 1.4:1 and
-`cyan` 1.7:1, so in light **the six are fills and marks only — never text, never
-a hairline.** Where a hue must carry text in both themes, use `textPrimary` and
-let the hue be the shape behind it.
+**Pink and sand exist because the reserved two left the identity set short.**
+Pink was the one hue family nothing else sat near. Every other remaining hue —
+lime, orchid, teal — read as a shade of a neighbour, so sand differs from the
+rest by saturation rather than by hue: a muted warm tone among clear ones.
 
-**Red is deliberately outside the six.** `negative` must never read as
+**The same colours in both themes** — a colour that changes with the phone's
+setting is one you learn twice. The cost: on a white card `yellow` measures
+1.4:1 and `cyan` 1.7:1, so in light **the hues are fills and marks only — never
+text, never a hairline.** Where a hue must carry text in both themes, use
+`textPrimary` and let the hue be the shape behind it.
+
+**Red is deliberately outside the rest.** `negative` must never read as
 information, so it stays out of the palette everything else draws from — and may
-shout where the six may not.
+shout where the others may not: a destructive action.
 
 ### Semantic assignments
 
-| Token             | Hue                                     | Means                                       |
-| ----------------- | --------------------------------------- | ------------------------------------------- |
-| `seriesPrimary`   | cyan                                    | First chart line, sparklines                |
-| `positive`        | green                                   | Success, completed, beat last time          |
-| `deload`          | orange                                  | A light week, wherever it appears           |
-| `warning`         | yellow                                  | A stated limit or consequence               |
-| `negative`        | red                                     | Destructive fill, delete panel              |
-| `seriesSecondary` | blue                                    | Second chart line, heat ramp, session marks |
-| `series[]`        | cyan · blue · yellow · green · lavender | Categorical, in order                       |
-| `identity[]`      | the six, in order                       | One per programme                           |
-| `heatOn`          | blue                                    | A day trained                               |
-| `heatEmpty`       | `surfaceHighest`                        | A day not trained, and an untrained muscle  |
+| Token         | Hue                                                   | Means                                                    |
+| ------------- | ----------------------------------------------------- | -------------------------------------------------------- |
+| `progress`    | blue                                                  | A day trained, and every chart line                      |
+| `deload`      | orange                                                | A light week, wherever it appears, and nothing else      |
+| `negative`    | red                                                   | Destructive fill, delete panel                           |
+| `positive`    | green                                                 | Success, completed, beat last time                       |
+| `warning`     | yellow                                                | A stated limit or consequence                            |
+| `identity[]`  | pink · cyan · yellow · lavender · sand · green        | One per programme, and one per muscle region, in order   |
+| `chartLines`  | `progress`, then `identity[]` in order                | The lines of a chart that draws more than one            |
+| `warmup`      | cyan                                                  | A warm-up set on the log                                 |
+| `dropSet`     | lavender                                              | A drop or rest-pause set on the log                      |
+| `heatEmpty`   | `surfaceHighest`                                      | A day not trained, and an untrained muscle               |
+
+**The identity order alternates warm and cool.** The muscle regions draw in this
+order as a stack of bars, one per row, and two warm hues on adjacent rows read
+as one. Sand sits between lavender and green because beside yellow or pink it
+reads as their shade. Regimes take their slot in the order they were created,
+so the first two a person makes are the most different pair.
+
+**A chart with more lines than colours draws the most recent.** An exercise's
+trend is one line per session, newest first, so the session trained last is
+always the blue one. Past seven, the oldest are left out and the chart says
+`Showing 7 of 9 sessions` under it. Repeating a colour would draw two
+progressions as one, which is the mistake the per-session chart exists to avoid.
 
 Two rules stop those colliding:
 
 - **A closed set may be reused only where the two never share a screen.** The
-  six serve both programme identity and muscle regions, and no screen shows both.
+  six serve programme identity, muscle regions and extra chart lines, and no
+  screen shows two of those at once.
 - **Identity marks appear only where they separate programmes** — the regime
-  library. Elsewhere a mark means _what kind of day this was_: `heatOn` for a
+  library. Elsewhere a mark means _what kind of day this was_: `progress` for a
   session, `deload` for a light week. That is what a feed of trained days is
   scanned for, and a programme hue in the same slot hides it.
 
@@ -810,6 +842,19 @@ as pressed. A pad that captions itself covers what it is captioning.
 - Anything a movement's numbers imply — a plate diagram for a barbell load —
   grows in above the digits and **collapses to nothing** when it does not apply,
   rather than reserving a band that is empty most of the time.
+- **The plate view is three columns**, in the order a bar is loaded: the drawing,
+  the plates for one side as a list with no label, since the drawing is one end of the bar (`1 × 25`, each with a
+  swatch in its plate's colour so the list and the drawing are one picture),
+  then the bar behind a hairline, on one line as one phrase: `20 kg bar`. Plates keep their competition colours — the one place a hue is literal —
+  except the 2.5, which is grey: a red one beside the 25 made two identical
+  swatches in the list. The solver loads heaviest first, so
+  there are never more than three kinds of plate: the 25s, one middle plate, a
+  2.5. Two rows to a column, so a third kind starts a second column beside the
+  first rather than a third row. An empty bar has no list and no hairline; its weight moves up beside the
+  drawing. A load the rack cannot make adds one grey line under a divider, said
+  per side because a side is what gets loaded: `1.5 kg each side has no plate`.
+  Grey, not red: the rack lacking a small plate is not an error. A screen
+  reader hears the whole load as one sentence.
 - **`F` / `P` says whether the set is being given partials**, not which box the
   digits are in. `P` opens the partial half and puts the digits there; `F`
   closes it and is the **only** control that does — and because it says the set

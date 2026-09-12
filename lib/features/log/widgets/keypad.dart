@@ -62,7 +62,6 @@ class SetKeypad extends StatelessWidget {
     required this.buffer,
     required this.onKey,
     required this.onNext,
-    required this.onDismiss,
     this.nextLabel = 'Next',
     this.barKg,
     this.isTime = false,
@@ -86,7 +85,6 @@ class SetKeypad extends StatelessWidget {
   final ValueChanged<String> onKey;
 
   final VoidCallback onNext;
-  final VoidCallback onDismiss;
 
   final String nextLabel;
 
@@ -131,10 +129,11 @@ class SetKeypad extends StatelessWidget {
               // typed into already shows last time's number, and `Next` adopts
               // it when nothing is typed, so a button repeating it was the same
               // number printed twice.
-              Align(
-                alignment: Alignment.centerRight,
-                child: PadDismissButton(onPressed: onDismiss),
-              ),
+              //
+              // No button to put the pad away, either. Back does it, as it
+              // does everywhere else on Android, and `Next` walks off the end
+              // of the table; a third way was a 28pt row of chrome above the
+              // digits that nobody reached for.
               // The plate view grows in and collapses to nothing, rather than
               // sitting in a reserved slot: an empty 60pt band above the digits
               // on every reps field was paying for the diagram whether or not
@@ -371,25 +370,6 @@ class PadKey extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The ⌄ that puts a pad away, top right of both pads.
-class PadDismissButton extends StatelessWidget {
-  const PadDismissButton({super.key, required this.onPressed});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 28,
-        width: 28,
-        child: IconButton(
-          padding: EdgeInsets.zero,
-          iconSize: 18,
-          icon: const Icon(Icons.keyboard_hide_outlined),
-          onPressed: onPressed,
-        ),
-      );
 }
 
 /// Switches the digits between a set's full reps and its partials.

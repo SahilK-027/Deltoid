@@ -249,4 +249,41 @@ void main() {
       );
     });
   });
+
+  group('mostRecentKeys', () {
+    ({String key, int dayKey}) r(String k, int d) => (key: k, dayKey: d);
+
+    test('orders by the latest day each key was seen, newest first', () {
+      final got = mostRecentKeys([
+        r('Push 1', 20260101),
+        r('Push 2', 20260105),
+        r('Push 1', 20260110),
+        r('Upper 1', 20260103),
+      ], max: 7);
+      expect(got.shown, ['Push 1', 'Push 2', 'Upper 1']);
+      expect(got.total, 3);
+    });
+
+    test('keeps the seven most recent of nine and reports all nine', () {
+      final got = mostRecentKeys([
+        for (var i = 1; i <= 9; i++) r('S$i', 20260100 + i),
+      ], max: 7);
+      expect(got.shown, ['S9', 'S8', 'S7', 'S6', 'S5', 'S4', 'S3']);
+      expect(got.total, 9);
+    });
+
+    test('a tie on the latest day keeps first-seen order', () {
+      final got = mostRecentKeys([
+        r('B', 20260110),
+        r('A', 20260110),
+      ], max: 7);
+      expect(got.shown, ['B', 'A']);
+    });
+
+    test('no rows is no lines', () {
+      final got = mostRecentKeys(const [], max: 7);
+      expect(got.shown, isEmpty);
+      expect(got.total, 0);
+    });
+  });
 }

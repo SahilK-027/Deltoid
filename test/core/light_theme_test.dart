@@ -109,7 +109,7 @@ void main() {
         // of the section.
         expect(_contrast(c.heatEmpty, c.surface), greaterThanOrEqualTo(1.2),
             reason: 'a rest day has to be visible as a cell');
-        expect(_contrast(c.heatOn, c.heatEmpty), greaterThanOrEqualTo(1.5),
+        expect(_contrast(c.progress, c.heatEmpty), greaterThanOrEqualTo(1.5),
             reason: 'a day trained against a day not');
         expect(_contrast(c.borderStrong, c.surface), greaterThanOrEqualTo(1.3));
       });
@@ -169,8 +169,8 @@ void main() {
     // A token added to one and not the other is how a screen ends up half
     // themed. Colours are non-nullable, so this is really a check that the
     // lists that are palettes stay the same length.
-    expect(DeltoidColors.light.series.length,
-        DeltoidColors.dark.series.length);
+    expect(DeltoidColors.light.chartLines.length,
+        DeltoidColors.dark.chartLines.length);
     expect(DeltoidColors.light.identity.length,
         DeltoidColors.dark.identity.length);
   });

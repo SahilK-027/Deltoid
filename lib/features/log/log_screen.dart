@@ -788,7 +788,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
         if (didPop) return;
         // Back dismisses the keypad first: it covers half the screen, and
         // losing the whole session to one stray swipe would be unforgivable.
+        // It is the way to put the pad away — there is no button for it — so
+        // it saves what was typed now, rather than on the write's timer.
         if (_editing != null) {
+          _flushWrite();
           setState(() => _editing = null);
           return;
         }
@@ -1143,10 +1146,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
           _advance(detail, cells, target);
         },
         onType: () => setState(() => _typeHold = true),
-        onDismiss: () {
-          _flushWrite();
-          setState(() => _editing = null);
-        },
       );
     }
 
@@ -1210,10 +1209,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
         _commit(next, target);
       },
       onNext: () => _advance(detail, cells, target),
-      onDismiss: () {
-        _flushWrite();
-        setState(() => _editing = null);
-      },
     );
   }
 

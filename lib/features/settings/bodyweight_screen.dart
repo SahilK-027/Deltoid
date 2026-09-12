@@ -627,7 +627,7 @@ class _TrendCard extends ConsumerWidget {
               series: [
                 TrendSeries(
                   name: 'Bodyweight',
-                  color: context.c.seriesPrimary,
+                  color: context.c.progress,
                   spots: [
                     for (final b in marks) FlSpot(bucketX(b), b.value!),
                   ],
@@ -841,7 +841,7 @@ class _BodyweightSheetState extends State<_BodyweightSheet> {
       // to find the day that was missed, and a grid of identical white numbers
       // is the one thing that cannot answer that.
       marks: {
-        for (final key in widget.logged) key: context.c.heatOn,
+        for (final key in widget.logged) key: context.c.progress,
       },
     );
     if (picked != null) setState(() => _day = picked);

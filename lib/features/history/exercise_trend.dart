@@ -328,17 +328,25 @@ class _Chart extends ConsumerWidget {
     // **And each of them is folded on its own.** Averaging the two together
     // into one monthly mark would do exactly what drawing them as one line
     // does, one layer further down where it cannot be seen.
-    final palette = [c.seriesPrimary, c.seriesSecondary, c.deload, c.positive];
-    final names = bySession.keys.toList();
+    //
+    // Newest first, so the session you trained last is the blue line, and no
+    // more lines than there are colours: a repeated colour makes two
+    // progressions read as one. What was left out is said under the chart.
+    final palette = c.chartLines;
+    final picked = mostRecentKeys(
+      [for (final p in source) (key: p.sessionName, dayKey: p.dayKey)],
+      max: palette.length,
+    );
+    final names = picked.shown;
 
-    return TrendChart(
+    final chart = TrendChart(
       window: window,
       earliest: earliest,
       series: [
         for (var i = 0; i < names.length; i++)
           TrendSeries(
             name: names[i],
-            color: palette[i % palette.length],
+            color: palette[i],
             spots: [
               for (final b in bucketize(
                 rows: [
@@ -364,6 +372,19 @@ class _Chart extends ConsumerWidget {
           ? '${metricFormat(v, unit, measure)} held'
           : '${formatWeight(v, unit)} ${unit.label} '
               '${metricNoun(metric, measure)}',
+    );
+    if (picked.total <= names.length) return chart;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        chart,
+        const SizedBox(height: Space.sm),
+        Text(
+          'Showing ${names.length} of ${picked.total} sessions',
+          style: context.t.bodySmall,
+        ),
+      ],
     );
   }
 }
@@ -443,7 +464,11 @@ class _Summary extends ConsumerWidget {
                 : stalled == 0
                     ? 'Best is the latest'
                     : 'Session${stalled == 1 ? '' : 's'} since best',
-            emphasis: stalled >= 3 ? c.negative : null,
+            // Grey, never the delete red. A run of sessions off your best is a
+            // fact about the log, not a fault: you deloaded, you were ill, you
+            // were working a different rep range. Red made an ordinary count
+            // read as an alarm.
+            emphasis: stalled >= 3 ? c.textSecondary : null,
           ),
         ),
       ],

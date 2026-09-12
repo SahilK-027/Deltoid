@@ -16,8 +16,8 @@ import '../../domain/muscle_volume.dart';
 ///   data colours as the only elements on screen with a colour temperature.
 /// * [accent] is white, and black in the light theme. The primary action, the
 ///   selected chip and the active tab are all monochrome. Hue is reserved for
-///   elements that carry meaning: a chart series, a record, a deload, a
-///   deletion.
+///   elements that carry meaning: progress, a deload, a deletion, and the
+///   identity of a regime or a muscle region.
 @immutable
 class DeltoidColors extends ThemeExtension<DeltoidColors> {
   const DeltoidColors({
@@ -39,12 +39,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.warningMuted,
     required this.positive,
     required this.negative,
-    required this.seriesPrimary,
-    required this.seriesSecondary,
-    required this.series,
     required this.identity,
     required this.heatEmpty,
-    required this.heatOn,
+    required this.progress,
     required this.shadow,
   });
 
@@ -81,9 +78,12 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// Deload identity. Orange, and the only hue in the cycle model — a light
   /// week has to be legible at a glance on the heatmap and in history.
   ///
-  /// Orange rather than amber, which sits one notch from the yellow in
-  /// `series[]` and the yellow identity mark: this separates the one state the
-  /// cycle model has from the palette information is drawn from.
+  /// Orange rather than amber, which sits one notch from the yellow identity
+  /// mark: this separates the one state the cycle model has from the palette
+  /// information is drawn from.
+  ///
+  /// Reserved. Orange means a deload and nothing else — not a warning, not a
+  /// set type, not a regime — so a light week is never one colour among many.
   final Color deload;
   final Color deloadMuted;
 
@@ -98,25 +98,15 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   final Color positive;
   final Color negative;
 
-  /// The first line on a chart, and the only one when there is just one. Not
-  /// [accent]: a chart is information, not an action.
+  /// The six identity colours: one per regime, and one per muscle region.
   ///
-  /// Named for the role rather than the category: `data` would distinguish
-  /// nothing from `info` sitting next to it, since every one of these is
-  /// data.
-  final Color seriesPrimary;
-
-  /// The second line, the heatmap ramp and identity tiles.
-  final Color seriesSecondary;
-
-  /// Categorical series, in order.
-  final List<Color> series;
-
-  /// Identity marks for regimes and sessions — a colour per regime, so history
-  /// rows and cards can be scanned by shape rather than read.
+  /// Ordered so that neighbours differ in temperature — warm, cool, warm, cool —
+  /// because the muscle regions are drawn in this order as a stack of bars, and
+  /// two warm hues on adjacent rows read as one. Sand in particular sits between
+  /// two cool colours, since beside yellow or pink it reads as their shade.
   ///
-  /// A step darker than the six hues, because these are filled shapes with a
-  /// white glyph on them rather than colour on charcoal.
+  /// None of them is [progress], [deload] or [negative]: each of those means one
+  /// thing everywhere, and a regime wearing it would claim that meaning.
   final List<Color> identity;
 
   /// An untrained day, and the unfilled portion of a volume bar's track.
@@ -128,25 +118,36 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// same absence. Two greys eight points apart would indicate otherwise.
   final Color heatEmpty;
 
-  /// A single tone for any trained day, whatever it contained.
+  /// Progress: a trained day, and every line on every chart.
   ///
-  /// A four-step ramp on session count says the wrong thing twice: a day with
-  /// one session — a full day's work — comes out darkest and nearly
-  /// indistinguishable from a rest day, and a day with three reads as three
-  /// times the achievement when it is usually just a Saturday. The grid answers
-  /// "did I train", and that is a yes or a no.
-  final Color heatOn;
+  /// One tone for any trained day, whatever it contained. A four-step ramp on
+  /// session count says the wrong thing twice: a day with one session — a full
+  /// day's work — comes out darkest and nearly indistinguishable from a rest
+  /// day, and a day with three reads as three times the achievement when it is
+  /// usually just a Saturday. The grid answers "did I train", and that is a yes
+  /// or a no.
+  ///
+  /// The same blue draws a trend, because a trend is the same fact read over
+  /// time. It is reserved: no regime and no muscle region wears it.
+  final Color progress;
 
   /// Kept for the rare surface that genuinely floats above the page (a snack
   /// bar, a dragged row). Cards, sheets and the navigation bar do not use it:
   /// depth in this application is conveyed by surface colour.
   final Color shadow;
 
-  /// The six hues, defined once and identical in both themes.
+  /// The hues, defined once and identical in both themes.
   ///
-  /// Every semantic colour that is not red is one of these, so a chart series,
-  /// a regime's mark and the deload orange are the same tones wherever they
-  /// turn up rather than near-misses chosen one screen at a time.
+  /// Every semantic colour that is not red is one of these, so progress, a
+  /// regime's mark and the deload orange are the same tones wherever they turn
+  /// up rather than near-misses chosen one screen at a time.
+  ///
+  /// Two are reserved for one meaning each and never lent to an identity:
+  /// [orange] is a deload and [blue] is progress. The six identity colours are
+  /// the rest. [pink] and [sand] exist because the reserved two left the
+  /// identity set short: pink is the one hue family nothing else was near, and
+  /// sand differs by saturation rather than by hue, because every remaining hue
+  /// read as a shade of a neighbour.
   ///
   /// Two tempting replacements are both wrong. A saturated set (`#FF6535`,
   /// `#F9AC0E` …) reads as shouting. A set solved for equal contrast on
@@ -176,6 +177,8 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   static const green = Color(0xFF5DBA86);
   static const lavender = Color(0xFFB28DF7);
   static const cyan = Color(0xFF77D4E3);
+  static const pink = Color(0xFFFF7F9F);
+  static const sand = Color(0xFFCBA27B);
 
   /// The one red, for the one thing red means — and the one place a hue is
   /// allowed to shout.
@@ -200,10 +203,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     warningMuted: Color(0xFF3A3117),
     positive: green,
     negative: red,
-    seriesPrimary: cyan,
-    seriesSecondary: blue,
-    series: [cyan, blue, yellow, green, lavender],
-    identity: [orange, blue, yellow, green, lavender, cyan],
+    identity: [pink, cyan, yellow, lavender, sand, green],
     // A rest day has to be visible *as a cell* on `surface` (#1F1F1F). At
     // #222222 the grid dissolves into the card and the pattern — the whole
     // point of the section — can only be read where it is filled.
@@ -212,7 +212,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     heatEmpty: Color(0xFF3A3A3A),
     // The palette's blue, not a lighter cousin of it: something like #6FA8F5,
     // one nudge off `info`, is a bug waiting to be noticed.
-    heatOn: blue,
+    progress: blue,
     shadow: Color(0x66000000),
   );
 
@@ -235,12 +235,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     warningMuted: Color(0xFFFBEED2),
     positive: green,
     negative: red,
-    seriesPrimary: cyan,
-    seriesSecondary: blue,
-    series: [cyan, blue, yellow, green, lavender],
-    identity: [orange, blue, yellow, green, lavender, cyan],
+    identity: [pink, cyan, yellow, lavender, sand, green],
     heatEmpty: Color(0xFFE0E0E0),
-    heatOn: blue,
+    progress: blue,
     shadow: Color(0x1A000000),
   );
 
@@ -250,8 +247,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// reason — six fixed categories, one apiece, and the colour *is* the
   /// category. The two never share a screen (a regime's mark is on the Regimes
   /// screen and nowhere else, THEME → Colour), so nothing claims a hue means a
-  /// programme. `series` will not do: it holds five, and the sixth region would
-  /// wrap onto a colour already spoken for.
+  /// programme.
   Color forRegion(MuscleRegion region) =>
       identity[region.index % identity.length];
 
@@ -278,6 +274,23 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// restore written against a longer palette. It never fires in normal use.
   Color identityAt(int slot) => identity[slot.abs() % identity.length];
 
+  /// The lines of a chart that draws more than one, in order.
+  ///
+  /// [progress] first, always: a chart with one line is a chart in blue. The
+  /// rest are the identity colours, which a chart may borrow because no chart
+  /// shares a screen with a regime's mark or a muscle region's bar. Seven in
+  /// all, and a chart with more lines than that shows the seven most recent
+  /// rather than repeating a colour, which would make two lines one.
+  List<Color> get chartLines => [progress, ...identity];
+
+  /// A warm-up set on the log. A fact about the set rather than chrome, so it
+  /// takes a hue; not [progress], because a warm-up is not progress.
+  Color get warmup => cyan;
+
+  /// A drop or rest-pause set on the log. Lavender, because the deload orange
+  /// it used to borrow now means a deload and nothing else.
+  Color get dropSet => lavender;
+
   @override
   DeltoidColors copyWith({
     Color? bg,
@@ -298,12 +311,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     Color? warningMuted,
     Color? positive,
     Color? negative,
-    Color? seriesPrimary,
-    Color? seriesSecondary,
-    List<Color>? series,
     List<Color>? identity,
     Color? heatEmpty,
-    Color? heatOn,
+    Color? progress,
     Color? shadow,
   }) {
     return DeltoidColors(
@@ -325,12 +335,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       warningMuted: warningMuted ?? this.warningMuted,
       positive: positive ?? this.positive,
       negative: negative ?? this.negative,
-      seriesPrimary: seriesPrimary ?? this.seriesPrimary,
-      seriesSecondary: seriesSecondary ?? this.seriesSecondary,
-      series: series ?? this.series,
       identity: identity ?? this.identity,
       heatEmpty: heatEmpty ?? this.heatEmpty,
-      heatOn: heatOn ?? this.heatOn,
+      progress: progress ?? this.progress,
       shadow: shadow ?? this.shadow,
     );
   }
@@ -361,12 +368,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       warningMuted: c(warningMuted, other.warningMuted),
       positive: c(positive, other.positive),
       negative: c(negative, other.negative),
-      seriesPrimary: c(seriesPrimary, other.seriesPrimary),
-      seriesSecondary: c(seriesSecondary, other.seriesSecondary),
-      series: l(series, other.series),
       identity: l(identity, other.identity),
       heatEmpty: c(heatEmpty, other.heatEmpty),
-      heatOn: c(heatOn, other.heatOn),
+      progress: c(progress, other.progress),
       shadow: c(shadow, other.shadow),
     );
   }

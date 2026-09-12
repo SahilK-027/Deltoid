@@ -19,7 +19,7 @@ import 'primitives.dart';
 /// [first]..[last] are shown but not tappable: a month with holes in it says
 /// *why* the day cannot be picked, where a month that simply stops does not.
 ///
-/// [marks] rings the logged days, keyed by `dayKey`: `heatOn` blue for a
+/// [marks] rings the logged days, keyed by `dayKey`: `progress` blue for a
 /// session, `deload` orange for a light week, and whatever colour a caller
 /// gives a weigh-in. Every other day inside the range wears the `heatEmpty`
 /// ring instead, so the grid answers *which day did I miss* by shape rather
@@ -676,7 +676,7 @@ class _MonthGrid extends StatelessWidget {
 /// Four facts stack on one circle, ranked so none of them hides another.
 ///
 /// The ring says whether the day holds anything: the day's own colour when it
-/// does (`heatOn` blue for a session, `deload` orange for a light week), and
+/// does (`progress` blue for a session, `deload` orange for a light week), and
 /// `heatEmpty` — the grey an untrained day wears in the heatmap — when it does
 /// not. Both rings are drawn, because *logged* and *not logged* are read
 /// against each other; a ring against a bare number is two states one of which

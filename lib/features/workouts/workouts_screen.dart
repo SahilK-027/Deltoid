@@ -304,7 +304,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
       // cannot show you the gap you are trying to fill.
       marks: {
         for (final entry in logged.entries)
-          entry.key: entry.value.isDeload ? c.deload : c.heatOn,
+          entry.key: entry.value.isDeload ? c.deload : c.progress,
       },
     );
     if (picked == null || !mounted) return;
@@ -686,16 +686,16 @@ class _RestGap extends StatelessWidget {
     // Trained / Rested keeps the two live states parallel: same shape, same
     // length, one word apart, so the difference between them is the only thing
     // that has to be read.
+    //
+    // Every rest length is the same grey. Four days and more used to turn
+    // orange, but orange is a deload and nothing else, and the number of days
+    // already says how long it has been without the app judging it.
     final (icon, text, tint) = switch (last) {
       null => (Icons.flag_outlined, 'Nothing logged', c.textSecondary),
       final l => switch (_daysSince(l.workout.dayKey)) {
         0 => (Icons.check_circle_rounded, 'Trained today', c.positive),
         1 => (Icons.bedtime_outlined, 'Rested 1 day', c.textSecondary),
-        final n => (
-          Icons.bedtime_outlined,
-          'Rested $n days',
-          n >= 4 ? c.deload : c.textSecondary,
-        ),
+        final n => (Icons.bedtime_outlined, 'Rested $n days', c.textSecondary),
       },
     };
 
@@ -968,7 +968,7 @@ class _ResumeHero extends ConsumerWidget {
     // orange regime and competing with the mark on every other one. Which
     // programme a workout came from is on the row in words; whether it was a
     // deload is only ever said by this tile.
-    final mark = workout.isDeload ? c.deload : c.heatOn;
+    final mark = workout.isDeload ? c.deload : c.progress;
 
     // No accent fill: what makes this loud is the pulse, the label and a
     // stopwatch at display size, not a tinted rectangle. The `surface` under it
@@ -1271,7 +1271,7 @@ class _NextUpHero extends ConsumerWidget {
     // One colour on this card, and it is the blue a trained day gets on the
     // heatmap — not an accent, and not the regime's identity hue. A deload
     // overrides it: the light week is the fact this tile exists to state.
-    final mark = status.isDeload ? c.deload : c.heatOn;
+    final mark = status.isDeload ? c.deload : c.progress;
 
     // The caller wraps this in an `AppCard`: out of the header band, `surface`
     // has to be drawn rather than inherited.

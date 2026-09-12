@@ -1369,13 +1369,17 @@ class IconTile extends StatelessWidget {
   const IconTile(
     this.icon, {
     super.key,
-    this.color,
+    required this.color,
     this.size = 44,
     this.solid = true,
   });
 
   final IconData icon;
-  final Color? color;
+
+  /// Required rather than defaulted. A tile's colour is what it means, and a
+  /// default would be a meaning no caller chose: every tile reached for one
+  /// explicitly anyway, and the blue it fell back to is now progress.
+  final Color color;
   final double size;
 
   /// Filled in [color] with the glyph knocked out. Off gives a tinted wash for
@@ -1384,8 +1388,7 @@ class IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    final tint = color ?? c.seriesSecondary;
+    final tint = color;
     return Container(
       width: size,
       height: size,
