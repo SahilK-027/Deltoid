@@ -2,6 +2,8 @@ import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/enums.dart';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,6 +79,64 @@ void main() {
       detail,
       contains('idx_workouts_day'),
       reason: 'the seven-day window should be found on the day index: $detail',
+    );
+    // Cycle progress walks a whole regime, so it is driven from `cycles` —
+    // `workouts.regime_id` carries no index, and the same question asked that
+    // way is a scan of every workout ever logged. `idx_cycles_regime` finds the
+    // regime's cycles and `idx_workouts_cycle` finds each cycle's workouts.
+    //
+    // Enough workouts for the planner to have an opinion worth holding: with a
+    // handful of rows, scanning them is genuinely the cheaper plan and the
+    // assertion below would be testing the size of the fixture rather than the
+    // shape of the query.
+    await db.batch((b) {
+      b.insertAll(db.workouts, [
+        for (var i = 0; i < 300; i++)
+          () {
+            // `day_key` and `started_at` are checked against each other by the
+            // schema, so the two are named from one date rather than invented
+            // separately.
+            final day = DateTime.utc(2020, 1, 1 + i);
+            return WorkoutsCompanion.insert(
+              id: Value('bulk-$i'),
+              regimeId: regime.id,
+              dayKey: day.year * 10000 + day.month * 100 + day.day,
+              startedAt: Value(day.millisecondsSinceEpoch),
+              tzOffsetMinutes: 0,
+              status: const Value(WorkoutStatus.completed),
+            );
+          }(),
+      ]);
+    });
+    await db.customStatement('ANALYZE');
+
+    final cyclePlan = await db
+        .customSelect(
+          'EXPLAIN QUERY PLAN '
+          'SELECT we.id, wo.day_key, e.load_mode '
+          'FROM cycles c '
+          '  INNER JOIN workouts wo ON wo.cycle_id = c.id '
+          '  INNER JOIN workout_exercises we ON we.workout_id = wo.id '
+          '  INNER JOIN exercises e ON e.id = we.exercise_id '
+          "WHERE c.regime_id = ?1 AND c.deleted_at IS NULL "
+          "  AND wo.deleted_at IS NULL AND wo.status = 'completed' "
+          '  AND we.deleted_at IS NULL',
+          variables: [Variable.withString(regime.id)],
+        )
+        .get();
+    final cycleDetail =
+        cyclePlan.map((r) => r.data['detail'].toString()).join(' | ');
+    expect(
+      cycleDetail,
+      contains('idx_cycles_regime'),
+      reason: "a regime's cycles should be found on their own index: "
+          '$cycleDetail',
+    );
+    expect(
+      cycleDetail,
+      isNot(contains('SCAN wo')),
+      reason: 'the workouts of a regime should be reached through its cycles '
+          'rather than by scanning every workout ever logged: $cycleDetail',
     );
   });
 }

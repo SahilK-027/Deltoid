@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/ids.dart';
 import '../../domain/cycle_engine.dart';
+import '../../domain/cycle_progress.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/muscle_volume.dart';
@@ -113,6 +114,69 @@ class WorkoutDetail {
   final Workout workout;
   final Session? session;
   final List<ExerciseEntry> entries;
+}
+
+
+/// What a lift is called, for the screen that lists lifts rather than numbers.
+///
+/// A [LiftId] is a pair of ids and deliberately says nothing a person can read.
+/// The names come back beside it rather than inside it so that the domain layer
+/// keeps comparing ids and the screen keeps printing words.
+class LiftLabel {
+  const LiftLabel({required this.exerciseName, required this.sessionName});
+
+  final String exerciseName;
+  final String sessionName;
+}
+
+/// A regime's cycle progress, with everything the three surfaces print.
+class RegimeProgress {
+  const RegimeProgress({
+    required this.regimeId,
+    required this.regimeName,
+    required this.identityIndex,
+    required this.isActive,
+    required this.progress,
+    required this.labels,
+  });
+
+  final String regimeId;
+  final String regimeName;
+
+  /// Which identity colour the regime wears, so the timeline and the card agree
+  /// without either of them deciding.
+  final int identityIndex;
+
+  final bool isActive;
+
+  final CycleProgress progress;
+
+  /// A name for every lift in [progress]. Complete: a lift that scored has a
+  /// slot, and a slot has an exercise.
+  final Map<LiftId, LiftLabel> labels;
+
+  LiftLabel labelOf(LiftId lift) =>
+      labels[lift] ??
+      const LiftLabel(exerciseName: '', sessionName: unplannedSessionName);
+}
+
+/// A regime reduced to what a list needs of it.
+class RegimeMark {
+  const RegimeMark({
+    required this.id,
+    required this.name,
+    required this.identityIndex,
+    required this.isActive,
+  });
+
+  final String id;
+  final String name;
+
+  /// Which identity colour the regime wears, so the timeline, the legend and
+  /// the cards agree without any of them deciding.
+  final int identityIndex;
+
+  final bool isActive;
 }
 
 /// One scored performance on the progress chart.
@@ -2244,6 +2308,347 @@ class TrainingRepository {
     }
 
     return points;
+  }
+
+
+  // ── Cycle progress ────────────────────────────────────────────────────
+
+  /// How much stronger the active regime has made you, or null when none is
+  /// active.
+  Future<RegimeProgress?> activeRegimeProgress() async {
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.isActive.equals(true) & t.deletedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    if (regime == null) return null;
+    return regimeProgress(regime.id);
+  }
+
+  /// One regime scored cycle by cycle, for the Workouts card, the regime screen
+  /// and the All time cards.
+  ///
+  /// Three raw statements, for the reasons [exerciseProgress] gives at length:
+  /// the window is the whole life of a regime, and hydrating every
+  /// `WorkoutExercise` and `SetLog` row to read five columns of each is most of
+  /// a second on a long history. The shape is deliberately the one that file
+  /// already uses — slots, then their sets gathered by a subquery repeating the
+  /// same predicate — rather than a third way of asking the same question.
+  ///
+  /// Driven from `cycles` rather than from `workouts.regime_id`, which carries
+  /// no index: `idx_cycles_regime` finds the regime's cycles and
+  /// `idx_workouts_cycle` finds each cycle's workouts, so the read is two index
+  /// walks instead of a scan of every workout ever logged.
+  /// `query_planning_test.dart` holds that.
+  Future<RegimeProgress?> regimeProgress(String regimeId) async {
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(regimeId) & t.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (regime == null) return null;
+
+    // A cycle is real, its workouts are live and completed. The same text in
+    // all three statements, so the set query cannot drift from the slot query
+    // it is meant to gather for.
+    const live = 'c.regime_id = ?1 AND c.deleted_at IS NULL '
+        'AND wo.deleted_at IS NULL AND wo.status = \'completed\' '
+        'AND we.deleted_at IS NULL';
+
+    final cycleRows = await db.customSelect(
+      'SELECT c.id AS cycle_id, c.cycle_index AS cycle_index, '
+      'c.is_deload AS is_deload, c.completed_at AS completed_at, '
+      'MIN(wo.day_key) AS first_day, MAX(wo.day_key) AS last_day '
+      'FROM cycles c '
+      'LEFT JOIN workouts wo ON wo.cycle_id = c.id '
+      '  AND wo.deleted_at IS NULL AND wo.status = \'completed\' '
+      'WHERE c.regime_id = ?1 AND c.deleted_at IS NULL '
+      'GROUP BY c.id ORDER BY c.cycle_index',
+      variables: [Variable.withString(regimeId)],
+      readsFrom: {db.cycles, db.workouts},
+    ).get();
+    if (cycleRows.isEmpty) {
+      return RegimeProgress(
+        regimeId: regime.id,
+        regimeName: regime.name,
+        identityIndex: regime.identityIndex,
+        isActive: regime.isActive,
+        progress: computeCycleProgress(cycles: const []),
+        labels: const {},
+      );
+    }
+
+    // The dates a cycle covers are the days actually trained in it, not the
+    // cycle row's own timestamps: a cycle opens when the one before it closes
+    // and stays open over a week off, so `started_at` would name a day nothing
+    // happened on.
+    final slotRows = await db.customSelect(
+      'SELECT we.id AS slot, we.exercise_id AS exercise_id, '
+      'wo.cycle_id AS cycle_id, wo.session_id AS session_id, '
+      'wo.day_key AS day_key, e.name AS exercise_name, '
+      'e.load_mode AS load_mode, e.measure_mode AS measure_mode, '
+      'se.name AS session_name '
+      'FROM cycles c '
+      'INNER JOIN workouts wo ON wo.cycle_id = c.id '
+      'INNER JOIN workout_exercises we ON we.workout_id = wo.id '
+      'INNER JOIN exercises e ON e.id = we.exercise_id '
+      'LEFT JOIN sessions se ON se.id = wo.session_id '
+      'WHERE $live',
+      variables: [Variable.withString(regimeId)],
+      readsFrom: {
+        db.cycles,
+        db.workouts,
+        db.workoutExercises,
+        db.exercises,
+        db.sessions,
+      },
+    ).get();
+
+    // No ORDER BY, for the reason [exerciseProgress] gives: scoring a
+    // performance is an aggregate over its sets and does not care what order
+    // they arrive in.
+    final setRows = await db.customSelect(
+      'SELECT s.workout_exercise_id AS slot, s.set_type AS set_type, '
+      's.weight AS weight, s.reps AS reps, s.added_weight AS added_weight '
+      'FROM set_logs s '
+      'INNER JOIN workout_exercises we ON we.id = s.workout_exercise_id '
+      'INNER JOIN workouts wo ON wo.id = we.workout_id '
+      'INNER JOIN cycles c ON c.id = wo.cycle_id '
+      'WHERE $live AND s.deleted_at IS NULL AND s.is_done = 1',
+      variables: [Variable.withString(regimeId)],
+      readsFrom: {db.setLogs, db.workoutExercises, db.workouts, db.cycles},
+    ).get();
+
+    final setsBySlot = <String, List<ScoredSet>>{};
+    for (final r in setRows) {
+      setsBySlot.putIfAbsent(r.read<String>('slot'), () => []).add(ScoredSet(
+            type: SetType.values.byName(r.read<String>('set_type')),
+            weight: r.readNullable<double>('weight'),
+            reps: r.readNullable<int>('reps'),
+            addedWeight: r.readNullable<double>('added_weight'),
+          ));
+    }
+
+    final labels = <LiftId, LiftLabel>{};
+    final performances = <String, List<LiftPerformance>>{};
+    var needsBodyweight = false;
+
+    for (final r in slotRows) {
+      final sets = setsBySlot[r.read<String>('slot')];
+      if (sets == null) continue;
+      final mode = LoadMode.values.byName(r.read<String>('load_mode'));
+      needsBodyweight = needsBodyweight ||
+          mode == LoadMode.bodyweight ||
+          mode == LoadMode.bodyweightPlus;
+
+      // An unplanned workout has no session, so its lifts key on the exercise
+      // alone. That is the honest answer rather than a defect: the split
+      // exists because Push 1 and Push 2 are different progressions, and work
+      // done outside the programme belongs to neither.
+      final lift = LiftId(
+        sessionId: r.readNullable<String>('session_id') ?? '',
+        exerciseId: r.read<String>('exercise_id'),
+      );
+      labels.putIfAbsent(
+        lift,
+        () => LiftLabel(
+          exerciseName: r.read<String>('exercise_name'),
+          sessionName:
+              r.readNullable<String>('session_name') ?? unplannedSessionName,
+        ),
+      );
+
+      performances.putIfAbsent(r.read<String>('cycle_id'), () => []).add(
+            LiftPerformance(
+              lift: lift,
+              dayKey: r.read<int>('day_key'),
+              load: mode,
+              measure:
+                  MeasureMode.values.byName(r.read<String>('measure_mode')),
+              sets: sets,
+            ),
+          );
+    }
+
+    // Only a regime containing a chin-up pays for the weigh-in series, as in
+    // [exerciseProgress]. Ordering it once here is what keeps the lookup inside
+    // the scoring loop to a binary search.
+    final bodyweight = needsBodyweight
+        ? orderedByDay(await bodyweightSeries())
+        : const <({int dayKey, double weightKg})>[];
+
+    final cycles = [
+      for (final r in cycleRows)
+        CycleInput(
+          cycleId: r.read<String>('cycle_id'),
+          index: r.read<int>('cycle_index'),
+          isDeload: r.read<bool>('is_deload'),
+          isOpen: r.readNullable<int>('completed_at') == null,
+          startDayKey: r.readNullable<int>('first_day'),
+          endDayKey: r.readNullable<int>('last_day'),
+          performances:
+              performances[r.read<String>('cycle_id')] ?? const [],
+        ),
+    ];
+
+    return RegimeProgress(
+      regimeId: regime.id,
+      regimeName: regime.name,
+      identityIndex: regime.identityIndex,
+      isActive: regime.isActive,
+      progress: computeCycleProgress(
+        cycles: cycles,
+        bodyweightLog: bodyweight,
+      ),
+      labels: labels,
+    );
+  }
+
+  /// [activeRegimeProgress], re-read when the shape of the log changes.
+  ///
+  /// `set_logs` is deliberately not watched. It is the hot table during a
+  /// session — the reason [historyShapeChanges] exists — and this read walks a
+  /// whole regime, so watching it would score every cycle ever trained once per
+  /// set ticked. The open cycle's partial point therefore moves when a session
+  /// is completed rather than while it is being logged, which is also when it
+  /// means anything: half a session in, the cycle has not changed its mind.
+  Stream<RegimeProgress?> watchActiveRegimeProgress() {
+    return db.watchQuery(
+      [db.regimes, db.cycles, db.workouts, db.workoutExercises, db.exercises],
+      activeRegimeProgress,
+    );
+  }
+
+  /// [regimeProgress], on the same terms as [watchActiveRegimeProgress].
+  Stream<RegimeProgress?> watchRegimeProgress(String regimeId) {
+    return db.watchQuery(
+      [db.regimes, db.cycles, db.workouts, db.workoutExercises, db.exercises],
+      () => regimeProgress(regimeId),
+    );
+  }
+
+  /// Every day trained between two day keys, for the All time timeline.
+  ///
+  /// Bounded by the caller, because the timeline shows one year at a time: the
+  /// whole log would be a year's strip drawn from thirty years of rows. The
+  /// window is found on `idx_workouts_day`, the same index the weekly volume
+  /// query is planned off.
+  Future<List<TrainedDay>> trainedDaysBetween({
+    required int fromDayKey,
+    required int toDayKey,
+  }) async {
+    final rows = await db.customSelect(
+      'SELECT wo.day_key AS day_key, wo.regime_id AS regime_id, '
+      'wo.is_deload AS is_deload, c.cycle_index AS cycle_index '
+      'FROM workouts wo '
+      'LEFT JOIN cycles c ON c.id = wo.cycle_id '
+      'WHERE wo.day_key >= ?1 AND wo.day_key <= ?2 '
+      'AND wo.deleted_at IS NULL AND wo.status = \'completed\' '
+      'ORDER BY wo.day_key',
+      variables: [
+        Variable.withInt(fromDayKey),
+        Variable.withInt(toDayKey),
+      ],
+      readsFrom: {db.workouts, db.cycles},
+    ).get();
+
+    return [
+      for (final r in rows)
+        TrainedDay(
+          dayKey: r.read<int>('day_key'),
+          regimeId: r.read<String>('regime_id'),
+          isDeload: r.read<bool>('is_deload'),
+          cycleIndex: r.readNullable<int>('cycle_index'),
+        ),
+    ];
+  }
+
+  /// [trainedDaysBetween], re-read when a workout is written.
+  Stream<List<TrainedDay>> watchTrainedDaysBetween({
+    required int fromDayKey,
+    required int toDayKey,
+  }) {
+    return db.watchQuery(
+      [db.workouts, db.cycles],
+      () => trainedDaysBetween(fromDayKey: fromDayKey, toDayKey: toDayKey),
+    );
+  }
+
+  /// One regime as the All time screen lists it: its name, its mark, and
+  /// whether it is the one being trained.
+  ///
+  /// Deleted regimes are absent, because their cycles are tombstoned with them
+  /// and a card drawn for one would have nothing in it. That was decided rather
+  /// than overlooked. Their *workouts* remain, so the timeline can still hold a
+  /// week nothing here can name — see how the strip draws one.
+  Future<List<RegimeMark>> liveRegimes() async {
+    final rows = await (db.select(db.regimes)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+          ]))
+        .get();
+    return [
+      for (final r in rows)
+        RegimeMark(
+          id: r.id,
+          name: r.name,
+          identityIndex: r.identityIndex,
+          isActive: r.isActive,
+        ),
+    ];
+  }
+
+  /// [liveRegimes], re-read when a programme is created, renamed or deleted.
+  Stream<List<RegimeMark>> watchLiveRegimes() =>
+      db.watchQuery([db.regimes], liveRegimes);
+
+  /// Every lift the programme holds: each exercise in each session, with the
+  /// names a screen prints, in programme order.
+  ///
+  /// One row per (session, exercise) pair rather than per exercise, because
+  /// that is what a lift is (CLAUDE.md rule 1). It is what the first cycle of a
+  /// regime is measured out of — `8 of 15 lifts recorded` — and the denominator
+  /// the card prints.
+  Future<List<({LiftId lift, LiftLabel label})>> regimeLifts(
+    String regimeId,
+  ) async {
+    final rows = await db.customSelect(
+      'SELECT se.id AS session_id, se.name AS session_name, '
+      'e.id AS exercise_id, e.name AS exercise_name '
+      'FROM sessions se '
+      'INNER JOIN session_exercises sx ON sx.session_id = se.id '
+      'INNER JOIN exercises e ON e.id = sx.exercise_id '
+      'WHERE se.regime_id = ?1 AND se.deleted_at IS NULL '
+      'AND sx.deleted_at IS NULL '
+      'ORDER BY se.order_index, sx.order_index',
+      variables: [Variable.withString(regimeId)],
+      readsFrom: {db.sessions, db.sessionExercises, db.exercises},
+    ).get();
+
+    return [
+      for (final r in rows)
+        (
+          lift: LiftId(
+            sessionId: r.read<String>('session_id'),
+            exerciseId: r.read<String>('exercise_id'),
+          ),
+          label: LiftLabel(
+            exerciseName: r.read<String>('exercise_name'),
+            sessionName: r.read<String>('session_name'),
+          ),
+        ),
+    ];
+  }
+
+  /// [regimeLifts], re-read when the programme is edited.
+  Stream<List<({LiftId lift, LiftLabel label})>> watchRegimeLifts(
+    String regimeId,
+  ) {
+    return db.watchQuery(
+      [db.sessions, db.sessionExercises, db.exercises],
+      () => regimeLifts(regimeId),
+    );
   }
 
   // ── Starting and running a workout ────────────────────────────────────
