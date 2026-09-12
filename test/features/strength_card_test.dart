@@ -144,8 +144,9 @@ void main() {
     expect(find.text('Stronger overall'), findsOneWidget);
     expect(find.text('2 of 15'), findsOneWidget);
     expect(find.text('Lifts recorded'), findsOneWidget);
+    // One cycle is a chart with one dot on it — the starting point.
+    expect(find.byType(CycleAxisChart), findsOneWidget);
     // No comparison exists yet, so nothing claims one.
-    expect(find.byType(CycleAxisChart), findsNothing);
     expect(find.text('Progressing'), findsNothing);
   });
 
@@ -157,6 +158,9 @@ void main() {
     expect(find.text('——'), findsOneWidget);
     expect(find.text('— of 15'), findsOneWidget);
     expect(find.text('Lifts improved'), findsOneWidget);
+    // Nothing to plot and no height held open for it: a card with a hole in it
+    // reads as a chart that failed to draw.
+    expect(find.byType(CycleAxisChart), findsNothing);
   });
 
   testWidgets('changing the range redraws the same card', (tester) async {

@@ -178,6 +178,25 @@ void main() {
     expect(tapped, isNotNull);
   });
 
+  testWidgets('dragging the page past the chart selects nothing',
+      (tester) async {
+    // The card sits in a scrolling list. A flick that crosses the plot must
+    // scroll the page, not pick whichever cycle the finger went over.
+    CyclePoint? tapped;
+    await tester.pumpWidget(
+      harness(
+        [point(1, value: 0), point(2, value: 5), point(3, value: 9)],
+        onSelected: (p) => tapped = p,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(LineChart), const Offset(0, -300));
+    await tester.pumpAndSettle();
+
+    expect(tapped, isNull);
+  });
+
   testWidgets('the small variant drops the axes entirely', (tester) async {
     await tester.pumpWidget(
       harness([point(1, value: 0), point(2, value: 5)], small: true),

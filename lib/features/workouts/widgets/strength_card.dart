@@ -205,6 +205,7 @@ class _StrengthCardState extends State<StrengthCard> {
     final progress = widget.regime.progress;
     final planned = widget.plannedLifts;
     final counted = recorded ? '${progress.liftsCompared}' : '—';
+    final window = cycleWindow(progress, CycleRange.last12);
 
     return AppCard(
       padding: const EdgeInsets.all(Space.lg),
@@ -223,13 +224,24 @@ class _StrengthCardState extends State<StrengthCard> {
             ),
             const SizedBox(height: Space.md),
           ],
-          // The chart's room, held open and left empty. A cycle axis with no
-          // cycles has no numbers to label and no band to scale, so drawing one
-          // would be a scale the data does not have — THEME → Charts refuses a
-          // point the metric cannot score, and this is the same refusal one
-          // level up.
-          const SizedBox(height: _emptyChartHeight),
-          const SizedBox(height: Space.md),
+          // One cycle is a chart with one dot on it (THEME → Charts): the dot
+          // is the starting point every later cycle is read against, and
+          // refusing to draw until there are two makes a new regime's first
+          // week look like a fault.
+          //
+          // With nothing logged there is no dot and no chart at all. A cycle
+          // axis with no cycles has no numbers to label and no band to scale,
+          // so drawing one invents a scale — and holding the height open for
+          // it leaves a card with a hole in it.
+          if (recorded) ...[
+            CycleAxisChart(
+              points: window.points,
+              plotted: window.plotted,
+              formatValue: formatCycleTick,
+              selected: progress.latest?.cycleId,
+            ),
+            const SizedBox(height: Space.md),
+          ],
           const Divider(),
           const SizedBox(height: Space.md),
           Row(
@@ -260,10 +272,6 @@ class _StrengthCardState extends State<StrengthCard> {
     );
   }
 }
-
-/// The height the chart keeps while there is nothing to draw in it, so the card
-/// is the same card before and after the first cycle.
-const _emptyChartHeight = 150.0;
 
 /// What the chart is saying, in words: which cycle, when it ran, and how it
 /// scored.

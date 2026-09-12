@@ -1700,9 +1700,10 @@ class _CycleProgressCard extends StatelessWidget {
       children: [
         SectionHeader(
           'Cycle progress',
-          // Nothing to open before anything is logged, and a link into an
-          // empty timeline is a control that does nothing.
-          actionLabel: regime.progress.isEmpty ? null : 'All time',
+          // Nothing to open before anything is scored: an open cycle with no
+          // sets in it still fills the list of cycles, so the link is gated on
+          // there being a point to look at rather than on a row existing.
+          actionLabel: regime.progress.latest == null ? null : 'All time',
           onAction: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AllTimeScreen()),
           ),

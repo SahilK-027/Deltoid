@@ -111,6 +111,25 @@ void main() {
     expect(find.text(regime.name), findsWidgets);
   });
 
+  testWidgets('the week strip is drawn, not a band of empty space',
+      (tester) async {
+    await trainCycle(50);
+
+    await pump(tester);
+
+    // One cell per ISO week, each with a height. A `DecoratedBox` with no child
+    // collapses to nothing inside a row, which is how the strip once drew as a
+    // gap between the stepper and the legend.
+    final cells = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .length;
+    expect(cells, greaterThan(50));
+    final painted = tester.getSize(
+      find.byType(DecoratedBox).first,
+    );
+    expect(painted.height, greaterThan(0));
+  });
+
   testWidgets('the year\'s spells are folded away until asked for',
       (tester) async {
     await trainCycle(50);

@@ -1360,7 +1360,15 @@ class CycleAxisChart extends StatelessWidget {
                       ),
                   ],
                   touchCallback: (event, response) {
-                    if (!event.isInterestedForInteractions) return;
+                    // A tap, and nothing else. `isInterestedForInteractions`
+                    // is true for a drag as well, and this chart sits inside a
+                    // scrolling page: flicking the list past it would pick
+                    // whichever cycle the finger happened to cross and leave
+                    // the readout describing it.
+                    if (event is! FlTapUpEvent &&
+                        event is! FlLongPressEnd) {
+                      return;
+                    }
                     final spot = response?.lineBarSpots?.firstOrNull;
                     if (spot == null) return;
                     final cycle = drawn[spot.x.round()];

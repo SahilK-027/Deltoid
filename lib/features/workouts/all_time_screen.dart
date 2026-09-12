@@ -269,15 +269,21 @@ class _WeekStrip extends StatelessWidget {
                               : mark == null
                                   ? c.surfaceHighest
                                   : c.identityAt(mark.identityIndex);
+                  // `SizedBox.expand`, because a `DecoratedBox` with no
+                  // child takes the smallest height its constraints allow —
+                  // which inside a row is none, and the whole strip drew as a
+                  // band of empty space.
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 0.5),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: fill,
-                        borderRadius: BorderRadius.circular(2),
-                        border: future
-                            ? Border.all(color: c.border, width: 1)
-                            : null,
+                    child: SizedBox.expand(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: fill,
+                          borderRadius: BorderRadius.circular(2),
+                          border: future
+                              ? Border.all(color: c.border, width: 1)
+                              : null,
+                        ),
                       ),
                     ),
                   );
