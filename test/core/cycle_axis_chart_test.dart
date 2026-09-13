@@ -99,6 +99,11 @@ void main() {
     final data = dataOf(tester);
     expect(data.rangeAnnotations.verticalRangeAnnotations, isEmpty);
     expect(data.extraLinesData.verticalLines.length, 6);
+    // And the line between blocks is solid: under blocks a gap is what every
+    // segment has, so dashing them says "broken" about the normal case.
+    final segments = data.lineBarsData.where((b) => b.barWidth > 0);
+    expect(segments, isNotEmpty);
+    expect(segments.every((b) => b.dashArray == null), isTrue);
   });
 
   testWidgets('a cycle the window skips still holds its place', (tester) async {

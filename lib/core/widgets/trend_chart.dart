@@ -1426,7 +1426,11 @@ class CycleAxisChart extends StatelessWidget {
                   drawn[closed[k - 1]]!.value!,
                 ),
                 to: FlSpot(closed[k].toDouble(), drawn[closed[k]]!.value!),
-                soft: closed[k] - closed[k - 1] > 1,
+                // A gap is a break in the line only when the chart was drawing
+                // every cycle. Under blocks every segment spans a block, so
+                // softening them all dashes the whole chart and says "broken"
+                // about the one thing that is normal here.
+                soft: !isBlocks && closed[k] - closed[k - 1] > 1,
               ),
             // The open cycle, dashed away from the last closed one: its point
             // is real but partial, and drawing it solid would claim a finished

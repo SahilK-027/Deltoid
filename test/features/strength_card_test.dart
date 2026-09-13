@@ -89,8 +89,9 @@ void main() {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.byType(CycleAxisChart), findsOneWidget);
-    // Both lifts beat their baseline, out of the fifteen the programme holds.
-    expect(find.text('2 of 15'), findsOneWidget);
+    // Both lifts beat their baseline, out of the two the regime has scored —
+    // the same set the row opens onto.
+    expect(find.text('2 of 2'), findsOneWidget);
     expect(find.text('lifts improved'), findsOneWidget);
   });
 

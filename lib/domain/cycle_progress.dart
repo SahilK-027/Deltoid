@@ -210,6 +210,7 @@ class CycleProgress {
     required this.cycles,
     required this.latest,
     required this.trend,
+    this.lifts = const [],
   });
 
   /// Every cycle in regime order, deloads included.
@@ -221,17 +222,26 @@ class CycleProgress {
   /// Null until two cycles have scored.
   final ProgressTrend? trend;
 
+  /// Every lift the regime has scored, each on its most recent performance,
+  /// biggest change first.
+  ///
+  /// Not the latest cycle's lifts, which is what the chart's last point
+  /// averages. A cycle part way through holds only the sessions trained so far,
+  /// and a list that emptied to two sessions' worth every Monday would answer
+  /// "what did I train this week" — where the question this screen asks is what
+  /// the programme has done to each lift.
+  final List<LiftChange> lifts;
+
   bool get isEmpty => cycles.isEmpty;
 
   /// The percentage the card prints large.
   double? get percent => latest?.value;
 
-  /// The lifts of [latest] that beat their baseline.
-  int get liftsImproved =>
-      latest == null ? 0 : latest!.lifts.where((l) => l.isStronger).length;
+  /// The lifts that beat their baseline.
+  int get liftsImproved => lifts.where((l) => l.isStronger).length;
 
-  /// How many lifts the latest cycle had to compare.
-  int get liftsCompared => latest?.lifts.length ?? 0;
+  /// How many lifts the regime has to compare.
+  int get liftsCompared => lifts.length;
 
   /// Whether the regime is still inside the cycle everything is measured
   /// against, so there is no comparison to draw yet.
@@ -412,10 +422,23 @@ CycleProgress computeCycleProgress({
     if (p.isScored) latest = p;
   }
 
+  // The most recent reading of each lift, whichever cycle it came from. A lift
+  // trained in the first session of a four-session cycle is as current as one
+  // trained in the last.
+  final byLift = <LiftId, LiftChange>{};
+  for (final p in points) {
+    for (final l in p.lifts) {
+      byLift[l.lift] = l;
+    }
+  }
+  final lifts = byLift.values.toList()
+    ..sort((a, b) => b.percent.compareTo(a.percent));
+
   return CycleProgress(
     cycles: points,
     latest: latest,
     trend: computeTrend(points),
+    lifts: lifts,
   );
 }
 

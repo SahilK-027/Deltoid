@@ -2,6 +2,8 @@ import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/core/theme/tokens.dart';
+import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
@@ -170,6 +172,29 @@ void main() {
     expect(find.byType(CycleAxisChart), findsOneWidget);
     expect(find.text('——'), findsWidgets);
     expect(find.text('Stronger overall'), findsWidgets);
+  });
+
+  testWidgets('a deleted programme\'s weeks are not drawn as weeks off',
+      (tester) async {
+    await trainCycle(50);
+    final regime = await activeRegime();
+    await RegimeRepository(db).deleteRegime(regime.id);
+
+    await pump(tester);
+
+    // Named, because the strip still holds its weeks: the workouts survive the
+    // programme. And drawn in a grey that is not the empty grey — the two say
+    // different things.
+    expect(find.text('Deleted programme'), findsWidgets);
+    final colours = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((d) => d.decoration)
+        .whereType<BoxDecoration>()
+        .map((d) => d.color)
+        .whereType<Color>()
+        .toSet();
+    final c = buildTheme(Brightness.dark).extension<DeltoidColors>()!;
+    expect(colours, contains(c.textTertiary));
   });
 
   testWidgets('a log with nothing in it draws no timeline at all',

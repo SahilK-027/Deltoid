@@ -668,10 +668,10 @@ its legend, then the row that opens the detail.
   the app is entitled to paint red.
 - **The card opens nothing; the row at its foot does.** Tapping the chart picks
   a cycle, so a card-wide tap target would fight the gesture the chart needs.
-  The row reads `12 of 15 lifts improved`, counted against **the lifts the
-  programme holds** rather than the lifts the latest cycle happened to compare —
-  a denominator that moved with every skipped session would be a different
-  figure each week.
+  The row reads `25 of 37 lifts improved`, counted against **every lift the
+  regime has scored** — which is the list the row opens onto. Counting against
+  the lifts the latest cycle happened to reach gave a denominator that moved
+  with every session and did not match the list under it.
 - **The range control takes the card's full width.** It governs everything
   under it, and a track hugging three short words on the left of an otherwise
   empty band reads as something left over.
@@ -849,9 +849,10 @@ state.
 - **The open cycle is drawn as unfinished**: a dashed segment to a marker stroked
   in `textTertiary`. Its point is real and partial, and a solid one would claim a
   finished cycle two sessions in.
-- **A jump in the line is dashed at 60%** — across a deload, across a spell on
-  another regime, across the cycles a thinned chart does not draw. A solid line
-  between two points claims the training between them.
+- **A jump in the line is dashed at 60%** — across a deload, or across a spell
+  on another regime. A solid line between two points claims the training
+  between them. **Under blocks it is solid**: there every segment spans a block,
+  and dashing them all says "broken" about the one thing that is normal there.
 - **Zero is not the floor.** A window opening at cycle 13 is a band from +6 to
   +11; anchoring it draws four cycles of work as a flat line at the top. Zero
   appears when zero is in the data, which is what cycle 1 is.
@@ -886,6 +887,12 @@ state.
 The regime screen's list: the movement, the session it belongs to and the two
 sets it is between, with what it gained on the right.
 
+- **The list is every lift the regime has scored, each on its most recent
+  cycle** — not the latest cycle's lifts. A cycle part way through holds only
+  the sessions trained so far, and a list that emptied to two sessions' worth
+  every Monday would answer "what did I train this week" where the question is
+  what the programme has done to each lift.
+
 - **The gain is in kilograms, not per cent.** The percentage is the card's
   figure, averaged over every lift; the number a person acts on for one movement
   is the weight, and it is the estimated one-rep max that moved. A hold has no
@@ -911,6 +918,11 @@ from thirty queries to answer a question about one of them.
 - **A week that has not happened is an outline, not a fill.** Filled with the
   empty grey it reads as a week off, which is a claim about a week nobody has had
   the chance to train.
+- **A deleted programme's weeks keep a grey of their own.** Its workouts survive
+  it, so the strip still holds them, and `surfaceHighest` is deliberately the
+  same tone as `heatEmpty` — drawn in it, a week trained on a programme since
+  deleted was indistinguishable from a week nothing was trained in. They take
+  `textTertiary`, and the legend names them.
 - **Two legends, never one.** A regime's colour and a week's state are different
   kinds of fact, and one row of swatches invites the reader to take the orange
   one for a seventh programme. `Regimes` lists only those trained in the year on

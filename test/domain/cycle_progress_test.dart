@@ -606,4 +606,64 @@ void main() {
     expect(weeks[1].firstCycle, 3);
     expect(weeks[1].lastCycle, 4);
   });
+  group('the lift summary', () {
+    test('reads every lift on its most recent cycle, not on the last one', () {
+      // Bench in cycle 3, row only in cycle 2 — a cycle part way through holds
+      // only the sessions trained so far, and the row is not gone because of
+      // it.
+      final p = computeCycleProgress(
+        cycles: [
+          cycle(1, [
+            barbell(bench, weight: 100, reps: 10),
+            barbell(row, weight: 50, reps: 10),
+          ]),
+          cycle(2, [
+            barbell(bench, weight: 110, reps: 10),
+            barbell(row, weight: 55, reps: 10),
+          ]),
+          cycle(3, [barbell(bench, weight: 120, reps: 10)]),
+        ],
+      );
+
+      expect(p.latest!.lifts.length, 1, reason: 'the open cycle has one lift');
+      expect(p.lifts.length, 2, reason: 'the regime has two');
+      expect(p.liftsImproved, 2);
+      expect(p.liftsCompared, 2);
+
+      final benchChange = p.lifts.firstWhere((l) => l.lift == bench);
+      final rowChange = p.lifts.firstWhere((l) => l.lift == row);
+      expect(benchChange.percent, closeTo(20, 1e-9));
+      expect(rowChange.percent, closeTo(10, 1e-9));
+    });
+
+    test('a deload is not a lift\'s most recent reading', () {
+      final p = computeCycleProgress(
+        cycles: [
+          cycle(1, [barbell(bench, weight: 100, reps: 10)]),
+          cycle(2, [barbell(bench, weight: 120, reps: 10)]),
+          cycle(3, [barbell(bench, weight: 60, reps: 10)], isDeload: true),
+        ],
+      );
+
+      expect(p.lifts.single.percent, closeTo(20, 1e-9));
+    });
+
+    test('the biggest change is first', () {
+      final p = computeCycleProgress(
+        cycles: [
+          cycle(1, [
+            barbell(bench, weight: 100, reps: 10),
+            barbell(row, weight: 100, reps: 10),
+          ]),
+          cycle(2, [
+            barbell(bench, weight: 105, reps: 10),
+            barbell(row, weight: 130, reps: 10),
+          ]),
+        ],
+      );
+
+      expect(p.lifts.first.lift, row);
+      expect(p.lifts.last.lift, bench);
+    });
+  });
 }

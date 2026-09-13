@@ -62,7 +62,7 @@ class RegimeProgressScreen extends ConsumerWidget {
     WeightUnit unit,
   ) {
     final progress = regime.progress;
-    final lifts = progress.latest?.lifts ?? const <LiftChange>[];
+    final lifts = progress.lifts;
     final last = progress.cycles.isEmpty ? null : progress.cycles.last.index;
 
     return [
@@ -171,10 +171,7 @@ class RegimeProgressScreen extends ConsumerWidget {
     List<({LiftId lift, LiftLabel label})>? planned,
     WeightUnit unit,
   ) {
-    final recorded = {
-      for (final l in regime.progress.latest?.lifts ?? const <LiftChange>[])
-        l.lift: l,
-    };
+    final recorded = {for (final l in regime.progress.lifts) l.lift: l};
     final all = planned ??
         [
           for (final l in recorded.keys)

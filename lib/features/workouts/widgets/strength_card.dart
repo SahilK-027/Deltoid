@@ -168,13 +168,12 @@ class _StrengthCardState extends State<StrengthCard> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   ValueUnit(
-                    // Out of what the programme holds, not out of what the
-                    // latest cycle happened to compare: `12 of 15` is a
-                    // sentence about the regime, and a denominator that moved
-                    // with every skipped session would be a different figure
-                    // each week.
+                    // Out of every lift the regime has scored, which is the
+                    // list the row opens onto. Counting against the lifts the
+                    // open cycle happened to reach gave a denominator that
+                    // moved with every session and did not match the list.
                     value: '${progress.liftsImproved} of '
-                        '${widget.plannedLifts ?? progress.liftsCompared}',
+                        '${progress.liftsCompared}',
                     dense: true,
                   ),
                   const SizedBox(width: Space.xs),

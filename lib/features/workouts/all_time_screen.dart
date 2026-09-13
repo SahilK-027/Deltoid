@@ -147,7 +147,7 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
               for (final id in used)
                 _LegendSwatch(
                   colour: byId[id] == null
-                      ? c.surfaceHighest
+                      ? c.textTertiary
                       : c.identityAt(byId[id]!.identityIndex),
                   label: byId[id]?.name ?? 'Deleted programme',
                 ),
@@ -276,7 +276,13 @@ class _WeekStrip extends StatelessWidget {
                           : w.isDeload
                               ? c.deload
                               : mark == null
-                                  ? c.surfaceHighest
+                                  // A deleted programme's weeks, in the one
+                                  // grey that is not the empty grey:
+                                  // `surfaceHighest` is deliberately the same
+                                  // tone as `heatEmpty`, so a week trained on a
+                                  // programme since deleted drew exactly like a
+                                  // week nothing was trained in.
+                                  ? c.textTertiary
                                   : c.identityAt(mark.identityIndex);
                   // `SizedBox.expand`, because a `DecoratedBox` with no
                   // child takes the smallest height its constraints allow —
@@ -454,7 +460,7 @@ class _RunRow extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(
               color: regime == null
-                  ? c.surfaceHighest
+                  ? c.textTertiary
                   : c.identityAt(regime!.identityIndex),
               borderRadius: BorderRadius.circular(2),
             ),
