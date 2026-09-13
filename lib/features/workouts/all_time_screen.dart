@@ -436,7 +436,13 @@ class _RunRow extends StatelessWidget {
     final day = DateFormat('d MMM');
     final start = run.from.start;
     final end = run.to.start.add(const Duration(days: 6));
-    final ongoing = !end.isBefore(DateTime.now());
+    // Compared by week, not by instant. The week you are standing in is not
+    // over, whichever day of it you are reading this on — against the end of
+    // that week, a spell stopped saying "to now" at midnight on its Sunday.
+    final now = isoWeekOf(DateTime.now());
+    final last = isoWeekOf(run.to.start);
+    final ongoing = last.year > now.year ||
+        (last.year == now.year && last.week >= now.week);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -1299,10 +1299,16 @@ class CycleAxisChart extends StatelessWidget {
                       // percentages down a gutter do not, and a band whose top
                       // and bottom are unlabelled is a scale the reader has to
                       // infer.
-                      getTitlesWidget: (value, meta) => Text(
-                        formatValue(value),
-                        style: context.t.bodySmall,
-                        maxLines: 1,
+                      // Wrapped for the gap between the gutter and the plot.
+                      // A bare widget is drawn flush against the axis.
+                      getTitlesWidget: (value, meta) => SideTitleWidget(
+                        meta: meta,
+                        space: Space.xs,
+                        child: Text(
+                          formatValue(value),
+                          style: context.t.bodySmall,
+                          maxLines: 1,
+                        ),
                       ),
                     ),
                   ),
@@ -1311,7 +1317,7 @@ class CycleAxisChart extends StatelessWidget {
                 : AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 24,
+                      reservedSize: 30,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
                         final i = value.round();
@@ -1333,16 +1339,27 @@ class CycleAxisChart extends StatelessWidget {
                             i == 0 ||
                             isSelected;
                         if (!show) return const SizedBox.shrink();
-                        return Text(
-                          '$number',
-                          style: context.t.bodySmall?.copyWith(
-                            // An orange number under an orange band, so the
-                            // axis says which cycle the light week was.
-                            color: cycle != null && cycle.isDeload && !isBlocks
-                                ? c.deload
-                                : isSelected
-                                    ? c.textPrimary
-                                    : c.textSecondary,
+                        // Wrapped for the gap under the baseline. A bare widget
+                        // is drawn flush against the axis, and a point on the
+                        // lower bound sits on it — cycle 1 always does, being
+                        // the zero everything else is measured from — so its
+                        // marker and its own number were touching.
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: Space.sm,
+                          child: Text(
+                            '$number',
+                            style: context.t.bodySmall?.copyWith(
+                              // An orange number under an orange band, so the
+                              // axis says which cycle the light week was.
+                              color: cycle != null &&
+                                      cycle.isDeload &&
+                                      !isBlocks
+                                  ? c.deload
+                                  : isSelected
+                                      ? c.textPrimary
+                                      : c.textSecondary,
+                            ),
                           ),
                         );
                       },
