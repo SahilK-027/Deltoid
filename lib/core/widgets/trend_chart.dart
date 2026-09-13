@@ -1550,9 +1550,15 @@ class CycleAxisChart extends StatelessWidget {
   }
 }
 
-/// The gap two axis labels keep between them, so `36` and `37` are two numbers
-/// rather than one long one.
-const _labelGap = 10.0;
+/// The gap two axis labels keep between them, so `36` and `37` read as two
+/// numbers rather than one long one.
+///
+/// Six, which is the width of a digit at this size and the least that still
+/// separates them. It is a threshold, so it decides how much fits rather than
+/// how much room is left over: at eight, twelve two-digit cycles tipped over
+/// into every second one on an ordinary phone, which is half an axis thrown
+/// away to buy space nobody needed.
+const _labelGap = 6.0;
 
 /// One string, at the size and scale it will be drawn at.
 double _measure(BuildContext context, String text) {

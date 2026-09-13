@@ -250,13 +250,14 @@ void main() {
   });
   group('label thinning', () {
     test('counts the room a label needs, not the slots', () {
-      // Twelve slots, a slot 26px wide: `1` fits every slot, `36` does not.
+      // Twelve slots, a slot 26px wide: a narrow label fits every slot, one
+      // as wide as its own slot does not.
       expect(
         CycleAxisChart.labelEvery(12, labelWidth: 8, slotWidth: 26),
         1,
       );
       expect(
-        CycleAxisChart.labelEvery(12, labelWidth: 20, slotWidth: 26),
+        CycleAxisChart.labelEvery(12, labelWidth: 24, slotWidth: 26),
         2,
       );
       // A 1.3 system font on the same axis: wider still, so wider apart.
