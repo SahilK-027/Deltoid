@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-09-13
+
+Patch release correcting how chart axes are labelled at larger font sizes.
+
+### Fixed
+
+- **Charts:** At the largest font size, a chart's value labels no longer lose their unit. The axis printed `+60` where it meant `+60%`, and `200` where it meant `200 kg`, because the room reserved for a label was measured at the standard font while the label was drawn at the chosen one. Every chart in the app was affected.
+- **Cycle progress:** The cycle numbers under the chart are spaced to fit the width and the font in use, rather than to a fixed rule. Twelve cycles are numbered one by one where they fit and every second where they do not, always at an even spacing.
+  - The cycle being read is no longer forced onto the axis, which could print it half a step after its neighbour. It is named in full above the chart.
+
 ## [1.10.0] - 2026-09-12
 
 Minor release replacing the Last session card on Workouts with how much stronger the active programme has made you, cycle by cycle.
@@ -320,7 +330,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/SahilK-027/Deltoid/compare/v1.7.0...v1.8.0
