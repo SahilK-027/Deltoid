@@ -1314,28 +1314,31 @@ class CycleAxisChart extends StatelessWidget {
                       reservedSize: 24,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
-                        // Nothing scored anywhere: the axis is the one this
-                        // regime will have, and numbering a cycle nothing was
-                        // drawn for labels an empty chart.
-                        if (drawn.isEmpty) return const SizedBox.shrink();
                         final i = value.round();
-                        if (i < 0 || i >= n) return const SizedBox.shrink();
-                        final cycle = points[i];
-                        final isSelected = cycle.cycleId == selected;
+                        if (i < 0 || i >= slots) return const SizedBox.shrink();
+                        // A position no cycle has reached yet is still numbered:
+                        // the axis a new regime opens on is the axis it will
+                        // fill, and four unnumbered gridlines are a scale
+                        // without a subject.
+                        final cycle = i < n ? points[i] : null;
+                        final number = cycle?.index ??
+                            (n == 0 ? i + 1 : points[n - 1].index + (i - n + 1));
+                        final isSelected =
+                            cycle != null && cycle.cycleId == selected;
                         // The first label is always printed, or a thinned axis
                         // opens with an unlabelled stretch and the reader has
                         // no anchor to count from.
                         final show = every == 1 ||
-                            cycle.index % every == 0 ||
+                            number % every == 0 ||
                             i == 0 ||
                             isSelected;
                         if (!show) return const SizedBox.shrink();
                         return Text(
-                          '${cycle.index}',
+                          '$number',
                           style: context.t.bodySmall?.copyWith(
                             // An orange number under an orange band, so the
                             // axis says which cycle the light week was.
-                            color: cycle.isDeload && !isBlocks
+                            color: cycle != null && cycle.isDeload && !isBlocks
                                 ? c.deload
                                 : isSelected
                                     ? c.textPrimary

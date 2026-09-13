@@ -133,6 +133,10 @@ class _StrengthCardState extends State<StrengthCard> {
                 (value: r, label: r.label),
             ],
             value: _range,
+            // The full width of the card: the control governs everything under
+            // it, and a track hugging three short words on the left of an
+            // otherwise empty band reads as something left over.
+            expand: true,
             // Every range stays selectable on a short history. A chip that
             // would draw a perfectly good four-cycle chart and is greyed out
             // instead is a worse answer than the short chart.
@@ -412,9 +416,24 @@ class _Legend extends StatelessWidget {
         ],
         if (open != null) ...[
           if (hasDeload) const SizedBox(width: Space.md),
+          // Dashed, because the line it stands for is: a solid rule in the
+          // legend names a mark the chart never draws.
           SizedBox(
             width: 14,
-            child: Divider(color: c.textTertiary, thickness: 2, height: 2),
+            height: 2,
+            child: Row(
+              children: [
+                for (var i = 0; i < 3; i++) ...[
+                  if (i > 0) const SizedBox(width: 2),
+                  Expanded(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: c.textTertiary),
+                      child: const SizedBox(height: 2),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(width: Space.xs),
           Flexible(

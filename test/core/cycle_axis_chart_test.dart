@@ -31,6 +31,7 @@ Widget harness(
   String? selected,
   ValueChanged<CyclePoint>? onSelected,
   bool small = false,
+  int? minSlots,
 }) =>
     MaterialApp(
       theme: buildTheme(Brightness.dark),
@@ -47,6 +48,7 @@ Widget harness(
           selected: selected,
           onSelected: onSelected,
           small: small,
+          minSlots: minSlots,
         ),
       ),
     );
@@ -218,9 +220,19 @@ void main() {
     expect(data.minY, 0);
     expect(data.maxY, greaterThan(0));
     expect(data.lineBarsData.last.spots, isEmpty);
-    // And no cycle numbered under it: a label on an empty chart names a cycle
-    // that drew nothing.
-    expect(find.text('1'), findsNothing);
+  });
+
+  testWidgets('an axis numbers the positions no cycle has reached yet',
+      (tester) async {
+    // A regime one cycle in opens on the axis it will fill: four positions,
+    // numbered 1 to 4, with the one dot there is on the first of them.
+    await tester.pumpWidget(
+      harness([point(1, value: 0)], minSlots: 4),
+    );
+
+    for (final label in ['1', '2', '3', '4']) {
+      expect(find.text(label), findsOneWidget);
+    }
   });
 
   test('a percentage is printed with a sign and a real minus', () {

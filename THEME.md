@@ -672,6 +672,9 @@ its legend, then the row that opens the detail.
   programme holds** rather than the lifts the latest cycle happened to compare —
   a denominator that moved with every skipped session would be a different
   figure each week.
+- **The range control takes the card's full width.** It governs everything
+  under it, and a track hugging three short words on the left of an otherwise
+  empty band reads as something left over.
 - **The readout is a filled strip, not a line of prose.** It is the one thing on
   the card that changes when the chart is tapped, and grey text quietly
   rewording itself is not visibly an answer to the tap. The cycle is named in
@@ -874,9 +877,9 @@ state.
 - **The empty state is an empty axis, not an empty box.** Four positions, a
   band from zero, the gridlines and the gutter — the axis this regime will have,
   with nothing on it. One cycle puts one dot on it and no more, because a single
-  point is where you are and the next one is read against it. No cycle numbers
-  are printed under a chart with nothing drawn on it: a label names a cycle that
-  drew nothing.
+  point is where you are and the next one is read against it. **Every position
+  is numbered, including the ones no cycle has reached**: the numbers are what
+  make four gridlines a chart of cycles rather than a scale with no subject.
 
 ### Lift row
 
