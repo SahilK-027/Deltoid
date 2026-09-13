@@ -33,13 +33,21 @@ Future<void> _loadInter() async {
   await loader.load();
 }
 
-Widget _harness(Brightness brightness, (double, double) scale) => MaterialApp(
+Widget _harness(
+  Brightness brightness,
+  (double, double) scale, {
+  double textScale = 1,
+}) =>
+    MaterialApp(
       theme: buildTheme(brightness),
-      home: Scaffold(
-        body: EmptyTrendChart(
-          window: const TrendWindow.rolling(ChartRange.year),
-          scale: scale,
-          formatValue: (v) => v.round().toString(),
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+        child: Scaffold(
+          body: EmptyTrendChart(
+            window: const TrendWindow.rolling(ChartRange.year),
+            scale: scale,
+            formatValue: (v) => v.round().toString(),
+          ),
         ),
       ),
     );
@@ -75,6 +83,9 @@ void main() {
           final painter = TextPainter(
             text: TextSpan(text: label, style: style),
             textDirection: TextDirection.ltr,
+            textScaler: MediaQuery.textScalerOf(tester.element(
+              find.byType(LineChart),
+            )),
           )..layout();
           return painter.width;
         }
@@ -115,5 +126,47 @@ void main() {
         );
       },
     );
+  }
+  // The system font is a setting, and the gutter is measured in code. Measured
+  // at 1.0 while the label draws at 1.3, the reserved box is a third too narrow
+  // and `fl_chart` clips the title without a word — the axis printed `+60`
+  // where it meant `+60%`.
+  for (final textScale in const [1.3, 2.0]) {
+    testWidgets('the value gutter fits its labels at a $textScale font scale',
+        (tester) async {
+      await tester.pumpWidget(
+        _harness(Brightness.dark, (192, 208), textScale: textScale),
+      );
+      await tester.pumpAndSettle();
+
+      final data = tester.widget<LineChart>(find.byType(LineChart)).data;
+      final sideTitles = data.titlesData.rightTitles.sideTitles;
+      final style = tester
+          .widget<Text>(
+            find
+                .byWidgetPredicate(
+                  (w) => w is Text && int.tryParse(w.data ?? '') != null,
+                )
+                .first,
+          )
+          .style;
+
+      for (var v = data.minY;
+          v <= data.maxY + 0.0001;
+          v += sideTitles.interval!) {
+        final painter = TextPainter(
+          text: TextSpan(text: v.round().toString(), style: style),
+          textDirection: TextDirection.ltr,
+          textScaler: TextScaler.linear(textScale),
+        )..layout();
+        expect(
+          sideTitles.reservedSize - Space.xs,
+          greaterThanOrEqualTo(painter.width),
+          reason: 'at $textScale the axis reserves '
+              '${sideTitles.reservedSize} for a label needing '
+              '${painter.width.toStringAsFixed(2)}',
+        );
+      }
+    });
   }
 }

@@ -248,4 +248,125 @@ void main() {
     expect(formatCycleTick(10), '+10%');
     expect(formatCycleTick(0), '0%');
   });
+  group('label thinning', () {
+    test('counts the room a label needs, not the slots', () {
+      // Twelve slots, a slot 26px wide: `1` fits every slot, `36` does not.
+      expect(
+        CycleAxisChart.labelEvery(12, labelWidth: 8, slotWidth: 26),
+        1,
+      );
+      expect(
+        CycleAxisChart.labelEvery(12, labelWidth: 20, slotWidth: 26),
+        2,
+      );
+      // A 1.3 system font on the same axis: wider still, so wider apart.
+      expect(
+        CycleAxisChart.labelEvery(12, labelWidth: 28, slotWidth: 26),
+        2,
+      );
+    });
+
+    test('rounds up a ladder a person can count in', () {
+      // Never `every 3rd` or `every 7th`: 1, 2, 5, 10, then tens.
+      for (final width in [10.0, 20.0, 30.0, 40.0, 60.0, 100.0, 200.0]) {
+        final every = CycleAxisChart.labelEvery(
+          40,
+          labelWidth: width,
+          slotWidth: 12,
+        );
+        expect(
+          every == 1 || every == 2 || every == 5 || every % 10 == 0,
+          isTrue,
+          reason: 'a $width label produced every $every',
+        );
+      }
+    });
+
+    test('falls back to the slot count when nothing has been measured', () {
+      expect(CycleAxisChart.labelEvery(12), 1);
+      expect(CycleAxisChart.labelEvery(20), 2);
+      expect(CycleAxisChart.labelEvery(40), 10);
+    });
+  });
+
+  testWidgets('a crowded axis prints fewer numbers, not narrower ones',
+      (tester) async {
+    // Cycles 36 to 47 in the width of a phone card: two-digit labels in a slot
+    // sized for one is how `36 37 38` closed up into a grey band.
+    final points = [for (var i = 36; i <= 47; i++) point(i, value: i.toDouble())];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark),
+        home: Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+            child: SizedBox(
+              width: 360,
+              child: CycleAxisChart(
+                points: points,
+                plotted: {for (final p in points) p.cycleId},
+                formatValue: formatCycleTick,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final printed = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data)
+        .whereType<String>()
+        .where((t) => int.tryParse(t) != null)
+        .toList();
+
+    expect(printed, isNotEmpty);
+    expect(
+      printed.length,
+      lessThan(points.length),
+      reason: 'every cycle was numbered into a card too narrow for them',
+    );
+  });
+  testWidgets('a thinned axis keeps one rhythm all the way across',
+      (tester) async {
+    // `44 46 47` — the last cycle printed half a step after the one before it
+    // — reads as a mistake in the spacing. The ladder holds; the readout above
+    // is where the selected cycle is named.
+    final points = [for (var i = 36; i <= 47; i++) point(i, value: i.toDouble())];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark),
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            child: CycleAxisChart(
+              points: points,
+              plotted: {for (final p in points) p.cycleId},
+              formatValue: formatCycleTick,
+              selected: 'c47',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final printed = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data)
+        .whereType<String>()
+        .map(int.tryParse)
+        .whereType<int>()
+        .toList()
+      ..sort();
+
+    expect(printed.length, greaterThan(2));
+    final gaps = {
+      for (var i = 1; i < printed.length; i++) printed[i] - printed[i - 1],
+    };
+    expect(gaps.length, 1, reason: 'the axis printed $printed');
+  });
 }

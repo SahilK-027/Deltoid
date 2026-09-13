@@ -841,6 +841,19 @@ state.
   one cycle compared with the last, not when it happened. A regime resumed after
   a spell on another programme runs 1, 2, 5, 6 with no gap drawn — the numbers
   are on the labels, where they belong.
+- **How many numbers fit is a measurement, not a count of cycles.** Twelve
+  cycles fit twelve labels reading `1` to `12` and do not reading `36` to `47`,
+  and the same axis at a 1.3 system font is half as roomy again. The widest
+  label is measured, asked how many slots it needs, and rounded **up a ladder a
+  person can count in** — every cycle, every second, every fifth, every tenth.
+  `1 2 3 4` beats `1 3 5 7` wherever both fit, and the ladder is what stops an
+  axis landing on "every 7th".
+- **One rhythm the whole way across.** Nothing is added to the ladder for being
+  important — printing the selected cycle put a number half a step after the one
+  before it, `44 46 47`, and an axis whose spacing changes at the end reads as a
+  mistake. The selected cycle is named in words in the readout; here it is only
+  coloured, and only when the ladder lands on it. The single exception is the
+  first number on a heavily thinned axis, which is there to count from.
 - **A deload is a band, never a point.** The weights are lighter on purpose, so a
   point at the floor of the chart would report a planned week as a collapse. The
   band is `deload` at 14%, and its cycle number under the axis is orange to
@@ -856,6 +869,11 @@ state.
 - **Zero is not the floor.** A window opening at cycle 13 is a band from +6 to
   +11; anchoring it draws four cycles of work as a flat line at the top. Zero
   appears when zero is in the data, which is what cycle 1 is.
+- **The value gutter is measured at the size the label will be drawn**, system
+  font scale included. Measured at 1.0 and drawn at 1.3, the reserved box is a
+  third too narrow and `fl_chart` clips the title without a word — the axis
+  printed `+60` where it meant `+60%`. This is every chart's rule, not this
+  one's: they all size their gutter through `axisGutter`.
 - **Three gridlines, all of them labelled.** The band is two steps tall from a
   rounded floor, in steps of 1, 2, 4, 5, 10, 20, 25 or 50 percentage points —
   2.5% is not a figure anybody reads a block of training in. The time axis drops

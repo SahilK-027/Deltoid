@@ -1030,11 +1030,17 @@ double axisGutter(
   double gap = Space.xs,
 }) {
   final style = context.t.bodySmall;
+  // Measured at the size the label will actually be drawn at. Without the
+  // scaler this reserves room for 1.0 and the label renders at whatever the
+  // system font is set to — `fl_chart` then clips a side title silently, so at
+  // 1.3 the axis quietly printed `+60` where it meant `+60%`.
+  final scaler = MediaQuery.textScalerOf(context);
   var widest = 0.0;
   for (final label in labels) {
     final painter = TextPainter(
       text: TextSpan(text: label, style: style),
       textDirection: Directionality.of(context),
+      textScaler: scaler,
     )..layout();
     if (painter.width > widest) widest = painter.width;
   }
@@ -1178,13 +1184,28 @@ class CycleAxisChart extends StatelessWidget {
   /// chart rather than a dot in the middle of nothing.
   final int? minSlots;
 
-  /// How often a cycle number is printed.
+  /// How often a cycle number is printed, given the room each one has.
   ///
-  /// Every cycle up to fourteen, every second up to twenty-six, and every tenth
-  /// beyond — a label per cycle on a seventy-cycle regime is a grey band, not
-  /// an axis.
-  static int labelEvery(int slots) =>
-      slots <= 14 ? 1 : (slots <= 26 ? 2 : 10);
+  /// Counting slots is not enough. Twelve cycles fit twelve labels when they
+  /// read `1` to `12` and do not when they read `36` to `47`, and the same axis
+  /// at a 1.3 system font is half as roomy again — a rule written in slot
+  /// counts cannot see either, and the numbers close up until they touch.
+  ///
+  /// So the widest label is measured and asked how many slots it needs, then
+  /// rounded up the ladder to a step a person can count in: every cycle, every
+  /// second, every fifth, every tenth. `1 2 3 4` beats `1 3 5 7` where both
+  /// fit, and the ladder is what stops the axis landing on `every 7th`.
+  static int labelEvery(int slots, {double labelWidth = 0, double slotWidth = 0}) {
+    if (slots <= 0 || slotWidth <= 0 || labelWidth <= 0) {
+      return slots <= 14 ? 1 : (slots <= 26 ? 2 : 10);
+    }
+    // A label's own width plus the gap that keeps two of them apart.
+    final needed = (labelWidth + _labelGap) / slotWidth;
+    for (final step in const [1, 2, 5, 10]) {
+      if (step >= needed) return step;
+    }
+    return (needed / 10).ceil() * 10;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1222,11 +1243,33 @@ class CycleAxisChart extends StatelessWidget {
     final minX = -0.5;
     final maxX = slots - 0.5;
 
-    final every = labelEvery(slots);
     final openIndex = drawn.keys.where((i) => points[i].isOpen).firstOrNull;
     final closed = drawn.keys.where((i) => !points[i].isOpen).toList()..sort();
 
-    return SizedBox(
+    final gutter = small
+        ? 0.0
+        : axisGutter(context, _yTicks(minY, maxY, step).map(formatValue));
+    // The widest number the axis could print, at the size it will print it.
+    final labelWidth = small
+        ? 0.0
+        : _measure(
+            context,
+            '${points.isEmpty ? slots : max(points.last.index, slots)}',
+          );
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        // The room one slot has, off the box the chart is drawn in rather than
+        // assumed: the value gutter is already out of it.
+        final slotWidth =
+            !box.hasBoundedWidth ? 0.0 : (box.maxWidth - gutter) / max(slots, 1);
+        final every = labelEvery(
+          slots,
+          labelWidth: labelWidth,
+          slotWidth: slotWidth,
+        );
+
+        return SizedBox(
       height: height ?? (small ? 64 : 150),
       child: LineChart(
         duration: Motion.base,
@@ -1289,10 +1332,7 @@ class CycleAxisChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: step,
-                      reservedSize: axisGutter(
-                        context,
-                        _yTicks(minY, maxY, step).map(formatValue),
-                      ),
+                      reservedSize: gutter,
                       // Every tick printed, the two on the bounds included.
                       // The time axis suppresses its edges because its labels
                       // are dates wide enough to collide; three short
@@ -1331,13 +1371,20 @@ class CycleAxisChart extends StatelessWidget {
                             (n == 0 ? i + 1 : points[n - 1].index + (i - n + 1));
                         final isSelected =
                             cycle != null && cycle.cycleId == selected;
-                        // The first label is always printed, or a thinned axis
-                        // opens with an unlabelled stretch and the reader has
-                        // no anchor to count from.
+                        // Strictly on the ladder, with one exception: a
+                        // heavily thinned axis prints its first number, or it
+                        // opens with a long unlabelled stretch and the reader
+                        // has nothing to count from.
+                        //
+                        // The selected cycle is **not** forced on. Printing it
+                        // put a number half a step after the one before it —
+                        // `44 46 47` — and an axis whose spacing changes at the
+                        // end reads as a mistake. It is named in words in the
+                        // readout above, and coloured here when the ladder
+                        // happens to land on it.
                         final show = every == 1 ||
                             number % every == 0 ||
-                            i == 0 ||
-                            isSelected;
+                            (every >= 10 && i == 0);
                         if (!show) return const SizedBox.shrink();
                         // Wrapped for the gap under the baseline. A bare widget
                         // is drawn flush against the axis, and a point on the
@@ -1477,6 +1524,8 @@ class CycleAxisChart extends StatelessWidget {
           ],
         ),
       ),
+        );
+      },
     );
   }
 
@@ -1499,6 +1548,20 @@ class CycleAxisChart extends StatelessWidget {
       dotData: const FlDotData(show: false),
     );
   }
+}
+
+/// The gap two axis labels keep between them, so `36` and `37` are two numbers
+/// rather than one long one.
+const _labelGap = 10.0;
+
+/// One string, at the size and scale it will be drawn at.
+double _measure(BuildContext context, String text) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: context.t.bodySmall),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  return painter.width;
 }
 
 /// The step the cycle axis climbs in, so the band is the data plus air and
