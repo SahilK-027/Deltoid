@@ -15,6 +15,14 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-09-14
+
+Patch release restoring the Cycle progress section on a Workouts screen with no regime on it.
+
+### Fixed
+
+- **Workouts:** Cycle progress is drawn in the screen's empty states, alongside Consistency and Weekly volume, rather than being left out until a regime exists. The card already had an empty state of its own — four cycle slots and dashes for the figures — so the section now appears on a fresh install and the first regime fills it instead of building it.
+
 ## [1.10.1] - 2026-09-13
 
 Patch release correcting how chart axes are labelled at larger font sizes.
@@ -330,7 +338,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...HEAD
+[1.10.2]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/SahilK-027/Deltoid/compare/v1.8.0...v1.9.0
