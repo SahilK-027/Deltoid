@@ -13,6 +13,7 @@ import '../../core/widgets/primitives.dart';
 import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
+import '../../domain/cycle_progress.dart';
 import '../../domain/consistency.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/muscle_volume.dart';
@@ -804,6 +805,12 @@ class _NoRegimeState extends ConsumerWidget {
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
+                    const SizedBox(height: Space.section),
+                    _CycleProgressCard(
+                      regime:
+                          ref.watch(activeRegimeProgressProvider).valueOrNull ??
+                          _noProgress,
+                    ),
                   ],
                 ),
               ),
@@ -888,6 +895,12 @@ class _NoSessionsState extends ConsumerWidget {
                     _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
+                    const SizedBox(height: Space.section),
+                    _CycleProgressCard(
+                      regime:
+                          ref.watch(activeRegimeProgressProvider).valueOrNull ??
+                          _noProgress,
+                    ),
                   ],
                 ),
               ),
@@ -1687,6 +1700,21 @@ class _VolumeCard extends StatelessWidget {
 /// It replaces the Last session card, which repeated the masthead above it and
 /// the History tab beside it. The question this answers — is the training
 /// working — is asked nowhere else in the app.
+/// The score a phone with no regime on it has.
+///
+/// The empty states carry the Cycle progress section like every other section
+/// on this page (THEME -> Empty states): the card already draws itself with no
+/// cycles in it, so hiding it made the first regime look as though it had built
+/// a card rather than filled one.
+const _noProgress = RegimeProgress(
+  regimeId: '',
+  regimeName: '',
+  identityIndex: 0,
+  isActive: false,
+  progress: CycleProgress(cycles: [], latest: null, trend: null),
+  labels: {},
+);
+
 class _CycleProgressCard extends StatelessWidget {
   const _CycleProgressCard({required this.regime, this.plannedLifts});
 
@@ -1711,12 +1739,18 @@ class _CycleProgressCard extends StatelessWidget {
         StrengthCard(
           regime: regime,
           plannedLifts: plannedLifts,
-          onOpen: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  RegimeProgressScreen(regimeId: regime.regimeId),
-            ),
-          ),
+          // Before a regime exists there is no name to caption the card with
+          // and no regime screen to open: the section is the shape it will
+          // have, with the figures printed as dashes.
+          showName: regime.regimeId.isNotEmpty,
+          onOpen: regime.regimeId.isEmpty
+              ? null
+              : () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        RegimeProgressScreen(regimeId: regime.regimeId),
+                  ),
+                ),
         ),
       ],
     );
