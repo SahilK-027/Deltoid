@@ -15,6 +15,14 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.12.2] - 2026-09-24
+
+Patch release listing a discarded session once in the backup sheet.
+
+### Fixed
+
+- **Sync:** A session that was started and then discarded no longer appears in the backup sheet as a second copy of the session being logged. Until its removal is backed up, it is counted on one line, `Discarded and deleted sessions`, with sessions deleted from History.
+
 ## [1.12.1] - 2026-09-24
 
 Patch release turning the backup button green as soon as the connection returns, and showing the backup sheet's explanation in full.
@@ -376,7 +384,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...HEAD
+[1.12.2]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...v1.11.0

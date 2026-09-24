@@ -1183,7 +1183,10 @@ green face carries no number, so nothing blinks while you log.
 `textSecondary` that always starts `Everything is saved on this phone.` — a
 sentence, so not the one-line subtitle, which cut it off. Then
 `On this phone only`: one `AppRow` per session (`Push 1 · today`, `17 sets, in
-progress`), then `Bodyweight` and `Programme and exercises`, each with a
+progress`), then `Discarded and deleted sessions` as one line counted in
+sessions — never by name, where a discarded `Push 1 · today` beside the live one
+read as the same session twice — then `Bodyweight` and `Programme and
+exercises`, each with a
 `cloud_off` in the face's colour. Then `Last backed up`: the newest finished
 session the account holds, with a green `cloud_done`. `Try again now`, a
 secondary button, only while the face is yellow and something is waiting. Group
