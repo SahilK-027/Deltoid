@@ -26,3 +26,17 @@ Stream<void> networkRegained([Connectivity? connectivity]) {
     return regained;
   });
 }
+
+/// Whether the phone has a network interface, now and on every change.
+///
+/// For the header's backup button, which has to turn yellow the moment signal
+/// drops rather than when the next push happens to fail. Like
+/// [networkRegained] it is a hint: an interface is not an internet that works,
+/// so the button also turns yellow when a push fails with the interface up.
+Stream<bool> watchOnline([Connectivity? connectivity]) async* {
+  final c = connectivity ?? Connectivity();
+  bool has(List<ConnectivityResult> r) =>
+      r.any((each) => each != ConnectivityResult.none);
+  yield has(await c.checkConnectivity());
+  yield* c.onConnectivityChanged.map(has);
+}

@@ -1,8 +1,11 @@
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/db/table_spec.dart';
+import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/data/sync/push.dart';
 import 'package:deltoid/data/sync/sync_state.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,19 +23,41 @@ void main() {
   setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
   tearDown(() => db.close());
 
-  test('what is owed is listed table by table, and empties as it lands',
-      () async {
+  test('what is owed is grouped the way the app names it', () async {
     await ensureStarterCatalog(db);
-    final owed = await db
-        .customSelect('SELECT COUNT(*) AS n FROM exercises WHERE dirty = 1')
-        .map((row) => row.read<int>('n'))
+    await createRegimeFromTemplate(
+      db,
+      regimeTemplates.firstWhere((t) => t.key == 'ppl6'),
+    );
+    final repo = TrainingRepository(db);
+    final regime = await (db.select(db.regimes)).getSingle();
+    final push1 = await (db.select(db.sessions)
+          ..where((t) => t.name.equals('Push 1')))
         .getSingle();
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final sets = (await repo.workoutDetail(id))!.entries.first.sets;
 
-    final stream = watchOwedByTable(db);
-    expect(await stream.first, [('exercises', owed)]);
+    // Everything above has been sent; only what follows is owed.
+    for (final spec in tableSpecs(db).where((s) => s.syncs)) {
+      await db.customStatement('UPDATE ${spec.name} SET dirty = 0');
+    }
+    for (final set in sets.take(2)) {
+      await repo.updateSet(set.id, weight: const Value(60), reps: const Value(5));
+    }
+    await db.customStatement(
+      "INSERT INTO bodyweight_logs (id, updated_at, device_id, dirty, "
+      "day_key, weight_kg) VALUES ('bw', 0, 'd', 1, 20260924, 82.4)",
+    );
 
-    await db.customStatement('UPDATE exercises SET dirty = 0');
-    expect(await watchOwedByTable(db).first, isEmpty);
+    final summary = await watchOwedSummary(db).first;
+    final session = summary.waiting.first;
+    expect(session.kind, WaitingKind.session);
+    expect(session.sessionName, 'Push 1');
+    expect(session.count, 2, reason: 'a session is counted by its sets');
+    expect(session.inProgress, isTrue);
+    expect(summary.waiting.last.kind, WaitingKind.bodyweight);
+    expect(summary.count, 3);
+    expect(summary.last, isNull, reason: 'nothing finished has been sent');
   });
 
   test('signed out is Local, whatever is owed', () async {

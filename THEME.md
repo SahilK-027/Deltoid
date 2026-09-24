@@ -1158,22 +1158,34 @@ change stays reachable, and what you read never permanently owns half the screen
 icon and white `micro` label at weight 700; unselected `textSecondary` for both.
 **No pill, no indicator, no hue** — weight and brightness carry the state.
 
-### Backup mark
+### Backup button
 
-A `CircleIconButton` holding `cloud_off_outlined`, in the header's action slot
-on Workouts, History and Regimes, and between the title and `Finish` on the
-log. **Absent unless an attempt to back up has failed** and something is still
-owed; there is no mark for *backed up* and none for *about to be*. Glyph in
-`textSecondary` for no connection, which is the design working, and `warning`
-for a refusal, which does not clear on its own. Never `negative`: nothing has
-been lost, and red is where a person reads that it has.
+The same `CircleIconButton` as the calendar beside it: `surfaceHigh` fill, 40dp,
+in the header's action slot on Workouts (left of the calendar), History (left of
+the total) and Regimes, and between the title and `Finish` on the log. Drawn
+whenever an account is signed in; absent without one. Settings does not carry
+it, because its account row already says the same in words (rule 6).
 
-Tapping it opens a sheet titled `Not backed up yet`. The subtitle leads with
-`Everything is saved on this phone.` and then says what the Settings account
-row says. The body is one line per kind of thing waiting, the noun on the left
-and the count on the right in tabular figures. One secondary button, `Try again
-now`. Settings does not carry the mark: its account row already says it in
-words (rule 6).
+**Two faces.** `cloud_done_outlined` in `positive` while the phone is online and
+no attempt has failed. `cloud_off_outlined` in `warning` when there is no
+network interface or the last attempt failed. Not orange, which is a deload and
+nothing else and sits on the heatmap below; never `negative`, because nothing
+has been lost.
+
+**The number** sits on the yellow face only: a `warning` pill at the button's
+top-right corner, its figure in `IconTile.glyphOn(warning)`, counting what the
+sheet lists — sets for each session, entries for bodyweight, changes for the
+programme. Online, a set is owed for the few seconds the push waits, and the
+green face carries no number, so nothing blinks while you log.
+
+**The sheet.** Title `Offline`, `Not backed up`, `Backing up` or `Backed up
+14:02`. The subtitle always opens `Everything is saved on this phone.` Then
+`On this phone only`: one `AppRow` per session (`Push 1 · today`, `17 sets, in
+progress`), then `Bodyweight` and `Programme and exercises`, each with a
+`cloud_off` in the face's colour. Then `Last backed up`: the newest finished
+session the account holds, with a green `cloud_done`. `Try again now`, a
+secondary button, only while the face is yellow and something is waiting. Group
+headings are sentence case in `textSecondary`, not uppercase.
 
 ### Badges
 

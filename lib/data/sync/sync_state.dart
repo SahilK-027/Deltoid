@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../db/database.dart';
 import '../db/table_spec.dart';
 import '../db/watch.dart';
@@ -123,27 +125,155 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
   );
 }
 
-/// What is still owed, table by table, for the sheet that answers *what is
-/// waiting*.
+/// One line of *on this phone only*: a logged session, the bodyweight log, or
+/// the programme, with how many of its rows the account has not received.
+class WaitingItem {
+  const WaitingItem.session({
+    required String this.workoutId,
+    required this.sessionName,
+    required int this.dayKey,
+    required this.inProgress,
+    required this.count,
+  }) : kind = WaitingKind.session;
+
+  const WaitingItem.bodyweight(this.count)
+      : kind = WaitingKind.bodyweight,
+        workoutId = null,
+        sessionName = null,
+        dayKey = null,
+        inProgress = false;
+
+  const WaitingItem.programme(this.count)
+      : kind = WaitingKind.programme,
+        workoutId = null,
+        sessionName = null,
+        dayKey = null,
+        inProgress = false;
+
+  final WaitingKind kind;
+  final String? workoutId;
+
+  /// The training day's name, or null for a workout logged outside one.
+  final String? sessionName;
+  final int? dayKey;
+  final bool inProgress;
+
+  /// Sets for a session — or 1 when only the session's own details changed —
+  /// entries for bodyweight, and rows for the programme. The header's badge is
+  /// the sum, so it counts the same things the sheet lists.
+  final int count;
+}
+
+enum WaitingKind { session, bodyweight, programme }
+
+/// The most recent finished session the account holds in full.
+class BackedUpSession {
+  const BackedUpSession({required this.sessionName, required this.dayKey});
+
+  final String? sessionName;
+  final int dayKey;
+}
+
+/// What *on this phone only* and *last backed up* are made of.
+class OwedSummary {
+  const OwedSummary({required this.waiting, required this.last});
+
+  static const empty = OwedSummary(waiting: [], last: null);
+
+  final List<WaitingItem> waiting;
+  final BackedUpSession? last;
+
+  /// The badge: the counts of every line added up.
+  int get count => waiting.fold(0, (sum, item) => sum + item.count);
+}
+
+/// What the account has not received yet, grouped the way the app talks about
+/// training rather than the way the database stores it.
 ///
-/// Only tables that owe something appear, in the order [tableSpecs] lists
-/// them — parents before children, which is also the order a reader expects:
-/// workouts before the sets inside them. Watched, so the sheet empties itself
-/// as a drain lands rather than going on listing rows that have left.
-Stream<List<(String table, int owed)>> watchOwedByTable(AppDatabase db) {
+/// A set, the exercise it sits in and the workout around it are three tables
+/// and one thing to a person, so every dirty row under a workout is folded into
+/// that workout's line, counted by its sets. Everything that is neither a
+/// logged session nor bodyweight — exercises, regimes, days, planned exercises,
+/// cycles — is the programme. Each part starts from `dirty = 1`, which the
+/// partial indexes answer without a scan, so this is cheap to re-run on every
+/// write, the same bet [watchSyncState] makes.
+Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
   final specs = tableSpecs(db).where((s) => s.syncs).toList();
-  final sql = specs
-      .map((s) => "SELECT '${s.name}' AS t, COUNT(*) AS n "
-          'FROM ${s.name} WHERE dirty = 1')
-      .join(' UNION ALL ');
+  const programmeTables = [
+    'exercises',
+    'regimes',
+    'sessions',
+    'session_exercises',
+    'cycles',
+  ];
+  final programmeSql = programmeTables
+      .map((t) => '(SELECT COUNT(*) FROM $t WHERE dirty = 1)')
+      .join(' + ');
+
   return db.watchQuery([...specs.map((s) => s.table)], () async {
-    final rows = await db.customSelect(sql).get();
-    final owed = {
-      for (final row in rows) row.read<String>('t'): row.read<int>('n'),
-    };
-    return [
-      for (final s in specs)
-        if ((owed[s.name] ?? 0) > 0) (s.name, owed[s.name]!),
-    ];
+    final sessions = await db.customSelect('''
+      WITH owed(workout_id, sets) AS (
+        SELECT we.workout_id, 1 FROM set_logs sl
+          JOIN workout_exercises we ON we.id = sl.workout_exercise_id
+          WHERE sl.dirty = 1
+        UNION ALL
+        SELECT workout_id, 0 FROM workout_exercises WHERE dirty = 1
+        UNION ALL
+        SELECT id, 0 FROM workouts WHERE dirty = 1
+      )
+      SELECT w.id, w.day_key, w.status, s.name AS session_name,
+             SUM(owed.sets) AS sets
+        FROM owed
+        JOIN workouts w ON w.id = owed.workout_id
+        LEFT JOIN sessions s ON s.id = w.session_id
+        GROUP BY w.id
+        ORDER BY w.started_at DESC
+    ''').get();
+
+    final others = await db.customSelect(
+      'SELECT (SELECT COUNT(*) FROM bodyweight_logs WHERE dirty = 1) AS bw, '
+      '($programmeSql) AS programme',
+    ).getSingle();
+
+    // The newest finished session with nothing of it still owed.
+    final last = await db.customSelect('''
+      SELECT w.day_key, s.name AS session_name
+        FROM workouts w
+        LEFT JOIN sessions s ON s.id = w.session_id
+        WHERE w.status = 'completed' AND w.deleted_at IS NULL
+          AND w.dirty = 0
+          AND NOT EXISTS (
+            SELECT 1 FROM workout_exercises we
+              WHERE we.workout_id = w.id AND we.dirty = 1)
+          AND NOT EXISTS (
+            SELECT 1 FROM set_logs sl
+              JOIN workout_exercises we ON we.id = sl.workout_exercise_id
+              WHERE we.workout_id = w.id AND sl.dirty = 1)
+        ORDER BY w.started_at DESC
+        LIMIT 1
+    ''').getSingleOrNull();
+
+    final bodyweight = others.read<int>('bw');
+    final programme = others.read<int>('programme');
+    return OwedSummary(
+      waiting: [
+        for (final row in sessions)
+          WaitingItem.session(
+            workoutId: row.read<String>('id'),
+            sessionName: row.read<String?>('session_name'),
+            dayKey: row.read<int>('day_key'),
+            inProgress: row.read<String>('status') == 'inProgress',
+            count: math.max(1, row.read<int>('sets')),
+          ),
+        if (bodyweight > 0) WaitingItem.bodyweight(bodyweight),
+        if (programme > 0) WaitingItem.programme(programme),
+      ],
+      last: last == null
+          ? null
+          : BackedUpSession(
+              sessionName: last.read<String?>('session_name'),
+              dayKey: last.read<int>('day_key'),
+            ),
+    );
   });
 }

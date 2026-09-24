@@ -193,24 +193,62 @@ final syncStateProvider = StreamProvider<SyncState>((ref) {
   );
 });
 
-/// Whether the header should say that training is waiting to be backed up.
-///
-/// Signed in, something owed, *and* the last attempt to send it failed. The
-/// third condition is what keeps this still while the phone has signal: every
-/// set ticked is owed for the few seconds the push waits for writes to settle,
-/// and a mark that came and went with each one would be a flicker, not a
-/// state. With no connection the first attempt fails within seconds of a set,
-/// and the mark stays until one lands ([SYNC.md § 13](SYNC.md#13-when-it-fails)).
-final backupWaitingProvider = Provider<SyncTrouble?>((ref) {
-  final state = ref.watch(syncStateProvider).valueOrNull;
-  if (state == null || state.status != SyncStatus.pending) return null;
-  return ref.watch(syncTroubleProvider).valueOrNull;
+/// Whether the phone has a network interface. True when this build cannot
+/// sync, because then nothing is waiting on a network.
+final onlineProvider = StreamProvider<bool>((ref) {
+  if (ref.watch(syncBackendProvider).valueOrNull == null) {
+    return Stream.value(true);
+  }
+  return watchOnline();
 });
 
-/// What is owed, table by table. Only while the sheet asking is open.
-final owedByTableProvider =
-    StreamProvider.autoDispose<List<(String, int)>>((ref) {
-  return watchOwedByTable(ref.watch(databaseProvider));
+/// What *on this phone only* lists, and the session last backed up in full.
+final owedSummaryProvider = StreamProvider<OwedSummary>((ref) {
+  return watchOwedSummary(ref.watch(databaseProvider));
+});
+
+/// The three faces of the header's backup button.
+enum BackupLook {
+  /// Online, and no attempt has failed. Green.
+  backedUp,
+
+  /// No network interface, or the last attempt could not reach the account.
+  /// Yellow: the design working, but worth knowing.
+  offline,
+
+  /// The account was reached and refused the last attempt. Yellow as well —
+  /// nothing is lost — and the sheet says why it differs.
+  refused,
+}
+
+/// The header's backup button: which face it shows, and the number on it.
+///
+/// Null when there is no account, which is the only time the button is not
+/// drawn. It is always there otherwise, because *is my training backed up* is a
+/// question a person asks at the gym and should be answered at a glance rather
+/// than inferred from an icon that only appears when something went wrong.
+///
+/// **Green does not flicker.** Online, every set ticked is owed for the few
+/// seconds the push waits for writes to settle. Those seconds keep the button
+/// green and put no number on it: the phone has signal and the set is on its
+/// way. Only a missing interface or a failed attempt turns it yellow
+/// ([SYNC.md § 13](SYNC.md#13-when-it-fails)).
+final backupIndicatorProvider = Provider<({BackupLook look, int waiting})?>((
+  ref,
+) {
+  final state = ref.watch(syncStateProvider).valueOrNull;
+  if (state == null || state.status == SyncStatus.local) return null;
+  final online = ref.watch(onlineProvider).valueOrNull ?? true;
+  final trouble = ref.watch(syncTroubleProvider).valueOrNull;
+  final look = switch (trouble) {
+    SyncTrouble.refused => BackupLook.refused,
+    SyncTrouble.offline => BackupLook.offline,
+    null => online ? BackupLook.backedUp : BackupLook.offline,
+  };
+  final waiting = look == BackupLook.backedUp || state.owed == 0
+      ? 0
+      : ref.watch(owedSummaryProvider).valueOrNull?.count ?? state.owed;
+  return (look: look, waiting: waiting);
 });
 
 extension _StartWith<T> on Stream<T> {
