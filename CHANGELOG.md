@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-24
+
+Minor release making the backup status visible at all times, with a button that shows what is only on this phone.
+
+### Changed
+
+- **Sync:** The cloud button in the header of Workouts, History, Regimes and the log is now always shown while you are signed in, beside the calendar on Workouts. It is green while the phone is online and your training is backed up, and yellow as soon as the phone loses its connection or a backup attempt fails. A yellow button carries the number of sets and entries not yet backed up.
+  - Tapping it opens a sheet that confirms everything is saved on this phone, lists what is on this phone only by session, such as `Push 1 · today · 17 sets, in progress`, and names the last session your account holds. While something is waiting offline, it offers to try again now.
+  - The button no longer appears only after a failed attempt, which left it hidden whenever the phone had signal.
+
 ## [1.11.0] - 2026-09-24
 
 Minor release showing, on every tab and on the log, when training has not yet been backed up.
@@ -356,7 +366,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...v1.11.0
 [1.10.3]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...v1.10.2
