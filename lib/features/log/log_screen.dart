@@ -188,8 +188,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// The display unit for this build. Stored values are always kg.
   WeightUnit _unit = WeightUnit.kg;
 
-  /// Whether the opening exercise's rest target has been fetched yet.
-  bool _restTargetLoaded = false;
+  /// The exercise and session whose rest target [_restTargetSub] follows, so
+  /// a rebuild on the same page does not resubscribe.
+  String? _restTargetKey;
+  StreamSubscription<int>? _restTargetSub;
 
   /// What the ongoing notification was last posted with, so a keystroke does
   /// not re-post a line that has not changed.
@@ -259,6 +261,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     _preFire?.cancel();
     _fireAt?.cancel();
     _restBarHide?.cancel();
+    _restTargetSub?.cancel();
     _buffer.dispose();
     _openSwipe.dispose();
     // Anything typed in the last 300ms still belongs to the log.
@@ -453,22 +456,38 @@ class _LogScreenState extends ConsumerState<LogScreen>
     return seconds;
   }
 
-  /// Loads the rest target for the exercise now on screen.
+  /// Follows the rest target for the exercise now on screen.
   ///
   /// Per exercise rather than one number for the session: a single target of
   /// 120 s is wrong for a heavy squat and wrong again for a cable fly.
-  Future<void> _loadRestTarget(WorkoutDetail detail, int index) async {
+  ///
+  /// Watched rather than read once per page. The exercise's own screen opens
+  /// from this one's ⋯ menu, and a rest changed there, or the default changed
+  /// in Settings, has to reach the next set of the exercise still open — a page
+  /// turn is not the only moment the number can change.
+  void _watchRestTarget(WorkoutDetail detail, int index) {
     if (index < 0 || index >= detail.entries.length) return;
-    final seconds = await ref
+    final exerciseId = detail.entries[index].exercise.id;
+    final sessionId = detail.workout.sessionId;
+    final key = '$exerciseId|$sessionId';
+    if (key == _restTargetKey) return;
+    _restTargetKey = key;
+    _restTargetSub?.cancel();
+    _restTargetSub = ref
         .read(trainingRepositoryProvider)
-        .restTargetFor(
-          exerciseId: detail.entries[index].exercise.id,
-          sessionId: detail.workout.sessionId,
+        .watchRestTargetFor(exerciseId: exerciseId, sessionId: sessionId)
+        .listen(
+          _applyRestTarget,
+          // `watchQuery` has already said so; a missed target leaves the last
+          // one in place, which is a timer that still runs.
+          onError: (Object _) {},
         );
+  }
+
+  void _applyRestTarget(int seconds) {
     if (!mounted) return;
     // A clock already counting down belongs to the set that started it. The
-    // new exercise's target takes over at the next rest, not in the middle of
-    // this one.
+    // new target takes over at the next rest, not in the middle of this one.
     if (_restRunning) {
       _pendingRestTarget = seconds;
       return;
@@ -735,9 +754,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
     ref.watch(restPrefsProvider);
 
     // The first page's rest target isn't known until the workout loads.
-    if (detail != null && !_restTargetLoaded) {
-      _restTargetLoaded = true;
-      _loadRestTarget(detail, _page);
+    if (detail != null && _restTargetKey == null) {
+      _watchRestTarget(detail, _page);
     }
 
     // Both, or neither. A set row without its ghost is a row that has to be
@@ -1574,7 +1592,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   void _onPageChanged(WorkoutDetail detail, int index) {
     _flushWrite();
-    _loadRestTarget(detail, index);
+    _watchRestTarget(detail, index);
     setState(() {
       _page = index;
       // Turning the page by hand away from the value being typed dismisses the

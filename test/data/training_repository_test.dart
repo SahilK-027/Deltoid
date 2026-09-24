@@ -1560,6 +1560,41 @@ void main() {
     expect(await repo.loggedSetCount(entry.exercise.id), 2);
   });
 
+  test('a rest target changed mid-session reaches the open exercise',
+      () async {
+    final regime = await activeRegime();
+    final push1 = await sessionNamed('Push 1');
+    final id = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    final entry = (await repo.workoutDetail(id))!.entries.first;
+
+    // The log screen follows this stream; the exercise's own screen, opened
+    // from the log's menu, writes the slot. A number read once per page turn
+    // never saw that write.
+    final seen = <int>[];
+    final sub = repo
+        .watchRestTargetFor(exerciseId: entry.exercise.id, sessionId: push1.id)
+        .listen(seen.add);
+    await pumpEventQueue();
+    expect(seen, [120]);
+
+    await repo.setRestTarget(
+      exerciseId: entry.exercise.id,
+      sessionId: push1.id,
+      seconds: 90,
+    );
+    await pumpEventQueue();
+    expect(seen, [120, 90]);
+
+    // A write to settings that is not about rest is not a new target.
+    await repo.db.into(repo.db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(key: 'unrelated', value: 'x'),
+        );
+    await pumpEventQueue();
+    expect(seen, [120, 90]);
+
+    await sub.cancel();
+  });
+
   test('rest is recorded, and its target is remembered per exercise', () async {
     final regime = await activeRegime();
     final push1 = await sessionNamed('Push 1');

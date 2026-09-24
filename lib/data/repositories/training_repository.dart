@@ -2900,6 +2900,29 @@ class TrainingRepository {
     return restDefaultSeconds();
   }
 
+  /// [restTargetFor], read again whenever either of its sources is written.
+  ///
+  /// The log screen holds the exercise's settings one tap away, and a rest
+  /// changed there — or the default changed in Settings — has to reach the next
+  /// set of the exercise already open. Read once per page, it did not: the
+  /// number came from the page turn, and returning from the settings screen is
+  /// not one.
+  ///
+  /// Distinct, because `app_settings` is written for reasons that have nothing
+  /// to do with rest, and each of those would otherwise arrive as a new target
+  /// that is the old one.
+  Stream<int> watchRestTargetFor({
+    required String exerciseId,
+    required String? sessionId,
+  }) {
+    return db
+        .watchQuery(
+          [db.sessionExercises, db.appSettings],
+          () => restTargetFor(exerciseId: exerciseId, sessionId: sessionId),
+        )
+        .distinct();
+  }
+
   /// The rest an exercise with no number of its own opens on.
   ///
   /// The between-exercises number is not here: nothing below the widget layer
