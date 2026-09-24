@@ -140,7 +140,9 @@ class _BackupSheet extends ConsumerWidget {
 
     return AppSheet(
       title: title,
-      subtitle: detail,
+      // No subtitle. A sheet's subtitle is one line that names the thing, and
+      // this is a sentence: there it was cut to "Everything is saved on this
+      // phone. It is…", which drops the half that says when (THEME → Sheets).
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       footer: look != BackupLook.backedUp && owed
           ? SecondaryButton(
@@ -153,6 +155,18 @@ class _BackupSheet extends ConsumerWidget {
             )
           : null,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Space.gutter,
+            Space.md,
+            Space.gutter,
+            0,
+          ),
+          child: Text(
+            detail,
+            style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ),
         if (owed) ...[
           const _Heading('On this phone only'),
           for (final item in summary.waiting)

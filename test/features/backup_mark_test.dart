@@ -97,8 +97,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Offline'), findsWidgets);
-    expect(find.textContaining('Everything is saved on this phone.'),
-        findsOneWidget);
+    // The whole sentence, wrapping: in the sheet's one-line subtitle it was
+    // cut off halfway through.
+    final sentence = tester.widget<Text>(
+      find.text(
+        'Everything is saved on this phone. It is backed up to your account '
+        'when the phone is online again.',
+      ),
+    );
+    expect(sentence.maxLines, isNull);
+    expect(sentence.overflow, isNot(TextOverflow.ellipsis));
     expect(find.text('On this phone only'), findsOneWidget);
     expect(find.text('17 sets, in progress'), findsOneWidget);
     expect(find.text('Bodyweight'), findsOneWidget);
