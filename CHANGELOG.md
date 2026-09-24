@@ -15,6 +15,15 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-24
+
+Minor release showing, on every tab and on the log, when training has not yet been backed up.
+
+### Added
+
+- **Sync:** When an attempt to back up fails and changes are still waiting, a cloud mark appears in the header of Workouts, History and Regimes, and beside Finish on the log. It is grey when there is no connection and yellow when the account refused the changes, and it disappears as soon as a backup succeeds. It does not appear while the phone has a connection and a set is simply waiting a few seconds to be sent.
+  - Tapping it opens a sheet that confirms everything is saved on this phone, says how many changes are waiting and since when, lists them by kind, such as workouts and sets, and offers to try again now.
+
 ## [1.10.3] - 2026-09-24
 
 Patch release removing a false save warning when training offline, and applying a changed rest time to the exercise in progress.
@@ -347,7 +356,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...v1.11.0
 [1.10.3]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...v1.10.1
