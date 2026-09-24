@@ -173,6 +173,7 @@ class _BackupSheet extends ConsumerWidget {
             AppRow(
               icon: switch (item.kind) {
                 WaitingKind.session => Icons.fitness_center_rounded,
+                WaitingKind.removed => Icons.delete_outline_rounded,
                 WaitingKind.bodyweight => Icons.monitor_weight_outlined,
                 WaitingKind.programme => Icons.view_list_rounded,
               },
@@ -225,6 +226,7 @@ class _Heading extends StatelessWidget {
 
 String _title(WaitingItem item) => switch (item.kind) {
   WaitingKind.session => _sessionTitle(item.sessionName, item.dayKey!),
+  WaitingKind.removed => 'Discarded and deleted sessions',
   WaitingKind.bodyweight => 'Bodyweight',
   WaitingKind.programme => 'Programme and exercises',
 };
@@ -236,6 +238,7 @@ String _subtitle(WaitingItem item) {
       n == 1 ? '1 set' : '$n sets',
       if (item.inProgress) 'in progress',
     ].join(', '),
+    WaitingKind.removed => n == 1 ? '1 session' : '$n sessions',
     WaitingKind.bodyweight => n == 1 ? '1 entry' : '$n entries',
     WaitingKind.programme => n == 1 ? '1 change' : '$n changes',
   };

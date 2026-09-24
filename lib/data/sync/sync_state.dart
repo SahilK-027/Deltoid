@@ -143,6 +143,17 @@ class WaitingItem {
         dayKey = null,
         inProgress = false;
 
+  /// Sessions discarded or deleted on this phone whose removal the account
+  /// has not heard about yet. One line for all of them, counted in sessions:
+  /// listed by name beside the session being logged, a discarded `Push 1 ·
+  /// today` read as the same session twice.
+  const WaitingItem.removed(this.count)
+      : kind = WaitingKind.removed,
+        workoutId = null,
+        sessionName = null,
+        dayKey = null,
+        inProgress = false;
+
   const WaitingItem.programme(this.count)
       : kind = WaitingKind.programme,
         workoutId = null,
@@ -164,7 +175,7 @@ class WaitingItem {
   final int count;
 }
 
-enum WaitingKind { session, bodyweight, programme }
+enum WaitingKind { session, removed, bodyweight, programme }
 
 /// The most recent finished session the account holds in full.
 class BackedUpSession {
@@ -221,7 +232,7 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
         UNION ALL
         SELECT id, 0 FROM workouts WHERE dirty = 1
       )
-      SELECT w.id, w.day_key, w.status, s.name AS session_name,
+      SELECT w.id, w.day_key, w.status, w.deleted_at, s.name AS session_name,
              SUM(owed.sets) AS sets
         FROM owed
         JOIN workouts w ON w.id = owed.workout_id
@@ -255,9 +266,15 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
 
     final bodyweight = others.read<int>('bw');
     final programme = others.read<int>('programme');
+    // A tombstone and everything under it is one removal, not a session.
+    final live = [
+      for (final row in sessions)
+        if (row.read<int?>('deleted_at') == null) row,
+    ];
+    final removed = sessions.length - live.length;
     return OwedSummary(
       waiting: [
-        for (final row in sessions)
+        for (final row in live)
           WaitingItem.session(
             workoutId: row.read<String>('id'),
             sessionName: row.read<String?>('session_name'),
@@ -265,6 +282,7 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
             inProgress: row.read<String>('status') == 'inProgress',
             count: math.max(1, row.read<int>('sets')),
           ),
+        if (removed > 0) WaitingItem.removed(removed),
         if (bodyweight > 0) WaitingItem.bodyweight(bodyweight),
         if (programme > 0) WaitingItem.programme(programme),
       ],

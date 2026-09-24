@@ -60,6 +60,41 @@ void main() {
     expect(summary.last, isNull, reason: 'nothing finished has been sent');
   });
 
+  test('a discarded session is a removal, not a second session', () async {
+    await ensureStarterCatalog(db);
+    await createRegimeFromTemplate(
+      db,
+      regimeTemplates.firstWhere((t) => t.key == 'ppl6'),
+    );
+    final repo = TrainingRepository(db);
+    final regime = await (db.select(db.regimes)).getSingle();
+    final push1 = await (db.select(db.sessions)
+          ..where((t) => t.name.equals('Push 1')))
+        .getSingle();
+    for (final spec in tableSpecs(db).where((s) => s.syncs)) {
+      await db.customStatement('UPDATE ${spec.name} SET dirty = 0');
+    }
+
+    // Started, discarded, started again: the same day's same session twice
+    // on disk, one of them a tombstone the account still has to hear about.
+    final first =
+        await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    await repo.abandonWorkout(first);
+    await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+    for (final spec in tableSpecs(db).where((s) => s.syncs)) {
+      if (spec.name.startsWith('workout') || spec.name == 'set_logs') continue;
+      await db.customStatement('UPDATE ${spec.name} SET dirty = 0');
+    }
+
+    final summary = await watchOwedSummary(db).first;
+    final sessions =
+        summary.waiting.where((i) => i.kind == WaitingKind.session).toList();
+    expect(sessions, hasLength(1), reason: 'Push 1 is listed once');
+    final removed =
+        summary.waiting.singleWhere((i) => i.kind == WaitingKind.removed);
+    expect(removed.count, 1);
+  });
+
   test('signed out is Local, whatever is owed', () async {
     await ensureStarterCatalog(db);
 
