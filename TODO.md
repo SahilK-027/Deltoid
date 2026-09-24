@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,075 tests and nine pgTAP tests, analyzer clean.**
+**1,091 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 

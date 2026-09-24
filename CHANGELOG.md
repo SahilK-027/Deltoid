@@ -15,6 +15,15 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.10.3] - 2026-09-24
+
+Patch release removing a false save warning when training offline, and applying a changed rest time to the exercise in progress.
+
+### Fixed
+
+- **Sync:** Training without a signal no longer shows "That change was not saved." Every set was saved; the message came from the account's routine sign-in refresh failing without a network, which was reported as though a change had been lost. No network now shows nothing, and Settings still shows how many changes are waiting to be backed up.
+- **Logging:** A rest time changed in an exercise's settings, opened from the log's menu, now applies to that exercise from its next set. It previously took effect only after turning to another exercise and back. The same applies to the default rest changed in Settings. A rest already counting down keeps its length.
+
 ## [1.10.2] - 2026-09-14
 
 Patch release restoring the Cycle progress section on a Workouts screen with no regime on it.
@@ -338,7 +347,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...HEAD
+[1.10.3]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/SahilK-027/Deltoid/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/SahilK-027/Deltoid/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/SahilK-027/Deltoid/compare/v1.9.0...v1.10.0
