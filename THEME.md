@@ -1179,7 +1179,9 @@ programme. Online, a set is owed for the few seconds the push waits, and the
 green face carries no number, so nothing blinks while you log.
 
 **The sheet.** Title `Offline`, `Not backed up`, `Backing up` or `Backed up
-14:02`. The subtitle always opens `Everything is saved on this phone.` Then
+14:02`, with no subtitle. The body opens with a wrapping paragraph in
+`textSecondary` that always starts `Everything is saved on this phone.` — a
+sentence, so not the one-line subtitle, which cut it off. Then
 `On this phone only`: one `AppRow` per session (`Push 1 · today`, `17 sets, in
 progress`), then `Bodyweight` and `Programme and exercises`, each with a
 `cloud_off` in the face's colour. Then `Last backed up`: the newest finished

@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-09-24
+
+Patch release turning the backup button green as soon as the connection returns, and showing the backup sheet's explanation in full.
+
+### Fixed
+
+- **Sync:** The backup button turns green as soon as the phone is back online, rather than staying yellow until the next backup attempt succeeded. That attempt could be half a minute or more away, because the first try right after reconnecting often fails before the network is fully ready. The attempts just after reconnecting now retry every few seconds. The button turns yellow again if they keep failing.
+
+- **Sync:** The sentence at the top of the backup sheet, such as "Everything is saved on this phone. It is backed up to your account when the phone is online again.", is shown in full. It was cut off after the first few words, because it sat in the sheet's one-line subtitle.
+
 ## [1.12.0] - 2026-09-24
 
 Minor release making the backup status visible at all times, with a button that shows what is only on this phone.
@@ -366,7 +376,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...HEAD
+[1.12.1]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/SahilK-027/Deltoid/compare/v1.10.3...v1.11.0
 [1.10.3]: https://github.com/SahilK-027/Deltoid/compare/v1.10.2...v1.10.3

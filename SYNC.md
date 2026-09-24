@@ -85,7 +85,11 @@ worth mentioning is how long it has been true.
 drawn whenever an account is signed in: green while the phone is online and no
 attempt has failed, yellow when there is no network interface or the last
 attempt failed. The interface is read from the platform directly, so the button
-turns yellow the moment signal drops, not at the next push. Online, a set is
+turns yellow the moment signal drops, not at the next push. Regaining the
+interface clears `offline` at once rather than when the next push lands, and the
+first three failures after it retry every five seconds instead of backing off:
+Android reports an interface before it can resolve a name, so the first push
+after reconnecting often fails. Online, a set is
 owed for the few seconds the push waits for writes to settle; those seconds stay
 green and carry no number, so nothing blinks while you log. Behind the button, a
 sheet says that everything is saved on this phone, lists what is only on this
