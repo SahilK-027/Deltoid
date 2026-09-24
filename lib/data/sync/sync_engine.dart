@@ -53,6 +53,7 @@ class SyncEngine {
     this.backstop = const Duration(minutes: 20),
     this.minBackoff = const Duration(seconds: 30),
     this.maxBackoff = const Duration(minutes: 30),
+    this.reconnectRetry = const Duration(seconds: 5),
     PushService? push,
     PullService? pull,
   })  : _db = db,
@@ -77,6 +78,16 @@ class SyncEngine {
 
   final Duration minBackoff;
   final Duration maxBackoff;
+
+  /// How soon to try again when an attempt fails just after the network came
+  /// back. Android reports an interface before it can resolve a name, so the
+  /// first push after reconnecting often fails, and the ordinary backoff would
+  /// then leave the header yellow for half a minute over a phone that has
+  /// signal. The next few attempts after a reconnection wait this long instead.
+  final Duration reconnectRetry;
+
+  /// How many failures after a reconnection still retry at [reconnectRetry].
+  int _quickRetries = 0;
 
   /// Whether there is an account to push to. Nothing runs while this is false:
   /// a `Local` install fills `dirty` and owes it to nobody.
@@ -139,6 +150,12 @@ class SyncEngine {
       // Whatever the backoff was waiting for has probably just arrived.
       _failures = 0;
       _retry?.cancel();
+      _quickRetries = 3;
+      // *No connection* was the reason, and it has just gone. Holding on to it
+      // until a push lands kept the header yellow over a phone with signal;
+      // a push that fails again says so again. A refusal is not about the
+      // network and stays.
+      if (_trouble == SyncTrouble.offline) _setTrouble(null);
       trigger();
     });
 
@@ -200,6 +217,7 @@ class SyncEngine {
         if (_disposed) return;
       } while (_again);
       _failures = 0;
+      _quickRetries = 0;
       _retry?.cancel();
       _setTrouble(null);
     } on Object catch (error, stack) {
@@ -236,6 +254,10 @@ class SyncEngine {
     var wait = minBackoff;
     for (var i = 1; i < _failures && wait < maxBackoff; i++) {
       wait *= 2;
+    }
+    if (!permanent && _quickRetries > 0) {
+      _quickRetries--;
+      wait = reconnectRetry;
     }
     _retry?.cancel();
     _retry = Timer(wait > maxBackoff ? maxBackoff : wait, () {

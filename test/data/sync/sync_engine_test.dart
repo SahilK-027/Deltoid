@@ -48,6 +48,7 @@ void main() {
   SyncEngine start({
     Duration debounce = const Duration(milliseconds: 20),
     Duration minBackoff = const Duration(milliseconds: 20),
+    Duration reconnectRetry = const Duration(milliseconds: 20),
   }) {
     final started = SyncEngine(
       db: db,
@@ -58,6 +59,7 @@ void main() {
       backstop: const Duration(milliseconds: 200),
       minBackoff: minBackoff,
       maxBackoff: const Duration(milliseconds: 80),
+      reconnectRetry: reconnectRetry,
     )..start(signedIn: signedIn.stream, networkRegained: network.stream);
     return engine = started;
   }
@@ -192,6 +194,46 @@ void main() {
       () async => await _owed(db) == 0,
       reason: 'and the retry must land the rows it backed off over',
     );
+  });
+
+  test('connectivity regained clears no-connection at once', () async {
+    await ensureStarterCatalog(db);
+    backend.failEverything = const SyncTransportFailure(
+      'no signal',
+      transient: true,
+    );
+    start(minBackoff: const Duration(seconds: 30));
+    signedIn.add(true);
+    await waitUntil(() => engine!.trouble == SyncTrouble.offline);
+
+    // Still failing, so only the reconnection can have cleared it: the header
+    // turns green with the signal rather than after the next push lands.
+    network.add(null);
+    await Future<void>.delayed(Duration.zero);
+    expect(engine!.trouble, isNull);
+  });
+
+  test('a push that fails just after reconnecting retries quickly', () async {
+    await ensureStarterCatalog(db);
+    backend.failEverything = const SyncTransportFailure(
+      'no signal',
+      transient: true,
+    );
+    start(minBackoff: const Duration(seconds: 30));
+    signedIn.add(true);
+    await waitUntil(() => pull.pulls > 0);
+
+    // The interface is back but cannot resolve a name yet: the first attempt
+    // fails, and the next must not wait out thirty seconds.
+    final tries = pull.pulls;
+    network.add(null);
+    await waitUntil(() => pull.pulls > tries);
+    backend.failEverything = null;
+    await waitUntil(
+      () async => await _owed(db) == 0,
+      reason: 'the retry after a reconnection is seconds, not the backoff',
+    );
+    expect(engine!.trouble, isNull);
   });
 
   test(
