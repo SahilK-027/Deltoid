@@ -193,6 +193,26 @@ final syncStateProvider = StreamProvider<SyncState>((ref) {
   );
 });
 
+/// Whether the header should say that training is waiting to be backed up.
+///
+/// Signed in, something owed, *and* the last attempt to send it failed. The
+/// third condition is what keeps this still while the phone has signal: every
+/// set ticked is owed for the few seconds the push waits for writes to settle,
+/// and a mark that came and went with each one would be a flicker, not a
+/// state. With no connection the first attempt fails within seconds of a set,
+/// and the mark stays until one lands ([SYNC.md § 13](SYNC.md#13-when-it-fails)).
+final backupWaitingProvider = Provider<SyncTrouble?>((ref) {
+  final state = ref.watch(syncStateProvider).valueOrNull;
+  if (state == null || state.status != SyncStatus.pending) return null;
+  return ref.watch(syncTroubleProvider).valueOrNull;
+});
+
+/// What is owed, table by table. Only while the sheet asking is open.
+final owedByTableProvider =
+    StreamProvider.autoDispose<List<(String, int)>>((ref) {
+  return watchOwedByTable(ref.watch(databaseProvider));
+});
+
 extension _StartWith<T> on Stream<T> {
   Stream<T> startWith(T value) async* {
     yield value;

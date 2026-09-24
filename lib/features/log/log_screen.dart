@@ -33,6 +33,7 @@ import 'widgets/rest_timer.dart';
 import 'widgets/set_row.dart';
 import '../../core/widgets/toast.dart';
 import '../../domain/session_name.dart';
+import '../account/backup_mark.dart';
 
 /// Which value the keypad is currently editing.
 class EditTarget {
@@ -1973,7 +1974,13 @@ class _LogTopBar extends StatelessWidget {
                 ),
                 // Once everything is ticked this is the pinned white button at
                 // the bottom instead, so it doesn't appear in two places.
-                if (!complete) LinkAction('Finish', onTap: onFinish),
+                // Training this phone is holding on its own, visible from
+                // the one screen a session is spent on.
+                const BackupMark(),
+                if (!complete) ...[
+                  const SizedBox(width: Space.sm),
+                  LinkAction('Finish', onTap: onFinish),
+                ],
               ],
             ),
           ),

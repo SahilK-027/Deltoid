@@ -20,6 +20,21 @@ void main() {
   setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
   tearDown(() => db.close());
 
+  test('what is owed is listed table by table, and empties as it lands',
+      () async {
+    await ensureStarterCatalog(db);
+    final owed = await db
+        .customSelect('SELECT COUNT(*) AS n FROM exercises WHERE dirty = 1')
+        .map((row) => row.read<int>('n'))
+        .getSingle();
+
+    final stream = watchOwedByTable(db);
+    expect(await stream.first, [('exercises', owed)]);
+
+    await db.customStatement('UPDATE exercises SET dirty = 0');
+    expect(await watchOwedByTable(db).first, isEmpty);
+  });
+
   test('signed out is Local, whatever is owed', () async {
     await ensureStarterCatalog(db);
 

@@ -34,6 +34,7 @@ import 'widgets/strength_card.dart';
 import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/failure.dart';
+import '../account/backup_mark.dart';
 
 /// True between tapping Start and the log screen appearing.
 ///
@@ -647,7 +648,7 @@ class _WorkoutsHeader extends StatelessWidget {
         below: _RestGap(last: last),
         // No cog: Settings is a destination on the nav bar, and a screen
         // reachable two ways is a screen you have to decide about twice.
-        actions: actions,
+        actions: [const BackupMark(), ...actions],
       ),
     );
   }

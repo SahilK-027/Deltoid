@@ -122,3 +122,28 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
     },
   );
 }
+
+/// What is still owed, table by table, for the sheet that answers *what is
+/// waiting*.
+///
+/// Only tables that owe something appear, in the order [tableSpecs] lists
+/// them — parents before children, which is also the order a reader expects:
+/// workouts before the sets inside them. Watched, so the sheet empties itself
+/// as a drain lands rather than going on listing rows that have left.
+Stream<List<(String table, int owed)>> watchOwedByTable(AppDatabase db) {
+  final specs = tableSpecs(db).where((s) => s.syncs).toList();
+  final sql = specs
+      .map((s) => "SELECT '${s.name}' AS t, COUNT(*) AS n "
+          'FROM ${s.name} WHERE dirty = 1')
+      .join(' UNION ALL ');
+  return db.watchQuery([...specs.map((s) => s.table)], () async {
+    final rows = await db.customSelect(sql).get();
+    final owed = {
+      for (final row in rows) row.read<String>('t'): row.read<int>('n'),
+    };
+    return [
+      for (final s in specs)
+        if ((owed[s.name] ?? 0) > 0) (s.name, owed[s.name]!),
+    ];
+  });
+}

@@ -633,7 +633,9 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
 /// `Backed up` over a phone that is holding a session
 /// ([SYNC.md § 19](SYNC.md#19-traps)). Until the count arrives this says only
 /// what is certain — that this device is signed in.
-@visibleForTesting
+///
+/// The header's backup sheet says the same line, so the two never disagree
+/// about how much is waiting or why.
 String backupState(SyncState? state, SyncTrouble? trouble) {
   if (state == null) return 'Signed in on this device.';
 

@@ -12,6 +12,7 @@ import 'exercise_history_screen.dart';
 import 'history_providers.dart';
 import 'workout_detail_screen.dart';
 import '../../domain/session_name.dart';
+import '../account/backup_mark.dart';
 
 /// Which reading of "history" is on screen.
 enum HistoryView { sessions, exercises }
@@ -50,7 +51,7 @@ class HistoryScreen extends ConsumerWidget {
               // status bar, and 12 leaves it sitting on the notch (THEME → Space).
               topGap: _eyebrow(overview) == null ? Space.xxl : Space.md,
               belowGap: Space.lg,
-              actions: [_TotalStat(overview: overview)],
+              actions: [const BackupMark(), _TotalStat(overview: overview)],
               below: SegmentedPill<HistoryView>(
                 value: view,
                 expand: true,

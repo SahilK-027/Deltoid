@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,091 tests and nine pgTAP tests, analyzer clean.**
+**1,095 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -77,6 +77,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 6 · The states and the failures — Settings says which state, for how long and why; the second door of § 11; the empty state for a phone that has never had signal; sign-in from Settings runs adoption, same flow as the welcome screen.
 - [x] A first pull shows progress, behind the sheet the export and the restore already use. Background drains show nothing.
 - [x] The duplicate catalog is folded between the pull and the push of every drain, not only at a sign-in.
+- [x] A failed backup attempt puts a quiet mark in the header of every tab and the log; it opens onto what is waiting, table by table. An offline token refresh is no longer reported as a lost change.
 - [x] The Supabase project exists, the schema is on it, and the nine RLS tests pass against a real Postgres.
 
 ### The rebrand

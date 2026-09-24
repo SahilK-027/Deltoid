@@ -75,11 +75,20 @@ is fully usable with the radio off, forever, whether or not anyone signs in.
 | ----------- | ----------------------------------------------------- | ------------------------------------------------ |
 | **Local**   | Never connected, or declined at first launch          | Settings offers `Back up to your Google account` |
 | **Synced**  | Signed in, nothing owed                               | Settings shows when it last ran                  |
-| **Pending** | Signed in, rows owed — offline, or a push that failed | Settings says how many and why                   |
+| **Pending** | Signed in, rows owed — offline, or a push that failed | Settings says how many and why; once an attempt has failed, a mark in the header says so on every tab and on the log |
 
 **Pending is normal, not an error.** A session logged in a basement gym is
 pending for an hour and that is the design working. The only thing that makes it
 worth mentioning is how long it has been true.
+
+**The header mark is the one exception, and it waits for a failure.** Owed
+alone is every set for the few seconds the push waits for writes to settle, so
+a mark on *pending* would blink with each set. The mark appears only once an
+attempt has failed and stays until one lands: grey for no connection, `warning`
+for a refusal, never red. Behind it, a sheet says that everything is saved on
+this phone, repeats the account row's line, and lists what is waiting table by
+table. It exists because a person training offline mid-session should not have
+to leave the log for Settings to learn that nothing is lost.
 
 There is no state for "syncing right now". A spinner on a background job nobody
 is waiting for is a spinner that teaches the user to wait.
@@ -588,7 +597,7 @@ fails a build rather than a history.
 
 | Failure                         | What happens                              | What the user sees                                 |
 | ------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| No network                      | Rows stay dirty, retry later              | Nothing, until it has been a while                 |
+| No network                      | Rows stay dirty, retry later              | A grey mark in the header, never a toast           |
 | Auth expired, refresh failed    | Queue keeps filling, no data lost         | Settings asks for a sign-in; the app keeps working |
 | Push rejected — RLS, constraint | `dirty` stays set, backed off, reported   | The failure channel says it once                   |
 | Partial push                    | Upserts are idempotent; retry             | Nothing                                            |

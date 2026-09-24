@@ -10,6 +10,7 @@ import '../log/widgets/exercise_sheets.dart';
 import 'regime_screen.dart';
 import 'regime_setup.dart';
 import '../../core/widgets/toast.dart';
+import '../account/backup_mark.dart';
 
 /// The Regimes tab: every programme, and the catalog they are all built from.
 ///
@@ -39,6 +40,7 @@ class RegimesScreen extends ConsumerWidget {
         title: 'Regimes',
         eyebrow: _inventory(summaries),
         topGap: summaries == null ? Space.xxl : Space.md,
+        actions: const [BackupMark()],
       ),
     );
 

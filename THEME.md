@@ -1158,6 +1158,23 @@ change stays reachable, and what you read never permanently owns half the screen
 icon and white `micro` label at weight 700; unselected `textSecondary` for both.
 **No pill, no indicator, no hue** — weight and brightness carry the state.
 
+### Backup mark
+
+A `CircleIconButton` holding `cloud_off_outlined`, in the header's action slot
+on Workouts, History and Regimes, and between the title and `Finish` on the
+log. **Absent unless an attempt to back up has failed** and something is still
+owed; there is no mark for *backed up* and none for *about to be*. Glyph in
+`textSecondary` for no connection, which is the design working, and `warning`
+for a refusal, which does not clear on its own. Never `negative`: nothing has
+been lost, and red is where a person reads that it has.
+
+Tapping it opens a sheet titled `Not backed up yet`. The subtitle leads with
+`Everything is saved on this phone.` and then says what the Settings account
+row says. The body is one line per kind of thing waiting, the noun on the left
+and the count on the right in tabular figures. One secondary button, `Try again
+now`. Settings does not carry the mark: its account row already says it in
+words (rule 6).
+
 ### Badges
 
 A status pill: radius 999, a 14% tint of the semantic colour, text in that
