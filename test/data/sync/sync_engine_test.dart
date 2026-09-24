@@ -220,6 +220,30 @@ void main() {
     },
   );
 
+  test('a token refresh that fails offline is not a lost change', () async {
+    await ensureStarterCatalog(db);
+    final reported = <String>[];
+    final sub = _listenToFailures(reported);
+    start();
+    signedIn.add(true);
+    await waitUntil(() => push.drains > 0);
+
+    // The auth client puts a refresh that could not reach the server on its
+    // state stream as an error. Unhandled, it escapes to the zone and fails
+    // this test, which is the same path that put "That change was not saved."
+    // on the log in a gym with no signal.
+    signedIn.addError(Exception('Failed host lookup'));
+    await settle();
+    expect(reported, isEmpty, reason: 'no signal is not a failure');
+
+    // Still signed in, still pushing.
+    final before = push.drains;
+    engine!.resumed();
+    await waitUntil(() => push.drains > before);
+
+    await sub.cancel();
+  });
+
   test('a rejection is reported; no signal is not', () async {
     await ensureStarterCatalog(db);
     final reported = <String>[];

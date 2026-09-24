@@ -150,10 +150,21 @@ class _GoogleSupabaseAuth implements SyncAuth {
   @override
   SyncAccount? get current => _accountOf(_client.auth.currentUser);
 
+  /// Who is signed in, as events rather than errors.
+  ///
+  /// The client refreshes its token on a timer, and a refresh that cannot reach
+  /// the server — a phone in a gym with no signal — is put on this stream as an
+  /// error rather than thrown. Nothing about the account has changed: the
+  /// session is still on disk and the next refresh with signal succeeds. A
+  /// refresh token that has truly been revoked arrives as a `signedOut` event,
+  /// not as an error. Passed along, the error reached the zone handler in
+  /// `main`, which announced every token refresh in the gym as "That change was
+  /// not saved." in red, over a log that had saved everything
+  /// ([SYNC.md § 13](SYNC.md#13-when-it-fails): no network shows nothing).
   @override
-  Stream<SyncAccount?> get changes => _client.auth.onAuthStateChange.map(
-    (event) => _accountOf(event.session?.user),
-  );
+  Stream<SyncAccount?> get changes => _client.auth.onAuthStateChange
+      .map((event) => _accountOf(event.session?.user))
+      .handleError((Object _) {});
 
   SyncAccount? _accountOf(User? user) =>
       user == null ? null : SyncAccount(id: user.id, email: user.email);

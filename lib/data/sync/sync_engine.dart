@@ -118,6 +118,10 @@ class SyncEngine {
       // existed is owed the moment there is somewhere to owe it to.
       if (value && !was) trigger();
       if (!value) _cancelTimers();
+    }, onError: (Object _) {
+      // An account stream that fails has not signed anyone in or out. Left
+      // unhandled, the error escapes to the zone handler in `main` and is
+      // announced as a lost change — over a log that lost nothing.
     });
 
     // Any write to a syncable table. `app_settings` is excluded on purpose —
