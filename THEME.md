@@ -1035,7 +1035,11 @@ as pressed. A pad that captions itself covers what it is captioning.
   is all full reps, it **drops whatever partials were recorded**, rather than
   leaving a number behind a shut box. Tapping a box moves the digits there and
   leaves the key alone: the half is still open, so a key flipping back to `F`
-  would report a mode change nobody made. Both halves stay lit so the state is
+  would report a mode change nobody made. The key reads `P` whenever the half
+  is on screen, whether `P` opened it, a recorded count did, or last week's
+  partials did on a set not yet ticked, so one press of `F` always closes the
+  box in view. A ticked set with no partials of its own is a single cell,
+  whatever last week's set was. Both halves stay lit so the state is
   readable without looking at the table. It appears only where partials exist —
   a count, never a load, never a hold — and takes the slot the decimal point
   sits in on a load. It is for changing your mind mid-entry; the way _in_ is

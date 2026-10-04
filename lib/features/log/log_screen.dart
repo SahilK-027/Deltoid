@@ -995,6 +995,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
       // and writes it straight back — which is how a `3` refused to become a
       // `2`.
       if (sameCell && _partialField) _partialStash = _buffer.value;
+      // `F` was a statement about the set, so it holds while the set is being
+      // filled in. Cleared on the weight beside it, last week's partials would
+      // open the box again a tap after it was closed.
+      if (_editing?.setId != set.id) _partialClosedFor = null;
       _editing = EditTarget(set.id, field);
       _typeHold = false;
       _timeField = isTime;
@@ -1003,7 +1007,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
         _fullStash = null;
         _partialStash = null;
         _partialShownFor = null;
-        _partialClosedFor = null;
       }
       _buffer.value = switch (field) {
         SetField.weight => _fmtLoadIn(set.weight),
@@ -1045,8 +1048,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// The pending keystroke is flushed first, because the buffer is about to
   /// mean a different column: switching with a write in flight would land the
   /// full reps in the partial count, or the other way about.
-  void _togglePartial(SetLog set) {
-    final wasOpen = _partialShownFor == set.id;
+  ///
+  /// [wasOpen] is whether the row is showing the half, which is wider than
+  /// [_partialShownFor]: a recorded count or last week's partials open it
+  /// too, and `F` has to close the box that is on screen.
+  void _togglePartial(SetLog set, {required bool wasOpen}) {
     // Where the digits were going, which is not the same question as whether
     // the box was open: the reps half can be the live one with the partial box
     // sitting open beside it.
@@ -1183,6 +1189,16 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // and a load is not counted at all.
     final canBePartial =
         target.field == SetField.reps && !entry.exercise.measureMode.isHold;
+    // The same question [SetRow] asks before splitting the cell, so the key
+    // never reads `F` beside an open box. A set with partials recorded, or an
+    // unfinished one whose ghost had them, opens without `P` being pressed,
+    // and the key has to offer the `F` that closes it.
+    final partialOpen =
+        canBePartial &&
+        _partialClosedFor != set.id &&
+        (_partialShownFor == set.id ||
+            (set.partialReps ?? 0) > 0 ||
+            (!set.isDone && (ghost?.partialReps ?? 0) > 0));
 
     return SetKeypad(
       field: target.field,
@@ -1207,8 +1223,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
       // partial entry — the box is still there, waiting — and a key that
       // flipped back to `F` on that tap was reporting a mode change nobody
       // asked for.
-      partial: _partialShownFor == target.setId,
-      onTogglePartial: canBePartial ? () => _togglePartial(set) : null,
+      partial: partialOpen,
+      onTogglePartial: canBePartial
+          ? () => _togglePartial(set, wasOpen: partialOpen)
+          : null,
       nextLabel: needsReps
           ? (entry.exercise.measureMode.isHold ? 'Enter time' : 'Enter reps')
           : isLast

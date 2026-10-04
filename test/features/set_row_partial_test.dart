@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// second box on every row is five boxes an exercise that say nothing, bought
 /// by making the reps — the number the row exists for — narrower.
 void main() {
-  SetLog setLog({int? reps, int? partialReps}) => SetLog(
+  SetLog setLog({int? reps, int? partialReps, bool isDone = false}) => SetLog(
     id: 's1',
     updatedAt: 0,
     deviceId: 'test',
@@ -24,7 +24,7 @@ void main() {
     setType: SetType.working,
     reps: reps,
     partialReps: partialReps,
-    isDone: false,
+    isDone: isDone,
   );
 
   /// Stands in for "the partial half was asked for" in [edits], which is
@@ -177,6 +177,45 @@ void main() {
     // `8` where the week before read `8+3` claims a set that did not happen.
     expect(halfWidth(tester), greaterThan(60));
     expect(find.text('3'), findsOneWidget);
+  });
+
+  testWidgets('a finished set without partials is a full set', (tester) async {
+    // Last week was `8+2`, this week was eight clean reps and the set is
+    // ticked. Last week's partials may not keep the box open, or the row reads
+    // as halves that were never done and nothing on it can say otherwise.
+    await pump(
+      tester,
+      set: setLog(reps: 8, isDone: true),
+      ghost: const PastSet(type: SetType.working, reps: 8, partialReps: 2),
+    );
+    await tester.pumpAndSettle();
+    expect(halfWidth(tester), 0);
+    expect(find.text('2'), findsNothing);
+  });
+
+  testWidgets('a finished set keeps the partials it recorded', (tester) async {
+    await pump(
+      tester,
+      set: setLog(reps: 8, partialReps: 3, isDone: true),
+      ghost: const PastSet(type: SetType.working, reps: 8, partialReps: 2),
+    );
+    await tester.pumpAndSettle();
+    expect(halfWidth(tester), greaterThan(60));
+    expect(find.text('3'), findsOneWidget);
+  });
+
+  testWidgets('F closes a box that last week\'s partials opened', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      set: setLog(reps: 8),
+      ghost: const PastSet(type: SetType.working, reps: 8, partialReps: 2),
+      editing: const EditTarget('s1', SetField.reps),
+      partialClosedFor: 's1',
+    );
+    await tester.pumpAndSettle();
+    expect(halfWidth(tester), 0);
   });
 
   testWidgets('both halves take focus on their own tap', (tester) async {

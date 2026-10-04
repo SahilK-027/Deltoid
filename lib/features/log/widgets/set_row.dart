@@ -208,8 +208,10 @@ class SetRow extends StatelessWidget {
             // Last time's partials open it too. A ghost that quietly drops
             // half of what the set was is a ghost you cannot match: `8` where
             // the week before read `8+3` says you did the same set, and you
-            // did not.
-            (ghost?.partialReps ?? 0) > 0);
+            // did not. Only until the set is ticked: a finished set with no
+            // partials of its own was all full reps, and a box still holding
+            // last week's number would claim halves that were not done.
+            (!set.isDone && (ghost?.partialReps ?? 0) > 0));
 
     // Swipe-to-delete wraps this from the group above, so the index column
     // travels with the fields. See [SwipeToDelete].
@@ -328,7 +330,7 @@ class SetRow extends StatelessWidget {
                               Expanded(
                                 child: _PartialCell(
                                   value: set.partialReps,
-                                  ghost: ghost?.partialReps,
+                                  ghost: set.isDone ? null : ghost?.partialReps,
                                   done: set.isDone,
                                   active: editingThis && partialEditing,
                                   buffer: buffer,
