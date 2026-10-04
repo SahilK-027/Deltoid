@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-10-04
+
+Patch release letting a set be logged as full reps when the same set had partial reps last time.
+
+### Fixed
+
+- **Logging:** A set ticked without partial reps shows as a full set, even when the same set had partials last time. It used to keep last week's partial count beside the reps, so `8` read as `8 | 2`.
+  - Nothing stored changes: a set ticked without partials was already saved as full reps.
+- **Logging:** The `F` / `P` key reads `P` whenever the partial box is open, including when last week's partials opened it. One press of `F` closes the box and clears the partials, and the box stays closed while you fill in the rest of that set.
+
 ## [1.12.2] - 2026-09-24
 
 Patch release listing a discarded session once in the backup sheet.
@@ -384,7 +394,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...HEAD
+[1.12.3]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/SahilK-027/Deltoid/compare/v1.11.0...v1.12.0
