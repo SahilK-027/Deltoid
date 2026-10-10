@@ -1226,8 +1226,8 @@ the weigh-in sheet. One line under it says when it was last recorded, in
 an outlined card, the one card a sheet is allowed, because it holds a figure
 and its explanation rather than a choice: the scale glyph, the share as a
 badge, `+69.5 kg of resistance`, and a sentence saying what that figure is used
-for. Two buttons close it, `Edit scale weight` above `Got it`; the secondary
-one opens the weigh-in sheet. A hold has no pill, because nothing scores its
+for. One button, `Edit scale weight`, opens the weigh-in sheet; the sheet is
+otherwise closed by its ✕. A hold has no pill, because nothing scores its
 load.
 
 ---

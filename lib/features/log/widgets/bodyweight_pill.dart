@@ -145,20 +145,11 @@ class _BodyweightSheet extends StatelessWidget {
 
     return AppSheet(
       title: 'Bodyweight contribution',
-      footer: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SecondaryButton(
-            label: recorded ? 'Edit scale weight' : 'Log scale weight',
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
-          const SizedBox(height: Space.sm),
-          PrimaryButton(
-            label: 'Got it',
-            onPressed: () => Navigator.of(context).pop(false),
-          ),
-        ],
+      // One action. The sheet is read and closed by its ✕, and the only thing
+      // to do from it is change the weight.
+      footer: PrimaryButton(
+        label: recorded ? 'Edit scale weight' : 'Log scale weight',
+        onPressed: () => Navigator.of(context).pop(true),
       ),
       children: [
         Text('Scale weight', style: context.t.titleSmall),

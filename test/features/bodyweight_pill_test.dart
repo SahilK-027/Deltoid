@@ -112,7 +112,6 @@ void main() {
     expect(find.text('+60 kg of resistance'), findsOneWidget);
     expect(find.textContaining('counted on top'), findsOneWidget);
     expect(find.text('Log scale weight'), findsOneWidget);
-    expect(find.text('Got it'), findsOneWidget);
   });
 
   testWidgets('the sheet asks for a newer weight when the last one is old', (
@@ -149,17 +148,5 @@ void main() {
 
     expect(find.text('Last recorded on 18 Jan 2026'), findsOneWidget);
     expect(find.textContaining('accurate strength trend'), findsNothing);
-  });
-
-  testWidgets('Got it closes the sheet and opens nothing', (tester) async {
-    await pump(tester, series: const [(dayKey: 20260118, weightKg: 73.2)]);
-
-    await tester.tap(find.byType(FigurePill));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Got it'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Bodyweight contribution'), findsNothing);
-    expect(find.text('Log bodyweight'), findsNothing);
   });
 }
