@@ -15,6 +15,14 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-10-10
+
+Patch release making the fixed share of bodyweight on a built-in movement look fixed and answer a tap.
+
+### Fixed
+
+- **Exercises:** The `Share of bodyweight` row of a movement that comes with the app is greyed out and reads `Fixed for this movement`. Tapping it opens a sheet with the value and a note saying why it cannot be changed. It used to look editable and do nothing when tapped.
+
 ## [1.14.0] - 2026-10-10
 
 Minor release scoring bodyweight movements on the share of the body they move, and showing that load while logging.
@@ -424,7 +432,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...HEAD
+[1.14.1]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...v1.13.0
 [1.12.3]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...v1.12.3
