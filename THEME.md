@@ -1202,23 +1202,27 @@ A status pill: radius 999, a 14% tint of the semantic colour, text in that
 colour at `micro`. Used sparingly, never for anything a row already says.
 
 **The figure pill** is the one pill with two lines and a ring in place of a
-tint: `FigurePill`, radius 999, a 4px ring, no fill. The ring is a `surfaceHigh`
-track with the semantic colour drawn over it for a share of the way round, and
-the piece left undrawn sits at the top centre, so 95 per cent reads as a ring
-with a small piece missing. The first line is a figure at `valueSm`, the second
-what is derived from it at `label` in `textSecondary`. A ring rather than a
-tint because both lines are numbers to be read, and a tinted ground costs the
-smaller one its contrast.
+tint: `FigurePill`, radius 999, 40 tall, a 3px ring, no fill. It is the height
+of the round header buttons because it sits in a row with them. The ring is a
+`surfaceHigh` track with the semantic colour drawn over it for a share of the
+way round, and the piece left undrawn sits at the top centre, so 95 per cent
+reads as a ring with a small piece missing. The first line is a figure at
+`label` in `textPrimary`, the second what is derived from it at `micro` in
+`textSecondary`: the two rungs whose line heights fit inside the ring at that
+height. A ring rather than a tint because both lines are numbers to be read,
+and a tinted ground costs the smaller one its contrast.
 
-Its one use is **the bodyweight pill** on the log, under the header of a
-movement whose load is the person doing it. It reads `73.2 kg` over
-`+69.5 kg (95%)`: the bodyweight the lift is scored on, and what the movement
-takes from it. The ring is filled to that share, and is `positive` while the
-last weigh-in is a week old or newer. Older than that the first line reads `73.2 kg · 12 days old`, and
-with nothing ever logged `60 kg assumed`; both turn the ring `warning`, the
-hue the sheet's notice is drawn in. It sits under the header's row rather than
-beside the name, where the two buttons leave no room for the longest of the
-three. It opens a sheet titled `Bodyweight contribution`. Under the heading
+Its one use is **the bodyweight pill** on the log, in the header of a movement
+whose load is the person doing it, first of the three controls at the right of
+the exercise name. The first line is the bodyweight the lift is scored on,
+`73.2 kg`. The second is what the movement takes from it, `+69.5 kg (95%)`, and
+the ring is filled to that share and drawn in `positive`. When the last
+weigh-in is more than a week old the second line reads `12 days old`, and with
+nothing ever logged it reads `assumed` under `60 kg`; both turn the ring
+`warning`. One line has room for one of the two, and the doubt is the one that
+cannot wait for the sheet. The name beside it wraps to a second line sooner
+than on a page without the pill, which is the cost of adding no row to the
+header. It opens a sheet titled `Bodyweight contribution`. Under the heading
 `Scale weight` the figure sits in a `surfaceHigh` panel with its unit at the
 right, shaped like a field and not one: the weight is read here and changed in
 the weigh-in sheet. One line under it says when it was last recorded, in

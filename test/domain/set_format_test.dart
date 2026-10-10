@@ -392,6 +392,7 @@ void main() {
     test('a recent weigh-in is the figure and nothing else', () {
       final recent = basis(BodyweightTrust.logged, days: 2);
       expect(bodyweightBasisLabel(recent, WeightUnit.kg), '73.2 kg');
+      expect(bodyweightPillDetail(recent, 95, WeightUnit.kg), '+69.5 kg (95%)');
       expect(
         bodyweightRecordedLine(
           recent,
@@ -404,10 +405,8 @@ void main() {
 
     test('an old weigh-in says how old', () {
       final stale = basis(BodyweightTrust.stale, days: 12);
-      expect(
-        bodyweightBasisLabel(stale, WeightUnit.kg),
-        '73.2 kg · 12 days old',
-      );
+      expect(bodyweightBasisLabel(stale, WeightUnit.kg), '73.2 kg');
+      expect(bodyweightPillDetail(stale, 95, WeightUnit.kg), '12 days old');
       expect(
         bodyweightRecordedLine(
           stale,
@@ -421,7 +420,8 @@ void main() {
 
     test('nothing logged says the figure is assumed', () {
       final assumed = basis(BodyweightTrust.assumed, kg: 60);
-      expect(bodyweightBasisLabel(assumed, WeightUnit.kg), '60 kg assumed');
+      expect(bodyweightBasisLabel(assumed, WeightUnit.kg), '60 kg');
+      expect(bodyweightPillDetail(assumed, 95, WeightUnit.kg), 'assumed');
       expect(
         bodyweightRecordedLine(assumed, WeightUnit.kg, lastRecorded: null),
         'No weight is recorded, so 60 kg is assumed. Log your weight for an '

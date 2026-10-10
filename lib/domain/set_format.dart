@@ -217,21 +217,27 @@ String setTitle(SetType type, String label, int? leg) {
 }
 
 /// The bodyweight a lift is scored against, as the first line of the log's
-/// pill: `73.2 kg`, `73.2 kg · 12 days old`, `60 kg assumed`.
-///
-/// The figure is the same in all three. What follows it says how far to trust
-/// it, and is absent when the weigh-in is recent.
-String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) {
-  final figure = '${formatBodyweight(basis.kg, unit)} ${unit.label}';
-  return switch (basis.trust) {
-    BodyweightTrust.logged => figure,
-    BodyweightTrust.stale => '$figure · ${_daysOld(basis.daysOld ?? 0)} old',
-    BodyweightTrust.assumed => '$figure assumed',
-  };
-}
+/// pill: `73.2 kg`.
+String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) =>
+    '${formatBodyweight(basis.kg, unit)} ${unit.label}';
 
-/// What a movement takes from that bodyweight, as the pill's second line:
-/// `+69.5 kg (95%)`.
+/// The pill's second line. What the movement takes from the bodyweight while
+/// the weigh-in is recent, `+69.5 kg (95%)`, and otherwise why the figure
+/// above it is not to be trusted: `12 days old`, or `assumed`.
+///
+/// One line has room for one of the two, and the doubt is the one that cannot
+/// wait for the sheet: an assumed figure is never printed without the word.
+String bodyweightPillDetail(
+  BodyweightBasis basis,
+  int bodyweightPct,
+  WeightUnit unit,
+) => switch (basis.trust) {
+  BodyweightTrust.logged => bodyweightMovedLabel(basis.kg, bodyweightPct, unit),
+  BodyweightTrust.stale => '${_daysOld(basis.daysOld ?? 0)} old',
+  BodyweightTrust.assumed => 'assumed',
+};
+
+/// What a movement takes from a bodyweight: `+69.5 kg (95%)`.
 ///
 /// Signed, because it is what the body adds to whatever is on the belt, and
 /// the load column beside it reads `BW +` for the same reason.
@@ -270,7 +276,8 @@ String bodyweightRecordedLine(
 /// What the resistance on a bodyweight movement is, in the sentence under the
 /// figure.
 String bodyweightLoadBlurb(LoadMode mode, int bodyweightPct) {
-  final share = 'This is the part of your bodyweight that counts as '
+  final share =
+      'This is the part of your bodyweight that counts as '
       'resistance on this movement, $bodyweightPct% of it. It is what your '
       'charts, volume and cycle progress are worked out from.';
   return mode == LoadMode.bodyweightPlus
@@ -279,4 +286,3 @@ String bodyweightLoadBlurb(LoadMode mode, int bodyweightPct) {
 }
 
 String _daysOld(int days) => days == 1 ? '1 day' : '$days days';
-

@@ -2151,6 +2151,23 @@ class _ExercisePage extends ConsumerWidget {
             // somebody else's day, and that is not something to leave a person
             // to notice. Nothing is borrowed now — a first time here opens
             // blank — so there is no warning left to carry.
+            // First of the three controls, and as tall as the two buttons
+            // after it. It draws nothing on a movement that takes a load, so
+            // the gap is its own to carry.
+            if (!skipped &&
+                BodyweightPill.appliesTo(
+                  entry.exercise.loadMode,
+                  entry.exercise.measureMode,
+                )) ...[
+              const SizedBox(width: Space.sm),
+              BodyweightPill(
+                loadMode: entry.exercise.loadMode,
+                measureMode: entry.exercise.measureMode,
+                bodyweightPct: entry.exercise.bodyweightPct,
+                dayKey: workout.dayKey,
+              ),
+              const SizedBox(width: Space.sm),
+            ],
             _InfoButton(
               onTap: () => showExerciseInfo(context, ref, entry, prefill),
             ),
@@ -2170,24 +2187,6 @@ class _ExercisePage extends ConsumerWidget {
             ),
           ],
         ),
-        // Under the header rather than beside the name, where the two buttons
-        // leave too little width for `73.2 kg · 12 days old`.
-        if (!skipped &&
-            BodyweightPill.appliesTo(
-              entry.exercise.loadMode,
-              entry.exercise.measureMode,
-            )) ...[
-          const SizedBox(height: Space.md),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: BodyweightPill(
-              loadMode: entry.exercise.loadMode,
-              measureMode: entry.exercise.measureMode,
-              bodyweightPct: entry.exercise.bodyweightPct,
-              dayKey: workout.dayKey,
-            ),
-          ),
-        ],
         const SizedBox(height: Space.xl),
         if (skipped)
           AppCard(

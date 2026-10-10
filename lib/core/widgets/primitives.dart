@@ -1688,7 +1688,11 @@ class FigurePill extends StatelessWidget {
 
   /// The ring's stroke. Wide enough that the missing piece at 95 per cent is
   /// a visible gap rather than a hairline break.
-  static const ringWidth = 4.0;
+  static const ringWidth = 3.0;
+
+  /// As tall as the [CircleIconButton]s it sits beside in a header, so the
+  /// three read as one row of controls.
+  static const height = 40.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1706,21 +1710,28 @@ class FigurePill extends StatelessWidget {
             track: c.surfaceHigh,
             fraction: fraction,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.xl,
-              vertical: Space.sm + ringWidth,
-            ),
+          child: Container(
+            height: height,
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // `label` over `micro`: the two rungs whose line heights, 16
+                // and 14, fit inside the ring at the height of a button.
                 Text(
                   figure,
-                  style: context.t.labelLarge?.copyWith(color: c.textPrimary),
+                  maxLines: 1,
+                  style: context.t.bodySmall?.copyWith(
+                    color: c.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: tabular,
+                  ),
                 ),
                 Text(
                   detail,
-                  style: context.t.bodySmall?.copyWith(
+                  maxLines: 1,
+                  style: context.t.labelSmall?.copyWith(
                     color: c.textSecondary,
                     fontFeatures: tabular,
                   ),

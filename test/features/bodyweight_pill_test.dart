@@ -49,7 +49,8 @@ void main() {
 
   testWidgets('nothing logged shows the assumed figure', (tester) async {
     await pump(tester, series: const []);
-    expect(find.text('60 kg assumed'), findsOneWidget);
+    expect(find.text('60 kg'), findsOneWidget);
+    expect(find.text('assumed'), findsOneWidget);
   });
 
   testWidgets('a recent weigh-in shows the figure alone', (tester) async {
@@ -77,7 +78,15 @@ void main() {
 
   testWidgets('an old weigh-in says how old it is', (tester) async {
     await pump(tester, series: const [(dayKey: 20260108, weightKg: 73.2)]);
-    expect(find.text('73.2 kg · 12 days old'), findsOneWidget);
+    expect(find.text('73.2 kg'), findsOneWidget);
+    expect(find.text('12 days old'), findsOneWidget);
+  });
+
+  testWidgets('the pill is as tall as the buttons it sits beside', (
+    tester,
+  ) async {
+    await pump(tester, series: const [(dayKey: 20260118, weightKg: 73.2)]);
+    expect(tester.getSize(find.byType(FigurePill)).height, 40);
   });
 
   testWidgets('a movement that takes a load has no pill', (tester) async {

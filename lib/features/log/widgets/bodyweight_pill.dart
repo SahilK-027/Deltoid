@@ -62,18 +62,18 @@ class BodyweightPill extends ConsumerWidget {
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final basis = bodyweightBasis(dayKey, series);
     final figure = bodyweightBasisLabel(basis, unit);
-    final moved = bodyweightMovedLabel(basis.kg, bodyweightPct, unit);
+    final detail = bodyweightPillDetail(basis, bodyweightPct, unit);
 
     return FigurePill(
       figure: figure,
-      detail: moved,
+      detail: detail,
       // Green while the weigh-in is recent, and the warning yellow the sheet's
       // notice is drawn in when it is old or assumed.
       hue: basis.trust == BodyweightTrust.logged ? c.positive : c.warning,
       // The ring is filled to the share of the body the movement moves, so a
       // push-up's is two thirds drawn and a pull-up's is all but closed.
       fraction: bodyweightPct / 100,
-      semanticLabel: 'Bodyweight $figure, $moved on this movement',
+      semanticLabel: 'Bodyweight $figure, $detail',
       onTap: () => _open(context, ref, basis, unit),
     );
   }
