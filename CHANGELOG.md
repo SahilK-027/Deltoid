@@ -15,6 +15,20 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-10
+
+Minor release putting the backup button on Settings and giving the account backup and the file backup different names.
+
+### Added
+
+- **Settings:** The cloud button is on Settings, in the same corner as on Workouts, History and Regimes.
+
+### Changed
+
+- **Sync:** The backup sheet's title is the state alone, such as `Backed up`. The time is in the sentence under it, `Last backed up at 14:02.`, and when changes are waiting the sentence says how many and since when.
+- **Settings:** `Automatic backup` is now `Backup file on this phone`, and its time reads `Last written`. It was easy to take for the account's backup time, which it never matched.
+- **Settings:** The account row shows the account and no longer repeats the backup state. The cloud button beside it says that, and its sheet says how much is waiting.
+
 ## [1.14.1] - 2026-10-10
 
 Patch release making the fixed share of bodyweight on a built-in movement look fixed and answer a tap.
@@ -432,7 +446,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...v1.15.0
 [1.14.1]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...v1.13.0
