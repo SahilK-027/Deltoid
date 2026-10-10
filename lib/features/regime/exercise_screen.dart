@@ -376,13 +376,18 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                   AppRow(
                     title: 'Share of bodyweight',
                     subtitle: shareIsSet
-                        ? 'Set for this movement'
+                        ? 'Fixed for this movement'
                         : 'How much of your body this movement moves',
-                    trailing: RowValue.orChoose(
-                      bodyweightPct == null ? null : '$bodyweightPct%',
-                    ),
+                    // Dimmed where it cannot be changed. In the ink of an
+                    // answer it read as one, and a tap that did nothing read
+                    // as a tap that had missed.
+                    trailing: shareIsSet
+                        ? RowValue.fixed('$bodyweightPct%')
+                        : RowValue.orChoose(
+                            bodyweightPct == null ? null : '$bodyweightPct%',
+                          ),
                     onTap: shareIsSet
-                        ? null
+                        ? () => _showFixedShare(bodyweightPct!)
                         : () => _editBodyweightShare(exercise, bodyweightPct),
                   ),
                 // Only for a total load: the plate view breaks a barbell total
@@ -684,6 +689,33 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       exercise,
       loadMode: picked,
       barKind: picked == LoadMode.total ? null : BarKind.none,
+    );
+  }
+
+  /// The share of a movement the catalog seeded, shown and not offered.
+  ///
+  /// The same sheet the editable share opens, with its field switched off and
+  /// no Save: the row answers the tap, and the sheet says why there is nothing
+  /// to change.
+  Future<void> _showFixedShare(int pct) {
+    return showAppSheet<void>(
+      context,
+      builder: (sheet) => AppSheet(
+        title: 'Share of bodyweight',
+        children: [
+          TextField(
+            controller: TextEditingController(text: '$pct'),
+            enabled: false,
+            style: sheet.t.bodyLarge?.copyWith(color: sheet.c.textTertiary),
+          ),
+          const SizedBox(height: Space.sm),
+          Text(
+            'This movement comes with the app, so its share is fixed at '
+            '$pct%. A movement you create has a share you can set.',
+            style: sheet.t.bodySmall,
+          ),
+        ],
+      ),
     );
   }
 

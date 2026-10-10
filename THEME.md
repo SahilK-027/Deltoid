@@ -1265,9 +1265,12 @@ a menu dropped over the page has no room to say what an option _means_.
 **The share of bodyweight is stated for a seeded movement and asked for on a
 created one.** On the exercise screen a bodyweight movement carries a
 `Share of bodyweight` row under how its weight is entered. For a movement the
-catalog seeded, the row shows the figure, reads `Set for this movement`, and
-does nothing when tapped: the app knows the answer, and a figure anyone could
-move is one two months would not agree on. For a movement the user created it
+catalog seeded, the row shows the figure in `textTertiary` and reads
+`Fixed for this movement`: the app knows the answer, and a figure anyone could
+move is one two months would not agree on. It still answers a tap, with the
+same sheet the editable share opens, its field switched off, no `Save`, and one
+line saying the movement comes with the app. A row that looks like an answer
+and does nothing when tapped reads as a tap that missed. For a movement the user created it
 is a question like any other on that screen. It shows `Choose` until answered,
 `Create exercise` stays off until it is, and changing it on a movement with
 sets behind it asks first, with the count of sets it re-reads.
