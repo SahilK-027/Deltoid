@@ -15,6 +15,14 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-10-10
+
+Patch release renaming one heading in the backup sheet that read as contradicting the line above it.
+
+### Fixed
+
+- **Sync:** The backup sheet's heading over the newest session on your account reads `Newest session on your account`. It used to read `Last backed up`, directly under a sentence giving the time of the last backup, so a time from today sat over a session from yesterday.
+
 ## [1.15.0] - 2026-10-10
 
 Minor release putting the backup button on Settings and giving the account backup and the file backup different names.
@@ -446,7 +454,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...HEAD
+[1.15.1]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...v1.15.0
 [1.14.1]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...v1.14.0
