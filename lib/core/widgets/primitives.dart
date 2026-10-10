@@ -1686,9 +1686,10 @@ class FigurePill extends StatelessWidget {
   final VoidCallback? onTap;
   final String? semanticLabel;
 
-  /// The ring's stroke. Wide enough that the missing piece at 95 per cent is
-  /// a visible gap rather than a hairline break.
-  static const ringWidth = 3.0;
+  /// The ring's stroke: the weight of the app's other outlines, a focused
+  /// field and a selected card, so a pill 40 tall is not carrying a heavier
+  /// line than a field 48 tall.
+  static const ringWidth = 2.0;
 
   /// As tall as the [CircleIconButton]s it sits beside in a header, so the
   /// three read as one row of controls.

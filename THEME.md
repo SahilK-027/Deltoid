@@ -1202,7 +1202,7 @@ A status pill: radius 999, a 14% tint of the semantic colour, text in that
 colour at `micro`. Used sparingly, never for anything a row already says.
 
 **The figure pill** is the one pill with two lines and a ring in place of a
-tint: `FigurePill`, radius 999, 40 tall, a 3px ring, no fill. It is the height
+tint: `FigurePill`, radius 999, 40 tall, a 2px ring, no fill. It is the height
 of the round header buttons because it sits in a row with them. The ring is a
 `surfaceHigh` track with the semantic colour drawn over it for a share of the
 way round, and the piece left undrawn sits at the top centre, so 95 per cent
