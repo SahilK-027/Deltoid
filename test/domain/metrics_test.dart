@@ -382,6 +382,82 @@ void main() {
     });
   });
 
+  group('bodyweightBasis', () {
+    const log = [
+      (dayKey: 20260101, weightKg: 70.0),
+      (dayKey: 20260110, weightKg: 72.0),
+    ];
+
+    test('nothing logged is the assumed figure, and says so', () {
+      final basis = bodyweightBasis(20260115, const []);
+      expect(basis.kg, 60);
+      expect(basis.trust, BodyweightTrust.assumed);
+      expect(basis.lastDayKey, isNull);
+      expect(basis.daysOld, isNull);
+    });
+
+    test('a weigh-in a week old is still current', () {
+      final basis = bodyweightBasis(20260117, log);
+      expect(basis.kg, 72);
+      expect(basis.trust, BodyweightTrust.logged);
+      expect(basis.lastDayKey, 20260110);
+      expect(basis.daysOld, 7);
+    });
+
+    test('a weigh-in eight days old is stale', () {
+      final basis = bodyweightBasis(20260118, log);
+      expect(basis.kg, 72);
+      expect(basis.trust, BodyweightTrust.stale);
+      expect(basis.daysOld, 8);
+    });
+
+    test('age is counted in days across a month end, not in keys', () {
+      // 28 January to 4 February is 7 days and 76 key units.
+      final basis = bodyweightBasis(
+        20260204,
+        const [(dayKey: 20260128, weightKg: 71.0)],
+      );
+      expect(basis.daysOld, 7);
+      expect(basis.trust, BodyweightTrust.logged);
+    });
+
+    test('a day before the newest weigh-in is not stale', () {
+      // A session backfilled to a day between two entries, or before the
+      // first, is scored on real entries taken around it.
+      final between = bodyweightBasis(20260105, log);
+      expect(between.kg, closeTo(70.8889, 1e-4));
+      expect(between.trust, BodyweightTrust.logged);
+      expect(between.daysOld, 0);
+
+      final before = bodyweightBasis(20251201, log);
+      expect(before.kg, 70);
+      expect(before.trust, BodyweightTrust.logged);
+    });
+  });
+
+  group('a weighted bodyweight lift with nothing logged', () {
+    test('is scored on the assumed bodyweight plus the added weight', () {
+      final kg = bodyweightOn(20260101, const []);
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweightPlus,
+          addedWeight: 10,
+          bodyweightKg: kg,
+        ),
+        70,
+      );
+      // 10 kg to 12.5 kg added is 70 to 72.5, not a quarter more.
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweightPlus,
+          addedWeight: 12.5,
+          bodyweightKg: kg,
+        ),
+        72.5,
+      );
+    });
+  });
+
   group('bodyweightOn', () {
     final log = [
       (dayKey: 20260101, weightKg: 70.0),
@@ -427,8 +503,9 @@ void main() {
       expect(bodyweightOn(20260601, log), 72);
     });
 
-    test('returns null with no log at all', () {
-      expect(bodyweightOn(20260101, const []), isNull);
+    test('assumes a bodyweight when none has ever been logged', () {
+      expect(bodyweightOn(20260101, const []), 60);
+      expect(assumedBodyweightKg, 60);
     });
 
     test('handles unsorted input', () {

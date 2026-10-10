@@ -398,6 +398,18 @@ screen. Selected, it **fills with the hue**, label taken down by
 `IconTile.glyphOn`. A chip meaning "all" has no hue: it is every category and
 therefore none.
 
+**The bodyweight chip** is a dense chip under the exercise header on the log,
+on a movement whose load is the person doing it. It reads `Bodyweight 73.2 kg`
+with the scale glyph while the last weigh-in is a week old or newer. Older than
+that it reads `Bodyweight 73.2 kg · 12 days old`, and with nothing ever logged
+`Bodyweight 60 kg assumed`; both swap the glyph for a `warning` dot, the hue the
+sheet's notice is drawn in. It sits under the header's row rather than beside
+the name, where the two buttons leave no room for the longest of the three. It
+opens a sheet titled `Bodyweight`: the notice when there is something to ask,
+the figure with the day it was weighed, one line saying what the movement's
+load is made of, and one button that opens the weigh-in sheet. A hold has no
+chip, because nothing scores its load.
+
 ### Cards
 
 `surface` fill, radius 20, **no border, no shadow**, padding 16. A card is a

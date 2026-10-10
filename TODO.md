@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,126 tests and nine pgTAP tests, analyzer clean.**
+**1,145 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -35,6 +35,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Ticking advances the keypad to the next open set, across pages, and closes on the last.
 - [x] Partial reps logged apart from full ones, shown as `8+3`, out of volume, e1RM and `beatsPrevious`.
 - [x] Isometric holds through `MeasureMode`, with a stopwatch in place of the keypad.
+- [x] A bodyweight movement shows the bodyweight it is scored against under its name, marks it when it is assumed or more than a week old, and opens the weigh-in from the log. With nothing logged, 60 kg is assumed rather than the lift going unscored.
 - [x] Session summary: volume, sets, time, the session note, a recap and the offer to keep programme changes.
 
 ### Reading it back

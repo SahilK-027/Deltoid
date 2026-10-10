@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/ids.dart';
+import '../../../core/providers.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/primitives.dart';
+import '../../../domain/enums.dart';
+import '../../../domain/metrics.dart';
+import '../../../domain/set_format.dart';
+import '../../../domain/units.dart';
+import '../../settings/bodyweight_screen.dart';
+import '../log_providers.dart';
+
+/// The bodyweight a bodyweight movement is being scored against today.
+///
+/// A pull-up's load is the person doing it, and the log is the one screen where
+/// that number is otherwise invisible: the load column reads `Bodyweight` and
+/// the figure behind it lives in Settings. The chip prints it under the
+/// exercise name, marks it when it is old or assumed, and opens the weigh-in
+/// from where the lift is being logged.
+///
+/// Drawn only for a movement whose score reads bodyweight. A hold carries no
+/// estimated 1RM and adds nothing to volume, so a bodyweight under a dead hang
+/// would be a number nothing uses.
+class BodyweightChip extends ConsumerWidget {
+  const BodyweightChip({
+    super.key,
+    required this.loadMode,
+    required this.measureMode,
+    required this.dayKey,
+  });
+
+  final LoadMode loadMode;
+  final MeasureMode measureMode;
+
+  /// The day the session is logged on, which is the day the lift is scored on.
+  final int dayKey;
+
+  static bool appliesTo(LoadMode load, MeasureMode measure) =>
+      !measure.isHold &&
+      (load == LoadMode.bodyweight || load == LoadMode.bodyweightPlus);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!appliesTo(loadMode, measureMode)) return const SizedBox.shrink();
+
+    // Nothing until the series has loaded. An empty list and a list that has
+    // not arrived are different states (RULES § 5), and reading the second as
+    // the first would flash `60 kg assumed` at someone who weighed in today.
+    final series = ref.watch(bodyweightSeriesProvider).valueOrNull;
+    if (series == null) return const SizedBox.shrink();
+
+    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+    final basis = bodyweightBasis(dayKey, series);
+    final trusted = basis.trust == BodyweightTrust.logged;
+
+    return AppChip(
+      dense: true,
+      label: bodyweightBasisLabel(basis, unit),
+      // A recent weigh-in is a plain fact and wears a glyph. One that is old or
+      // assumed wears the warning dot instead, the same yellow the sheet's
+      // notice is drawn in.
+      icon: trusted ? Icons.monitor_weight_outlined : null,
+      hue: trusted ? null : context.c.warning,
+      onTap: () => _open(context, ref, basis, unit),
+    );
+  }
+
+  Future<void> _open(
+    BuildContext context,
+    WidgetRef ref,
+    BodyweightBasis basis,
+    WeightUnit unit,
+  ) async {
+    // Captured before the first await: logging a weight re-reads the series,
+    // which rebuilds the page this chip sits on (RULES § 4).
+    final container = ProviderScope.containerOf(context);
+    final loggedToday = basis.lastDayKey == dayKeyOf(DateTime.now());
+
+    final log = await showAppSheet<bool>(
+      context,
+      builder: (sheet) => _BodyweightSheet(
+        basis: basis,
+        unit: unit,
+        loadMode: loadMode,
+        loggedToday: loggedToday,
+      ),
+    );
+    if (log != true || !context.mounted) return;
+
+    await logBodyweightPrompt(
+      context,
+      ref,
+      date: loggedToday ? DateTime.now() : null,
+      initial: loggedToday ? basis.kg : null,
+    );
+    // The series is a one-shot read, so whoever changes it says so.
+    container.invalidate(bodyweightSeriesProvider);
+  }
+}
+
+class _BodyweightSheet extends StatelessWidget {
+  const _BodyweightSheet({
+    required this.basis,
+    required this.unit,
+    required this.loadMode,
+    required this.loggedToday,
+  });
+
+  final BodyweightBasis basis;
+  final WeightUnit unit;
+  final LoadMode loadMode;
+  final bool loggedToday;
+
+  String get _weighed {
+    final last = basis.lastDayKey;
+    if (last == null) return 'Assumed until a weight is logged';
+    if (loggedToday) return 'Weighed today';
+    return 'Weighed ${DateFormat('d MMM yyyy').format(dateFromDayKey(last))}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notice = bodyweightBasisNotice(basis, unit);
+    return AppSheet(
+      title: 'Bodyweight',
+      contentPadding: const EdgeInsets.only(bottom: Space.md),
+      footer: PrimaryButton(
+        label: loggedToday ? "Edit today's weight" : 'Log bodyweight',
+        onPressed: () => Navigator.of(context).pop(true),
+      ),
+      children: [
+        if (notice != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.lg,
+              Space.lg,
+              Space.lg,
+              Space.sm,
+            ),
+            child: NoticeBox(message: notice),
+          ),
+        AppRow(
+          icon: Icons.monitor_weight_outlined,
+          title: '${formatBodyweight(basis.kg, unit)} ${unit.label}',
+          subtitle: _weighed,
+        ),
+        AppRow(
+          icon: Icons.fitness_center_rounded,
+          title: 'Load on this movement',
+          subtitle: bodyweightLoadBlurb(loadMode),
+        ),
+      ],
+    );
+  }
+}

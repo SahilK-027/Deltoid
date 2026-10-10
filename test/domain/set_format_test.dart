@@ -1,4 +1,5 @@
 import 'package:deltoid/domain/enums.dart';
+import 'package:deltoid/domain/metrics.dart';
 import 'package:deltoid/domain/set_format.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,8 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
   double? weight,
   double? added,
   int? reps,
-}) =>
-    (setType: type, weight: weight, addedWeight: added, reps: reps);
+}) => (setType: type, weight: weight, addedWeight: added, reps: reps);
 
 void main() {
   group('loadLabel', () {
@@ -157,7 +157,6 @@ void main() {
       expect('×'.allMatches(line).length, 1);
     });
 
-
     test('appends what was done against the load', () {
       expect(
         loadWithCount(
@@ -186,19 +185,22 @@ void main() {
       );
     });
 
-    test('an unloaded rep set says reps rather than printing a bare number', () {
-      expect(
-        loadWithCount(
-          loadMode: LoadMode.total,
-          measureMode: MeasureMode.reps,
-          weight: null,
-          addedWeight: null,
-          reps: 12,
-          unit: WeightUnit.kg,
-        ),
-        '12 reps',
-      );
-    });
+    test(
+      'an unloaded rep set says reps rather than printing a bare number',
+      () {
+        expect(
+          loadWithCount(
+            loadMode: LoadMode.total,
+            measureMode: MeasureMode.reps,
+            weight: null,
+            addedWeight: null,
+            reps: 12,
+            unit: WeightUnit.kg,
+          ),
+          '12 reps',
+        );
+      },
+    );
   });
 
   group('setLabel', () {
@@ -240,7 +242,14 @@ void main() {
         s(weight: 80, reps: 5),
         s(weight: 70, reps: 6),
       ];
-      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        1,
+      );
     });
 
     test('a hold is ranked by its clock, not by the load on it', () {
@@ -253,7 +262,14 @@ void main() {
         s(weight: 0, reps: 90),
         s(weight: 0, reps: 60),
       ];
-      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.hold, loadMode: LoadMode.bodyweight), 1);
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.hold,
+          loadMode: LoadMode.bodyweight,
+        ),
+        1,
+      );
     });
 
     test('warm-ups are not what the day was about', () {
@@ -261,7 +277,14 @@ void main() {
         s(type: SetType.warmup, weight: 100, reps: 5),
         s(weight: 80, reps: 5),
       ];
-      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        1,
+      );
     });
 
     test('unless warm-ups are all there is', () {
@@ -269,7 +292,14 @@ void main() {
         s(type: SetType.warmup, weight: 40, reps: 10),
         s(type: SetType.warmup, weight: 60, reps: 8),
       ];
-      expect(heaviestLogged(sets: sets, measureMode: MeasureMode.reps, loadMode: LoadMode.total), 1);
+      expect(
+        heaviestLogged(
+          sets: sets,
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        1,
+      );
     });
 
     test('added weight ranks a weighted chin above an unweighted one', () {
@@ -291,10 +321,7 @@ void main() {
       // chart scores it as having no weight at all. One set, two answers.
       //
       // Ranked by effectiveLoad, set 1 has no load and set 0 has 50 kg.
-      final sets = [
-        s(weight: 50, reps: 5),
-        s(added: 100, reps: 5),
-      ];
+      final sets = [s(weight: 50, reps: 5), s(added: 100, reps: 5)];
       expect(
         heaviestLogged(
           sets: sets,
@@ -339,7 +366,86 @@ void main() {
     });
 
     test('nothing logged has no top set', () {
-      expect(heaviestLogged(sets: [], measureMode: MeasureMode.reps, loadMode: LoadMode.total), isNull);
+      expect(
+        heaviestLogged(
+          sets: [],
+          measureMode: MeasureMode.reps,
+          loadMode: LoadMode.total,
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('the bodyweight chip', () {
+    BodyweightBasis basis(
+      BodyweightTrust trust, {
+      double kg = 73.2,
+      int? days,
+    }) => (
+      kg: kg,
+      trust: trust,
+      lastDayKey: days == null ? null : 20260101,
+      daysOld: days,
+    );
+
+    test('a recent weigh-in is the figure and nothing else', () {
+      expect(
+        bodyweightBasisLabel(
+          basis(BodyweightTrust.logged, days: 2),
+          WeightUnit.kg,
+        ),
+        'Bodyweight 73.2 kg',
+      );
+      expect(
+        bodyweightBasisNotice(
+          basis(BodyweightTrust.logged, days: 2),
+          WeightUnit.kg,
+        ),
+        isNull,
+      );
+    });
+
+    test('an old weigh-in says how old', () {
+      final stale = basis(BodyweightTrust.stale, days: 12);
+      expect(
+        bodyweightBasisLabel(stale, WeightUnit.kg),
+        'Bodyweight 73.2 kg · 12 days old',
+      );
+      expect(
+        bodyweightBasisNotice(stale, WeightUnit.kg),
+        'Your last weigh-in was 12 days ago. Log your latest weight for an '
+        'accurate strength trend.',
+      );
+    });
+
+    test('nothing logged says the figure is assumed', () {
+      final assumed = basis(BodyweightTrust.assumed, kg: 60);
+      expect(
+        bodyweightBasisLabel(assumed, WeightUnit.kg),
+        'Bodyweight 60 kg assumed',
+      );
+      expect(
+        bodyweightBasisNotice(assumed, WeightUnit.kg),
+        'No bodyweight is logged, so 60 kg is assumed. Log your weight for an '
+        'accurate strength trend.',
+      );
+    });
+
+    test('the assumed figure is printed in the unit the phone shows', () {
+      final assumed = basis(BodyweightTrust.assumed, kg: 60);
+      expect(
+        bodyweightBasisLabel(assumed, WeightUnit.lb),
+        startsWith('Bodyweight 132'),
+      );
+    });
+
+    test('the load line names what the movement adds', () {
+      expect(bodyweightLoadBlurb(LoadMode.bodyweight), 'Your bodyweight');
+      expect(
+        bodyweightLoadBlurb(LoadMode.bodyweightPlus),
+        'Your bodyweight plus the weight you add',
+      );
     });
   });
 }

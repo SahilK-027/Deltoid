@@ -212,9 +212,10 @@ PerformanceScore scorePerformance({
 /// off the row instead reported `0 kg` for a session of chins and dips, where
 /// `weight` is null on every set.
 ///
-/// Bodyweight sets contribute nothing when [bodyweightKg] is null, because it
-/// is unknown rather than zero. A caller that gets 0 back should say so with a
-/// dash, not print a total that quietly dropped half the session.
+/// Bodyweight sets contribute nothing when [bodyweightKg] is null. Every caller
+/// in the app reads it through [bodyweightOn], which answers
+/// [assumedBodyweightKg] when nothing has been logged, so null reaches this
+/// only from a caller that has no bodyweight to give.
 ///
 /// Holds contribute nothing either, for a different reason: kg × seconds is
 /// not the unit this figure is in. Three minutes of plank is real work and
@@ -250,8 +251,79 @@ double sessionVolume({
 /// movement is a thousand-odd calls over a thousand-odd entries, and doing the
 /// copy, the sort and a linear scan on each of them cost most of a second
 /// before the chart could be drawn.
-double? bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) =>
+double bodyweightOn(int dayKey, List<({int dayKey, double weightKg})> log) =>
     bodyweightOnOrdered(dayKey, orderedByDay(log));
+
+/// The bodyweight a lift is scored against when none has ever been logged.
+///
+/// A weighted dip with no bodyweight behind it is scored on the added weight
+/// alone, so 10 kg to 12.5 kg reads as a quarter stronger when the load moved
+/// rose by about three per cent. Any plausible bodyweight is closer to the
+/// truth than none: for a movement that is bodyweight only, the change between
+/// two days does not depend on the figure at all, and for a weighted one it
+/// depends on it only weakly. What an assumed figure cannot give is a true
+/// total in kilograms, so the log says it is assumed wherever it is used
+/// ([BodyweightTrust.assumed]) and offers the weigh-in beside it. The first
+/// weigh-in replaces it on every day ever logged, because nothing stores it.
+const assumedBodyweightKg = 60.0;
+
+/// How many days a weigh-in is taken as current.
+///
+/// A bodyweight is extended forward from the last entry without limit, which
+/// is right for the arithmetic and says nothing about how old the entry is.
+/// Past a week the log asks for a new one.
+const bodyweightFreshDays = 7;
+
+/// How far the bodyweight behind a lift is to be trusted.
+enum BodyweightTrust {
+  /// Weighed within [bodyweightFreshDays] of the day being scored.
+  logged,
+
+  /// Weighed, but longer ago than that.
+  stale,
+
+  /// Never weighed. The figure is [assumedBodyweightKg].
+  assumed,
+}
+
+/// The bodyweight a day is scored against, and where it came from.
+///
+/// [lastDayKey] and [daysOld] describe the newest entry in the log and are
+/// null when there is none. [daysOld] is never negative: a session backfilled
+/// to a day before the first weigh-in is scored on that weigh-in, and it is
+/// not stale for having been taken afterwards.
+typedef BodyweightBasis = ({
+  double kg,
+  BodyweightTrust trust,
+  int? lastDayKey,
+  int? daysOld,
+});
+
+/// [bodyweightOn] for [dayKey], with how much the figure can be trusted.
+BodyweightBasis bodyweightBasis(
+  int dayKey,
+  List<({int dayKey, double weightKg})> log,
+) {
+  final ordered = orderedByDay(log);
+  if (ordered.isEmpty) {
+    return (
+      kg: assumedBodyweightKg,
+      trust: BodyweightTrust.assumed,
+      lastDayKey: null,
+      daysOld: null,
+    );
+  }
+  final last = ordered.last.dayKey;
+  final days = math.max(0, daysBetweenKeys(last, dayKey));
+  return (
+    kg: bodyweightOnOrdered(dayKey, ordered),
+    trust: days > bodyweightFreshDays
+        ? BodyweightTrust.stale
+        : BodyweightTrust.logged,
+    lastDayKey: last,
+    daysOld: days,
+  );
+}
 
 /// [log] ordered by day, copying only when it is not already.
 ///
@@ -273,11 +345,15 @@ List<({int dayKey, double weightKg})> orderedByDay(
 /// [bodyweightOn] for a series already through [orderedByDay]. Binary search
 /// and nothing else, so looking up a thousand days costs a thousand log-n
 /// probes rather than a thousand passes over the series.
-double? bodyweightOnOrdered(
+///
+/// An empty log answers [assumedBodyweightKg] rather than nothing, and the
+/// return type says so: no caller can score a bodyweight lift against a load
+/// it does not have.
+double bodyweightOnOrdered(
   int dayKey,
   List<({int dayKey, double weightKg})> ordered,
 ) {
-  if (ordered.isEmpty) return null;
+  if (ordered.isEmpty) return assumedBodyweightKg;
 
   if (dayKey <= ordered.first.dayKey) return ordered.first.weightKg;
   if (dayKey >= ordered.last.dayKey) return ordered.last.weightKg;

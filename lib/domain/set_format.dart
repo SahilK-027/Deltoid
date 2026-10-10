@@ -215,3 +215,45 @@ String setTitle(SetType type, String label, int? leg) {
   final head = type == SetType.working ? 'Set $label' : '${type.label} set';
   return leg == null ? head : '$head · leg $leg';
 }
+
+/// The bodyweight a lift is scored against, as the log's chip prints it:
+/// `Bodyweight 73.2 kg`, `Bodyweight 73.2 kg · 12 days old`,
+/// `Bodyweight 60 kg assumed`.
+///
+/// The figure is the same in all three. What follows it says how far to trust
+/// it, and is absent when the weigh-in is recent.
+String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) {
+  final figure = 'Bodyweight ${formatBodyweight(basis.kg, unit)} ${unit.label}';
+  return switch (basis.trust) {
+    BodyweightTrust.logged => figure,
+    BodyweightTrust.stale => '$figure · ${_daysOld(basis.daysOld ?? 0)} old',
+    BodyweightTrust.assumed => '$figure assumed',
+  };
+}
+
+/// What the bodyweight sheet asks for, or null when the weigh-in is recent and
+/// there is nothing to ask.
+///
+/// A string the user reads, so it is in the second person
+/// (THEME → The words).
+String? bodyweightBasisNotice(BodyweightBasis basis, WeightUnit unit) {
+  const ask = 'for an accurate strength trend.';
+  return switch (basis.trust) {
+    BodyweightTrust.logged => null,
+    BodyweightTrust.stale =>
+      'Your last weigh-in was ${_daysOld(basis.daysOld ?? 0)} ago. '
+          'Log your latest weight $ask',
+    BodyweightTrust.assumed =>
+      'No bodyweight is logged, so '
+          '${formatBodyweight(basis.kg, unit)} ${unit.label} is assumed. '
+          'Log your weight $ask',
+  };
+}
+
+/// How a bodyweight movement's load is made up, in one line.
+String bodyweightLoadBlurb(LoadMode mode) => mode == LoadMode.bodyweightPlus
+    ? 'Your bodyweight plus the weight you add'
+    : 'Your bodyweight';
+
+String _daysOld(int days) => days == 1 ? '1 day' : '$days days';
+
