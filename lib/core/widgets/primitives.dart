@@ -1469,6 +1469,11 @@ class RowValue extends StatelessWidget {
       : text = value ?? 'Choose',
         pending = value == null;
 
+  /// A value the row states and does not let you change: the figure in
+  /// `textTertiary`, the ink of something that is not an answer of yours. The
+  /// chevron stays, because the row still opens a sheet that says why.
+  const RowValue.fixed(this.text, {super.key}) : pending = true;
+
   final String text;
   final bool pending;
 

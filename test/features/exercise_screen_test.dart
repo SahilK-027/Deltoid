@@ -1,6 +1,7 @@
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
+import 'package:deltoid/core/theme/tokens.dart';
 import 'package:deltoid/core/widgets/primitives.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/seed/seeder.dart';
@@ -240,12 +241,35 @@ void main() {
       expect(pushUp.bodyweightPct, 64);
 
       await pumpFor(tester, pushUp.id);
-      expect(find.text('64%'), findsOneWidget);
-      expect(find.text('Set for this movement'), findsOneWidget);
+      expect(find.text('Fixed for this movement'), findsOneWidget);
+      // Dimmed, so the row does not read as an answer waiting to be changed.
+      final value = tester.widget<Text>(find.text('64%'));
+      expect(
+        value.style?.color,
+        buildTheme(Brightness.dark).extension<DeltoidColors>()!.textTertiary,
+      );
 
       await tester.tap(find.text('Share of bodyweight'));
       await settle(tester);
-      expect(find.byType(TextField), findsNothing);
+
+      // The sheet opens, so the tap is answered, and says why nothing here
+      // can be changed. The field is off and there is nothing to save.
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.enabled, isFalse);
+      expect(field.controller?.text, '64');
+      expect(
+        find.text(
+          'This movement comes with the app, so its share is fixed at 64%. '
+          'A movement you create has a share you can set.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(PrimaryButton, 'Save'), findsNothing);
+
+      final after = await (db.select(db.exercises)
+            ..where((t) => t.id.equals(pushUp.id)))
+          .getSingle();
+      expect(after.bodyweightPct, 64);
     });
 
     testWidgets('a movement the user created can have its share changed', (
