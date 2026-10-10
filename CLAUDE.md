@@ -11,15 +11,15 @@ exactly as it did before sync existed. Sync is an additive layer over columns
 that every syncable row already carries: an upload of locally changed rows, a
 download that merges, and one question at first sign-in if both sides already
 contain training data. [RULES § 6](RULES.md#6-scope) explains what that decision
-does and does not permit, and [TODO.md](TODO.md) lists the one task still open.
+does and does not permit, and [TODO.md](TODO.md) lists what has been built.
 
-The repository is private and MIT-licensed, and the app is a personal tool
-rather than a product. Nothing personal belongs in the repository even so.
-Privacy is not the reason for that rule: `seed_data.dart` is starter data for
-an empty install, so putting personal numbers, coaching cues, or links there
-hardcodes one training programme into an app whose whole design refuses to
-assume one. That is rule 9 below, and it holds regardless of who can read the
-code. Do not commit a real Supabase project reference, key, or OAuth client ID
+The repository is public and MIT-licensed, and the app is a personal tool
+rather than a product. Nothing personal belongs in the repository, and being
+public is only the second reason for that rule. The first is that
+`seed_data.dart` is starter data for an empty install, so putting personal
+numbers, coaching cues, or links there hardcodes one training programme into an
+app whose whole design refuses to assume one. That is rule 9 below, and it
+holds regardless of who can read the code. Do not commit a real Supabase project reference, key, or OAuth client ID
 either (`deltoid.env.json` is git-ignored, and `deltoid.env.example.json`
 shows the expected shape). Those three values are not secrets — they ship
 inside any release APK and are extractable from it — but they are the live
@@ -34,7 +34,7 @@ data behind them.
 | **[THEME.md](THEME.md)**   | Before changing anything visual. The app screen by screen, and the design language it is drawn in. Do not invent a card, row, button, or sheet it does not describe |
 | **[SYNC.md](SYNC.md)**     | Before changing cloud backup. Sections 1–16 are the design: what syncs, what never syncs, how a conflict resolves, and the ten things sync must never do. Sections 17–20 are the implementation: architecture, the seven phases, and what must exist outside the repository |
 | **[README.md](README.md)** | Setup, commands, project layout, and how the layers fit together                                                                                          |
-| **[TODO.md](TODO.md)**     | What is done and what is left. Status is recorded there and nowhere else                                                                                  |
+| **[TODO.md](TODO.md)**     | What has been built. Status is recorded there and nowhere else                                                                                            |
 | **[CHANGELOG.md](CHANGELOG.md)** | Every release, in terms of what changed for the user. Written in the release commit, alongside the version bump                        |
 | [SETUP-SYNC.md](SETUP-SYNC.md) | Only when the question is how a person configures their own Supabase and Google projects. Operational setup, not design                                |
 

@@ -1,6 +1,6 @@
 # Deltoid — the list
 
-Status only, one line per item: what is done, what is left. Why anything is
+Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
@@ -119,16 +119,3 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
       answer spread over every row, and resolving it row by row let two phones
       settle on opposite ones permanently. Ten seeds of 1,577 found it.
 - [x] Where each load-bearing rule is checked: [RULES § 7](RULES.md#7-working-on-it).
-
----
-
-## Left
-
-**Rebrand 7 · Reconciliation**, above, and nothing else. The light theme has
-been checked on five empty screens, and its status bar is no longer white on
-white; everything that needs a populated log is still unchecked.
-
-Sync is built and its design is settled. Two numbers in `sync_engine.dart` — a
-20-minute backstop and a 4-second debounce — are placeholders by design rather
-than oversights, and [SYNC § 16](SYNC.md#16-still-to-decide) says why they can
-only be chosen against a phone and a real week.

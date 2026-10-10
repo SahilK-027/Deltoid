@@ -20,8 +20,10 @@ Three other properties follow from the same intent:
 - **No training programme is built in.** A new install contains an exercise
   catalog and nothing else. You either build a split yourself or start from a
   template (PPL 6-day, Upper/Lower) and edit it.
-- **Logged workouts are immutable snapshots.** Editing a programme changes what
-  you will do next; it never rewrites what you have already done.
+- **Logged workouts are snapshots.** Editing a programme changes what you will
+  do next; it never rewrites what you have already done. A set typed wrong at
+  the bar can be corrected by hand afterwards, and nothing else changes a
+  logged day.
 
 <table>
   <tr>
@@ -50,12 +52,18 @@ Three other properties follow from the same intent:
 
 ## Getting the app
 
-There is no Play Store listing, so the way to get Deltoid is to build it
-yourself. You will need the Flutter SDK (Dart `^3.11.5`) and an Android
-toolchain.
+There is no Play Store listing. The quickest way to get Deltoid is the APK
+attached to the
+[latest release](https://github.com/SahilK-027/Deltoid/releases/latest):
+download `app-arm64-v8a-offline-release.apk` on an Android phone and open it.
+That is the offline build described below. It has no account and no server
+behind it, and everything you log stays on the phone.
+
+To build it yourself you will need the Flutter SDK (Dart `^3.11.5`) and an
+Android toolchain.
 
 ```bash
-git clone git@github.com:SahilK-027/Deltoid.git
+git clone https://github.com/SahilK-027/Deltoid.git
 cd Deltoid
 flutter pub get
 dart run build_runner build
@@ -150,10 +158,10 @@ build instead.
 
 ## Status
 
-The app is feature-complete and in daily use. All 886 Dart tests and nine pgTAP
-tests pass, and the analyzer reports no issues. One task remains open: a
-light-theme review that requires a populated log on real hardware.
-[TODO.md](TODO.md) is the only place where status is recorded.
+The app is feature-complete and in daily use. All 1,167 Dart tests and nine
+pgTAP tests pass, and the analyzer reports no issues. [TODO.md](TODO.md) is the
+only place where status is recorded, and [CHANGELOG.md](CHANGELOG.md) says what
+each release changed.
 
 This is a personal tool rather than a product. There is no roadmap and no
 support, and issues and pull requests are not being solicited. You are welcome
@@ -257,7 +265,7 @@ account.
 
 ### Testing
 
-The suite contains 886 Dart tests, plus nine pgTAP tests that run behind
+The suite contains 1,167 Dart tests, plus nine pgTAP tests that run behind
 `supabase test db`. Alongside conventional unit and widget tests, three pieces
 are worth describing:
 
@@ -317,7 +325,7 @@ same importer, and installs the finished database directly.
 
 ### Schema changes
 
-`schemaVersion` is currently **3**, and the migration ladder is live. A schema
+`schemaVersion` is currently **5**, and the migration ladder is live. A schema
 change consists of four steps: edit `tables.dart`, regenerate with
 `build_runner`, add a default in `data/db/table_spec.dart`, and add an
 idempotent step to `upgradeSchema`. Read
@@ -385,7 +393,7 @@ them.
 | **[RULES.md](RULES.md)**  | Every rule the app is held to: data invariants, migrations, known traps, and scope     |
 | **[THEME.md](THEME.md)**  | The app screen by screen, and the design language it is drawn in                       |
 | **[SYNC.md](SYNC.md)**    | The sync design: what syncs, how conflicts resolve, and what sync must never do        |
-| **[TODO.md](TODO.md)**    | A single list of what is done and what is left. Status is recorded here and nowhere else |
+| **[TODO.md](TODO.md)**    | A single list of what has been built. Status is recorded here and nowhere else |
 | [SETUP-SYNC.md](SETUP-SYNC.md) | Step-by-step setup for the full build: Supabase, Google OAuth, keystore, and env file |
 | [CLAUDE.md](CLAUDE.md)    | Orientation for AI coding sessions. It points at the documents above and contains no facts of its own |
 

@@ -9,7 +9,7 @@ loosened. Adoption and the failure states are still ahead; see
 [TODO.md](TODO.md).
 
 The rules this must not break live in [RULES.md](RULES.md). The screens it adds
-are drawn in [THEME.md](THEME.md). What is done and what is left is in
+are drawn in [THEME.md](THEME.md). What has been built is listed in
 [TODO.md](TODO.md).
 
 **§ 1–16 are the design: what sync must do.** **§ 17–20 are the build: the code
