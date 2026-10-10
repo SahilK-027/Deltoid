@@ -30,6 +30,7 @@ Future<void> ensureStarterCatalog(AppDatabase db) async {
               loadMode: e.loadMode,
               barKind: Value(e.barKind),
               measureMode: Value(e.measureMode),
+              bodyweightPct: Value(e.bodyweightPct),
               starterKey: Value(e.key),
             ),
           );
@@ -120,6 +121,7 @@ Future<String> createRegimeFromTemplate(
               loadMode: starter.loadMode,
               barKind: Value(starter.barKind),
               measureMode: Value(starter.measureMode),
+              bodyweightPct: Value(starter.bodyweightPct),
               starterKey: Value(key),
             ),
           );
@@ -203,6 +205,36 @@ Future<void> backfillSeededMeasureModes(AppDatabase db) async {
                 t.measureMode.equalsValue(MeasureMode.reps),
           ))
         .write(ExercisesCompanion(measureMode: Value(starter.measureMode)));
+  }
+}
+
+/// Gives the rows this app seeded the share of bodyweight they move.
+///
+/// The same argument as [backfillSeededBarKinds]: 100 is the right default for
+/// a movement nobody has been asked about and wrong for the push-up this app
+/// put in the catalog itself. Only touches rows still carrying their
+/// `starterKey` and still on the default.
+///
+/// The rows are marked `dirty`, which the two backfills above do not do. This
+/// one runs on a phone that may be signed in, and a value held only on the
+/// phone is lost to the next restore from the account. `updated_at` and
+/// `device_id` are left alone: the migration runs before the device has its
+/// id, and two phones that both run it write the same value.
+Future<void> backfillSeededBodyweightShares(AppDatabase db) async {
+  for (final starter in starterExercises) {
+    if (starter.bodyweightPct == 100) continue;
+    await (db.update(db.exercises)
+          ..where(
+            (t) =>
+                t.starterKey.equals(starter.key) &
+                t.bodyweightPct.equals(100),
+          ))
+        .write(
+      ExercisesCompanion(
+        bodyweightPct: Value(starter.bodyweightPct),
+        dirty: const Value(true),
+      ),
+    );
   }
 }
 

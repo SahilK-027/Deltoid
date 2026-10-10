@@ -37,6 +37,7 @@ void main() {
           loadMode: LoadMode.total,
           barKind: BarKind.none,
           measureMode: MeasureMode.reps,
+          bodyweightPct: 100,
           archived: false,
           formVideoUrls: const [],
         ),

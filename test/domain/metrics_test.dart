@@ -5,10 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('effectiveLoad', () {
     test('doubles per-side dumbbell entries', () {
-      expect(
-        effectiveLoad(mode: LoadMode.perSide, weight: 22.5),
-        45,
-      );
+      expect(effectiveLoad(mode: LoadMode.perSide, weight: 22.5), 45);
     });
 
     test('takes machine and barbell entries at face value', () {
@@ -16,10 +13,7 @@ void main() {
     });
 
     test('bodyweight lifts use logged bodyweight', () {
-      expect(
-        effectiveLoad(mode: LoadMode.bodyweight, bodyweightKg: 72),
-        72,
-      );
+      expect(effectiveLoad(mode: LoadMode.bodyweight, bodyweightKg: 72), 72);
     });
 
     test('bodyweight-plus adds the belt load', () {
@@ -33,21 +27,44 @@ void main() {
       );
     });
 
-    test('bodyweight-plus without a bodyweight log falls back to added only', () {
-      expect(
-        effectiveLoad(mode: LoadMode.bodyweightPlus, addedWeight: 10),
-        10,
-      );
-    });
+    test(
+      'bodyweight-plus without a bodyweight log falls back to added only',
+      () {
+        expect(
+          effectiveLoad(mode: LoadMode.bodyweightPlus, addedWeight: 10),
+          10,
+        );
+      },
+    );
   });
 
   group('sessionVolume', () {
-    List<({LoadMode mode, MeasureMode measure, List<ScoredSet> sets})> one(
+    List<
+      ({
+        LoadMode mode,
+        MeasureMode measure,
+        int bodyweightPct,
+        List<ScoredSet> sets,
+      })
+    >
+    one(
       LoadMode mode,
       List<ScoredSet> sets, {
       MeasureMode measure = MeasureMode.reps,
-    }) =>
-        [(mode: mode, measure: measure, sets: sets)];
+      int bodyweightPct = 100,
+    }) => [
+      (mode: mode, measure: measure, bodyweightPct: bodyweightPct, sets: sets),
+    ];
+
+    test('a push-up day counts the part of the body a push-up moves', () {
+      final volume = sessionVolume(
+        bodyweightKg: 75,
+        exercises: one(LoadMode.bodyweight, const [
+          ScoredSet(type: SetType.working, reps: 10),
+        ], bodyweightPct: 64),
+      );
+      expect(volume, closeTo(480, 1e-9));
+    });
 
     test('a bodyweight session is not a session of nothing', () {
       // The bug: volume read `weight` off the row, which is null on every
@@ -97,16 +114,19 @@ void main() {
       );
     });
 
-    test('with no bodyweight ever logged it is zero, for the caller to dash', () {
-      expect(
-        sessionVolume(
-          exercises: one(LoadMode.bodyweight, const [
-            ScoredSet(type: SetType.working, reps: 8),
-          ]),
-        ),
-        0,
-      );
-    });
+    test(
+      'with no bodyweight ever logged it is zero, for the caller to dash',
+      () {
+        expect(
+          sessionVolume(
+            exercises: one(LoadMode.bodyweight, const [
+              ScoredSet(type: SetType.working, reps: 8),
+            ]),
+          ),
+          0,
+        );
+      },
+    );
   });
 
   group('estimated1RM', () {
@@ -187,10 +207,10 @@ void main() {
 
   group('a hold is scored on the clock', () {
     List<ScoredSet> plank() => const [
-          ScoredSet(type: SetType.working, reps: 45),
-          ScoredSet(type: SetType.working, reps: 62),
-          ScoredSet(type: SetType.working, reps: 50),
-        ];
+      ScoredSet(type: SetType.working, reps: 45),
+      ScoredSet(type: SetType.working, reps: 62),
+      ScoredSet(type: SetType.working, reps: 50),
+    ];
 
     test('the top set is the longest, not the heaviest', () {
       final score = scorePerformance(
@@ -234,11 +254,13 @@ void main() {
           (
             mode: LoadMode.total,
             measure: MeasureMode.reps,
+            bodyweightPct: 100,
             sets: const [ScoredSet(type: SetType.working, weight: 60, reps: 5)],
           ),
           (
             mode: LoadMode.bodyweight,
             measure: MeasureMode.hold,
+            bodyweightPct: 100,
             sets: plank(),
           ),
         ],
@@ -344,12 +366,7 @@ void main() {
       );
       // 2.7% up, same shape of set: lit.
       expect(
-        beatsPrevious(
-          load: 46.2,
-          reps: 12,
-          previousLoad: 45,
-          previousReps: 13,
-        ),
+        beatsPrevious(load: 46.2, reps: 12, previousLoad: 45, previousReps: 13),
         isTrue,
       );
     });
@@ -378,6 +395,139 @@ void main() {
       expect(
         beatsPrevious(load: 45, reps: 12, previousLoad: null, previousReps: 8),
         isFalse,
+      );
+    });
+  });
+
+  group('the share of bodyweight a movement moves', () {
+    test('a push-up moves 64 per cent of the body', () {
+      expect(bodyweightMoved(75, 64), closeTo(48, 1e-9));
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweight,
+          bodyweightKg: 75,
+          bodyweightPct: 64,
+        ),
+        closeTo(48, 1e-9),
+      );
+    });
+
+    test('added weight is added whole, on top of the share', () {
+      // A 10 kg plate on a push-up is 10 kg, not 64 per cent of it.
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweightPlus,
+          bodyweightKg: 75,
+          bodyweightPct: 64,
+          addedWeight: 10,
+        ),
+        closeTo(58, 1e-9),
+      );
+    });
+
+    test('a movement with no share stated moves the whole body', () {
+      expect(effectiveLoad(mode: LoadMode.bodyweight, bodyweightKg: 75), 75);
+    });
+
+    test('a loaded movement does not read the share', () {
+      expect(
+        effectiveLoad(mode: LoadMode.total, weight: 100, bodyweightPct: 64),
+        100,
+      );
+      expect(
+        effectiveLoad(mode: LoadMode.perSide, weight: 20, bodyweightPct: 64),
+        40,
+      );
+    });
+
+    test('the same plate is a bigger step on a push-up than on a pull-up', () {
+      double? best(int pct, double added) => scorePerformance(
+        mode: LoadMode.bodyweightPlus,
+        bodyweightKg: 75,
+        bodyweightPct: pct,
+        sets: [ScoredSet(type: SetType.working, addedWeight: added, reps: 5)],
+      ).best1RM;
+
+      // 48 → 58 kg on the push-up, 71.25 → 81.25 on the pull-up.
+      final pushUp = best(64, 10)! / best(64, 0)! - 1;
+      final pullUp = best(95, 10)! / best(95, 0)! - 1;
+      expect(pushUp, closeTo(10 / 48, 1e-9));
+      expect(pullUp, closeTo(10 / 71.25, 1e-9));
+      expect(pushUp, greaterThan(pullUp));
+    });
+  });
+
+  group('bodyweightBasis', () {
+    const log = [
+      (dayKey: 20260101, weightKg: 70.0),
+      (dayKey: 20260110, weightKg: 72.0),
+    ];
+
+    test('nothing logged is the assumed figure, and says so', () {
+      final basis = bodyweightBasis(20260115, const []);
+      expect(basis.kg, 60);
+      expect(basis.trust, BodyweightTrust.assumed);
+      expect(basis.lastDayKey, isNull);
+      expect(basis.daysOld, isNull);
+    });
+
+    test('a weigh-in a week old is still current', () {
+      final basis = bodyweightBasis(20260117, log);
+      expect(basis.kg, 72);
+      expect(basis.trust, BodyweightTrust.logged);
+      expect(basis.lastDayKey, 20260110);
+      expect(basis.daysOld, 7);
+    });
+
+    test('a weigh-in eight days old is stale', () {
+      final basis = bodyweightBasis(20260118, log);
+      expect(basis.kg, 72);
+      expect(basis.trust, BodyweightTrust.stale);
+      expect(basis.daysOld, 8);
+    });
+
+    test('age is counted in days across a month end, not in keys', () {
+      // 28 January to 4 February is 7 days and 76 key units.
+      final basis = bodyweightBasis(20260204, const [
+        (dayKey: 20260128, weightKg: 71.0),
+      ]);
+      expect(basis.daysOld, 7);
+      expect(basis.trust, BodyweightTrust.logged);
+    });
+
+    test('a day before the newest weigh-in is not stale', () {
+      // A session backfilled to a day between two entries, or before the
+      // first, is scored on real entries taken around it.
+      final between = bodyweightBasis(20260105, log);
+      expect(between.kg, closeTo(70.8889, 1e-4));
+      expect(between.trust, BodyweightTrust.logged);
+      expect(between.daysOld, 0);
+
+      final before = bodyweightBasis(20251201, log);
+      expect(before.kg, 70);
+      expect(before.trust, BodyweightTrust.logged);
+    });
+  });
+
+  group('a weighted bodyweight lift with nothing logged', () {
+    test('is scored on the assumed bodyweight plus the added weight', () {
+      final kg = bodyweightOn(20260101, const []);
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweightPlus,
+          addedWeight: 10,
+          bodyweightKg: kg,
+        ),
+        70,
+      );
+      // 10 kg to 12.5 kg added is 70 to 72.5, not a quarter more.
+      expect(
+        effectiveLoad(
+          mode: LoadMode.bodyweightPlus,
+          addedWeight: 12.5,
+          bodyweightKg: kg,
+        ),
+        72.5,
       );
     });
   });
@@ -427,8 +577,9 @@ void main() {
       expect(bodyweightOn(20260601, log), 72);
     });
 
-    test('returns null with no log at all', () {
-      expect(bodyweightOn(20260101, const []), isNull);
+    test('assumes a bodyweight when none has ever been logged', () {
+      expect(bodyweightOn(20260101, const []), 60);
+      expect(assumedBodyweightKg, 60);
     });
 
     test('handles unsorted input', () {

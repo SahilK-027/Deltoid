@@ -656,6 +656,14 @@ Future<String?> promptForText(
   String initial = '',
   String? Function(String value)? validate,
   int maxLength = 60,
+
+  /// Takes a whole number instead of a name: a digit keyboard, digits only.
+  /// What a field does is the call site's to say (THEME → Fields).
+  bool digits = false,
+
+  /// One line under the field saying what is being asked, for a prompt whose
+  /// title cannot carry it.
+  String? help,
 }) {
   return showAppSheet<String>(
     context,
@@ -665,6 +673,8 @@ Future<String?> promptForText(
       initial: initial,
       validate: validate,
       maxLength: maxLength,
+      digits: digits,
+      help: help,
     ),
   );
 }
@@ -676,12 +686,16 @@ class _NamePromptSheet extends StatefulWidget {
     required this.initial,
     required this.maxLength,
     this.validate,
+    this.digits = false,
+    this.help,
   });
 
   final String title;
   final String? hint;
   final String initial;
   final int maxLength;
+  final bool digits;
+  final String? help;
   final String? Function(String value)? validate;
 
   @override
@@ -726,13 +740,22 @@ class _NamePromptSheetState extends State<_NamePromptSheet> {
           autofocus: true,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.done,
-          inputFormatters: [LengthLimitingTextInputFormatter(widget.maxLength)],
+          keyboardType: widget.digits ? TextInputType.number : null,
+          inputFormatters: [
+            if (widget.digits) FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(widget.maxLength),
+          ],
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _submit(),
           style: context.t.bodyLarge?.copyWith(color: c.textPrimary),
           cursorColor: c.textPrimary,
           decoration: InputDecoration(hintText: widget.hint),
         ),
+        if (widget.help != null && error == null)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.sm),
+            child: Text(widget.help!, style: context.t.bodySmall),
+          ),
         if (error != null)
           Padding(
             padding: const EdgeInsets.only(top: Space.sm),

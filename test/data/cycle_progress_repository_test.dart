@@ -3,6 +3,7 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/cycle_progress.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,10 +107,36 @@ void main() {
 
     final progress = (await repo.activeRegimeProgress())!.progress;
 
-    expect(progress.cycles[1].value, closeTo(10, 1e-9));
-    expect(progress.percent, closeTo(10, 1e-9));
-    expect(progress.liftsImproved, progress.liftsCompared);
-    expect(progress.liftsCompared, greaterThan(0));
+    // A movement that takes a load moved by exactly the load. A bodyweight
+    // movement did the same reps on both passes against the same assumed
+    // bodyweight, because nothing was weighed in, so it is scored and has not
+    // changed — where it used to go unscored for want of a bodyweight.
+    final loadOf = {
+      for (final e in await db.select(db.exercises).get()) e.id: e.loadMode,
+    };
+    bool takesLoad(LiftChange l) =>
+        loadOf[l.lift.exerciseId] == LoadMode.total ||
+        loadOf[l.lift.exerciseId] == LoadMode.perSide;
+
+    final lifts = progress.cycles[1].lifts;
+    final loaded = lifts.where(takesLoad).toList();
+    final bodyweight = lifts.where((l) => !takesLoad(l)).toList();
+    expect(loaded, isNotEmpty);
+    expect(bodyweight, isNotEmpty);
+    for (final l in loaded) {
+      expect(l.percent, closeTo(10, 1e-9));
+    }
+    for (final l in bodyweight) {
+      expect(l.percent, closeTo(0, 1e-9));
+    }
+
+    // The cycle's point is the mean over both kinds.
+    expect(
+      progress.cycles[1].value,
+      closeTo(10 * loaded.length / lifts.length, 1e-9),
+    );
+    expect(progress.liftsImproved, loaded.length);
+    expect(progress.liftsCompared, lifts.length);
   });
 
   test('a lift is a session and an exercise, not an exercise', () async {

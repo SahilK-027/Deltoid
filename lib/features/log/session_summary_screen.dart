@@ -272,6 +272,7 @@ class SessionSummaryScreen extends ConsumerWidget {
           (
             mode: entry.exercise.loadMode,
             measure: entry.exercise.measureMode,
+            bodyweightPct: entry.exercise.bodyweightPct,
             sets: [
               for (final set in entry.sets)
                 if (set.isDone)

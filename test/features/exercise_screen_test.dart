@@ -1,3 +1,4 @@
+import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/primitives.dart';
@@ -144,7 +145,136 @@ void main() {
 
     // The row is gone, so there is no outstanding question behind it.
     expect(find.text('Bar'), findsNothing);
+
+    // A bodyweight movement owes a different answer in its place: how much of
+    // the body it moves. Nothing is created on a guess at it.
+    expect(find.text('Share of bodyweight'), findsOneWidget);
+
+    // The button is the foot of a lazily built list, and the extra row puts it
+    // below a test phone's fold, so it is scrolled to before it is read.
+    final create = find.widgetWithText(PrimaryButton, 'Create exercise');
+    Future<void> toCreate() async {
+      await tester.dragUntilVisible(
+        create,
+        find.byType(Scrollable).first,
+        const Offset(0, -200),
+      );
+      await settle(tester);
+    }
+
+    await toCreate();
+    expect(createAction(tester), isNull);
+
+    await tester.dragUntilVisible(
+      find.text('Share of bodyweight'),
+      find.byType(Scrollable).first,
+      const Offset(0, 200),
+    );
+    await settle(tester);
+    await tester.tap(find.text('Share of bodyweight'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextField).first, '95');
+    await settle(tester);
+    await tester.tap(find.widgetWithText(PrimaryButton, 'Save'));
+    await settle(tester);
+
+    expect(find.text('95%'), findsOneWidget);
+    await toCreate();
     expect(createAction(tester), isNotNull);
+
+    await tester.tap(create);
+    await settle(tester);
+
+    final made = await (db.select(db.exercises)
+          ..where((t) => t.name.equals('Ring pull-up')))
+        .getSingle();
+    expect(made.bodyweightPct, 95);
+  });
+
+  testWidgets('a share outside 1 to 100 is refused while it is typed', (
+    tester,
+  ) async {
+    await pumpNew(tester);
+    await answer(
+        tester, 'How the weight is entered', 'Bodyweight plus added weight');
+
+    await tester.tap(find.text('Share of bodyweight'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextField).first, '140');
+    await settle(tester);
+
+    expect(find.text('Enter a whole number from 1 to 100'), findsOneWidget);
+    expect(
+      tester
+          .widget<PrimaryButton>(find.widgetWithText(PrimaryButton, 'Save'))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('a loaded movement is not asked for a share', (tester) async {
+    await pumpNew(tester);
+    await answer(tester, 'How the weight is entered', 'Total load');
+    expect(find.text('Share of bodyweight'), findsNothing);
+  });
+
+  group('the share of bodyweight on an existing movement', () {
+    Future<void> pumpFor(WidgetTester tester, String id) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.dark),
+            home: ExerciseScreen(exerciseId: id),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    testWidgets('a seeded movement states its share and does not offer to '
+        'change it', (tester) async {
+      final pushUp = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('pushup')))
+          .getSingle();
+      expect(pushUp.bodyweightPct, 64);
+
+      await pumpFor(tester, pushUp.id);
+      expect(find.text('64%'), findsOneWidget);
+      expect(find.text('Set for this movement'), findsOneWidget);
+
+      await tester.tap(find.text('Share of bodyweight'));
+      await settle(tester);
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('a movement the user created can have its share changed', (
+      tester,
+    ) async {
+      final id = await RegimeRepository(db).createExercise(
+        name: 'Ring dip',
+        muscle: MuscleGroup.chest,
+        equipment: Equipment.bodyweight,
+        loadMode: LoadMode.bodyweightPlus,
+      );
+
+      await pumpFor(tester, id);
+      expect(find.text('100%'), findsOneWidget);
+
+      await tester.tap(find.text('Share of bodyweight'));
+      await settle(tester);
+      await tester.enterText(find.byType(TextField).first, '95');
+      await settle(tester);
+      await tester.tap(find.widgetWithText(PrimaryButton, 'Save'));
+      await settle(tester);
+
+      final row = await (db.select(db.exercises)
+            ..where((t) => t.id.equals(id)))
+          .getSingle();
+      expect(row.bodyweightPct, 95);
+      // Stamped and owed to the account like any other edit.
+      expect(row.dirty, isTrue);
+    });
   });
 
   group('editing an existing exercise', () {

@@ -26,6 +26,7 @@ import '../../domain/units.dart';
 import 'log_providers.dart';
 import 'session_summary_screen.dart';
 import 'set_completion.dart';
+import 'widgets/bodyweight_pill.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
 import 'widgets/hold_pad.dart';
@@ -2150,6 +2151,23 @@ class _ExercisePage extends ConsumerWidget {
             // somebody else's day, and that is not something to leave a person
             // to notice. Nothing is borrowed now — a first time here opens
             // blank — so there is no warning left to carry.
+            // First of the three controls, and as tall as the two buttons
+            // after it. It draws nothing on a movement that takes a load, so
+            // the gap is its own to carry.
+            if (!skipped &&
+                BodyweightPill.appliesTo(
+                  entry.exercise.loadMode,
+                  entry.exercise.measureMode,
+                )) ...[
+              const SizedBox(width: Space.sm),
+              BodyweightPill(
+                loadMode: entry.exercise.loadMode,
+                measureMode: entry.exercise.measureMode,
+                bodyweightPct: entry.exercise.bodyweightPct,
+                dayKey: workout.dayKey,
+              ),
+              const SizedBox(width: Space.sm),
+            ],
             _InfoButton(
               onTap: () => showExerciseInfo(context, ref, entry, prefill),
             ),

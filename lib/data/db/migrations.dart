@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../seed/seeder.dart';
 import 'database.dart';
 
 /// The ladder: one step per released schema change, and every step idempotent.
@@ -71,6 +72,21 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
         db, m, db.sessionExercises, db.sessionExercises.barKind);
     await addColumnIfMissing(
         db, m, db.workoutExercises, db.workoutExercises.barKind);
+  }
+
+  // 4 → 5 · How much of the body a bodyweight movement moves.
+  //
+  // `exercises.bodyweight_pct`, 100 by default. That default is what every
+  // existing row meant when it was written, since every bodyweight movement
+  // was scored on the whole bodyweight, so a movement the user created stays
+  // on it until they say otherwise.
+  //
+  // The movements this app seeded itself are backfilled, because the app
+  // already knows their answer: a push-up left at 100 would go on being scored
+  // half as heavy again as it is. See [backfillSeededBodyweightShares].
+  if (from < 5) {
+    await addColumnIfMissing(db, m, db.exercises, db.exercises.bodyweightPct);
+    await backfillSeededBodyweightShares(db);
   }
 }
 

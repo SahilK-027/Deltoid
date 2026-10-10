@@ -215,3 +215,74 @@ String setTitle(SetType type, String label, int? leg) {
   final head = type == SetType.working ? 'Set $label' : '${type.label} set';
   return leg == null ? head : '$head · leg $leg';
 }
+
+/// The bodyweight a lift is scored against, as the first line of the log's
+/// pill: `73.2 kg`.
+String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) =>
+    '${formatBodyweight(basis.kg, unit)} ${unit.label}';
+
+/// The pill's second line. What the movement takes from the bodyweight while
+/// the weigh-in is recent, `+69.5 kg (95%)`, and otherwise why the figure
+/// above it is not to be trusted: `12 days old`, or `assumed`.
+///
+/// One line has room for one of the two, and the doubt is the one that cannot
+/// wait for the sheet: an assumed figure is never printed without the word.
+String bodyweightPillDetail(
+  BodyweightBasis basis,
+  int bodyweightPct,
+  WeightUnit unit,
+) => switch (basis.trust) {
+  BodyweightTrust.logged => bodyweightMovedLabel(basis.kg, bodyweightPct, unit),
+  BodyweightTrust.stale => '${_daysOld(basis.daysOld ?? 0)} old',
+  BodyweightTrust.assumed => 'assumed',
+};
+
+/// What a movement takes from a bodyweight: `+69.5 kg (95%)`.
+///
+/// Signed, because it is what the body adds to whatever is on the belt, and
+/// the load column beside it reads `BW +` for the same reason.
+String bodyweightMovedLabel(
+  double bodyweightKg,
+  int bodyweightPct,
+  WeightUnit unit,
+) =>
+    '+${formatBodyweight(bodyweightMoved(bodyweightKg, bodyweightPct), unit)} '
+    '${unit.label} ($bodyweightPct%)';
+
+/// The line under the scale weight on the bodyweight sheet: when it was last
+/// recorded, and what to do about it when that is too long ago or never.
+///
+/// [lastRecorded] is the date of the newest weigh-in, already formatted, or
+/// null when there is none. A string the user reads, so it is in the second
+/// person (THEME → The words).
+String bodyweightRecordedLine(
+  BodyweightBasis basis,
+  WeightUnit unit, {
+  required String? lastRecorded,
+}) {
+  const ask = 'for an accurate strength trend.';
+  return switch (basis.trust) {
+    BodyweightTrust.logged => 'Last recorded on $lastRecorded',
+    BodyweightTrust.stale =>
+      'Last recorded on $lastRecorded, ${_daysOld(basis.daysOld ?? 0)} ago. '
+          'Log your latest weight $ask',
+    BodyweightTrust.assumed =>
+      'No weight is recorded, so '
+          '${formatBodyweight(basis.kg, unit)} ${unit.label} is assumed. '
+          'Log your weight $ask',
+  };
+}
+
+/// What the resistance on a bodyweight movement is, in the sentence under the
+/// figure.
+String bodyweightLoadBlurb(LoadMode mode, int bodyweightPct) {
+  final share =
+      'This is the part of your bodyweight that counts as '
+      'resistance on this movement, $bodyweightPct% of it. It is what your '
+      'charts, volume and cycle progress are worked out from.';
+  return mode == LoadMode.bodyweightPlus
+      ? '$share The weight you add is counted on top.'
+      : share;
+}
+
+String _daysOld(int days) => days == 1 ? '1 day' : '$days days';

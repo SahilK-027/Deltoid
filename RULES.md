@@ -77,6 +77,8 @@ in through step 3.
 | **A position is unique among live rows**                        | `sessions`, `session_exercises`, `workout_exercises` and `set_logs` all carry a partial unique index on their parent plus `orderIndex`. Every append takes one past the highest live position rather than the live count — a tombstone leaves a gap and nothing renumbers behind it — and the index is what holds when the writer is a restore rather than a tap. **A reorder therefore cannot renumber in place**: see `renumber` in [§ 4](#4-code).                                                                                                         |
 | **One session is open at a time**                               | A partial unique index on `workouts (status) WHERE status = 'inProgress'`, the same shape as the single-active-regime one. `startWorkout`'s check reads outside the transaction that writes, so Start and the backfill sheet could both find nothing running — and `openWorkout` then hides the loser behind the newer one: unreachable, in progress forever, counted by nothing.                                                                                                                                                                             |
 | **A day answers to one name in its regime**                     | `idx_sessions_name_live`, keyed on `lower(trim(name))`. The prefill disclosure names the day a movement was last done in, History filters by it, and the chart labels its lines with it — two live `Push 1`s makes all three ambiguous. Across regimes is fine, which is why `LoggedSession` carries the regime name.                                                                                                                                                                                                                                                    |
+| **A bodyweight movement moves a share of the body, not all of it** | `exercises.bodyweight_pct`, read through `bodyweightMoved` under the two bodyweight load modes. A push-up is a lever on the toes, and the hands carry bodyweight times the distance from toes to centre of mass over the distance from toes to hands: 64 per cent across lifters. Scored on the whole body it read half as heavy again as it is, and a plate added to it counted for less than the same plate on a pull-up. **On the movement and read live, as `LoadMode` is**, since it says how every set of the movement is read. Added weight is added whole, never scaled. Fixed for a movement the catalog seeded, asked for on one the user creates. |
+| **A bodyweight never logged is assumed, and the log says so**    | `bodyweightOn` answers `assumedBodyweightKg`, 60 kg, on an empty log, and returns a `double` so no caller can score a bodyweight lift on nothing. Scored on nothing, a weighted dip was read on its added weight alone, and 10 kg to 12.5 kg came out a quarter stronger where the load rose by about three per cent. An assumed figure is exact for the change in a bodyweight-only lift and close for a weighted one; what it cannot give is a true total in kilograms. So it is never silent: `bodyweightBasis` reports `assumed`, or `stale` past a week, and the log's chip prints which. Nothing stores it, so the first weigh-in replaces it on every day ever logged. |
 | **An enum column is checked in the database**                   | `textEnum` throws on a string no member answers to, and takes the **whole result set** with it — one bad row blanks the log, history and the chart together. Every enum column carries a hand-written `CHECK … IN (…)`, and `schema_constraints_test` walks every member of every enum, so a value added to one and not the other fails a test rather than a screen.                                                                                                                                                                                          |
 | **A number that cannot mean anything is refused at the column** | Deload percentages, backwards rep ranges, a `dayKey` of 0, a session ending before it started, a set that is a leg of itself, a bodyweight of 850. Each is reachable only through a restore or a merged row — the writer that does not pass the repository, which is what a server becomes. **The column is the backstop, never the gate**: every one is also bounded at the input, or a slip becomes a failed write instead of a refused keystroke.                                                                                                          |
 
@@ -137,7 +139,7 @@ Drift code has to be regenerated after any edit to `lib/data/db/tables.dart`:
 dart run build_runner build
 ```
 
-**The ladder is running.** `schemaVersion` is 4 and `MigrationStrategy` has an
+**The ladder is running.** `schemaVersion` is 5 and `MigrationStrategy` has an
 `onUpgrade`, in `lib/data/db/migrations.dart`. So a schema change is:
 
 1. the column or `@TableIndex` in `tables.dart`,
@@ -213,6 +215,15 @@ and backfilled neither — the same rule reaching the opposite answer. Null here
 means _no answer, follow the catalog_, which is precisely what every existing
 row meant when it was written; copying today's catalog value onto them would
 freeze a guess as though it had been a decision at the time.
+
+**4 → 5** added `exercises.bodyweight_pct`, 100 by default, and backfilled the
+movements the app seeded itself: a push-up to 64, a pull-up, a chin-up and a
+dip to 95. Both halves of the backfill rule at once. A movement the user
+created stays on 100, which is what it meant when it was written, and a seeded
+one takes the figure the app already knows. This backfill marks its rows
+`dirty`, which the earlier ones did not, because it runs on phones that may be
+signed in and a value held only on the phone is lost to the next restore from
+the account.
 
 ---
 
@@ -469,6 +480,14 @@ else has to pass: **no new screen, and no new question asked.**
   destination, targets to fail against, and a score the app invents rather than
   derives.
 
+- **The bodyweight pill** is the fourth, and the one that comes nearest to a
+  new question. It adds no screen: a pill on the log page of a movement that is
+  already open, and a sheet whose one button opens the weigh-in sheet Settings
+  already has. It does ask, but only when the answer is missing or more than a
+  week old, only on a movement whose score reads the answer, and it never
+  stands between the thumb and a set. What stays ruled out is the reminder as
+  a feature: no notification, no badge on a tab, no prompt on opening the app.
+
 **Accounts came off it too, and did _not_ pass that test — so the reason has to
 be written down rather than assumed.** Sync across your own phones needs an
 identity to sync to, and an identity needs somewhere to say who you are, which
@@ -617,6 +636,8 @@ rather than shape. Where the checks live now:
 | Every derived number in cycle progress                                                  | `test/domain/cycle_progress_test.dart` — a deload, a switch away and back, a lift added part way, a hold, a bodyweight lift, all against hand-worked literals                                                                                                                                                                                                        |
 | A regime's whole history is read through its cycles, never by scanning every workout    | `test/data/query_planning_test.dart` — the plan for the cycle-progress read finds `idx_cycles_regime` and never scans `workouts`                                                                                                                                                                                                                                    |
 | A correction to a finished session reaches every reader, and changes what was lifted and never when | `test/data/logged_set_correction_test.dart` — the cycle card re-reads on the correction alone though it does not watch `set_logs`, `completedAt` and the exercise row's stamp are untouched, and a session still in progress is refused |
+| A bodyweight lift is never scored on nothing, and an assumed or old bodyweight is said | `test/domain/metrics_test.dart` — an empty log is 60 kg, a weigh-in is current for seven days counted in days, and a day before the newest entry is not stale; `test/features/bodyweight_pill_test.dart` — the three faces of the pill, and none on a hold or a loaded movement |
+| A bodyweight movement is scored on its share, and a seeded one's share cannot be moved | `test/domain/metrics_test.dart` — 64 per cent of 75 kg is 48, added weight is added whole, a loaded movement ignores the share; `test/features/exercise_screen_test.dart` — the row is inert on a seeded movement, required before a created one can be made, and refused outside 1 to 100; `test/data/regime_repository_test.dart` — the backfill reaches the seeded rows only |
 | A control that is busy does not look disabled                                           | `test/features/welcome_screen_test.dart` — the two answers' fills must differ mid-sign-in                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 **A comment that states a fact about other code is the kind that rots** — how

@@ -16,6 +16,7 @@ class StarterExercise {
     required this.loadMode,
     this.barKind = BarKind.none,
     this.measureMode = MeasureMode.reps,
+    this.bodyweightPct = 100,
   });
 
   final String key;
@@ -34,6 +35,20 @@ class StarterExercise {
   /// Reps for everything but the plank, which is the one movement in this
   /// catalog nobody counts repetitions of.
   final MeasureMode measureMode;
+
+  /// How much of the lifter's bodyweight the movement moves, as a percentage.
+  ///
+  /// A push-up is a lever resting on the toes: the hands carry bodyweight
+  /// times the distance from toes to centre of mass over the distance from
+  /// toes to hands. Those distances are not known for any one person, so the
+  /// figure is the one measured across lifters on a force plate, 64 per cent,
+  /// which is also what the lever gives for ordinary proportions. A pull-up, a
+  /// chin-up and a dip have no second point of support and move everything
+  /// but the forearms and hands, taken as 95.
+  ///
+  /// A movement the catalog seeds keeps this figure and the exercise screen
+  /// does not offer to change it. One the user creates is asked for its own.
+  final int bodyweightPct;
 }
 
 /// One exercise slot in a template session.
@@ -123,6 +138,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.chest,
     equipment: Equipment.bodyweight,
     loadMode: LoadMode.bodyweightPlus,
+    bodyweightPct: 95,
   ),
   StarterExercise(
     key: 'pushup',
@@ -130,6 +146,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.chest,
     equipment: Equipment.bodyweight,
     loadMode: LoadMode.bodyweightPlus,
+    bodyweightPct: 64,
   ),
 
   // ── Back ──────────────────────────────────────────────────────────────
@@ -139,6 +156,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.back,
     equipment: Equipment.bodyweight,
     loadMode: LoadMode.bodyweightPlus,
+    bodyweightPct: 95,
   ),
   StarterExercise(
     key: 'chinup',
@@ -146,6 +164,7 @@ const starterExercises = <StarterExercise>[
     muscle: MuscleGroup.back,
     equipment: Equipment.bodyweight,
     loadMode: LoadMode.bodyweightPlus,
+    bodyweightPct: 95,
   ),
   StarterExercise(
     key: 'lat_pulldown',

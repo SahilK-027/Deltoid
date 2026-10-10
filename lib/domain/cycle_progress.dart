@@ -56,12 +56,17 @@ class LiftPerformance {
     required this.load,
     required this.sets,
     this.measure = MeasureMode.reps,
+    this.bodyweightPct = 100,
   });
 
   final LiftId lift;
   final int dayKey;
   final LoadMode load;
   final MeasureMode measure;
+
+  /// How much of the bodyweight the movement moves, in per cent. Read under
+  /// the two bodyweight load modes only.
+  final int bodyweightPct;
   final List<ScoredSet> sets;
 }
 
@@ -281,6 +286,7 @@ class CycleProgress {
     mode: p.load,
     measure: p.measure,
     bodyweightKg: bodyweightOnOrdered(p.dayKey, bodyweight),
+    bodyweightPct: p.bodyweightPct,
   );
   if (score.isEmpty) return null;
 

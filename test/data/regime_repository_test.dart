@@ -241,6 +241,63 @@ void main() {
       expect(squat.barKind, BarKind.olympic);
     });
 
+    test('the v5 backfill gives the seeded movements the share they move',
+        () async {
+      // What the migration finds: every row on the column's default, and none
+      // of them owed to the account.
+      await db.update(db.exercises).write(
+            const ExercisesCompanion(
+              bodyweightPct: Value(100),
+              dirty: Value(false),
+            ),
+          );
+      final mine = await repo.createExercise(
+        name: 'Ring dip',
+        muscle: MuscleGroup.chest,
+        equipment: Equipment.bodyweight,
+        loadMode: LoadMode.bodyweightPlus,
+      );
+
+      await backfillSeededBodyweightShares(db);
+
+      Future<Exercise> starter(String key) => (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals(key)))
+          .getSingle();
+
+      expect((await starter('pushup')).bodyweightPct, 64);
+      expect((await starter('pullup')).bodyweightPct, 95);
+      expect((await starter('chinup')).bodyweightPct, 95);
+      expect((await starter('dips')).bodyweightPct, 95);
+      // Owed to the account, or the next restore from it brings 100 back.
+      expect((await starter('pushup')).dirty, isTrue);
+
+      // A movement that takes a load is not touched and is not made dirty.
+      final squat = await starter('back_squat');
+      expect(squat.bodyweightPct, 100);
+      expect(squat.dirty, isFalse);
+
+      // A movement the user created keeps the default until they answer.
+      final ringDip = await (db.select(db.exercises)
+            ..where((t) => t.id.equals(mine)))
+          .getSingle();
+      expect(ringDip.bodyweightPct, 100);
+
+      // Run again, it changes nothing.
+      await db.update(db.exercises).write(
+            const ExercisesCompanion(dirty: Value(false)),
+          );
+      await backfillSeededBodyweightShares(db);
+      expect((await starter('pushup')).dirty, isFalse);
+    });
+
+    test('a fresh catalog is seeded with the shares already in place',
+        () async {
+      final pushUp = await (db.select(db.exercises)
+            ..where((t) => t.starterKey.equals('pushup')))
+          .getSingle();
+      expect(pushUp.bodyweightPct, 64);
+    });
+
     test('the backfill leaves a bar the user has already chosen alone',
         () async {
       final squat = await (db.select(db.exercises)

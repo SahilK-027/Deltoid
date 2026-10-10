@@ -91,6 +91,12 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   LoadMode? _loadMode;
   BarKind? _barKind;
 
+  /// The share of bodyweight a new bodyweight movement moves. Asked, not
+  /// defaulted: 100 would be right for a pull-up and half as much again as the
+  /// truth for a push-up, and nothing on the screen could tell the two apart
+  /// afterwards.
+  int? _bodyweightPct;
+
   /// Not in [_complete], unlike every other field on this screen. Reps is not a
   /// guess: it is what a movement is unless it is a plank, and the row states
   /// it rather than hiding behind `Choose`. Making it a fourth required answer
@@ -117,7 +123,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       _muscle != null &&
       _equipment != null &&
       _loadMode != null &&
-      (_loadMode != LoadMode.total || _barKind != null);
+      (_loadMode != LoadMode.total || _barKind != null) &&
+      (!_movesBodyweight(_loadMode) || _bodyweightPct != null);
+
+  static bool _movesBodyweight(LoadMode? mode) =>
+      mode == LoadMode.bodyweight || mode == LoadMode.bodyweightPlus;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +175,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     final equipment = exercise?.equipment ?? _equipment;
     final loadMode = exercise?.loadMode ?? _loadMode;
     final barKind = exercise?.barKind ?? _barKind;
+    final bodyweightPct = exercise?.bodyweightPct ?? _bodyweightPct;
+    // A movement the catalog seeded keeps the catalog's figure. The app knows
+    // the answer for those, and a figure anyone could move is one that two
+    // phones, or two months, would not agree on.
+    final shareIsSet = exercise?.starterKey != null;
     final measure = exercise?.measureMode ?? _measureMode;
     final notes = exercise?.notes ?? _notes;
 
@@ -354,6 +369,22 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       : const Icon(Icons.chevron_right_rounded, size: 20),
                   onTap: () => _editLoadMode(exercise, loadMode),
                 ),
+                // Only where bodyweight is the load. The row states the figure
+                // for a movement the catalog seeded and asks for it on one the
+                // user created.
+                if (_movesBodyweight(loadMode))
+                  AppRow(
+                    title: 'Share of bodyweight',
+                    subtitle: shareIsSet
+                        ? 'Set for this movement'
+                        : 'How much of your body this movement moves',
+                    trailing: RowValue.orChoose(
+                      bodyweightPct == null ? null : '$bodyweightPct%',
+                    ),
+                    onTap: shareIsSet
+                        ? null
+                        : () => _editBodyweightShare(exercise, bodyweightPct),
+                  ),
                 // Only for a total load: the plate view breaks a barbell total
                 // into plates, and there is nothing to break down when the
                 // number means one dumbbell or what is hanging off a belt.
@@ -490,10 +521,12 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     LoadMode? loadMode,
     BarKind? barKind,
     MeasureMode? measureMode,
+    int? bodyweightPct,
     Object? notes = _unset,
   }) {
     if (exercise == null) {
       setState(() {
+        if (bodyweightPct != null) _bodyweightPct = bodyweightPct;
         if (name != null) _name = name;
         if (muscle != null) _muscle = muscle;
         if (equipment != null) _equipment = equipment;
@@ -521,6 +554,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
           barKind: barKind == null ? const Value.absent() : Value(barKind),
           measureMode:
               measureMode == null ? const Value.absent() : Value(measureMode),
+          bodyweightPct: bodyweightPct == null
+              ? const Value.absent()
+              : Value(bodyweightPct),
           notes: notes == _unset
               ? const Value.absent()
               : Value(notes as String?),
@@ -651,6 +687,51 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     );
   }
 
+  /// The third field that is not a label: it decides how heavy every set of a
+  /// bodyweight movement is read as. No row is rewritten, and the estimated
+  /// 1RM, the chart and session volume all move with it, so on a movement with
+  /// sets behind it the change is confirmed with the count in view, as
+  /// [_editLoadMode] does.
+  Future<void> _editBodyweightShare(Exercise? exercise, int? current) async {
+    final typed = await promptForText(
+      context,
+      title: 'Share of bodyweight',
+      hint: '1 to 100',
+      initial: current?.toString() ?? '',
+      digits: true,
+      maxLength: 3,
+      help: 'A push-up moves about 64% of your bodyweight. A pull-up or a dip '
+          'moves about 95%.',
+      validate: (value) {
+        final pct = int.tryParse(value);
+        return pct == null || pct < 1 || pct > 100
+            ? 'Enter a whole number from 1 to 100'
+            : null;
+      },
+    );
+    final picked = int.tryParse(typed ?? '');
+    if (picked == null || picked == current) return;
+
+    if (exercise != null) {
+      final affected =
+          await ref.read(trainingRepositoryProvider).loggedSetCount(exercise.id);
+      if (affected > 0) {
+        if (!mounted) return;
+        final ok = await confirmAction(
+          context,
+          title: 'Change how this load is read?',
+          message: '$affected logged ${affected == 1 ? 'set' : 'sets'} will be '
+              're-read as moving $picked% of your bodyweight. Their estimated '
+              '1RMs, the progress chart and session volume move with them.',
+          confirmLabel: 'Change it',
+          destructive: false,
+        );
+        if (!ok) return;
+      }
+    }
+    _apply(exercise, bodyweightPct: picked);
+  }
+
   /// The second field that is not a label: it decides what the count on every
   /// set of this movement *is*. Flipping it does not rewrite a single row —
   /// eight stays eight — it changes whether eight means eight reps or eight
@@ -704,6 +785,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       loadMode: _loadMode!,
       barKind: _barKind ?? BarKind.none,
       measureMode: _measureMode,
+      bodyweightPct:
+          _movesBodyweight(_loadMode) ? _bodyweightPct ?? 100 : 100,
       notes: (_notes?.trim().isEmpty ?? true) ? null : _notes!.trim(),
     );
     final row = await (db.select(db.exercises)..where((t) => t.id.equals(id)))
