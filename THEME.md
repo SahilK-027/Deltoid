@@ -1229,6 +1229,22 @@ a menu dropped over the page has no room to say what an option _means_.
   that changes how existing records are _read_ asks the harder version, counting
   what it is about to reinterpret.
 
+**A logged set is corrected from its own line, in one sheet.** A number typed
+wrong at the bar is found on the logged day, so that is where it is put right:
+the set's line carries the pencil the note blocks on the page carry, not a
+chevron, because the line is edited rather than followed, and opens a sheet
+headed with the set's name and the exercise under it. The sheet is the
+weigh-in sheet's shape — the numbers as fields under their names, `Set type` as
+a row that opens its picker, the red delete row last, one `Save` — and `Save`
+stays off until something has changed and every field holds a number. It holds
+what was lifted and nothing about when: no tick, no rest, no time. The picker
+offers `Working` and `Warm-up` and never `Drop`, which needs a leg that a
+finished day has nobody to fill. A day still being logged shows its lines
+without the pencil, because the log screen is where an open session is
+changed. There is no edit mode and no second logger: a finished session reopened
+in the log would bring the rest timer, the ghosts and the finish flow to a day
+that is over.
+
 **Creation is a sheet, or one screen. Never a wizard.** No illustrated intro, no
 progress bar, no "we will build you a plan" — the user is the planner. One
 question per sheet; a second genuinely required question is a second sheet.

@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +15,7 @@ import '../../domain/set_format.dart';
 import '../../domain/units.dart';
 import 'exercise_history_screen.dart';
 import 'history_providers.dart';
+import 'logged_set_sheet.dart';
 import '../../core/widgets/toast.dart';
 import '../../domain/session_name.dart';
 
@@ -155,7 +157,12 @@ class WorkoutDetailScreen extends ConsumerWidget {
                   ),
                   for (var i = 0; i < detail.entries.length; i++) ...[
                     if (i > 0) const Divider(),
-                    _ExerciseBlock(entry: detail.entries[i]),
+                    _ExerciseBlock(
+                      entry: detail.entries[i],
+                      // A session still open is corrected on the log screen,
+                      // which is the one writer its rows have.
+                      editable: workout.status != WorkoutStatus.inProgress,
+                    ),
                   ],
                 ],
               ],
@@ -321,9 +328,12 @@ class WorkoutDetailScreen extends ConsumerWidget {
 /// hairline, which is what makes a day of six exercises read as one list rather
 /// than six panels (THEME → Components).
 class _ExerciseBlock extends ConsumerStatefulWidget {
-  const _ExerciseBlock({required this.entry});
+  const _ExerciseBlock({required this.entry, required this.editable});
 
   final ExerciseEntry entry;
+
+  /// Whether a set line opens the sheet that corrects it.
+  final bool editable;
 
   @override
   ConsumerState<_ExerciseBlock> createState() => _ExerciseBlockState();
@@ -451,6 +461,9 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
                     exercise: entry.exercise,
                     index: _workingIndex(done, i),
                     unit: unit,
+                    onTap: widget.editable
+                        ? () => _correctSet(done, i, unit)
+                        : null,
                   ),
                 ],
                 // Three different kinds of thing, told apart: what happened is
@@ -505,6 +518,62 @@ class _ExerciseBlockState extends ConsumerState<_ExerciseBlock> {
     await ref
         .read(trainingRepositoryProvider)
         .setWorkoutExerciseNotes(entry.workoutExercise.id, text);
+  }
+
+  /// Corrects one set of the day: a number typed wrong at the bar, a warm-up
+  /// logged as a working set, or a set that was never done.
+  ///
+  /// The repository is read before the sheet opens and the write goes through
+  /// that object, because the block can be rebuilt out from under the sheet by
+  /// the very query the write wakes (RULES § 4).
+  Future<void> _correctSet(List<SetLog> done, int i, WeightUnit unit) async {
+    final entry = widget.entry;
+    final set = done[i];
+    final repo = ref.read(trainingRepositoryProvider);
+
+    // A drop group's head takes its legs with it, ticked or not: a leg is a
+    // continuation of its head and means nothing once the head is gone.
+    final legs = [
+      for (final s in entry.sets)
+        if (s.parentSetId == set.id) s.id,
+    ];
+    final head = set.parentSetId;
+    final siblings = [
+      for (final s in entry.sets)
+        if (head != null && s.parentSetId == head) s.id,
+    ];
+
+    final edit = await showLoggedSetSheet(
+      context,
+      set: set,
+      exercise: entry.exercise,
+      unit: unit,
+      label: '${_workingIndex(done, i)}',
+      // The head is leg 1, so the first row under it is leg 2.
+      leg: head == null ? null : siblings.indexOf(set.id) + 2,
+      deleteCount: 1 + legs.length,
+    );
+    if (edit == null) return;
+
+    if (edit.delete) {
+      await repo.deleteLoggedSets([set.id, ...legs]);
+      return;
+    }
+
+    final load = edit.load;
+    final partial = edit.partial;
+    final added = entry.exercise.loadMode == LoadMode.bodyweightPlus;
+    await repo.correctLoggedSet(
+      set.id,
+      weight: load == null || added ? const Value.absent() : Value(load.kg),
+      addedWeight:
+          load == null || !added ? const Value.absent() : Value(load.kg),
+      reps: edit.count == null ? const Value.absent() : Value(edit.count),
+      partialReps:
+          partial == null ? const Value.absent() : Value(partial.reps),
+      setType:
+          edit.setType == null ? const Value.absent() : Value(edit.setType!),
+    );
   }
 
   /// What the exercise came to in one figure: the heaviest set logged. Warm-ups
@@ -608,13 +677,20 @@ class _NoteBlock extends StatelessWidget {
 }
 
 /// One logged set: index chip, then the load and reps as one phrase.
+///
+/// The line opens the sheet that corrects it, and says so with the pencil the
+/// note blocks carry.
 class _SetLine extends StatelessWidget {
   const _SetLine({
     required this.set,
     required this.exercise,
     required this.index,
     required this.unit,
+    required this.onTap,
   });
+
+  /// Null on a day that is still being logged, where the line is only read.
+  final VoidCallback? onTap;
 
   final SetLog set;
   final Exercise exercise;
@@ -630,7 +706,7 @@ class _SetLine extends StatelessWidget {
     final c = context.c;
     final short = set.setType.shortLabel;
 
-    return Padding(
+    final line = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: Space.gutter,
         vertical: Space.sm,
@@ -677,8 +753,31 @@ class _SetLine extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: Space.sm),
+            // The pencil the note blocks on this page carry, at the same size
+            // and ink, so the page has one mark for something that can be
+            // edited. A chevron would say the line leads somewhere. Boxed to
+            // the chip's height so it centres on the line's first row whether
+            // or not a set note sits under it.
+            SizedBox(
+              height: 28,
+              child: Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: c.textTertiary,
+              ),
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) return line;
+    return Pressable(
+      scale: 0.99,
+      onTap: onTap,
+      child: Semantics(button: true, hint: 'Correct this set', child: line),
     );
   }
 }

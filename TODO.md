@@ -4,7 +4,7 @@ Status only, one line per item: what is done, what is left. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,107 tests and nine pgTAP tests, analyzer clean.**
+**1,126 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -40,6 +40,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 ### Reading it back
 
 - [x] History pages by keyset, indexes every exercise trained, opens a workout from its own snapshots.
+- [x] A set on a logged day can be corrected or removed from its own line: load, count, partials and type, never the tick or the time. Cycle progress re-reads on the correction.
 - [x] Trend chart: e1RM or top weight, one line per session slot, deloads excluded, stalls flagged, pinch to zoom, holds in seconds.
 - [x] Consistency heatmap, eighteen weeks on Workouts with the all-time view behind it.
 - [x] Weekly muscle volume, six regions counted in SQL, arms and legs folding open.

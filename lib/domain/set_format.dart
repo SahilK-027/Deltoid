@@ -189,3 +189,29 @@ int? heaviestLogged({
   }
   return best;
 }
+
+/// What each set type does, in the one line a row has room for.
+///
+/// Only the three a set's sheet offers, on the log and on a logged day:
+/// backoff, rest-pause and AMRAP exist in the data and arrive from a template,
+/// but nothing types them by hand.
+String setTypeBlurb(SetType type) => switch (type) {
+  SetType.working => 'Counts towards the top set and est. 1RM',
+  // A warm-up is out of the progression maths — no top set, no e1RM, no
+  // volume — and it is *not* out of last-time: the ramp is mirrored into
+  // next week's rows and ghosted like any other set, which is the whole
+  // reason it is worth typing one in.
+  SetType.warmup => 'Out of progression, filled from last time',
+  SetType.drop => 'Continues the set above it, lighter',
+  _ => '',
+};
+
+/// What the set sheet calls itself.
+///
+/// A working set is numbered, because that number is what the table shows and
+/// what "beat last time" is measured against. Every other type is *named*: its
+/// chip is a letter, and "Set W" reads as a set called W.
+String setTitle(SetType type, String label, int? leg) {
+  final head = type == SetType.working ? 'Set $label' : '${type.label} set';
+  return leg == null ? head : '$head · leg $leg';
+}

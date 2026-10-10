@@ -3369,6 +3369,96 @@ class TrainingRepository {
     }
   }
 
+  /// Corrects a set in a session that has already ended.
+  ///
+  /// A number mistyped at the bar is read by everything downstream of the log:
+  /// the next prefill for the same day, the trend chart, weekly volume, and
+  /// every later cycle when the set sits in a lift's baseline. Deleting the
+  /// session and logging it again is the only other repair, and it discards the
+  /// day's timestamps and can reopen a closed cycle.
+  ///
+  /// `isDone` and `completedAt` are not parameters. A correction changes what
+  /// was lifted and never when, and a set unticked from history would vanish
+  /// from the only screen that could tick it again.
+  ///
+  /// Refuses a session still in progress, which has the log screen and its
+  /// debounced writes; two writers on one open row is the stale-write problem
+  /// RULES § 5 describes.
+  Future<void> correctLoggedSet(
+    String setId, {
+    Value<double?> weight = const Value.absent(),
+    Value<double?> addedWeight = const Value.absent(),
+    Value<int?> reps = const Value.absent(),
+    Value<int?> partialReps = const Value.absent(),
+    Value<SetType> setType = const Value.absent(),
+  }) {
+    return db.transaction(() async {
+      await _requireEndedSession([setId]);
+      await updateSet(
+        setId,
+        weight: weight,
+        addedWeight: addedWeight,
+        reps: reps,
+        partialReps: partialReps,
+      );
+      // Through `_setSetType` rather than the column, so a drop head put back
+      // to a working set releases its legs exactly as it does mid-session.
+      if (setType.present) await _setSetType(setId, setType.value);
+      _announceLoggedSetChange();
+    });
+  }
+
+  /// Removes sets from a session that has already ended.
+  ///
+  /// The caller hands over the whole drop group when its head is the set being
+  /// removed, on the terms [deleteSets] gives.
+  Future<void> deleteLoggedSets(List<String> setIds) {
+    if (setIds.isEmpty) return Future.value();
+    return db.transaction(() async {
+      await _requireEndedSession(setIds);
+      await deleteSets(setIds);
+      _announceLoggedSetChange();
+    });
+  }
+
+  /// Throws unless every one of [setIds] belongs to a session that has ended.
+  Future<void> _requireEndedSession(List<String> setIds) async {
+    final open = await db.customSelect(
+      'SELECT 1 FROM set_logs s '
+      'JOIN workout_exercises we ON we.id = s.workout_exercise_id '
+      'JOIN workouts w ON w.id = we.workout_id '
+      'WHERE s.id IN (${List.filled(setIds.length, '?').join(', ')}) '
+      'AND w.status = ? LIMIT 1',
+      variables: [
+        for (final id in setIds) Variable.withString(id),
+        Variable.withString(WorkoutStatus.inProgress.name),
+      ],
+    ).get();
+    if (open.isNotEmpty) {
+      throw StateError(
+        'A set in a session still in progress is edited on the log screen.',
+      );
+    }
+  }
+
+  /// Wakes the readers that watch the shape of the log rather than its sets.
+  ///
+  /// [watchActiveRegimeProgress] and [historyShapeChanges] leave `set_logs`
+  /// unwatched so that a whole regime is not scored again on every set ticked
+  /// mid-session. A correction to a finished session writes `set_logs` and
+  /// nothing else, so without this the cycle card would keep the old figure
+  /// until the next session was completed.
+  ///
+  /// A notification rather than a stamp on the parent `workout_exercises` row:
+  /// that row has not changed, and a fresh `updatedAt` on it would carry this
+  /// phone's copy of the day's note over a newer one written on another device.
+  /// Called inside the transaction, where drift holds it until the commit.
+  void _announceLoggedSetChange() {
+    db.notifyUpdates({
+      TableUpdate.onTable(db.workoutExercises, kind: UpdateKind.update),
+    });
+  }
+
   Future<void> deleteSet(String setId) => deleteSets([setId]);
 
   /// Tombstones several sets as one act.

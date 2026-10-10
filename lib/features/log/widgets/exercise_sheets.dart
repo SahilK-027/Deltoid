@@ -324,30 +324,6 @@ Future<void> showExerciseMenu(
   );
 }
 
-/// What each set type does, in the one line a row has room for. Only the three
-/// offered in the set sheet: backoff, rest-pause and AMRAP exist in the data
-/// and arrive from a template, but nothing types them by hand mid-session.
-String _typeBlurb(SetType type) => switch (type) {
-  SetType.working => 'Counts towards the top set and est. 1RM',
-  // A warm-up is out of the progression maths — no top set, no e1RM, no
-  // volume — and it is *not* out of last-time: the ramp is mirrored into
-  // next week's rows and ghosted like any other set, which is the whole
-  // reason it is worth typing one in.
-  SetType.warmup => 'Out of progression, filled from last time',
-  SetType.drop => 'Continues the set above it, lighter',
-  _ => '',
-};
-
-/// What the set sheet calls itself.
-///
-/// A working set is numbered, because that number is what the table shows and
-/// what "beat last time" is measured against. Every other type is *named*: its
-/// chip is a letter, and "Set W" reads as a set called W.
-String _setTitle(SetType type, String label, int? leg) {
-  final head = type == SetType.working ? 'Set $label' : '${type.label} set';
-  return leg == null ? head : '$head · leg $leg';
-}
-
 /// Everything you can do to one set.
 ///
 /// Opened from the set's type chip. Swipe-to-delete is not an option any more:
@@ -379,7 +355,7 @@ Future<void> showSetActions(
   await showAppSheet<void>(
     context,
     builder: (sheetContext) => AppSheet(
-      title: _setTitle(set.setType, label, leg),
+      title: setTitle(set.setType, label, leg),
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
         // A picker, built the way every other picker in the app is: rows with
@@ -398,7 +374,7 @@ Future<void> showSetActions(
                 ? Icons.radio_button_checked_rounded
                 : Icons.radio_button_unchecked_rounded,
             title: type.label,
-            subtitle: _typeBlurb(type),
+            subtitle: setTypeBlurb(type),
             onTap: () async {
               final navigator = Navigator.of(sheetContext);
               // The group side of the change — the first leg of a new drop

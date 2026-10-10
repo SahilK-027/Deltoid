@@ -105,6 +105,14 @@ list people read:
 Editing the second must never reach the first: the snapshot row is a copy for
 exactly this reason.
 
+**A finished session can be corrected, and only corrected.** A set on a logged
+day takes a new load, count, partial count or type, or is removed, through
+`correctLoggedSet` and `deleteLoggedSets`. Neither takes `isDone` or a time, and
+both refuse a session still in progress. The write is to `set_logs` alone, which
+the readers of the log's shape leave unwatched, so each announces a change to
+`workout_exercises` rather than stamping a row that has not changed. Adding an
+exercise or a set to a finished day is logging, and stays on the log screen.
+
 **Improvising is a snapshot edit, and stays one.** Adding a movement
 mid-session, dropping one, running the day out of order or ticking fewer working
 sets than the day programmes changes today and nothing else. The end-of-session screen then _offers_ each change back to the
@@ -608,6 +616,7 @@ rather than shape. Where the checks live now:
 | A progress bar never goes backwards, past its end, or invents a denominator             | `test/data/sync/pull_test.dart` — the steps of a first pull                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Every derived number in cycle progress                                                  | `test/domain/cycle_progress_test.dart` — a deload, a switch away and back, a lift added part way, a hold, a bodyweight lift, all against hand-worked literals                                                                                                                                                                                                        |
 | A regime's whole history is read through its cycles, never by scanning every workout    | `test/data/query_planning_test.dart` — the plan for the cycle-progress read finds `idx_cycles_regime` and never scans `workouts`                                                                                                                                                                                                                                    |
+| A correction to a finished session reaches every reader, and changes what was lifted and never when | `test/data/logged_set_correction_test.dart` — the cycle card re-reads on the correction alone though it does not watch `set_logs`, `completedAt` and the exercise row's stamp are untouched, and a session still in progress is refused |
 | A control that is busy does not look disabled                                           | `test/features/welcome_screen_test.dart` — the two answers' fills must differ mid-sign-in                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 **A comment that states a fact about other code is the kind that rots** — how
