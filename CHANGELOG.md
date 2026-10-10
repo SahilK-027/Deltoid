@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-10-10
+
+Minor release letting a set in a past session be corrected.
+
+### Added
+
+- **History:** A set in a past session can be corrected. Tapping the set, marked with a pencil, opens a sheet where its weight, reps, partial reps and set type can be changed, or the set deleted.
+  - Charts, weekly volume, cycle progress and the next session's suggested numbers all follow the corrected set.
+  - A session that is still being logged is changed on the log screen, as before.
+
 ## [1.12.3] - 2026-10-04
 
 Patch release letting a set be logged as full reps when the same set had partial reps last time.
@@ -394,7 +404,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...v1.13.0
 [1.12.3]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/SahilK-027/Deltoid/compare/v1.12.0...v1.12.1
