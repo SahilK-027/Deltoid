@@ -140,6 +140,30 @@ void main() {
     );
   });
 
+  testWidgets('the newest session held is not called last backed up', (
+    tester,
+  ) async {
+    // Two facts, two phrases: when the account last received anything, and
+    // which session is the newest it holds. Sharing one phrase put a time
+    // from today over a session from yesterday.
+    final at = DateTime.now().subtract(const Duration(minutes: 5));
+    await pump(
+      tester,
+      state: SyncState(status: SyncStatus.synced, owed: 0, lastPushAt: at),
+      owed: const OwedSummary(
+        waiting: [],
+        last: BackedUpSession(sessionName: 'Leg 2', dayKey: 20260101),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.cloud_done_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Newest session on your account'), findsOneWidget);
+    expect(find.text('Last backed up'), findsNothing);
+    expect(find.textContaining('Last backed up at '), findsOneWidget);
+  });
+
   testWidgets('offline: the sheet says how much is waiting', (tester) async {
     await pump(tester, state: pending, online: false, owed: summary);
 
