@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../account/backup_mark.dart';
 import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/sync_providers.dart';
@@ -16,8 +17,6 @@ import '../../core/widgets/progress_sheet.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
 import '../../data/sync/forget.dart';
-import '../../data/sync/sync_engine.dart';
-import '../../data/sync/sync_state.dart';
 import '../../domain/rest.dart';
 import '../account/sign_in_flow.dart';
 import 'bodyweight_screen.dart';
@@ -48,7 +47,13 @@ class SettingsScreen extends ConsumerWidget {
           // the band would make this the only tab whose header is one line,
           // which reads as a screen from a different app.
           const HeaderBand(
-            child: PageHeader(title: 'Settings', eyebrow: 'On this device'),
+            child: PageHeader(
+              title: 'Settings',
+              eyebrow: 'On this device',
+              // The same button the other three tabs carry, in the same
+              // corner. It draws nothing without an account.
+              actions: [BackupMark()],
+            ),
           ),
           Expanded(child: _body(context, ref, bodyweight, lastBackup, c)),
         ],
@@ -116,15 +121,18 @@ class SettingsScreen extends ConsumerWidget {
             ),
             AppRow(
               icon: Icons.schedule,
-              title: 'Automatic backup',
+              // Named for what it is, a file on the phone. As `Automatic
+              // backup` beside an account that is also a backup, its time read
+              // as the account's, and the two never matched.
+              title: 'Backup file on this phone',
               // "After each finished session" alone does not say whether it
               // has ever happened — it reads as a description or as a promise
               // depending on what you came to the row for, and the one thing a
               // backup row exists to answer is whether there is a backup.
               subtitle: lastBackup == null
-                  ? 'Has not run yet. It writes a file after each finished '
+                  ? 'Not written yet. A file is written after each finished '
                         'session.'
-                  : 'Last ran '
+                  : 'Last written '
                         '${DateFormat('d MMM yyyy, HH:mm').format(lastBackup)}',
               subtitleMaxLines: 3,
             ),
@@ -503,10 +511,11 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
         : AppRow(
             icon: Icons.account_circle_outlined,
             title: account.email ?? 'Signed in',
-            subtitle: backupState(
-              ref.watch(syncStateProvider).valueOrNull,
-              ref.watch(syncTroubleProvider).valueOrNull,
-            ),
+            // Which account, and nothing about its state. The button in the
+            // header says whether it is backed up, and its sheet says how
+            // much is waiting and since when; a second copy here was the same
+            // fact twice on one screen.
+            subtitle: 'Your training is backed up to this account',
             subtitleMaxLines: 3,
             onTap: () => _openAccountSheet(context, ref),
             chevron: true,
@@ -617,66 +626,6 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
     await forgetLocalHistory(db);
     showToastOn(messenger, 'Removed from this phone.');
   }
-}
-
-/// What the account row says under the address: which state, for how long, and
-/// why.
-///
-/// [SYNC.md § 2](SYNC.md#2-the-three-states) asks for all three, and *for how
-/// long* is the one that carries the meaning. **Pending is normal** — a session
-/// logged in a basement gym is pending for an hour and that is the design
-/// working — so the number of changes alone says nothing. Since this morning is
-/// a gym with no signal; since Tuesday is something to look at.
-///
-/// The loading case is the other half: `valueOrNull` on an `AsyncValue` that has
-/// not resolved is null, and reading null as *nothing owed* would show
-/// `Backed up` over a phone that is holding a session
-/// ([SYNC.md § 19](SYNC.md#19-traps)). Until the count arrives this says only
-/// what is certain — that this device is signed in.
-///
-/// The header's backup sheet says the same line, so the two never disagree
-/// about how much is waiting or why.
-String backupState(SyncState? state, SyncTrouble? trouble) {
-  if (state == null) return 'Signed in on this device.';
-
-  return switch (state.status) {
-    SyncStatus.pending => [
-      state.owed == 1 ? '1 change waiting' : '${state.owed} changes waiting',
-      if (state.owedSince case final since?) ' since ${_since(since)}',
-      '.',
-      // Only when the last attempt actually failed. Rows written a minute ago
-      // are pending because the debounce has not elapsed, and explaining that
-      // to a user would be inventing a problem to reassure them about.
-      switch (trouble) {
-        SyncTrouble.offline => " There's no connection right now.",
-        SyncTrouble.refused =>
-          ' The account refused the last attempt. It will keep trying.',
-        null => '',
-      },
-    ].join(),
-    SyncStatus.synced || SyncStatus.local => switch (state.lastPushAt) {
-      final at? =>
-        'Backed up ${DateFormat('d MMM, HH:mm').format(at.toLocal())}.',
-      // Signed in, nothing owed, and nothing has ever left: a fresh install
-      // that has not been trained on yet.
-      _ => 'Signed in on this device.',
-    },
-  };
-}
-
-/// A time if it is today, a date if it is not.
-///
-/// `09:14` on the day it happened and `12 Aug` after that: the hour matters
-/// while it is still this session, and stops meaning anything the moment the
-/// answer is *days*.
-String _since(DateTime at) {
-  final local = at.toLocal();
-  final now = DateTime.now();
-  final sameDay =
-      local.year == now.year &&
-      local.month == now.month &&
-      local.day == now.day;
-  return DateFormat(sameDay ? 'HH:mm' : 'd MMM').format(local);
 }
 
 /// **The three numbers rest runs on.**

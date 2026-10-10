@@ -102,7 +102,7 @@ void main() {
     final sentence = tester.widget<Text>(
       find.text(
         'Everything is saved on this phone. It is backed up to your account '
-        'when the phone is online again.',
+        'when the phone is online again. 3 changes waiting.',
       ),
     );
     expect(sentence.maxLines, isNull);
@@ -111,6 +111,48 @@ void main() {
     expect(find.text('17 sets, in progress'), findsOneWidget);
     expect(find.text('Bodyweight'), findsOneWidget);
     expect(find.text('Try again now'), findsOneWidget);
+  });
+
+  testWidgets('backed up: the title is the state, and the time is a sentence '
+      'under it', (tester) async {
+    final at = DateTime.now().subtract(const Duration(minutes: 5));
+    final time =
+        '${at.hour.toString().padLeft(2, '0')}:'
+        '${at.minute.toString().padLeft(2, '0')}';
+    await pump(
+      tester,
+      state: SyncState(status: SyncStatus.synced, owed: 0, lastPushAt: at),
+    );
+
+    await tester.tap(find.byIcon(Icons.cloud_done_outlined));
+    await tester.pumpAndSettle();
+
+    // No clock in the title: beside the file backup's time on Settings it
+    // read as a second, unexplained one.
+    expect(find.text('Backed up'), findsOneWidget);
+    expect(find.textContaining('Backed up $time'), findsNothing);
+    expect(
+      find.text(
+        'Everything is saved on this phone and on your account. '
+        'Last backed up at $time.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('offline: the sheet says how much is waiting', (tester) async {
+    await pump(tester, state: pending, online: false, owed: summary);
+
+    await tester.tap(find.byIcon(Icons.cloud_off_outlined));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Everything is saved on this phone. It is backed up to your account '
+        'when the phone is online again. 3 changes waiting.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a failed attempt with the interface up is yellow too',

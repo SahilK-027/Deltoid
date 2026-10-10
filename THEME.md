@@ -1166,9 +1166,10 @@ icon and white `micro` label at weight 700; unselected `textSecondary` for both.
 
 The same `CircleIconButton` as the calendar beside it: `surfaceHigh` fill, 40dp,
 in the header's action slot on Workouts (left of the calendar), History (left of
-the total) and Regimes, and between the title and `Finish` on the log. Drawn
-whenever an account is signed in; absent without one. Settings does not carry
-it, because its account row already says the same in words (rule 6).
+the total), Regimes and Settings, and between the title and `Finish` on the
+log. Drawn whenever an account is signed in; absent without one. On Settings
+the account row beside it names the account and says nothing about its state,
+so the button is where that screen says it, once (rule 6).
 
 **Two faces.** `cloud_done_outlined` in `positive` while the phone is online and
 no attempt has failed. `cloud_off_outlined` in `warning` when there is no
@@ -1182,10 +1183,13 @@ sheet lists — sets for each session, entries for bodyweight, changes for the
 programme. Online, a set is owed for the few seconds the push waits, and the
 green face carries no number, so nothing blinks while you log.
 
-**The sheet.** Title `Offline`, `Not backed up`, `Backing up` or `Backed up
-14:02`, with no subtitle. The body opens with a wrapping paragraph in
-`textSecondary` that always starts `Everything is saved on this phone.` — a
-sentence, so not the one-line subtitle, which cut it off. Then
+**The sheet.** Title `Offline`, `Not backed up`, `Backing up` or `Backed up`,
+with no subtitle and no time: the title names the state. The body opens with a
+wrapping paragraph in `textSecondary` that always starts `Everything is saved
+on this phone.` — a sentence, so not the one-line subtitle, which cut it off.
+The paragraph ends with the one figure the state has: `Last backed up at
+14:02.` when everything has gone, `3 changes waiting since 09:14.` when it has
+not. Then
 `On this phone only`: one `AppRow` per session (`Push 1 · today`, `17 sets, in
 progress`), then `Discarded and deleted sessions` as one line counted in
 sessions — never by name, where a discarded `Push 1 · today` beside the live one
@@ -1195,6 +1199,12 @@ exercises`, each with a
 session the account holds, with a green `cloud_done`. `Try again now`, a
 secondary button, only while the face is yellow and something is waiting. Group
 headings are sentence case in `textSecondary`, not uppercase.
+
+**Two backups, two names.** The account is a backup and so is the file the app
+writes to the phone after each finished session, and each has a time. They are
+never both called a backup with a time beside it. The account's is `Last backed
+up`, in the sheet. The file's row on Settings is `Backup file on this phone`,
+`Last written 9 Oct 2026, 19:22`.
 
 ### Badges
 
