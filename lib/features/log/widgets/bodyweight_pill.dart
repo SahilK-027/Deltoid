@@ -70,6 +70,9 @@ class BodyweightPill extends ConsumerWidget {
       // Green while the weigh-in is recent, and the warning yellow the sheet's
       // notice is drawn in when it is old or assumed.
       hue: basis.trust == BodyweightTrust.logged ? c.positive : c.warning,
+      // The ring is filled to the share of the body the movement moves, so a
+      // push-up's is two thirds drawn and a pull-up's is all but closed.
+      fraction: bodyweightPct / 100,
       semanticLabel: 'Bodyweight $figure, $moved on this movement',
       onTap: () => _open(context, ref, basis, unit),
     );
@@ -109,6 +112,12 @@ class BodyweightPill extends ConsumerWidget {
   }
 }
 
+/// What the pill opens: the scale weight the lift is scored on, and the part
+/// of it that counts as resistance on this movement.
+///
+/// The scale weight is shown as a figure in a panel rather than as a field. It
+/// is read here and changed in the weigh-in sheet, which `Edit scale weight`
+/// opens, so the panel does not take a tap it cannot answer.
 class _BodyweightSheet extends StatelessWidget {
   const _BodyweightSheet({
     required this.basis,
@@ -124,48 +133,100 @@ class _BodyweightSheet extends StatelessWidget {
   final int bodyweightPct;
   final bool loggedToday;
 
-  String get _weighed {
-    final last = basis.lastDayKey;
-    if (last == null) return 'Assumed until a weight is logged';
-    if (loggedToday) return 'Weighed today';
-    return 'Weighed ${DateFormat('d MMM yyyy').format(dateFromDayKey(last))}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final notice = bodyweightBasisNotice(basis, unit);
+    final c = context.c;
+    final hue = basis.trust == BodyweightTrust.logged ? c.positive : c.warning;
     final moved = formatBodyweight(
       bodyweightMoved(basis.kg, bodyweightPct),
       unit,
     );
+    final recorded = basis.lastDayKey != null;
+
     return AppSheet(
-      title: 'Bodyweight',
-      contentPadding: const EdgeInsets.only(bottom: Space.md),
-      footer: PrimaryButton(
-        label: loggedToday ? "Edit today's weight" : 'Log bodyweight',
-        onPressed: () => Navigator.of(context).pop(true),
+      title: 'Bodyweight contribution',
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SecondaryButton(
+            label: recorded ? 'Edit scale weight' : 'Log scale weight',
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+          const SizedBox(height: Space.sm),
+          PrimaryButton(
+            label: 'Got it',
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+        ],
       ),
       children: [
-        if (notice != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Space.lg,
-              Space.lg,
-              Space.lg,
-              Space.sm,
-            ),
-            child: NoticeBox(message: notice),
+        Text('Scale weight', style: context.t.titleSmall),
+        const SizedBox(height: Space.sm),
+        InsetPanel(
+          width: double.infinity,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatBodyweight(basis.kg, unit),
+                  style: context.t.labelLarge,
+                ),
+              ),
+              Text(
+                unit.label,
+                style: context.t.labelSmall?.copyWith(color: c.textSecondary),
+              ),
+            ],
           ),
-        AppRow(
-          icon: Icons.monitor_weight_outlined,
-          title: '${formatBodyweight(basis.kg, unit)} ${unit.label}',
-          subtitle: _weighed,
         ),
-        AppRow(
-          icon: Icons.fitness_center_rounded,
-          title: '$moved ${unit.label} of resistance',
-          subtitle: bodyweightLoadBlurb(loadMode, bodyweightPct),
-          subtitleMaxLines: 3,
+        const SizedBox(height: Space.sm),
+        Text(
+          bodyweightRecordedLine(
+            basis,
+            unit,
+            lastRecorded: recorded
+                ? DateFormat('d MMM yyyy').format(
+                    dateFromDayKey(basis.lastDayKey!),
+                  )
+                : null,
+          ),
+          style: context.t.bodySmall?.copyWith(
+            color: basis.trust == BodyweightTrust.logged
+                ? c.textSecondary
+                : c.warning,
+          ),
+        ),
+        const SizedBox(height: Space.lg),
+        AppCard(
+          fill: Colors.transparent,
+          outline: BorderSide(color: c.border),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.monitor_weight_outlined,
+                    size: 22,
+                    color: c.textPrimary,
+                  ),
+                  const Spacer(),
+                  Pill('$bodyweightPct%', color: hue),
+                ],
+              ),
+              const SizedBox(height: Space.md),
+              Text(
+                '+$moved ${unit.label} of resistance',
+                style: context.t.titleMedium,
+              ),
+              const SizedBox(height: Space.xxs),
+              Text(
+                bodyweightLoadBlurb(loadMode, bodyweightPct),
+                style: context.t.bodyMedium,
+              ),
+            ],
+          ),
         ),
       ],
     );

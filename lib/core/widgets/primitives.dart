@@ -1656,18 +1656,23 @@ class Pill extends StatelessWidget {
   }
 }
 
-/// A figure and the figure derived from it, in an outlined capsule.
+/// A figure and the figure derived from it, inside a ring that is filled to a
+/// share.
 ///
-/// The log's bodyweight pill: `73.2 kg` over `+69.5 kg (95%)`. An outline in
-/// [hue] rather than a fill, because the two lines inside it are numbers to be
-/// read and a tinted ground behind them would cost the smaller one its
-/// contrast. The outline carries the state, as a [Pill]'s tint does.
+/// The log's bodyweight pill: `73.2 kg` over `+69.5 kg (95%)`, in a capsule
+/// whose outline is drawn in [hue] for [fraction] of the way round and left as
+/// track for the rest. The gap sits at the top centre, so 95 per cent reads as
+/// a ring with a small piece missing rather than as a line that stops
+/// somewhere. A ring rather than a fill, because the two lines inside it are
+/// numbers to be read and a tinted ground behind them would cost the smaller
+/// one its contrast.
 class FigurePill extends StatelessWidget {
   const FigurePill({
     super.key,
     required this.figure,
     required this.detail,
     required this.hue,
+    this.fraction = 1,
     this.onTap,
     this.semanticLabel,
   });
@@ -1675,8 +1680,15 @@ class FigurePill extends StatelessWidget {
   final String figure;
   final String detail;
   final Color hue;
+
+  /// How much of the ring is drawn in [hue], from 0 to 1.
+  final double fraction;
   final VoidCallback? onTap;
   final String? semanticLabel;
+
+  /// The ring's stroke. Wide enough that the missing piece at 95 per cent is
+  /// a visible gap rather than a hairline break.
+  static const ringWidth = 4.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1688,38 +1700,100 @@ class FigurePill extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         scale: 0.97,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.lg,
-            vertical: Space.xs,
+        child: CustomPaint(
+          painter: _RingPainter(
+            hue: hue,
+            track: c.surfaceHigh,
+            fraction: fraction,
           ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Radii.pill),
-            border: Border.all(color: hue, width: 2),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                figure,
-                style: context.t.labelLarge?.copyWith(
-                  color: c.textPrimary,
-                  fontFeatures: tabular,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Space.xl,
+              vertical: Space.sm + ringWidth,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  figure,
+                  style: context.t.labelLarge?.copyWith(color: c.textPrimary),
                 ),
-              ),
-              Text(
-                detail,
-                style: context.t.labelSmall?.copyWith(
-                  color: c.textSecondary,
-                  fontFeatures: tabular,
+                Text(
+                  detail,
+                  style: context.t.bodySmall?.copyWith(
+                    color: c.textSecondary,
+                    fontFeatures: tabular,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// The capsule outline of a [FigurePill]: a full track, and over it the part
+/// of the way round that [fraction] covers.
+class _RingPainter extends CustomPainter {
+  const _RingPainter({
+    required this.hue,
+    required this.track,
+    required this.fraction,
+  });
+
+  final Color hue;
+  final Color track;
+  final double fraction;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const w = FigurePill.ringWidth;
+    final rect = (Offset.zero & size).deflate(w / 2);
+    if (rect.width <= 0 || rect.height <= 0) return;
+    final r = rect.height / 2;
+
+    // Drawn by hand from the top centre, clockwise, so that the start of the
+    // path is where the gap belongs. `addRRect` starts wherever the engine
+    // starts it, which is not a thing to measure a gap from.
+    final path = Path()
+      ..moveTo(rect.center.dx, rect.top)
+      ..lineTo(rect.right - r, rect.top)
+      ..arcToPoint(
+        Offset(rect.right - r, rect.bottom),
+        radius: Radius.circular(r),
+      )
+      ..lineTo(rect.left + r, rect.bottom)
+      ..arcToPoint(Offset(rect.left + r, rect.top), radius: Radius.circular(r))
+      ..close();
+
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w;
+
+    canvas.drawPath(path, stroke..color = track);
+
+    final share = fraction < 0 ? 0.0 : (fraction > 1 ? 1.0 : fraction);
+    if (share == 0) return;
+    if (share == 1) {
+      canvas.drawPath(path, stroke..color = hue);
+      return;
+    }
+    for (final metric in path.computeMetrics()) {
+      // The missing piece is centred on the top, half of it either side of
+      // where the path begins.
+      final gap = metric.length * (1 - share);
+      canvas.drawPath(
+        metric.extractPath(gap / 2, metric.length - gap / 2),
+        stroke..color = hue,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.hue != hue || old.track != track || old.fraction != fraction;
 }
 
 // ─── Sheets and confirmations ───────────────────────────────────────────────

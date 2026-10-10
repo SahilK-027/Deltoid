@@ -392,7 +392,14 @@ void main() {
     test('a recent weigh-in is the figure and nothing else', () {
       final recent = basis(BodyweightTrust.logged, days: 2);
       expect(bodyweightBasisLabel(recent, WeightUnit.kg), '73.2 kg');
-      expect(bodyweightBasisNotice(recent, WeightUnit.kg), isNull);
+      expect(
+        bodyweightRecordedLine(
+          recent,
+          WeightUnit.kg,
+          lastRecorded: '8 Jan 2026',
+        ),
+        'Last recorded on 8 Jan 2026',
+      );
     });
 
     test('an old weigh-in says how old', () {
@@ -402,9 +409,13 @@ void main() {
         '73.2 kg · 12 days old',
       );
       expect(
-        bodyweightBasisNotice(stale, WeightUnit.kg),
-        'Your last weigh-in was 12 days ago. Log your latest weight for an '
-        'accurate strength trend.',
+        bodyweightRecordedLine(
+          stale,
+          WeightUnit.kg,
+          lastRecorded: '8 Jan 2026',
+        ),
+        'Last recorded on 8 Jan 2026, 12 days ago. Log your latest weight for '
+        'an accurate strength trend.',
       );
     });
 
@@ -412,18 +423,15 @@ void main() {
       final assumed = basis(BodyweightTrust.assumed, kg: 60);
       expect(bodyweightBasisLabel(assumed, WeightUnit.kg), '60 kg assumed');
       expect(
-        bodyweightBasisNotice(assumed, WeightUnit.kg),
-        'No bodyweight is logged, so 60 kg is assumed. Log your weight for an '
+        bodyweightRecordedLine(assumed, WeightUnit.kg, lastRecorded: null),
+        'No weight is recorded, so 60 kg is assumed. Log your weight for an '
         'accurate strength trend.',
       );
     });
 
     test('the assumed figure is printed in the unit the phone shows', () {
       final assumed = basis(BodyweightTrust.assumed, kg: 60);
-      expect(
-        bodyweightBasisLabel(assumed, WeightUnit.lb),
-        startsWith('132'),
-      );
+      expect(bodyweightBasisLabel(assumed, WeightUnit.lb), startsWith('132'));
     });
 
     test('the second line is what the movement takes from it', () {
@@ -433,15 +441,16 @@ void main() {
       expect(bodyweightMovedLabel(73.2, 100, WeightUnit.kg), '+73.2 kg (100%)');
     });
 
-    test('the load line names the share, and what is added to it', () {
+    test('the sentence under the resistance names the share', () {
       expect(
         bodyweightLoadBlurb(LoadMode.bodyweight, 64),
-        '64% of your bodyweight is the load on this movement',
+        'This is the part of your bodyweight that counts as resistance on '
+        'this movement, 64% of it. It is what your charts, volume and cycle '
+        'progress are worked out from.',
       );
       expect(
         bodyweightLoadBlurb(LoadMode.bodyweightPlus, 95),
-        '95% of your bodyweight is the load on this movement, plus the weight '
-        'you add',
+        endsWith('The weight you add is counted on top.'),
       );
     });
   });

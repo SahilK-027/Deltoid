@@ -243,31 +243,38 @@ String bodyweightMovedLabel(
     '+${formatBodyweight(bodyweightMoved(bodyweightKg, bodyweightPct), unit)} '
     '${unit.label} ($bodyweightPct%)';
 
-/// What the bodyweight sheet asks for, or null when the weigh-in is recent and
-/// there is nothing to ask.
+/// The line under the scale weight on the bodyweight sheet: when it was last
+/// recorded, and what to do about it when that is too long ago or never.
 ///
-/// A string the user reads, so it is in the second person
-/// (THEME → The words).
-String? bodyweightBasisNotice(BodyweightBasis basis, WeightUnit unit) {
+/// [lastRecorded] is the date of the newest weigh-in, already formatted, or
+/// null when there is none. A string the user reads, so it is in the second
+/// person (THEME → The words).
+String bodyweightRecordedLine(
+  BodyweightBasis basis,
+  WeightUnit unit, {
+  required String? lastRecorded,
+}) {
   const ask = 'for an accurate strength trend.';
   return switch (basis.trust) {
-    BodyweightTrust.logged => null,
+    BodyweightTrust.logged => 'Last recorded on $lastRecorded',
     BodyweightTrust.stale =>
-      'Your last weigh-in was ${_daysOld(basis.daysOld ?? 0)} ago. '
+      'Last recorded on $lastRecorded, ${_daysOld(basis.daysOld ?? 0)} ago. '
           'Log your latest weight $ask',
     BodyweightTrust.assumed =>
-      'No bodyweight is logged, so '
+      'No weight is recorded, so '
           '${formatBodyweight(basis.kg, unit)} ${unit.label} is assumed. '
           'Log your weight $ask',
   };
 }
 
-/// How a bodyweight movement's load is made up, in one line.
+/// What the resistance on a bodyweight movement is, in the sentence under the
+/// figure.
 String bodyweightLoadBlurb(LoadMode mode, int bodyweightPct) {
-  final share = '$bodyweightPct% of your bodyweight is the load on this '
-      'movement';
+  final share = 'This is the part of your bodyweight that counts as '
+      'resistance on this movement, $bodyweightPct% of it. It is what your '
+      'charts, volume and cycle progress are worked out from.';
   return mode == LoadMode.bodyweightPlus
-      ? '$share, plus the weight you add'
+      ? '$share The weight you add is counted on top.'
       : share;
 }
 

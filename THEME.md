@@ -1201,24 +1201,34 @@ headings are sentence case in `textSecondary`, not uppercase.
 A status pill: radius 999, a 14% tint of the semantic colour, text in that
 colour at `micro`. Used sparingly, never for anything a row already says.
 
-**The figure pill** is the one pill with two lines and an outline in place of a
-tint: `FigurePill`, radius 999, a 2px outline in the semantic colour, no fill.
-The first line is a figure at `valueSm`, the second what is derived from it at
-`micro` in `textSecondary`. An outline rather than a tint because both lines are
-numbers to be read, and a tinted ground costs the smaller one its contrast.
+**The figure pill** is the one pill with two lines and a ring in place of a
+tint: `FigurePill`, radius 999, a 4px ring, no fill. The ring is a `surfaceHigh`
+track with the semantic colour drawn over it for a share of the way round, and
+the piece left undrawn sits at the top centre, so 95 per cent reads as a ring
+with a small piece missing. The first line is a figure at `valueSm`, the second
+what is derived from it at `label` in `textSecondary`. A ring rather than a
+tint because both lines are numbers to be read, and a tinted ground costs the
+smaller one its contrast.
 
 Its one use is **the bodyweight pill** on the log, under the header of a
 movement whose load is the person doing it. It reads `73.2 kg` over
 `+69.5 kg (95%)`: the bodyweight the lift is scored on, and what the movement
-takes from it. The outline is `positive` while the last weigh-in is a week old
-or newer. Older than that the first line reads `73.2 kg · 12 days old`, and
-with nothing ever logged `60 kg assumed`; both turn the outline `warning`, the
+takes from it. The ring is filled to that share, and is `positive` while the
+last weigh-in is a week old or newer. Older than that the first line reads `73.2 kg · 12 days old`, and
+with nothing ever logged `60 kg assumed`; both turn the ring `warning`, the
 hue the sheet's notice is drawn in. It sits under the header's row rather than
 beside the name, where the two buttons leave no room for the longest of the
-three. It opens a sheet titled `Bodyweight`: the notice when there is something
-to ask, the figure with the day it was weighed, the resistance with the share
-it comes from, and one button that opens the weigh-in sheet. A hold has no
-pill, because nothing scores its load.
+three. It opens a sheet titled `Bodyweight contribution`. Under the heading
+`Scale weight` the figure sits in a `surfaceHigh` panel with its unit at the
+right, shaped like a field and not one: the weight is read here and changed in
+the weigh-in sheet. One line under it says when it was last recorded, in
+`warning` and with the request for a newer one when it is old or assumed. Then
+an outlined card, the one card a sheet is allowed, because it holds a figure
+and its explanation rather than a choice: the scale glyph, the share as a
+badge, `+69.5 kg of resistance`, and a sentence saying what that figure is used
+for. Two buttons close it, `Edit scale weight` above `Got it`; the secondary
+one opens the weigh-in sheet. A hold has no pill, because nothing scores its
+load.
 
 ---
 
