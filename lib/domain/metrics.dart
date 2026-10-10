@@ -11,11 +11,15 @@ double roundLoad(double kg) => (kg * 2).round() / 2;
 /// [LoadMode] is what makes this honest: a dumbbell entered as 22.5 is 45kg of
 /// total load, and a pull-up is only comparable across months if bodyweight is
 /// part of the number.
+///
+/// [bodyweightPct] is how much of the bodyweight the movement moves, and is
+/// read under the two bodyweight modes only. See [bodyweightMoved].
 double? effectiveLoad({
   required LoadMode mode,
   double? weight,
   double? addedWeight,
   double? bodyweightKg,
+  int bodyweightPct = 100,
 }) {
   switch (mode) {
     case LoadMode.total:
@@ -23,12 +27,23 @@ double? effectiveLoad({
     case LoadMode.perSide:
       return weight == null ? null : weight * 2;
     case LoadMode.bodyweight:
-      return bodyweightKg;
+      return bodyweightKg == null
+          ? null
+          : bodyweightMoved(bodyweightKg, bodyweightPct);
     case LoadMode.bodyweightPlus:
       if (bodyweightKg == null) return addedWeight;
-      return bodyweightKg + (addedWeight ?? 0);
+      return bodyweightMoved(bodyweightKg, bodyweightPct) + (addedWeight ?? 0);
   }
 }
+
+/// The part of [bodyweightKg] a movement moves, given its share in per cent.
+///
+/// A push-up is a lever resting on the toes, and the hands carry bodyweight
+/// times the distance from toes to centre of mass over the distance from toes
+/// to hands: about 64 per cent. A pull-up has no second point of support and
+/// moves nearly everything. The share is `exercises.bodyweight_pct`.
+double bodyweightMoved(double bodyweightKg, int bodyweightPct) =>
+    bodyweightKg * bodyweightPct / 100;
 
 /// Epley estimated 1RM.
 ///
@@ -147,6 +162,7 @@ PerformanceScore scorePerformance({
   required LoadMode mode,
   MeasureMode measure = MeasureMode.reps,
   double? bodyweightKg,
+  int bodyweightPct = 100,
 }) {
   double? topLoad;
   int? topReps;
@@ -165,6 +181,7 @@ PerformanceScore scorePerformance({
       weight: s.weight,
       addedWeight: s.addedWeight,
       bodyweightKg: bodyweightKg,
+      bodyweightPct: bodyweightPct,
     );
 
     count++;
@@ -221,7 +238,14 @@ PerformanceScore scorePerformance({
 /// not the unit this figure is in. Three minutes of plank is real work and
 /// this number is not the place it gets counted — the weekly set count is.
 double sessionVolume({
-  required List<({LoadMode mode, MeasureMode measure, List<ScoredSet> sets})>
+  required List<
+    ({
+      LoadMode mode,
+      MeasureMode measure,
+      int bodyweightPct,
+      List<ScoredSet> sets,
+    })
+  >
   exercises,
   double? bodyweightKg,
 }) {
@@ -234,6 +258,7 @@ double sessionVolume({
         weight: s.weight,
         addedWeight: s.addedWeight,
         bodyweightKg: bodyweightKg,
+        bodyweightPct: e.bodyweightPct,
       );
       total += (load ?? 0) * (s.reps ?? 0);
     }

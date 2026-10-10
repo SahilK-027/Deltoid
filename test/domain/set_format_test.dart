@@ -377,7 +377,7 @@ void main() {
     });
   });
 
-  group('the bodyweight chip', () {
+  group('the bodyweight pill', () {
     BodyweightBasis basis(
       BodyweightTrust trust, {
       double kg = 73.2,
@@ -390,27 +390,16 @@ void main() {
     );
 
     test('a recent weigh-in is the figure and nothing else', () {
-      expect(
-        bodyweightBasisLabel(
-          basis(BodyweightTrust.logged, days: 2),
-          WeightUnit.kg,
-        ),
-        'Bodyweight 73.2 kg',
-      );
-      expect(
-        bodyweightBasisNotice(
-          basis(BodyweightTrust.logged, days: 2),
-          WeightUnit.kg,
-        ),
-        isNull,
-      );
+      final recent = basis(BodyweightTrust.logged, days: 2);
+      expect(bodyweightBasisLabel(recent, WeightUnit.kg), '73.2 kg');
+      expect(bodyweightBasisNotice(recent, WeightUnit.kg), isNull);
     });
 
     test('an old weigh-in says how old', () {
       final stale = basis(BodyweightTrust.stale, days: 12);
       expect(
         bodyweightBasisLabel(stale, WeightUnit.kg),
-        'Bodyweight 73.2 kg · 12 days old',
+        '73.2 kg · 12 days old',
       );
       expect(
         bodyweightBasisNotice(stale, WeightUnit.kg),
@@ -421,10 +410,7 @@ void main() {
 
     test('nothing logged says the figure is assumed', () {
       final assumed = basis(BodyweightTrust.assumed, kg: 60);
-      expect(
-        bodyweightBasisLabel(assumed, WeightUnit.kg),
-        'Bodyweight 60 kg assumed',
-      );
+      expect(bodyweightBasisLabel(assumed, WeightUnit.kg), '60 kg assumed');
       expect(
         bodyweightBasisNotice(assumed, WeightUnit.kg),
         'No bodyweight is logged, so 60 kg is assumed. Log your weight for an '
@@ -436,15 +422,26 @@ void main() {
       final assumed = basis(BodyweightTrust.assumed, kg: 60);
       expect(
         bodyweightBasisLabel(assumed, WeightUnit.lb),
-        startsWith('Bodyweight 132'),
+        startsWith('132'),
       );
     });
 
-    test('the load line names what the movement adds', () {
-      expect(bodyweightLoadBlurb(LoadMode.bodyweight), 'Your bodyweight');
+    test('the second line is what the movement takes from it', () {
+      // 95 per cent of 72.5 kg is 68.875 kg.
+      expect(bodyweightMovedLabel(72.5, 95, WeightUnit.kg), '+68.9 kg (95%)');
+      expect(bodyweightMovedLabel(75, 64, WeightUnit.kg), '+48 kg (64%)');
+      expect(bodyweightMovedLabel(73.2, 100, WeightUnit.kg), '+73.2 kg (100%)');
+    });
+
+    test('the load line names the share, and what is added to it', () {
       expect(
-        bodyweightLoadBlurb(LoadMode.bodyweightPlus),
-        'Your bodyweight plus the weight you add',
+        bodyweightLoadBlurb(LoadMode.bodyweight, 64),
+        '64% of your bodyweight is the load on this movement',
+      );
+      expect(
+        bodyweightLoadBlurb(LoadMode.bodyweightPlus, 95),
+        '95% of your bodyweight is the load on this movement, plus the weight '
+        'you add',
       );
     });
   });

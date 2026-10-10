@@ -216,20 +216,32 @@ String setTitle(SetType type, String label, int? leg) {
   return leg == null ? head : '$head · leg $leg';
 }
 
-/// The bodyweight a lift is scored against, as the log's chip prints it:
-/// `Bodyweight 73.2 kg`, `Bodyweight 73.2 kg · 12 days old`,
-/// `Bodyweight 60 kg assumed`.
+/// The bodyweight a lift is scored against, as the first line of the log's
+/// pill: `73.2 kg`, `73.2 kg · 12 days old`, `60 kg assumed`.
 ///
 /// The figure is the same in all three. What follows it says how far to trust
 /// it, and is absent when the weigh-in is recent.
 String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) {
-  final figure = 'Bodyweight ${formatBodyweight(basis.kg, unit)} ${unit.label}';
+  final figure = '${formatBodyweight(basis.kg, unit)} ${unit.label}';
   return switch (basis.trust) {
     BodyweightTrust.logged => figure,
     BodyweightTrust.stale => '$figure · ${_daysOld(basis.daysOld ?? 0)} old',
     BodyweightTrust.assumed => '$figure assumed',
   };
 }
+
+/// What a movement takes from that bodyweight, as the pill's second line:
+/// `+69.5 kg (95%)`.
+///
+/// Signed, because it is what the body adds to whatever is on the belt, and
+/// the load column beside it reads `BW +` for the same reason.
+String bodyweightMovedLabel(
+  double bodyweightKg,
+  int bodyweightPct,
+  WeightUnit unit,
+) =>
+    '+${formatBodyweight(bodyweightMoved(bodyweightKg, bodyweightPct), unit)} '
+    '${unit.label} ($bodyweightPct%)';
 
 /// What the bodyweight sheet asks for, or null when the weigh-in is recent and
 /// there is nothing to ask.
@@ -251,9 +263,13 @@ String? bodyweightBasisNotice(BodyweightBasis basis, WeightUnit unit) {
 }
 
 /// How a bodyweight movement's load is made up, in one line.
-String bodyweightLoadBlurb(LoadMode mode) => mode == LoadMode.bodyweightPlus
-    ? 'Your bodyweight plus the weight you add'
-    : 'Your bodyweight';
+String bodyweightLoadBlurb(LoadMode mode, int bodyweightPct) {
+  final share = '$bodyweightPct% of your bodyweight is the load on this '
+      'movement';
+  return mode == LoadMode.bodyweightPlus
+      ? '$share, plus the weight you add'
+      : share;
+}
 
 String _daysOld(int days) => days == 1 ? '1 day' : '$days days';
 

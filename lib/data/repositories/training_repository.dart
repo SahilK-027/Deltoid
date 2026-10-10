@@ -2069,6 +2069,7 @@ class TrainingRepository {
             mode: exercise.loadMode,
             measure: exercise.measureMode,
             bodyweightKg: bodyweightOn(workout.dayKey, bodyweight),
+            bodyweightPct: exercise.bodyweightPct,
             sets: [
               for (final s in sets)
                 if (s.isDone)
@@ -2290,6 +2291,7 @@ class TrainingRepository {
         measure: exercise.measureMode,
         bodyweightKg:
             needsBodyweight ? bodyweightOnOrdered(dayKey, bodyweight) : null,
+        bodyweightPct: exercise.bodyweightPct,
         sets: sets,
       );
       if (score.isEmpty) continue;
@@ -2387,6 +2389,7 @@ class TrainingRepository {
       'wo.cycle_id AS cycle_id, wo.session_id AS session_id, '
       'wo.day_key AS day_key, e.name AS exercise_name, '
       'e.load_mode AS load_mode, e.measure_mode AS measure_mode, '
+      'e.bodyweight_pct AS bodyweight_pct, '
       'se.name AS session_name '
       'FROM cycles c '
       'INNER JOIN workouts wo ON wo.cycle_id = c.id '
@@ -2465,6 +2468,7 @@ class TrainingRepository {
               load: mode,
               measure:
                   MeasureMode.values.byName(r.read<String>('measure_mode')),
+              bodyweightPct: r.read<int>('bodyweight_pct'),
               sets: sets,
             ),
           );

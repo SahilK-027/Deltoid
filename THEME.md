@@ -398,18 +398,6 @@ screen. Selected, it **fills with the hue**, label taken down by
 `IconTile.glyphOn`. A chip meaning "all" has no hue: it is every category and
 therefore none.
 
-**The bodyweight chip** is a dense chip under the exercise header on the log,
-on a movement whose load is the person doing it. It reads `Bodyweight 73.2 kg`
-with the scale glyph while the last weigh-in is a week old or newer. Older than
-that it reads `Bodyweight 73.2 kg · 12 days old`, and with nothing ever logged
-`Bodyweight 60 kg assumed`; both swap the glyph for a `warning` dot, the hue the
-sheet's notice is drawn in. It sits under the header's row rather than beside
-the name, where the two buttons leave no room for the longest of the three. It
-opens a sheet titled `Bodyweight`: the notice when there is something to ask,
-the figure with the day it was weighed, one line saying what the movement's
-load is made of, and one button that opens the weigh-in sheet. A hold has no
-chip, because nothing scores its load.
-
 ### Cards
 
 `surface` fill, radius 20, **no border, no shadow**, padding 16. A card is a
@@ -1213,6 +1201,25 @@ headings are sentence case in `textSecondary`, not uppercase.
 A status pill: radius 999, a 14% tint of the semantic colour, text in that
 colour at `micro`. Used sparingly, never for anything a row already says.
 
+**The figure pill** is the one pill with two lines and an outline in place of a
+tint: `FigurePill`, radius 999, a 2px outline in the semantic colour, no fill.
+The first line is a figure at `valueSm`, the second what is derived from it at
+`micro` in `textSecondary`. An outline rather than a tint because both lines are
+numbers to be read, and a tinted ground costs the smaller one its contrast.
+
+Its one use is **the bodyweight pill** on the log, under the header of a
+movement whose load is the person doing it. It reads `73.2 kg` over
+`+69.5 kg (95%)`: the bodyweight the lift is scored on, and what the movement
+takes from it. The outline is `positive` while the last weigh-in is a week old
+or newer. Older than that the first line reads `73.2 kg · 12 days old`, and
+with nothing ever logged `60 kg assumed`; both turn the outline `warning`, the
+hue the sheet's notice is drawn in. It sits under the header's row rather than
+beside the name, where the two buttons leave no room for the longest of the
+three. It opens a sheet titled `Bodyweight`: the notice when there is something
+to ask, the figure with the day it was weighed, the resistance with the share
+it comes from, and one button that opens the weigh-in sheet. A hold has no
+pill, because nothing scores its load.
+
 ---
 
 ## 8. Composing a screen
@@ -1240,6 +1247,16 @@ a menu dropped over the page has no room to say what an option _means_.
 - **Changing a field on something that already exists asks first**, and a field
   that changes how existing records are _read_ asks the harder version, counting
   what it is about to reinterpret.
+
+**The share of bodyweight is stated for a seeded movement and asked for on a
+created one.** On the exercise screen a bodyweight movement carries a
+`Share of bodyweight` row under how its weight is entered. For a movement the
+catalog seeded, the row shows the figure, reads `Set for this movement`, and
+does nothing when tapped: the app knows the answer, and a figure anyone could
+move is one two months would not agree on. For a movement the user created it
+is a question like any other on that screen. It shows `Choose` until answered,
+`Create exercise` stays off until it is, and changing it on a movement with
+sets behind it asks first, with the count of sets it re-reads.
 
 **A logged set is corrected from its own line, in one sheet.** A number typed
 wrong at the bar is found on the logged day, so that is where it is put right:

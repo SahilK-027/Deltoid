@@ -13,27 +13,33 @@ import '../../../domain/units.dart';
 import '../../settings/bodyweight_screen.dart';
 import '../log_providers.dart';
 
-/// The bodyweight a bodyweight movement is being scored against today.
+/// The bodyweight a bodyweight movement is being scored against today, and how
+/// much of it the movement moves.
 ///
 /// A pull-up's load is the person doing it, and the log is the one screen where
 /// that number is otherwise invisible: the load column reads `Bodyweight` and
-/// the figure behind it lives in Settings. The chip prints it under the
-/// exercise name, marks it when it is old or assumed, and opens the weigh-in
-/// from where the lift is being logged.
+/// the figure behind it lives in Settings. The pill prints it under the
+/// exercise header with the share the movement takes from it, marks it when it
+/// is old or assumed, and opens the weigh-in from where the lift is being
+/// logged.
 ///
 /// Drawn only for a movement whose score reads bodyweight. A hold carries no
 /// estimated 1RM and adds nothing to volume, so a bodyweight under a dead hang
 /// would be a number nothing uses.
-class BodyweightChip extends ConsumerWidget {
-  const BodyweightChip({
+class BodyweightPill extends ConsumerWidget {
+  const BodyweightPill({
     super.key,
     required this.loadMode,
     required this.measureMode,
+    required this.bodyweightPct,
     required this.dayKey,
   });
 
   final LoadMode loadMode;
   final MeasureMode measureMode;
+
+  /// `exercises.bodyweight_pct`: how much of the bodyweight the movement moves.
+  final int bodyweightPct;
 
   /// The day the session is logged on, which is the day the lift is scored on.
   final int dayKey;
@@ -52,18 +58,19 @@ class BodyweightChip extends ConsumerWidget {
     final series = ref.watch(bodyweightSeriesProvider).valueOrNull;
     if (series == null) return const SizedBox.shrink();
 
+    final c = context.c;
     final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
     final basis = bodyweightBasis(dayKey, series);
-    final trusted = basis.trust == BodyweightTrust.logged;
+    final figure = bodyweightBasisLabel(basis, unit);
+    final moved = bodyweightMovedLabel(basis.kg, bodyweightPct, unit);
 
-    return AppChip(
-      dense: true,
-      label: bodyweightBasisLabel(basis, unit),
-      // A recent weigh-in is a plain fact and wears a glyph. One that is old or
-      // assumed wears the warning dot instead, the same yellow the sheet's
-      // notice is drawn in.
-      icon: trusted ? Icons.monitor_weight_outlined : null,
-      hue: trusted ? null : context.c.warning,
+    return FigurePill(
+      figure: figure,
+      detail: moved,
+      // Green while the weigh-in is recent, and the warning yellow the sheet's
+      // notice is drawn in when it is old or assumed.
+      hue: basis.trust == BodyweightTrust.logged ? c.positive : c.warning,
+      semanticLabel: 'Bodyweight $figure, $moved on this movement',
       onTap: () => _open(context, ref, basis, unit),
     );
   }
@@ -75,7 +82,7 @@ class BodyweightChip extends ConsumerWidget {
     WeightUnit unit,
   ) async {
     // Captured before the first await: logging a weight re-reads the series,
-    // which rebuilds the page this chip sits on (RULES § 4).
+    // which rebuilds the page this pill sits on (RULES § 4).
     final container = ProviderScope.containerOf(context);
     final loggedToday = basis.lastDayKey == dayKeyOf(DateTime.now());
 
@@ -85,6 +92,7 @@ class BodyweightChip extends ConsumerWidget {
         basis: basis,
         unit: unit,
         loadMode: loadMode,
+        bodyweightPct: bodyweightPct,
         loggedToday: loggedToday,
       ),
     );
@@ -106,12 +114,14 @@ class _BodyweightSheet extends StatelessWidget {
     required this.basis,
     required this.unit,
     required this.loadMode,
+    required this.bodyweightPct,
     required this.loggedToday,
   });
 
   final BodyweightBasis basis;
   final WeightUnit unit;
   final LoadMode loadMode;
+  final int bodyweightPct;
   final bool loggedToday;
 
   String get _weighed {
@@ -124,6 +134,10 @@ class _BodyweightSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notice = bodyweightBasisNotice(basis, unit);
+    final moved = formatBodyweight(
+      bodyweightMoved(basis.kg, bodyweightPct),
+      unit,
+    );
     return AppSheet(
       title: 'Bodyweight',
       contentPadding: const EdgeInsets.only(bottom: Space.md),
@@ -149,8 +163,9 @@ class _BodyweightSheet extends StatelessWidget {
         ),
         AppRow(
           icon: Icons.fitness_center_rounded,
-          title: 'Load on this movement',
-          subtitle: bodyweightLoadBlurb(loadMode),
+          title: '$moved ${unit.label} of resistance',
+          subtitle: bodyweightLoadBlurb(loadMode, bodyweightPct),
+          subtitleMaxLines: 3,
         ),
       ],
     );

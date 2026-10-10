@@ -123,6 +123,18 @@ class $ExercisesTable extends Exercises
         requiredDuringInsert: false,
         defaultValue: const Constant('none'),
       ).withConverter<BarKind>($ExercisesTable.$converterbarKind);
+  static const VerificationMeta _bodyweightPctMeta = const VerificationMeta(
+    'bodyweightPct',
+  );
+  @override
+  late final GeneratedColumn<int> bodyweightPct = GeneratedColumn<int>(
+    'bodyweight_pct',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
   static const VerificationMeta _starterKeyMeta = const VerificationMeta(
     'starterKey',
   );
@@ -181,6 +193,7 @@ class $ExercisesTable extends Exercises
     loadMode,
     measureMode,
     barKind,
+    bodyweightPct,
     starterKey,
     formVideoUrls,
     notes,
@@ -232,6 +245,15 @@ class $ExercisesTable extends Exercises
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('bodyweight_pct')) {
+      context.handle(
+        _bodyweightPctMeta,
+        bodyweightPct.isAcceptableOrUnknown(
+          data['bodyweight_pct']!,
+          _bodyweightPctMeta,
+        ),
+      );
     }
     if (data.containsKey('starter_key')) {
       context.handle(
@@ -314,6 +336,10 @@ class $ExercisesTable extends Exercises
           data['${effectivePrefix}bar_kind'],
         )!,
       ),
+      bodyweightPct: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bodyweight_pct'],
+      )!,
       starterKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}starter_key'],
@@ -375,6 +401,21 @@ class Exercise extends DataClass implements Insertable<Exercise> {
   /// means the movement has no bar and gets no plate maths.
   final BarKind barKind;
 
+  /// How much of the lifter's bodyweight this movement moves, as a percentage.
+  ///
+  /// Read only under [LoadMode.bodyweight] and [LoadMode.bodyweightPlus]. A
+  /// push-up leaves the feet on the floor and moves about two thirds of the
+  /// body; a pull-up moves nearly all of it. Scoring both on the whole
+  /// bodyweight overstates the push-up's load by half, and makes a plate added
+  /// to one count for less than the same plate added to the other.
+  ///
+  /// It sits on the movement and is read live, as [loadMode] is: it says how
+  /// every set of the movement is to be read, and is a property of the
+  /// movement rather than of a day.
+  ///
+  /// 100 by default, which is what every row written before the column meant.
+  final int bodyweightPct;
+
   /// The `starterExercises` key this row was seeded from, when it was.
   ///
   /// Templates match on this rather than on the name, so renaming "Dips" to
@@ -396,6 +437,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     required this.loadMode,
     required this.measureMode,
     required this.barKind,
+    required this.bodyweightPct,
     this.starterKey,
     required this.formVideoUrls,
     this.notes,
@@ -437,6 +479,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
         $ExercisesTable.$converterbarKind.toSql(barKind),
       );
     }
+    map['bodyweight_pct'] = Variable<int>(bodyweightPct);
     if (!nullToAbsent || starterKey != null) {
       map['starter_key'] = Variable<String>(starterKey);
     }
@@ -467,6 +510,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       loadMode: Value(loadMode),
       measureMode: Value(measureMode),
       barKind: Value(barKind),
+      bodyweightPct: Value(bodyweightPct),
       starterKey: starterKey == null && nullToAbsent
           ? const Value.absent()
           : Value(starterKey),
@@ -505,6 +549,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       barKind: $ExercisesTable.$converterbarKind.fromJson(
         serializer.fromJson<String>(json['barKind']),
       ),
+      bodyweightPct: serializer.fromJson<int>(json['bodyweightPct']),
       starterKey: serializer.fromJson<String?>(json['starterKey']),
       formVideoUrls: $ExercisesTable.$converterformVideoUrls.fromJson(
         serializer.fromJson<String>(json['formVideoUrls']),
@@ -538,6 +583,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
       'barKind': serializer.toJson<String>(
         $ExercisesTable.$converterbarKind.toJson(barKind),
       ),
+      'bodyweightPct': serializer.toJson<int>(bodyweightPct),
       'starterKey': serializer.toJson<String?>(starterKey),
       'formVideoUrls': serializer.toJson<String>(
         $ExercisesTable.$converterformVideoUrls.toJson(formVideoUrls),
@@ -559,6 +605,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     LoadMode? loadMode,
     MeasureMode? measureMode,
     BarKind? barKind,
+    int? bodyweightPct,
     Value<String?> starterKey = const Value.absent(),
     List<String>? formVideoUrls,
     Value<String?> notes = const Value.absent(),
@@ -575,6 +622,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     loadMode: loadMode ?? this.loadMode,
     measureMode: measureMode ?? this.measureMode,
     barKind: barKind ?? this.barKind,
+    bodyweightPct: bodyweightPct ?? this.bodyweightPct,
     starterKey: starterKey.present ? starterKey.value : this.starterKey,
     formVideoUrls: formVideoUrls ?? this.formVideoUrls,
     notes: notes.present ? notes.value : this.notes,
@@ -595,6 +643,9 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           ? data.measureMode.value
           : this.measureMode,
       barKind: data.barKind.present ? data.barKind.value : this.barKind,
+      bodyweightPct: data.bodyweightPct.present
+          ? data.bodyweightPct.value
+          : this.bodyweightPct,
       starterKey: data.starterKey.present
           ? data.starterKey.value
           : this.starterKey,
@@ -620,6 +671,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           ..write('loadMode: $loadMode, ')
           ..write('measureMode: $measureMode, ')
           ..write('barKind: $barKind, ')
+          ..write('bodyweightPct: $bodyweightPct, ')
           ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
           ..write('notes: $notes, ')
@@ -641,6 +693,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
     loadMode,
     measureMode,
     barKind,
+    bodyweightPct,
     starterKey,
     formVideoUrls,
     notes,
@@ -661,6 +714,7 @@ class Exercise extends DataClass implements Insertable<Exercise> {
           other.loadMode == this.loadMode &&
           other.measureMode == this.measureMode &&
           other.barKind == this.barKind &&
+          other.bodyweightPct == this.bodyweightPct &&
           other.starterKey == this.starterKey &&
           other.formVideoUrls == this.formVideoUrls &&
           other.notes == this.notes &&
@@ -679,6 +733,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
   final Value<LoadMode> loadMode;
   final Value<MeasureMode> measureMode;
   final Value<BarKind> barKind;
+  final Value<int> bodyweightPct;
   final Value<String?> starterKey;
   final Value<List<String>> formVideoUrls;
   final Value<String?> notes;
@@ -696,6 +751,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     this.loadMode = const Value.absent(),
     this.measureMode = const Value.absent(),
     this.barKind = const Value.absent(),
+    this.bodyweightPct = const Value.absent(),
     this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
     this.notes = const Value.absent(),
@@ -714,6 +770,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     required LoadMode loadMode,
     this.measureMode = const Value.absent(),
     this.barKind = const Value.absent(),
+    this.bodyweightPct = const Value.absent(),
     this.starterKey = const Value.absent(),
     this.formVideoUrls = const Value.absent(),
     this.notes = const Value.absent(),
@@ -735,6 +792,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Expression<String>? loadMode,
     Expression<String>? measureMode,
     Expression<String>? barKind,
+    Expression<int>? bodyweightPct,
     Expression<String>? starterKey,
     Expression<String>? formVideoUrls,
     Expression<String>? notes,
@@ -753,6 +811,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       if (loadMode != null) 'load_mode': loadMode,
       if (measureMode != null) 'measure_mode': measureMode,
       if (barKind != null) 'bar_kind': barKind,
+      if (bodyweightPct != null) 'bodyweight_pct': bodyweightPct,
       if (starterKey != null) 'starter_key': starterKey,
       if (formVideoUrls != null) 'form_video_urls': formVideoUrls,
       if (notes != null) 'notes': notes,
@@ -773,6 +832,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
     Value<LoadMode>? loadMode,
     Value<MeasureMode>? measureMode,
     Value<BarKind>? barKind,
+    Value<int>? bodyweightPct,
     Value<String?>? starterKey,
     Value<List<String>>? formVideoUrls,
     Value<String?>? notes,
@@ -791,6 +851,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
       loadMode: loadMode ?? this.loadMode,
       measureMode: measureMode ?? this.measureMode,
       barKind: barKind ?? this.barKind,
+      bodyweightPct: bodyweightPct ?? this.bodyweightPct,
       starterKey: starterKey ?? this.starterKey,
       formVideoUrls: formVideoUrls ?? this.formVideoUrls,
       notes: notes ?? this.notes,
@@ -845,6 +906,9 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
         $ExercisesTable.$converterbarKind.toSql(barKind.value),
       );
     }
+    if (bodyweightPct.present) {
+      map['bodyweight_pct'] = Variable<int>(bodyweightPct.value);
+    }
     if (starterKey.present) {
       map['starter_key'] = Variable<String>(starterKey.value);
     }
@@ -879,6 +943,7 @@ class ExercisesCompanion extends UpdateCompanion<Exercise> {
           ..write('loadMode: $loadMode, ')
           ..write('measureMode: $measureMode, ')
           ..write('barKind: $barKind, ')
+          ..write('bodyweightPct: $bodyweightPct, ')
           ..write('starterKey: $starterKey, ')
           ..write('formVideoUrls: $formVideoUrls, ')
           ..write('notes: $notes, ')
@@ -1298,14 +1363,15 @@ class Regime extends DataClass implements Insertable<Regime> {
 
   /// When this regime was last made the active one, or null if it never was.
   ///
-  /// **`is_active` is the answer; this is the fact.** The flag is a singleton
+  /// `is_active` is the derived answer; this column is the underlying fact. The
+  /// flag is a singleton
   /// across the whole account — activating one regime deactivates another — so
   /// it is the one column that cannot be merged row by row. Two phones that
-  /// each activated something derived the flag pairwise, against whatever
-  /// happened to be active locally when the row arrived, and could reach
-  /// opposite answers; because the derived deactivation deliberately minted no
-  /// new version, both copies then looked up to date to the other side and the
-  /// disagreement was permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
+  /// each activate something would derive the flag pairwise, against whatever
+  /// happened to be active locally when the row arrived, and can reach opposite
+  /// answers; because the derived deactivation mints no new version, both
+  /// copies then look up to date to the other side and the disagreement is
+  /// permanent. `sync_fuzz_test` seeds 41, 146, 335 and 531.
   ///
   /// A stamp is a fact about *this row*, so it merges like any other column and
   /// is never rewritten by the merge. Both phones then compute the same winner
@@ -2685,7 +2751,8 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
   /// kind of friction that gets an app closed mid-session.
   final int? restSeconds;
 
-  /// The bar this movement is loaded on **in this day**, when it is not the
+  /// The bar this movement is loaded on within this training day, where it is
+  /// not the
   /// one on the catalog row.
   ///
   /// Per slot for the same reason as the rest above: the same movement is not
@@ -2693,13 +2760,15 @@ class SessionExercise extends DataClass implements Insertable<SessionExercise> {
   /// off a women's bar on another is two different empty weights, and the
   /// plate diagram is wrong on one of them if the catalog is the only answer.
   ///
-  /// **Null means "follow the catalog"** — not [BarKind.none], which is a
+  /// Null means "follow the catalog", and is distinct from [BarKind.none],
+  /// which is a
   /// decision that this movement sits on no bar at all. The distinction is the
   /// whole point of the column: an override that could not be cleared would
   /// leave every slot permanently answering for a bar nobody chose.
   final BarKind? barKind;
 
-  /// Per-exercise deload overrides. Schema only for now — no v1 UI.
+  /// Per-exercise deload overrides. Schema only: nothing in the app sets
+  /// these yet.
   final int? deloadSetDelta;
   final int? deloadWeightPct;
   const SessionExercise({
@@ -5047,14 +5116,14 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
 
   /// The muscle this movement trained, copied at the moment it was logged.
   ///
-  /// The snapshot rule applied to a column that used to be read live. Weekly
-  /// volume counted sets through a join onto `exercises.muscle`, which is fine
-  /// over seven days and dishonest over years: recategorising one movement in
-  /// the catalog silently rewrote every week it ever appeared in, and a chart
-  /// of "sets per muscle since 2026" would redraw itself because you fixed a
-  /// label today. What you trained in March is a fact about March.
+  /// The snapshot rule, applied to a column that could otherwise be read live.
+  /// Counting weekly volume through a join onto `exercises.muscle` is fine over
+  /// seven days and dishonest over years: recategorising one movement in the
+  /// catalog would silently rewrite every week it ever appeared in, and a chart
+  /// of "sets per muscle since 2026" would be redrawn by a label corrected
+  /// today. What was trained in March is a fact about March.
   ///
-  /// **Nullable, and null is not [MuscleGroup.other].** Null means the row was
+  /// Nullable, and null is not [MuscleGroup.other]. Null indicates the row was
   /// logged before this column existed and the catalog is the best answer we
   /// have; readers fall back to `exercises.muscle` for exactly those rows
   /// (`_muscleOfLog` in `training_repository.dart`). Defaulting to `other`
@@ -5064,13 +5133,12 @@ class WorkoutExercise extends DataClass implements Insertable<WorkoutExercise> {
 
   /// The bar this movement was loaded on, copied at the moment it was logged.
   ///
-  /// The same rule as [muscle] above, applied to the one thing that still read
-  /// live: the plate diagram asked `exercises.bar_kind` every time it drew, so
-  /// changing a bar in the catalog — or, now, in one training day — silently
-  /// re-read every session ever logged. What you put on the bar in March is a
-  /// fact about March.
+  /// The same rule as [muscle] above. Read live, the plate diagram would ask
+  /// `exercises.bar_kind` every time it drew, so changing a bar in the catalog —
+  /// or in one training day — would silently re-read every session ever logged.
+  /// What was loaded on the bar in March is a fact about March.
   ///
-  /// **Nullable, and null is not [BarKind.none].** Null means the row predates
+  /// Nullable, and null is not [BarKind.none]. Null indicates the row predates
   /// this column and the catalog is the best answer available; readers fall
   /// back to it for exactly those rows. `none` is a decision — that this
   /// movement sits on no bar — and defaulting to it would have taken the plate
@@ -5984,14 +6052,14 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   /// The head of the drop group this set is a leg of, or null when the set
   /// stands on its own.
   ///
-  /// Consecutive `drop` rows used to be treated as one group by position
-  /// alone, which cannot tell "one drop set with two legs" from "two separate
-  /// drop sets that happen to sit next to each other" — converting two sets in
-  /// a row swallowed the second into the first.
+  /// Grouping consecutive `drop` rows by position alone cannot tell "one drop
+  /// set with two legs" from "two separate drop sets that happen to sit next to
+  /// each other" — converting two sets in a row would swallow the second into
+  /// the first.
   ///
-  /// A real reference, like every other relationship here. It was a bare text
-  /// column, so the database would accept a head id that names no set at all —
-  /// the one place the schema took the app's word for it.
+  /// A real reference, like every other relationship here. As a bare text
+  /// column the database would accept a head id that names no set at all, which
+  /// is the schema taking the app's word for it.
   ///
   /// The head must also sit in the *same slot*, which this reference does not
   /// say and the composite foreign key in [customConstraints] does. That one
@@ -7395,6 +7463,7 @@ typedef $$ExercisesTableCreateCompanionBuilder =
       required LoadMode loadMode,
       Value<MeasureMode> measureMode,
       Value<BarKind> barKind,
+      Value<int> bodyweightPct,
       Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
       Value<String?> notes,
@@ -7414,6 +7483,7 @@ typedef $$ExercisesTableUpdateCompanionBuilder =
       Value<LoadMode> loadMode,
       Value<MeasureMode> measureMode,
       Value<BarKind> barKind,
+      Value<int> bodyweightPct,
       Value<String?> starterKey,
       Value<List<String>> formVideoUrls,
       Value<String?> notes,
@@ -7534,6 +7604,11 @@ class $$ExercisesTableFilterComposer
         column: $table.barKind,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<int> get bodyweightPct => $composableBuilder(
+    column: $table.bodyweightPct,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<String> get starterKey => $composableBuilder(
     column: $table.starterKey,
@@ -7671,6 +7746,11 @@ class $$ExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get bodyweightPct => $composableBuilder(
+    column: $table.bodyweightPct,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get starterKey => $composableBuilder(
     column: $table.starterKey,
     builder: (column) => ColumnOrderings(column),
@@ -7736,6 +7816,11 @@ class $$ExercisesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<BarKind, String> get barKind =>
       $composableBuilder(column: $table.barKind, builder: (column) => column);
+
+  GeneratedColumn<int> get bodyweightPct => $composableBuilder(
+    column: $table.bodyweightPct,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get starterKey => $composableBuilder(
     column: $table.starterKey,
@@ -7847,6 +7932,7 @@ class $$ExercisesTableTableManager
                 Value<LoadMode> loadMode = const Value.absent(),
                 Value<MeasureMode> measureMode = const Value.absent(),
                 Value<BarKind> barKind = const Value.absent(),
+                Value<int> bodyweightPct = const Value.absent(),
                 Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -7864,6 +7950,7 @@ class $$ExercisesTableTableManager
                 loadMode: loadMode,
                 measureMode: measureMode,
                 barKind: barKind,
+                bodyweightPct: bodyweightPct,
                 starterKey: starterKey,
                 formVideoUrls: formVideoUrls,
                 notes: notes,
@@ -7883,6 +7970,7 @@ class $$ExercisesTableTableManager
                 required LoadMode loadMode,
                 Value<MeasureMode> measureMode = const Value.absent(),
                 Value<BarKind> barKind = const Value.absent(),
+                Value<int> bodyweightPct = const Value.absent(),
                 Value<String?> starterKey = const Value.absent(),
                 Value<List<String>> formVideoUrls = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -7900,6 +7988,7 @@ class $$ExercisesTableTableManager
                 loadMode: loadMode,
                 measureMode: measureMode,
                 barKind: barKind,
+                bodyweightPct: bodyweightPct,
                 starterKey: starterKey,
                 formVideoUrls: formVideoUrls,
                 notes: notes,

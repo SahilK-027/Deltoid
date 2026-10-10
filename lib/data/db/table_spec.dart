@@ -84,6 +84,7 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
         parse: (row) => Exercise.fromJson({
           'barKind': BarKind.none.name,
           'measureMode': MeasureMode.reps.name,
+          'bodyweightPct': 100,
           ...row,
         }),
         syncs: true,

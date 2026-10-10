@@ -1656,6 +1656,72 @@ class Pill extends StatelessWidget {
   }
 }
 
+/// A figure and the figure derived from it, in an outlined capsule.
+///
+/// The log's bodyweight pill: `73.2 kg` over `+69.5 kg (95%)`. An outline in
+/// [hue] rather than a fill, because the two lines inside it are numbers to be
+/// read and a tinted ground behind them would cost the smaller one its
+/// contrast. The outline carries the state, as a [Pill]'s tint does.
+class FigurePill extends StatelessWidget {
+  const FigurePill({
+    super.key,
+    required this.figure,
+    required this.detail,
+    required this.hue,
+    this.onTap,
+    this.semanticLabel,
+  });
+
+  final String figure;
+  final String detail;
+  final Color hue;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Semantics(
+      button: onTap != null,
+      label: semanticLabel,
+      excludeSemantics: semanticLabel != null,
+      child: Pressable(
+        onTap: onTap,
+        scale: 0.97,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.lg,
+            vertical: Space.xs,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Radii.pill),
+            border: Border.all(color: hue, width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                figure,
+                style: context.t.labelLarge?.copyWith(
+                  color: c.textPrimary,
+                  fontFeatures: tabular,
+                ),
+              ),
+              Text(
+                detail,
+                style: context.t.labelSmall?.copyWith(
+                  color: c.textSecondary,
+                  fontFeatures: tabular,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Sheets and confirmations ───────────────────────────────────────────────
 
 /// The header every sheet wears: title centred, subtitle under it, ✕ on the

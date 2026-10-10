@@ -26,7 +26,7 @@ import '../../domain/units.dart';
 import 'log_providers.dart';
 import 'session_summary_screen.dart';
 import 'set_completion.dart';
-import 'widgets/bodyweight_chip.dart';
+import 'widgets/bodyweight_pill.dart';
 import 'widgets/exercise_rail.dart';
 import 'widgets/exercise_sheets.dart';
 import 'widgets/hold_pad.dart';
@@ -2171,18 +2171,19 @@ class _ExercisePage extends ConsumerWidget {
           ],
         ),
         // Under the header rather than beside the name, where the two buttons
-        // leave too little width for `Bodyweight 73.2 kg · 12 days old`.
+        // leave too little width for `73.2 kg · 12 days old`.
         if (!skipped &&
-            BodyweightChip.appliesTo(
+            BodyweightPill.appliesTo(
               entry.exercise.loadMode,
               entry.exercise.measureMode,
             )) ...[
           const SizedBox(height: Space.md),
           Align(
             alignment: Alignment.centerLeft,
-            child: BodyweightChip(
+            child: BodyweightPill(
               loadMode: entry.exercise.loadMode,
               measureMode: entry.exercise.measureMode,
+              bodyweightPct: entry.exercise.bodyweightPct,
               dayKey: workout.dayKey,
             ),
           ),

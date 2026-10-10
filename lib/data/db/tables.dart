@@ -73,6 +73,21 @@ class Exercises extends Table with SyncColumns {
   TextColumn get barKind =>
       textEnum<BarKind>().withDefault(const Constant('none'))();
 
+  /// How much of the lifter's bodyweight this movement moves, as a percentage.
+  ///
+  /// Read only under [LoadMode.bodyweight] and [LoadMode.bodyweightPlus]. A
+  /// push-up leaves the feet on the floor and moves about two thirds of the
+  /// body; a pull-up moves nearly all of it. Scoring both on the whole
+  /// bodyweight overstates the push-up's load by half, and makes a plate added
+  /// to one count for less than the same plate added to the other.
+  ///
+  /// It sits on the movement and is read live, as [loadMode] is: it says how
+  /// every set of the movement is to be read, and is a property of the
+  /// movement rather than of a day.
+  ///
+  /// 100 by default, which is what every row written before the column meant.
+  IntColumn get bodyweightPct => integer().withDefault(const Constant(100))();
+
   /// The `starterExercises` key this row was seeded from, when it was.
   ///
   /// Templates match on this rather than on the name, so renaming "Dips" to
@@ -109,6 +124,7 @@ class Exercises extends Table with SyncColumns {
             "'bodyweightPlus'))",
         "CHECK (measure_mode IN ('reps', 'hold'))",
         "CHECK (bar_kind IN ('none', 'olympic', 'womens', 'ez', 'trap'))",
+        'CHECK (bodyweight_pct BETWEEN 1 AND 100)',
       ];
 }
 
