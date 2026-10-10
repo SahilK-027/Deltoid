@@ -1195,7 +1195,7 @@ progress`), then `Discarded and deleted sessions` as one line counted in
 sessions — never by name, where a discarded `Push 1 · today` beside the live one
 read as the same session twice — then `Bodyweight` and `Programme and
 exercises`, each with a
-`cloud_off` in the face's colour. Then `Last backed up`: the newest finished
+`cloud_off` in the face's colour. Then `Newest session on your account`: the newest finished
 session the account holds, with a green `cloud_done`. `Try again now`, a
 secondary button, only while the face is yellow and something is waiting. Group
 headings are sentence case in `textSecondary`, not uppercase.

@@ -185,7 +185,7 @@ class BackedUpSession {
   final int dayKey;
 }
 
-/// What *on this phone only* and *last backed up* are made of.
+/// What *on this phone only* and *newest session on your account* are made of.
 class OwedSummary {
   const OwedSummary({required this.waiting, required this.last});
 

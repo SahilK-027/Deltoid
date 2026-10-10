@@ -190,7 +190,11 @@ class _BackupSheet extends ConsumerWidget {
             ),
         ],
         if (summary.last case final last?) ...[
-          const _Heading('Last backed up'),
+          // Not `Last backed up`. The paragraph above ends with the time the
+          // account last received anything, in those words, and this is a
+          // different fact: the newest finished session the account holds.
+          // Under one phrase, `14:28` today sat over `yesterday`.
+          const _Heading('Newest session on your account'),
           AppRow(
             icon: Icons.fitness_center_rounded,
             title: _sessionTitle(last.sessionName, last.dayKey),
