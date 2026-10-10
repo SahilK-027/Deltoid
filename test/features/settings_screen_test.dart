@@ -1,3 +1,4 @@
+import 'package:deltoid/features/account/backup_mark.dart';
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
@@ -134,6 +135,30 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Log bodyweight'), findsOneWidget);
+    });
+
+    testWidgets('the masthead carries the backup button the other tabs do', (
+      tester,
+    ) async {
+      await pump(tester, const SettingsScreen());
+      // In the tree on every build. It draws nothing until an account is
+      // signed in, which is `backup_mark_test`'s to show.
+      expect(find.byType(BackupMark), findsOneWidget);
+    });
+
+    testWidgets('the file backup is named as a file on the phone', (
+      tester,
+    ) async {
+      await pump(tester, const SettingsScreen());
+      await scrollTo(tester, 'Backup file on this phone');
+      expect(find.text('Backup file on this phone'), findsOneWidget);
+      expect(find.text('Automatic backup'), findsNothing);
+      expect(
+        find.text(
+          'Not written yet. A file is written after each finished session.',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('every section renders, top to bottom', (tester) async {

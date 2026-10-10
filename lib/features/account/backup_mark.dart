@@ -29,8 +29,9 @@ import '../../data/sync/sync_state.dart';
 /// is yellow. Online, a set is owed for the few seconds the push waits, and a
 /// count that blinked with every set would be noise.
 ///
-/// Not on Settings. Its account row says the same thing in words, and a fact
-/// says itself once per screen (THEME § 2, rule 6).
+/// On Settings as on the other three tabs. The account row there names the
+/// account and says nothing about its state, so the state is still said once
+/// on that screen.
 class BackupMark extends ConsumerWidget {
   const BackupMark({super.key, this.size = 40});
 
@@ -128,14 +129,19 @@ class _BackupSheet extends ConsumerWidget {
         'Everything is saved on this phone, and the newest changes are being '
             'sent to your account now.',
       ),
+      // The title names the state and nothing else. With the time in it, the
+      // title read as a second clock beside the file backup's on Settings,
+      // and nothing said which of the two it was.
       BackupLook.backedUp => (
-        switch (state?.lastPushAt) {
-          final at? => 'Backed up ${_when(at)}',
-          _ => 'Backed up',
-        },
+        'Backed up',
         'Everything is saved on this phone and on your account.',
       ),
     };
+    // One more sentence, after the one that is always there: how much is
+    // waiting and since when, or when the account last received anything.
+    final further = look == BackupLook.backedUp && !owed
+        ? lastBackedUpLine(state)
+        : backupWaitingLine(state);
     final hue = look == BackupLook.backedUp ? c.positive : c.warning;
 
     return AppSheet(
@@ -163,7 +169,7 @@ class _BackupSheet extends ConsumerWidget {
             0,
           ),
           child: Text(
-            detail,
+            further == null ? detail : '$detail $further',
             style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
           ),
         ),
@@ -256,9 +262,49 @@ String _sessionTitle(String? name, int dayKey) {
   return '${name ?? 'Workout'} · $when';
 }
 
-/// A time if it is today, a day and time if it is not.
-String _when(DateTime at) {
+/// How much is waiting to reach the account, and since when:
+/// `3 changes waiting since 09:14.`
+///
+/// [SYNC.md § 2](SYNC.md#2-the-three-states) asks for how long as well as how
+/// many, and how long is the one that carries the meaning. Pending is normal,
+/// since a session logged in a basement gym is pending for an hour, so the
+/// count alone says nothing: since this morning is a gym with no signal, and
+/// since Tuesday is something to look at.
+///
+/// Null when nothing is waiting, and null while the state has not resolved. A
+/// loading value read as nothing owed would say `Backed up` over a phone that
+/// is holding a session ([SYNC.md § 19](SYNC.md#19-traps)).
+String? backupWaitingLine(SyncState? state) {
+  if (state == null || state.status != SyncStatus.pending) return null;
+  final count =
+      state.owed == 1 ? '1 change waiting' : '${state.owed} changes waiting';
+  return switch (state.owedSince) {
+    final since? => '$count since ${_since(since)}.',
+    _ => '$count.',
+  };
+}
+
+/// When the account last received anything: `Last backed up at 14:02.` on the
+/// day it happened, `Last backed up on 12 Aug at 14:02.` after it.
+///
+/// Null when nothing has ever been sent: signed in on a fresh install is not
+/// backed up, and has no time to give.
+String? lastBackedUpLine(SyncState? state) {
+  final at = state?.lastPushAt?.toLocal();
+  if (at == null) return null;
+  final time = DateFormat('HH:mm').format(at);
+  return dayKeyOf(at) == dayKeyOf(DateTime.now())
+      ? 'Last backed up at $time.'
+      : 'Last backed up on ${DateFormat('d MMM').format(at)} at $time.';
+}
+
+/// A time if it is today, a date if it is not.
+///
+/// `09:14` on the day it happened and `12 Aug` after that: the hour matters
+/// while it is still this session, and stops meaning anything once the answer
+/// is days.
+String _since(DateTime at) {
   final local = at.toLocal();
   final sameDay = dayKeyOf(local) == dayKeyOf(DateTime.now());
-  return DateFormat(sameDay ? 'HH:mm' : 'd MMM, HH:mm').format(local);
+  return DateFormat(sameDay ? 'HH:mm' : 'd MMM').format(local);
 }
