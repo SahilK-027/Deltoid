@@ -15,6 +15,26 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-10
+
+Minor release scoring bodyweight movements on the share of the body they move, and showing that load while logging.
+
+### Added
+
+- **Logging:** A bodyweight movement shows the bodyweight it is scored on beside its name, with the load that comes from it, such as `73.2 kg` over `+69.5 kg (95%)`. Tapping it opens a sheet that explains the figure and lets you log your weight without leaving the session.
+  - The ring turns yellow when your last weigh-in is more than a week old, or when no weight has been logged.
+- **Exercises:** A bodyweight movement has a share of bodyweight. Push-up is 64%, and Pull-up, Chin-up and Dips are 95%. A bodyweight movement you create asks for its own share.
+
+### Changed
+
+- **Progress:** A bodyweight movement is scored on its share of your bodyweight plus any weight you add, where it used to count your whole bodyweight. Estimated 1RM, charts, session volume and cycle progress for Push-up, Pull-up, Chin-up and Dips change to match.
+  - Movements you created keep counting your whole bodyweight until you set their share on the exercise's screen.
+- **Progress:** With no bodyweight logged, 60 kg is assumed, where a bodyweight movement used to go unscored and a weighted one was scored on its added weight alone. The first weight you log replaces the assumed figure for every past session.
+
+### Upgrade notes
+
+- If you sync to your own server, apply `supabase/migrations/20261010120000_bodyweight_pct.sql` before installing this build. Without the new column the server refuses the app's backups.
+
 ## [1.13.0] - 2026-10-10
 
 Minor release letting a set in a past session be corrected.
@@ -404,7 +424,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/SahilK-027/Deltoid/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/SahilK-027/Deltoid/compare/v1.12.3...v1.13.0
 [1.12.3]: https://github.com/SahilK-027/Deltoid/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/SahilK-027/Deltoid/compare/v1.12.1...v1.12.2
