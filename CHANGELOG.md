@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-10-11
+
+Patch release correcting when the done mark on a bodyweight movement turns green.
+
+### Fixed
+
+- **Log:** The done mark on a bodyweight movement is scored on your logged bodyweight and the share of it the movement moves. It used to assume 100 kg at a full share, so a set that added load for one rep fewer could stay white when it was the better set.
+  - For example, BW+10 kg for 9 followed by BW+15 kg for 8 is a 3.5% better estimate at 70 kg and now turns green. At 100 kg the same two sets are 1.9% apart, inside the 2.5% margin, and stay white.
+  - Both sets are scored on today's bodyweight, so a change on the scale between two sessions does not turn a set green.
+
 ## [1.15.1] - 2026-10-10
 
 Patch release renaming one heading in the backup sheet that read as contradicting the line above it.
@@ -454,7 +464,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...HEAD
+[1.15.2]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...v1.15.2
 [1.15.1]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...v1.15.0
 [1.14.1]: https://github.com/SahilK-027/Deltoid/compare/v1.14.0...v1.14.1
