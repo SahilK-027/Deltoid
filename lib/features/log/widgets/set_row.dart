@@ -129,6 +129,8 @@ class SetRow extends StatelessWidget {
     this.partialShownFor,
     this.partialClosedFor,
     this.partialEditing = false,
+    this.bodyweightKg = assumedBodyweightKg,
+    this.bodyweightPct = 100,
   });
 
   static const indexColumn = 34.0;
@@ -157,6 +159,12 @@ class SetRow extends StatelessWidget {
   final MeasureMode measure;
 
   final PastSet? ghost;
+
+  /// The bodyweight the session is scored against, and the share of it the
+  /// movement moves. Read only under the two bodyweight load modes, where the
+  /// done mark compares total load and not the plates alone.
+  final double bodyweightKg;
+  final int bodyweightPct;
 
   /// The set whose count cell is showing its partial half.
   ///
@@ -363,23 +371,26 @@ class SetRow extends StatelessWidget {
     final g = ghost;
     if (g == null || !set.isDone) return false;
 
-    // Bodyweight is held constant: within a single comparison it is the same
-    // number on both sides, so it cancels and cannot skew the result.
-    const assumedBodyweight = 100.0;
-
+    // Both sides are scored on today's bodyweight, so a change on the scale
+    // between the two sessions is never credited to the set. The figure still
+    // has to be the real one: it cancels under strict dominance, but not in
+    // the estimate, where BW+10 × 9 → BW+15 × 8 is a 3.5% gain at 70kg and
+    // 1.9% at 100kg.
     return beatsPrevious(
       load: effectiveLoad(
         mode: loadMode,
         weight: set.weight,
         addedWeight: set.addedWeight,
-        bodyweightKg: assumedBodyweight,
+        bodyweightKg: bodyweightKg,
+        bodyweightPct: bodyweightPct,
       ),
       reps: set.reps,
       previousLoad: effectiveLoad(
         mode: loadMode,
         weight: g.weight,
         addedWeight: g.addedWeight,
-        bodyweightKg: assumedBodyweight,
+        bodyweightKg: bodyweightKg,
+        bodyweightPct: bodyweightPct,
       ),
       previousReps: g.reps,
     );

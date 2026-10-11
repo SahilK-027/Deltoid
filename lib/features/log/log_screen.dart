@@ -20,6 +20,7 @@ import '../../data/backup/backup_service.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
+import '../../domain/metrics.dart';
 import '../../domain/prefill.dart';
 import '../../domain/rest.dart';
 import '../../domain/units.dart';
@@ -2221,6 +2222,7 @@ class _ExercisePage extends ConsumerWidget {
                 _SetGroup(
                   group: group,
                   entry: entry,
+                  dayKey: workout.dayKey,
                   unit: unit,
                   editing: editing,
                   partialShownFor: partialShownFor,
@@ -2478,6 +2480,7 @@ class _SetGroup extends ConsumerWidget {
   const _SetGroup({
     required this.group,
     required this.entry,
+    required this.dayKey,
     required this.unit,
     required this.editing,
     required this.partialShownFor,
@@ -2493,6 +2496,9 @@ class _SetGroup extends ConsumerWidget {
 
   final _SetGroupData group;
   final ExerciseEntry entry;
+
+  /// The day the session is logged on, which is the day its sets are scored on.
+  final int dayKey;
   final WeightUnit unit;
   final EditTarget? editing;
 
@@ -2516,6 +2522,12 @@ class _SetGroup extends ConsumerWidget {
     final prefill = ref
         .watch(workoutPrefillProvider(entry.workoutExercise.workoutId))
         .valueOrNull?[entry.exercise.id];
+    // The figure the bodyweight pill above the table prints, so the done mark
+    // and the pill never disagree about what the set was scored on.
+    final bodyweightKg = bodyweightBasis(
+      dayKey,
+      ref.watch(bodyweightSeriesProvider).valueOrNull ?? const [],
+    ).kg;
     final repo = ref.read(trainingRepositoryProvider);
     final last = group.sets.length - 1;
 
@@ -2587,6 +2599,8 @@ class _SetGroup extends ConsumerWidget {
                       measure: entry.exercise.measureMode,
                       unit: unit,
                       ghost: _ghostFor(prefill, entry.sets, group.positions[k]),
+                      bodyweightKg: bodyweightKg,
+                      bodyweightPct: entry.exercise.bodyweightPct,
                       editing: editing,
                       partialShownFor: partialShownFor,
                       partialClosedFor: partialClosedFor,
