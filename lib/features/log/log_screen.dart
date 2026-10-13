@@ -1384,12 +1384,27 @@ class _LogScreenState extends ConsumerState<LogScreen>
     }
 
     final index = cells.indexOf(from);
-    if (index < 0 || index + 1 >= cells.length) {
+    final next = index < 0 || index + 1 >= cells.length
+        ? null
+        : cells[index + 1];
+
+    // Leaving the last set of an exercise with an earlier one still open goes
+    // back to that one. The page turns when the exercise is finished, which is
+    // the same answer the box gives in [_followTick].
+    if (from.field == SetField.reps &&
+        (next == null || _pageOf(detail, next.setId) != _page)) {
+      final behind = _openSetBeside(detail, from.setId);
+      if (behind != null) {
+        _focus(behind, _firstEmptyField(behind.id) ?? SetField.reps);
+        return;
+      }
+    }
+
+    if (next == null) {
       setState(() => _editing = null);
       return;
     }
 
-    final next = cells[index + 1];
     final located = _locate(detail, next.setId);
     if (located == null) {
       setState(() => _editing = null);
@@ -1483,9 +1498,33 @@ class _LogScreenState extends ConsumerState<LogScreen>
     ];
     final at = ordered.indexWhere((s) => s.id == setId);
     if (at < 0) return null;
-    // Only forwards. A set ticked out of order in the middle of an exercise
-    // should carry on down the table, not send the page back to a row above it.
+    // The exercise is finished before the page turns. Ticking its last set
+    // with an earlier one still open is not the end of it, and turning the
+    // page there leaves the open set behind on a page nobody is looking at.
+    final beside = _openSetBeside(detail, setId);
+    if (beside != null) return beside;
+    // Past the exercise, only forwards: an exercise left open earlier in the
+    // session was left on purpose, and the page does not go back for it.
     for (final set in ordered.skip(at + 1)) {
+      if (!set.isDone) return set;
+    }
+    return null;
+  }
+
+  /// The open set to go to within the exercise holding [setId], if it has one.
+  ///
+  /// The sets below come first. A set ticked out of order in the middle of an
+  /// exercise should carry on down the table, and only when nothing below is
+  /// open does the caret go back to a row above.
+  SetLog? _openSetBeside(WorkoutDetail detail, String setId) {
+    final located = _locate(detail, setId);
+    if (located == null) return null;
+    final (entry, _, position) = located;
+    if (entry.workoutExercise.skipReason != SkipReason.none) return null;
+    for (final set in entry.sets.skip(position + 1)) {
+      if (!set.isDone) return set;
+    }
+    for (final set in entry.sets.take(position)) {
       if (!set.isDone) return set;
     }
     return null;
