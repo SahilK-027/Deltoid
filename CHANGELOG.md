@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-10-13
+
+Patch release correcting where the log goes after the last set of an exercise is completed out of order.
+
+### Fixed
+
+- **Log:** Completing the last set of an exercise while earlier sets are still open keeps you on that exercise and moves to the first open set. It used to turn to the next exercise and leave the open sets behind.
+  - The page turns once every set of the exercise is completed. This holds for the checkbox, the keypad's Next key, and the hold stopwatch.
+  - A set completed in the middle of an exercise still moves down to the next open set before going back to one above it.
+
 ## [1.15.2] - 2026-10-11
 
 Patch release correcting when the done mark on a bodyweight movement turns green.
@@ -464,7 +474,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...HEAD
+[1.15.3]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...v1.15.3
 [1.15.2]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...v1.15.2
 [1.15.1]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/SahilK-027/Deltoid/compare/v1.14.1...v1.15.0
