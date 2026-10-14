@@ -108,7 +108,7 @@ class _ReorderSheetState extends State<_ReorderSheet> {
                   horizontal: Space.sm,
                   vertical: Space.md,
                 ),
-                child: Icon(Icons.drag_handle_rounded, color: c.textTertiary),
+                child: Icon(Icons.drag_indicator_rounded, color: c.textTertiary),
               ),
             ),
           ),

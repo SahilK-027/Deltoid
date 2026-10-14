@@ -44,10 +44,10 @@ void main() {
     await open(tester);
 
     expect(find.text('Bench press'), findsOneWidget);
-    expect(find.byIcon(Icons.drag_handle_rounded), findsNWidgets(3));
+    expect(find.byIcon(Icons.drag_indicator_rounded), findsNWidgets(3));
 
     // Drag the first row's handle down past the second.
-    final handle = find.byIcon(Icons.drag_handle_rounded).first;
+    final handle = find.byIcon(Icons.drag_indicator_rounded).first;
     final gesture = await tester.startGesture(tester.getCenter(handle));
     await tester.pump(const Duration(milliseconds: 100));
     for (var i = 0; i < 8; i++) {

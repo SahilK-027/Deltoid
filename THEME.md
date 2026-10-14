@@ -1430,6 +1430,13 @@ made out of several movements, and writing each move pushes a stream update into
 everything watching underneath. Up/down buttons per row are a fine control for
 moving one thing and a bad one for arranging six.
 
+The handle is the six-dot grip (`drag_indicator_rounded`) at the trailing edge
+of the row, in `textTertiary`, inside a 44pt target. Three bars read as a menu;
+the dots are the glyph that reads as "pick this up". The log screen's exercise
+rail is the one exception: its tabs are picked up by a long press and carry no
+grip, as chips and tabs do everywhere else, because a 48pt tab has no room for
+one and a tap on it already means "go here".
+
 **Fields are declared once, in the theme.** Fill, radius, focused outline, hint
 colour and insets belong to the input theme; a call site passes a hint, a prefix
 or a suffix and nothing else. Seven fields each carrying their own copy is how
