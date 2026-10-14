@@ -15,6 +15,21 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-10-14
+
+Patch release keeping the log on the exercise you move and redrawing the reorder handle.
+
+### Changed
+
+- **Reorder:** The handle on each row of a reorder sheet is a grip of six dots. It used to be three bars, the symbol most apps use for a menu.
+  - This applies to reordering exercises on the log screen, exercises in a regime day, and the days of a regime.
+
+### Fixed
+
+- **Log:** Dragging the exercise you are logging to another place in the exercise rail keeps it on screen. The log used to stay at the position the exercise left, which then showed a different exercise.
+  - Dragging another exercise past the one you are logging also keeps you on your exercise.
+  - `Reorder exercises` now goes straight to the exercise you were logging after `Save order`, without scrolling through the pages in between.
+
 ## [1.16.0] - 2026-10-14
 
 Minor release letting two training days alternate in one position of the cycle.
@@ -500,7 +515,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...HEAD
+[1.16.1]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...v1.16.1
 [1.16.0]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...v1.16.0
 [1.15.3]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...v1.15.3
 [1.15.2]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...v1.15.2
