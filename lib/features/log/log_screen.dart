@@ -847,12 +847,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
                 ),
                 onSelect: _goToPage,
                 onAdd: () => _addExercise(detail),
-                onReorder: (ids) {
-                  setState(() => _pendingOrder = ids);
-                  ref
-                      .read(trainingRepositoryProvider)
-                      .reorderWorkoutExercises(ids);
-                },
+                onReorder: (ids) => _applyOrder(
+                  ids,
+                  ref.read(trainingRepositoryProvider),
+                ),
               ),
             Expanded(
               child: detail.entries.isEmpty
@@ -875,7 +873,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
                   : PageView.builder(
                       controller: _pages,
                       itemCount: detail.entries.length,
-                      onPageChanged: (i) => _onPageChanged(detail, i),
+                      // The field, not this build's copy: a reorder jumps the pager
+                      // before the next build, and the copy still holds the old
+                      // order, which would watch the rest target of whichever
+                      // exercise used to stand on the page landed on.
+                      onPageChanged: (i) => _onPageChanged(_detail ?? detail, i),
                       itemBuilder: (context, index) {
                         final entry = detail.entries[index];
                         return _ExercisePage(
@@ -1672,7 +1674,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// movements, which is what this is opened to do. The rail's long-press drag
   /// covers the single nudge.
   Future<void> _reorderExercises(WorkoutDetail detail) async {
-    final current = [for (final e in detail.entries) e.workoutExercise.id];
     // Looked up while this widget is certainly alive. A `ref` read from inside
     // a callback that fires after the owning widget is gone throws from a
     // gesture handler, where the only symptom is a button that does nothing.
@@ -1686,17 +1687,36 @@ class _LogScreenState extends ConsumerState<LogScreen>
           (id: e.workoutExercise.id, label: e.exercise.name),
       ],
       onCommit: (ids) {
-        if (!mounted) return;
-        // Follow the exercise that was in front of you, wherever it landed.
-        final was = current.isEmpty
-            ? null
-            : current[math.max(0, math.min(current.length - 1, _page))];
-        setState(() => _pendingOrder = ids);
-        repo.reorderWorkoutExercises(ids);
-        final landed = was == null ? -1 : ids.indexOf(was);
-        if (landed >= 0) _goToPage(landed);
+        if (mounted) _applyOrder(ids, repo);
       },
     );
+  }
+
+  /// Puts today's exercises in [ids] order and keeps the one in front of you
+  /// in front of you, wherever it landed.
+  ///
+  /// The selection follows the exercise, not the slot. Dragging the fourth tab
+  /// to the front left the pager on page four, which now held a different
+  /// exercise: the move had happened, and the screen had quietly swapped what
+  /// you were logging. The page is jumped rather than animated, and in the same
+  /// frame as the new order, so the exercise on screen never changes at all.
+  void _applyOrder(List<String> ids, TrainingRepository repo) {
+    final detail = _detail;
+    final was = detail == null || detail.entries.isEmpty
+        ? null
+        : detail
+            .entries[math.max(0, math.min(detail.entries.length - 1, _page))]
+            .workoutExercise
+            .id;
+    _pendingOrder = ids;
+    if (detail != null) _detail = _withPendingOrder(detail);
+    final landed = was == null ? -1 : ids.indexOf(was);
+    if (landed >= 0 && landed != _page) {
+      _page = landed;
+      if (_pages.hasClients) _pages.jumpToPage(landed);
+    }
+    setState(() {});
+    repo.reorderWorkoutExercises(ids);
   }
 
   /// The order the last move put things in, held until the database agrees.

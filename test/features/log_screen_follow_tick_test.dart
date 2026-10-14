@@ -189,4 +189,51 @@ void main() {
     expect(editingSetId(tester), sets.first.id,
         reason: 'the caret did not go to the first open set');
   });
+
+  group('a reorder from the rail', () {
+    /// The exercise the pager is showing, by its workout row.
+    String onScreen(WidgetTester tester) {
+      final rail = tester.widget<ExerciseRail>(find.byType(ExerciseRail));
+      return rail.entries[rail.current].workoutExercise.id;
+    }
+
+    Future<void> drop(WidgetTester tester, List<String> ids) async {
+      tester.widget<ExerciseRail>(find.byType(ExerciseRail)).onReorder(ids);
+      await settle(tester);
+    }
+
+    testWidgets('keeps the exercise in front of you when it is moved',
+        (tester) async {
+      phone(tester);
+      await pumpLog(tester);
+      final rail = tester.widget<ExerciseRail>(find.byType(ExerciseRail));
+      rail.onSelect(3);
+      await settle(tester);
+      final ids = [for (final e in rail.entries) e.workoutExercise.id];
+      final moved = ids[3];
+
+      await drop(tester, [moved, ...ids.where((id) => id != moved)]);
+
+      expect(currentPage(tester), 0,
+          reason: 'the pager stayed on the slot the exercise left');
+      expect(onScreen(tester), moved);
+    });
+
+    testWidgets('keeps the exercise in front of you when another crosses it',
+        (tester) async {
+      phone(tester);
+      await pumpLog(tester);
+      final rail = tester.widget<ExerciseRail>(find.byType(ExerciseRail));
+      rail.onSelect(2);
+      await settle(tester);
+      final ids = [for (final e in rail.entries) e.workoutExercise.id];
+      final shown = ids[2];
+
+      // The first exercise carried past the one on screen moves it up one.
+      await drop(tester, [...ids.skip(1), ids.first]);
+
+      expect(currentPage(tester), 1);
+      expect(onScreen(tester), shown);
+    });
+  });
 }
