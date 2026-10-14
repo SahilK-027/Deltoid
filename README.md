@@ -158,7 +158,7 @@ build instead.
 
 ## Status
 
-The app is feature-complete and in daily use. All 1,167 Dart tests and nine
+The app is feature-complete and in daily use. All 1,226 Dart tests and nine
 pgTAP tests pass, and the analyzer reports no issues. [TODO.md](TODO.md) is the
 only place where status is recorded, and [CHANGELOG.md](CHANGELOG.md) says what
 each release changed.
@@ -199,7 +199,8 @@ lib/
 
   domain/                   Pure Dart: no Flutter, no database, no I/O
     prefill.dart              resolvePrefill and applyDeload — the core rule
-    cycle_engine.dart         Cycle status and deload scheduling
+    cycle_engine.dart         Cycle status, positions, alternating days, deload scheduling
+    cycle_order.dart          The words the regime editor prints about a cycle's order
     metrics.dart              e1RM, effective load, beatsPrevious, stall detection
     muscle_volume.dart        Weekly sets grouped into six muscle regions
     volume_history.dart       Weeks, spans, and rates
@@ -233,7 +234,8 @@ lib/
     widgets/                primitives.dart (cards, rows, chips, sheets),
                             trend_chart.dart (the single chart widget),
                             calendar.dart (the single day picker),
-                            reorder_sheet.dart, ticking.dart (all per-second rebuilds)
+                            reorder_sheet.dart, ticking.dart (all per-second rebuilds),
+                            cycle_order.dart (the order of a cycle, drawn)
     providers.dart · sync_providers.dart · sync_scope.dart · progress.dart
     ids.dart · rest_alert.dart · failure.dart · workout_notifications.dart
 
@@ -265,7 +267,7 @@ account.
 
 ### Testing
 
-The suite contains 1,167 Dart tests, plus nine pgTAP tests that run behind
+The suite contains 1,226 Dart tests, plus nine pgTAP tests that run behind
 `supabase test db`. Alongside conventional unit and widget tests, three pieces
 are worth describing:
 
@@ -325,7 +327,7 @@ same importer, and installs the finished database directly.
 
 ### Schema changes
 
-`schemaVersion` is currently **5**, and the migration ladder is live. A schema
+`schemaVersion` is currently **6**, and the migration ladder is live. A schema
 change consists of four steps: edit `tables.dart`, regenerate with
 `build_runner`, add a default in `data/db/table_spec.dart`, and add an
 idempotent step to `upgradeSchema`. Read

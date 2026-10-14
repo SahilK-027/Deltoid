@@ -103,7 +103,9 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
       TableSpec(
         name: 'sessions',
         table: db.sessions,
-        parse: Session.fromJson,
+        // A row written before days could alternate has no rotation, and null
+        // is exactly what it meant: the day is trained every cycle.
+        parse: (row) => Session.fromJson({'rotationId': null, ...row}),
         syncs: true,
       ),
       TableSpec(

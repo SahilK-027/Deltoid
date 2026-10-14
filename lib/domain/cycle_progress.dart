@@ -353,9 +353,25 @@ Map<LiftId, _Best> _strengths(
 /// [cycles] may arrive in any order and is read in cycle-index order.
 /// [bodyweightLog] need not be sorted; ordering it once here is what keeps a
 /// long history of chin-ups from re-sorting the series on every set.
+///
+/// [rotations] maps a session to the rotation it alternates in. Where one day
+/// of a rotation was trained in a cycle, the days resting are counted at their
+/// most recent reading. A cycle's point is the mean of its lifts, and a regime
+/// that trains Leg 1 and Leg 2 in turn would otherwise be averaged over a
+/// different set of lifts every cycle: with the squat 40 per cent up and the
+/// deadlift 10, the figure would swing between the two for ever, and the trend
+/// would report a programme standing still as rising and falling by turns.
+///
+/// What is carried is what the resting day held the last time it was trained,
+/// outside a deload. A movement it has since dropped is left behind with it,
+/// and a light week is not brought forward as though it were the day's
+/// strength. Nothing is carried into a cycle that has not trained the
+/// position at all, which is a cycle part way through, and that point is
+/// partial in the way every open cycle's is.
 CycleProgress computeCycleProgress({
   required List<CycleInput> cycles,
   List<({int dayKey, double weightKg})> bodyweightLog = const [],
+  Map<String, String> rotations = const {},
 }) {
   if (cycles.isEmpty) {
     return const CycleProgress(cycles: [], latest: null, trend: null);
@@ -381,12 +397,28 @@ CycleProgress computeCycleProgress({
     }
   }
 
+  // What each alternating day held the last time it was trained outside a
+  // deload, keyed by session. Read by the cycles after it, never by its own.
+  final lastTrained = <String, Map<LiftId, _Best>>{};
+
   final points = <CyclePoint>[];
   for (final c in ordered) {
     final strengths = strengthsByCycle[c.cycleId]!;
     final lifts = <LiftChange>[];
     if (!c.isDeload) {
-      for (final entry in strengths.entries) {
+      final trained = {for (final lift in strengths.keys) lift.sessionId};
+      final spent = {
+        for (final session in trained) ?rotations[session],
+      };
+      final counted = {
+        ...strengths,
+        for (final resting in lastTrained.entries)
+          if (!trained.contains(resting.key) &&
+              spent.contains(rotations[resting.key]))
+            ...resting.value,
+      };
+
+      for (final entry in counted.entries) {
         final base = baselines[entry.key];
         if (base == null || base.best.value <= 0) continue;
         lifts.add(
@@ -403,6 +435,14 @@ CycleProgress computeCycleProgress({
         );
       }
       lifts.sort((a, b) => b.percent.compareTo(a.percent));
+
+      for (final session in trained) {
+        if (rotations[session] == null) continue;
+        lastTrained[session] = {
+          for (final entry in strengths.entries)
+            if (entry.key.sessionId == session) entry.key: entry.value,
+        };
+      }
     }
 
     final value = lifts.isEmpty

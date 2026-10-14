@@ -214,6 +214,135 @@ void main() {
     expect(p.cycles[2].value, closeTo(20, 1e-9));
   });
 
+  group('days that alternate', () {
+    const squat = LiftId(sessionId: 'leg1', exerciseId: 'squat');
+    const deadlift = LiftId(sessionId: 'leg2', exerciseId: 'deadlift');
+    const legs = {'leg1': 'legs', 'leg2': 'legs'};
+
+    // Bench never moves, the squat is 40 % up and the deadlift 10 % up. Leg 1
+    // and Leg 2 are trained in turn from cycle 2.
+    final cycles = [
+      cycle(1, [
+        barbell(bench, weight: 100, reps: 10),
+        barbell(squat, weight: 100, reps: 10),
+        barbell(deadlift, weight: 100, reps: 10),
+      ]),
+      cycle(2, [
+        barbell(bench, weight: 100, reps: 10),
+        barbell(squat, weight: 140, reps: 10),
+      ]),
+      cycle(3, [
+        barbell(bench, weight: 100, reps: 10),
+        barbell(deadlift, weight: 110, reps: 10),
+      ]),
+      cycle(4, [
+        barbell(bench, weight: 100, reps: 10),
+        barbell(squat, weight: 140, reps: 10),
+      ]),
+      cycle(5, [
+        barbell(bench, weight: 100, reps: 10),
+        barbell(deadlift, weight: 110, reps: 10),
+      ]),
+    ];
+
+    test('the day resting this cycle counts at its last reading', () {
+      final p = computeCycleProgress(cycles: cycles, rotations: legs);
+
+      // Cycle 2: bench 0, squat +40, deadlift as it stood in cycle 1, 0.
+      expect(p.cycles[1].value, closeTo(40 / 3, 1e-9));
+      // Cycle 3: bench 0, deadlift +10, squat as it stood in cycle 2, +40.
+      expect(p.cycles[2].value, closeTo(50 / 3, 1e-9));
+      // Nothing moved after that, so neither does the figure. Scored on the
+      // trained day alone it would read 20, 5, 20, 5.
+      expect(p.cycles[3].value, closeTo(50 / 3, 1e-9));
+      expect(p.cycles[4].value, closeTo(50 / 3, 1e-9));
+    });
+
+    test('a programme standing still is not read as rising and falling', () {
+      // Three more cycles of the same weights, so the trend looks back from
+      // cycle 8 to cycle 5: a Leg 1 cycle against a Leg 2 one.
+      final still = [
+        ...cycles,
+        for (var i = 6; i <= 8; i++)
+          cycle(i, [
+            barbell(bench, weight: 100, reps: 10),
+            if (i.isEven)
+              barbell(squat, weight: 140, reps: 10)
+            else
+              barbell(deadlift, weight: 110, reps: 10),
+          ]),
+      ];
+
+      expect(
+        computeCycleProgress(cycles: still, rotations: legs).trend,
+        ProgressTrend.holdingSteady,
+      );
+      // Scored on the trained day alone, the same log reads 20 against 5.
+      expect(
+        computeCycleProgress(cycles: still).trend,
+        ProgressTrend.progressing,
+      );
+    });
+
+    test('nothing is carried into a cycle the position has not reached', () {
+      // Two sessions into cycle 6, neither of them a leg day.
+      final p = computeCycleProgress(
+        cycles: [
+          ...cycles,
+          cycle(6, [barbell(bench, weight: 110, reps: 10)], isOpen: true),
+        ],
+        rotations: legs,
+      );
+      expect(p.cycles[5].lifts.map((l) => l.lift), [bench]);
+      expect(p.cycles[5].value, closeTo(10, 1e-9));
+    });
+
+    test('a movement the resting day has since dropped is not carried', () {
+      const lunge = LiftId(sessionId: 'leg2', exerciseId: 'lunge');
+      final p = computeCycleProgress(
+        cycles: [
+          cycle(1, [
+            barbell(squat, weight: 100, reps: 10),
+            barbell(deadlift, weight: 100, reps: 10),
+            barbell(lunge, weight: 100, reps: 10),
+          ]),
+          // Leg 2 comes round without the lunge.
+          cycle(2, [barbell(deadlift, weight: 110, reps: 10)]),
+          cycle(3, [barbell(squat, weight: 120, reps: 10)]),
+        ],
+        rotations: legs,
+      );
+      // Squat +20 and the deadlift at +10. The lunge is not on the day any
+      // more, so its cycle 1 reading is not brought forward.
+      expect(p.cycles[2].lifts.map((l) => l.lift).toSet(), {squat, deadlift});
+      expect(p.cycles[2].value, closeTo(15, 1e-9));
+    });
+
+    test('a deload reading is never the one carried', () {
+      final p = computeCycleProgress(
+        cycles: [
+          cycle(1, [
+            barbell(squat, weight: 100, reps: 10),
+            barbell(deadlift, weight: 100, reps: 10),
+          ]),
+          cycle(2, [barbell(deadlift, weight: 120, reps: 10)]),
+          cycle(3, [barbell(deadlift, weight: 60, reps: 10)], isDeload: true),
+          cycle(4, [barbell(squat, weight: 110, reps: 10)]),
+        ],
+        rotations: legs,
+      );
+      // Squat +10, and the deadlift at the +20 of cycle 2 rather than the
+      // light week after it.
+      expect(p.cycles[3].value, closeTo(15, 1e-9));
+    });
+
+    test('a regime with no rotations is scored on what was trained', () {
+      final p = computeCycleProgress(cycles: cycles);
+      expect(p.cycles[1].value, closeTo(20, 1e-9));
+      expect(p.cycles[2].value, closeTo(5, 1e-9));
+    });
+  });
+
   test('a hold is measured in seconds, never in estimated 1RM', () {
     LiftPerformance hold(int seconds) => LiftPerformance(
           lift: plank,

@@ -723,6 +723,63 @@ class TrainingRepository {
     return rows.map((e) => e.id).toList();
   }
 
+  /// Session id to rotation id for the live days of [regimeId] that alternate.
+  ///
+  /// A rotation with one live member is left in, because `cyclePositions`
+  /// already reads it as a day of its own and a second filter here would be a
+  /// second definition of the same rule.
+  Future<Map<String, String>> _rotations(String regimeId) async {
+    final rows = await (db.select(db.sessions)
+          ..where((t) =>
+              t.regimeId.equals(regimeId) &
+              t.deletedAt.isNull() &
+              t.rotationId.isNotNull()))
+        .get();
+    return {for (final s in rows) s.id: s.rotationId!};
+  }
+
+  /// Rotation id to the member most recently trained outside [cycleId], or
+  /// trained at all when there is no cycle to leave out.
+  ///
+  /// One row per rotation at most. The newest completed workout of each
+  /// rotation's members is found by `started_at`, so a session backfilled into
+  /// an older cycle takes its place by when it happened and not by when it
+  /// was entered. Workouts in [cycleId] are left out because the open cycle is
+  /// read separately, through [_completedSessionIds]: a member trained in it
+  /// has spent the position, which is a different fact from whose turn it was.
+  ///
+  /// Bounded by the number of alternating days in one regime, each answered
+  /// through `idx_workouts_session_lookup`.
+  Future<Map<String, String>> _lastTrainedInRotation(
+    Map<String, String> rotations,
+    String? cycleId,
+  ) async {
+    if (rotations.isEmpty) return const {};
+    final newest = <String, ({String sessionId, int startedAt})>{};
+    for (final entry in rotations.entries) {
+      final row = await (db.select(db.workouts)
+            ..where((t) =>
+                t.sessionId.equals(entry.key) &
+                t.status.equalsValue(WorkoutStatus.completed) &
+                t.deletedAt.isNull() &
+                (cycleId == null
+                    ? const Constant(true)
+                    : t.cycleId.isNull() | t.cycleId.equals(cycleId).not()))
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.startedAt, mode: OrderingMode.desc)
+            ])
+            ..limit(1))
+          .getSingleOrNull();
+      if (row == null) continue;
+      final held = newest[entry.value];
+      if (held == null || row.startedAt > held.startedAt) {
+        newest[entry.value] = (sessionId: entry.key, startedAt: row.startedAt);
+      }
+    }
+    return {for (final e in newest.entries) e.key: e.value.sessionId};
+  }
+
   Future<Set<String>> _completedSessionIds(String cycleId) async {
     final rows = await (db.select(db.workouts)
           ..where((t) =>
@@ -733,6 +790,43 @@ class TrainingRepository {
     return rows.map((e) => e.sessionId).whereType<String>().toSet();
   }
 
+  /// The positions of [regimeId]'s cycle, each naming the day due.
+  ///
+  /// What the regime editor draws, for any regime and not only the active one.
+  /// It reads the open cycle when there is one and never creates it: a regime
+  /// that is not being trained has no cycle in flight, and opening one to
+  /// answer a question about the order of its days would start a programme
+  /// nobody started.
+  Future<List<CyclePosition>> cyclePositionsOf(String regimeId) async {
+    final rotations = await _rotations(regimeId);
+    final open = await (db.select(db.cycles)
+          ..where((t) =>
+              t.regimeId.equals(regimeId) &
+              t.completedAt.isNull() &
+              t.deletedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(
+                expression: t.cycleIndex, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    return buildPositions(
+      await _sessionIds(regimeId),
+      rotations: rotations,
+      trainedThisCycle:
+          open == null ? const {} : await _completedSessionIds(open.id),
+      lastTrainedInRotation:
+          await _lastTrainedInRotation(rotations, open?.id),
+    );
+  }
+
+  Stream<List<CyclePosition>> watchCyclePositions(String regimeId) {
+    return db.watchQuery(
+      [db.workouts, db.cycles, db.sessions],
+      () => cyclePositionsOf(regimeId),
+    );
+  }
+
   /// Null when the regime is gone — see [ensureOpenCycle].
   Future<CycleStatus?> cycleStatus(String regimeId) async {
     final regime = await (db.select(db.regimes)
@@ -741,6 +835,7 @@ class TrainingRepository {
     if (regime == null) return null;
     final cycle = await ensureOpenCycle(regimeId);
     if (cycle == null) return null;
+    final rotations = await _rotations(regimeId);
     return CycleStatus(
       cycleId: cycle.id,
       cycleIndex: cycle.cycleIndex,
@@ -751,6 +846,9 @@ class TrainingRepository {
           await _cyclesSinceDeload(regimeId, beforeIndex: cycle.cycleIndex),
       deloadEnabled: regime.deloadEnabled,
       deloadAfterCycles: regime.deloadAfterCycles,
+      rotations: rotations,
+      lastTrainedInRotation:
+          await _lastTrainedInRotation(rotations, cycle.id),
     );
   }
 
@@ -1559,7 +1657,8 @@ class TrainingRepository {
         final cycle = await _ensureOpenCycle(regimeId);
         if (cycle == null) return false;
         final done = await _completedSessionIds(cycle.id);
-        if (!sessionIds.every(done.contains)) return false;
+        final rotations = await _rotations(regimeId);
+        if (!everyPositionTrained(sessionIds, rotations, done)) return false;
 
         await (db.update(db.cycles)..where((t) => t.id.equals(cycle.id))).write(
           CyclesCompanion(
@@ -2503,6 +2602,7 @@ class TrainingRepository {
       progress: computeCycleProgress(
         cycles: cycles,
         bodyweightLog: bodyweight,
+        rotations: await _rotations(regimeId),
       ),
       labels: labels,
     );
@@ -2518,7 +2618,15 @@ class TrainingRepository {
   /// means anything: half a session in, the cycle has not changed its mind.
   Stream<RegimeProgress?> watchActiveRegimeProgress() {
     return db.watchQuery(
-      [db.regimes, db.cycles, db.workouts, db.workoutExercises, db.exercises],
+      [
+        db.regimes,
+        db.cycles,
+        db.workouts,
+        db.workoutExercises,
+        db.exercises,
+        // Which days alternate decides which lifts a cycle is scored on.
+        db.sessions,
+      ],
       activeRegimeProgress,
     );
   }
@@ -2526,7 +2634,15 @@ class TrainingRepository {
   /// [regimeProgress], on the same terms as [watchActiveRegimeProgress].
   Stream<RegimeProgress?> watchRegimeProgress(String regimeId) {
     return db.watchQuery(
-      [db.regimes, db.cycles, db.workouts, db.workoutExercises, db.exercises],
+      [
+        db.regimes,
+        db.cycles,
+        db.workouts,
+        db.workoutExercises,
+        db.exercises,
+        // Which days alternate decides which lifts a cycle is scored on.
+        db.sessions,
+      ],
       () => regimeProgress(regimeId),
     );
   }
@@ -4194,7 +4310,11 @@ class TrainingRepository {
 
     final sessionIds = await _sessionIds(cycle.regimeId);
     final done = await _completedSessionIds(cycle.id);
-    if (sessionIds.isEmpty || sessionIds.every(done.contains)) return;
+    final rotations = await _rotations(cycle.regimeId);
+    if (sessionIds.isEmpty ||
+        everyPositionTrained(sessionIds, rotations, done)) {
+      return;
+    }
 
     final later = await (db.select(db.cycles)
           ..where((t) =>

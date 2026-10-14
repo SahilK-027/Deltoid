@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,167 tests and nine pgTAP tests, analyzer clean.**
+**1,226 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -14,6 +14,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 - [x] Regimes, sessions, slots and cycles; a cycle advances on work done, not on the calendar.
 - [x] Deload after N cycles, per regime and overridable per slot.
+- [x] Days that alternate in one position of the cycle, one trained per cycle. Which is due is derived from the log, so a cycle closed early leaves the same day due.
 - [x] Prefill scoped to the session, with ghost text and adoption on tick. A session with no history of its own opens blank; the ⓘ names where the movement was last done and fills nothing in.
 - [x] Logging writes snapshots, so editing a programme never rewrites history.
 - [x] Six regimes, one active, each with an identity hue and a unique living name.
@@ -59,6 +60,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 ### Cycle progress
 
 - [x] The domain: a lift is a session and an exercise, a cycle's point is the mean change across the lifts in it, a deload scores nothing, and every cycle is measured against cycle 1 of its own regime — never against the last deload, and never reset.
+- [x] A regime with alternating days is scored on every lift of the position, the resting day counted at its last reading, so the figure does not swing with whichever day was due.
 - [x] The read walks a regime through its cycles rather than scanning every workout ever logged, and is watched on the shape of the log rather than on `set_logs`, so a whole regime is not re-scored on every set ticked.
 - [x] The cycle axis on the one trend chart: deload bands, hairlines once `All` thins to blocks, a hollow open cycle, a tap-to-read line and a y band that never anchors at zero.
 - [x] The strength card replaces Last session on Workouts, and carries its three states — trained, a first cycle, nothing trained.
@@ -91,6 +93,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] 3 · History and workout detail.
 - [x] 4 · Progress folded into History; the tab is gone.
 - [x] 5 · The Regime cluster.
+- [x] The regime editor's Cycle tab: the order of this cycle and the next, the days by position, and the sheet that makes two days alternate.
 - [x] 6 · Settings, bodyweight log, all-time heatmap.
 - [x] Feel — ink, folds, damped scrolling, no spinner over existing content.
 

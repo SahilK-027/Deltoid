@@ -279,11 +279,37 @@ class Sessions extends Table with SyncColumns {
   TextColumn get name => text()();
   IntColumn get orderIndex => integer()();
 
+  /// The rotation this day belongs to, or null when it is trained every cycle.
+  ///
+  /// The live sessions of one regime that share a value hold one position in
+  /// the cycle between them, and a cycle trains exactly one of them. The
+  /// position is where the earliest of them stands in `orderIndex`, and their
+  /// order within it is `orderIndex` too.
+  ///
+  /// An opaque id rather than a pointer at another session. A pointer names a
+  /// leader, and deleting the leader would leave the rest pointing at a
+  /// tombstone; a shared value has no member the others depend on, so any of
+  /// them can be deleted, renamed or merged from another device without the
+  /// rest noticing.
+  ///
+  /// Which member is due is not stored. It is derived from the workouts
+  /// already logged (`dueInRotation` in `domain/cycle_engine.dart`), so there
+  /// is no counter for two devices to disagree about, and a session logged on
+  /// another phone moves the rotation on by arriving.
+  ///
+  /// A rotation left with one live member is a day trained every cycle, and
+  /// every reader treats it as one. That is the state a delete or a merge
+  /// leaves behind, so it has to be a legal one.
+  TextColumn get rotationId => text().nullable()();
+
   @override
   List<String> get customConstraints => [
         _liveOrTombstoned,
         'CHECK (length(trim(name)) BETWEEN 1 AND 60)',
         'CHECK (order_index >= 0)',
+        // Null is the only way to say "no rotation". An empty string would be
+        // a second spelling of it that groups every day carrying it together.
+        'CHECK (rotation_id IS NULL OR length(rotation_id) > 0)',
       ];
 }
 

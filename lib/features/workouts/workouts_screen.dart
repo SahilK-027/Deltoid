@@ -84,12 +84,17 @@ class _SessionPickRow extends StatelessWidget {
     required this.onTap,
     this.done = false,
     this.isNext = false,
+    this.notDue = false,
   });
 
   final Session session;
   final VoidCallback onTap;
   final bool done;
   final bool isNext;
+
+  /// Whether the day alternates with another and this cycle is not its turn.
+  /// It can still be started, and the row says what starting it means.
+  final bool notDue;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +125,8 @@ class _SessionPickRow extends StatelessWidget {
                 // uppercase micro-label is what makes a screen look like a
                 // template (THEME → Type) — uppercase belongs to the masthead.
                 Text('Next up', style: context.t.labelSmall)
+              else if (notDue)
+                Text('Not due this cycle', style: context.t.labelSmall)
               else
                 Icon(
                   Icons.chevron_right_rounded,
@@ -147,6 +154,12 @@ Future<void> _trainAnotherSession(
   required List<Session> sessions,
   required CycleStatus status,
 }) async {
+  // The days that alternate with another and are waiting their turn.
+  final notDue = {
+    for (final p in status.positions)
+      for (final id in p.sessionIds)
+        if (id != p.dueSessionId) id,
+  };
   final chosen = await showAppSheet<Session>(
     context,
     builder: (sheet) => AppSheet(
@@ -158,6 +171,7 @@ Future<void> _trainAnotherSession(
             session: s,
             done: status.completedSessionIds.contains(s.id),
             isNext: status.nextSessionId == s.id,
+            notDue: notDue.contains(s.id),
             onTap: () => Navigator.of(sheet).pop(s),
           ),
       ],

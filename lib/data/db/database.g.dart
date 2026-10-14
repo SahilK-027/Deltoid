@@ -1903,6 +1903,17 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _rotationIdMeta = const VerificationMeta(
+    'rotationId',
+  );
+  @override
+  late final GeneratedColumn<String> rotationId = GeneratedColumn<String>(
+    'rotation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1913,6 +1924,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     regimeId,
     name,
     orderIndex,
+    rotationId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1977,6 +1989,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     } else if (isInserting) {
       context.missing(_orderIndexMeta);
     }
+    if (data.containsKey('rotation_id')) {
+      context.handle(
+        _rotationIdMeta,
+        rotationId.isAcceptableOrUnknown(data['rotation_id']!, _rotationIdMeta),
+      );
+    }
     return context;
   }
 
@@ -2018,6 +2036,10 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.int,
         data['${effectivePrefix}order_index'],
       )!,
+      rotationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rotation_id'],
+      ),
     );
   }
 
@@ -2036,6 +2058,29 @@ class Session extends DataClass implements Insertable<Session> {
   final String regimeId;
   final String name;
   final int orderIndex;
+
+  /// The rotation this day belongs to, or null when it is trained every cycle.
+  ///
+  /// The live sessions of one regime that share a value hold one position in
+  /// the cycle between them, and a cycle trains exactly one of them. The
+  /// position is where the earliest of them stands in `orderIndex`, and their
+  /// order within it is `orderIndex` too.
+  ///
+  /// An opaque id rather than a pointer at another session. A pointer names a
+  /// leader, and deleting the leader would leave the rest pointing at a
+  /// tombstone; a shared value has no member the others depend on, so any of
+  /// them can be deleted, renamed or merged from another device without the
+  /// rest noticing.
+  ///
+  /// Which member is due is not stored. It is derived from the workouts
+  /// already logged (`dueInRotation` in `domain/cycle_engine.dart`), so there
+  /// is no counter for two devices to disagree about, and a session logged on
+  /// another phone moves the rotation on by arriving.
+  ///
+  /// A rotation left with one live member is a day trained every cycle, and
+  /// every reader treats it as one. That is the state a delete or a merge
+  /// leaves behind, so it has to be a legal one.
+  final String? rotationId;
   const Session({
     required this.id,
     required this.updatedAt,
@@ -2045,6 +2090,7 @@ class Session extends DataClass implements Insertable<Session> {
     required this.regimeId,
     required this.name,
     required this.orderIndex,
+    this.rotationId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2059,6 +2105,9 @@ class Session extends DataClass implements Insertable<Session> {
     map['regime_id'] = Variable<String>(regimeId);
     map['name'] = Variable<String>(name);
     map['order_index'] = Variable<int>(orderIndex);
+    if (!nullToAbsent || rotationId != null) {
+      map['rotation_id'] = Variable<String>(rotationId);
+    }
     return map;
   }
 
@@ -2074,6 +2123,9 @@ class Session extends DataClass implements Insertable<Session> {
       regimeId: Value(regimeId),
       name: Value(name),
       orderIndex: Value(orderIndex),
+      rotationId: rotationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rotationId),
     );
   }
 
@@ -2091,6 +2143,7 @@ class Session extends DataClass implements Insertable<Session> {
       regimeId: serializer.fromJson<String>(json['regimeId']),
       name: serializer.fromJson<String>(json['name']),
       orderIndex: serializer.fromJson<int>(json['orderIndex']),
+      rotationId: serializer.fromJson<String?>(json['rotationId']),
     );
   }
   @override
@@ -2105,6 +2158,7 @@ class Session extends DataClass implements Insertable<Session> {
       'regimeId': serializer.toJson<String>(regimeId),
       'name': serializer.toJson<String>(name),
       'orderIndex': serializer.toJson<int>(orderIndex),
+      'rotationId': serializer.toJson<String?>(rotationId),
     };
   }
 
@@ -2117,6 +2171,7 @@ class Session extends DataClass implements Insertable<Session> {
     String? regimeId,
     String? name,
     int? orderIndex,
+    Value<String?> rotationId = const Value.absent(),
   }) => Session(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2126,6 +2181,7 @@ class Session extends DataClass implements Insertable<Session> {
     regimeId: regimeId ?? this.regimeId,
     name: name ?? this.name,
     orderIndex: orderIndex ?? this.orderIndex,
+    rotationId: rotationId.present ? rotationId.value : this.rotationId,
   );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -2139,6 +2195,9 @@ class Session extends DataClass implements Insertable<Session> {
       orderIndex: data.orderIndex.present
           ? data.orderIndex.value
           : this.orderIndex,
+      rotationId: data.rotationId.present
+          ? data.rotationId.value
+          : this.rotationId,
     );
   }
 
@@ -2152,7 +2211,8 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('dirty: $dirty, ')
           ..write('regimeId: $regimeId, ')
           ..write('name: $name, ')
-          ..write('orderIndex: $orderIndex')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('rotationId: $rotationId')
           ..write(')'))
         .toString();
   }
@@ -2167,6 +2227,7 @@ class Session extends DataClass implements Insertable<Session> {
     regimeId,
     name,
     orderIndex,
+    rotationId,
   );
   @override
   bool operator ==(Object other) =>
@@ -2179,7 +2240,8 @@ class Session extends DataClass implements Insertable<Session> {
           other.dirty == this.dirty &&
           other.regimeId == this.regimeId &&
           other.name == this.name &&
-          other.orderIndex == this.orderIndex);
+          other.orderIndex == this.orderIndex &&
+          other.rotationId == this.rotationId);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -2191,6 +2253,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<String> regimeId;
   final Value<String> name;
   final Value<int> orderIndex;
+  final Value<String?> rotationId;
   final Value<int> rowid;
   const SessionsCompanion({
     this.id = const Value.absent(),
@@ -2201,6 +2264,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.regimeId = const Value.absent(),
     this.name = const Value.absent(),
     this.orderIndex = const Value.absent(),
+    this.rotationId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SessionsCompanion.insert({
@@ -2212,6 +2276,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     required String regimeId,
     required String name,
     required int orderIndex,
+    this.rotationId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : regimeId = Value(regimeId),
        name = Value(name),
@@ -2225,6 +2290,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<String>? regimeId,
     Expression<String>? name,
     Expression<int>? orderIndex,
+    Expression<String>? rotationId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2236,6 +2302,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (regimeId != null) 'regime_id': regimeId,
       if (name != null) 'name': name,
       if (orderIndex != null) 'order_index': orderIndex,
+      if (rotationId != null) 'rotation_id': rotationId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2249,6 +2316,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<String>? regimeId,
     Value<String>? name,
     Value<int>? orderIndex,
+    Value<String?>? rotationId,
     Value<int>? rowid,
   }) {
     return SessionsCompanion(
@@ -2260,6 +2328,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       regimeId: regimeId ?? this.regimeId,
       name: name ?? this.name,
       orderIndex: orderIndex ?? this.orderIndex,
+      rotationId: rotationId ?? this.rotationId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2291,6 +2360,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (orderIndex.present) {
       map['order_index'] = Variable<int>(orderIndex.value);
     }
+    if (rotationId.present) {
+      map['rotation_id'] = Variable<String>(rotationId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2308,6 +2380,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('regimeId: $regimeId, ')
           ..write('name: $name, ')
           ..write('orderIndex: $orderIndex, ')
+          ..write('rotationId: $rotationId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8771,6 +8844,7 @@ typedef $$SessionsTableCreateCompanionBuilder =
       required String regimeId,
       required String name,
       required int orderIndex,
+      Value<String?> rotationId,
       Value<int> rowid,
     });
 typedef $$SessionsTableUpdateCompanionBuilder =
@@ -8783,6 +8857,7 @@ typedef $$SessionsTableUpdateCompanionBuilder =
       Value<String> regimeId,
       Value<String> name,
       Value<int> orderIndex,
+      Value<String?> rotationId,
       Value<int> rowid,
     });
 
@@ -8888,6 +8963,11 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<int> get orderIndex => $composableBuilder(
     column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rotationId => $composableBuilder(
+    column: $table.rotationId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9009,6 +9089,11 @@ class $$SessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get rotationId => $composableBuilder(
+    column: $table.rotationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$RegimesTableOrderingComposer get regimeId {
     final $$RegimesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9062,6 +9147,11 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<int> get orderIndex => $composableBuilder(
     column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get rotationId => $composableBuilder(
+    column: $table.rotationId,
     builder: (column) => column,
   );
 
@@ -9179,6 +9269,7 @@ class $$SessionsTableTableManager
                 Value<String> regimeId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
+                Value<String?> rotationId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionsCompanion(
                 id: id,
@@ -9189,6 +9280,7 @@ class $$SessionsTableTableManager
                 regimeId: regimeId,
                 name: name,
                 orderIndex: orderIndex,
+                rotationId: rotationId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9201,6 +9293,7 @@ class $$SessionsTableTableManager
                 required String regimeId,
                 required String name,
                 required int orderIndex,
+                Value<String?> rotationId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionsCompanion.insert(
                 id: id,
@@ -9211,6 +9304,7 @@ class $$SessionsTableTableManager
                 regimeId: regimeId,
                 name: name,
                 orderIndex: orderIndex,
+                rotationId: rotationId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

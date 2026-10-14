@@ -1219,11 +1219,31 @@ class UnderlineTabs extends StatefulWidget {
     required this.onSelect,
     this.trailingLabel,
     this.onTrailing,
-  });
+    this.leadingLabel,
+    this.leadingIcon,
+    this.leadingSelected = false,
+    this.onLeading,
+  }) : assert(
+         leadingLabel == null || leadingIcon != null,
+         'A leading tab is told apart by its glyph, so it has to carry one.',
+       );
 
   final List<String> labels;
   final int index;
   final ValueChanged<int> onSelect;
+
+  /// A tab ahead of [labels] that is not one of them: the overview of the
+  /// things the other tabs each hold one of.
+  ///
+  /// Set apart by [leadingIcon] and a hairline after it, and by nothing else.
+  /// A hue would read as data (THEME rule 1), and the tab is chrome.
+  final String? leadingLabel;
+  final IconData? leadingIcon;
+
+  /// Whether the leading tab is the one open. While it is, no tab of [labels]
+  /// is drawn selected, whatever [index] holds.
+  final bool leadingSelected;
+  final VoidCallback? onLeading;
 
   final String? trailingLabel;
   final VoidCallback? onTrailing;
@@ -1271,11 +1291,25 @@ class _UnderlineTabsState extends State<UnderlineTabs> {
         padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
         child: Row(
           children: [
+            if (widget.leadingLabel != null) ...[
+              _Tab(
+                label: widget.leadingLabel!,
+                icon: widget.leadingIcon,
+                selected: widget.leadingSelected,
+                onTap: widget.onLeading,
+              ),
+              Container(
+                width: 1,
+                height: 20,
+                margin: const EdgeInsets.symmetric(horizontal: Space.xs),
+                color: c.surfaceHighest,
+              ),
+            ],
             for (var i = 0; i < widget.labels.length; i++)
               _Tab(
                 key: _keys[i] ??= GlobalKey(),
                 label: widget.labels[i],
-                selected: i == widget.index,
+                selected: i == widget.index && !widget.leadingSelected,
                 onTap: () => widget.onSelect(i),
               ),
             if (widget.trailingLabel != null)
@@ -1299,12 +1333,14 @@ class _Tab extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.tint,
+    this.icon,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
   final Color? tint;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -1335,11 +1371,26 @@ class _Tab extends StatelessWidget {
                 Space.md,
                 Space.sm,
               ),
-              child: Text(
-                label,
-                style: context.t.titleMedium?.copyWith(
-                  color: selected ? c.textPrimary : (tint ?? c.textSecondary),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(
+                      icon,
+                      size: 18,
+                      color:
+                          selected ? c.textPrimary : (tint ?? c.textSecondary),
+                    ),
+                    const SizedBox(width: Space.xs),
+                  ],
+                  Text(
+                    label,
+                    style: context.t.titleMedium?.copyWith(
+                      color:
+                          selected ? c.textPrimary : (tint ?? c.textSecondary),
+                    ),
+                  ),
+                ],
               ),
             ),
             AnimatedContainer(

@@ -110,21 +110,69 @@ void main() {
     expect(find.text('No days yet'), findsOneWidget);
   });
 
-  testWidgets('a regime with days shows the tabs and the first day', (
+  testWidgets('a regime with days opens on its cycle', (tester) async {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+    final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
+    await pumpEditor(tester, id);
+
+    expect(tester.takeException(), isNull);
+    // The Cycle tab leads, and every day is a tab after it.
+    expect(find.text('Cycle'), findsOneWidget);
+    for (final s in ppl.sessions) {
+      expect(find.text(s.name), findsWidgets);
+    }
+    expect(find.text('Cycle order'), findsOneWidget);
+    // The count is the heading, and `Add day` is said once, beside it.
+    expect(find.text('6 days'), findsOneWidget);
+    expect(find.text('Add day'), findsOneWidget);
+    // Nothing alternates, so no cycle is named apart from another.
+    expect(find.text('This cycle'), findsNothing);
+    expect(find.text('Next cycle'), findsNothing);
+  });
+
+  testWidgets('a day tab shows the day, with Add day back on the strip', (
     tester,
   ) async {
     final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
     final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
     await pumpEditor(tester, id);
 
-    expect(tester.takeException(), isNull);
-    // Every day is a tab, and `Add day` is the last one.
-    for (final s in ppl.sessions) {
-      expect(find.text(s.name), findsWidgets);
+    // The first match is the tab; the tile and the row come after it.
+    await tester.tap(find.text(ppl.sessions.first.name).first);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
     }
-    expect(find.text('Add day'), findsOneWidget);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Cycle order'), findsNothing);
     // The count is the heading (§7).
     expect(find.textContaining('exercises'), findsWidgets);
+    expect(find.text('Add day'), findsOneWidget);
+  });
+
+  testWidgets('two days that alternate are drawn as this cycle and the next', (
+    tester,
+  ) async {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+    final id = await createRegimeFromTemplate(db, ppl, name: 'PPL');
+    final days = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(id)))
+        .get();
+    Session named(String name) => days.firstWhere((s) => s.name == name);
+    await RegimeRepository(db)
+        .alternateSessions(named('Leg 2').id, named('Leg 1').id);
+    await pumpEditor(tester, id);
+
+    expect(tester.takeException(), isNull);
+    // Once as the row's name in the card, once as the pill on the day.
+    expect(find.text('This cycle'), findsNWidgets(2));
+    expect(find.text('Next cycle'), findsNWidgets(2));
+    expect(
+      find.text('Leg 1 and Leg 2 alternate in position 3'),
+      findsOneWidget,
+    );
+    // Six days still, in five positions.
+    expect(find.text('6 days'), findsOneWidget);
   });
 
   testWidgets('an inactive regime opens without a cycle line', (tester) async {
@@ -135,8 +183,10 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Add day'), findsOneWidget);
-    // The cycle belongs to the programme being trained, not to this one.
-    expect(find.textContaining('Cycle '), findsNothing);
+    // The cycle belongs to the programme being trained, not to this one. The
+    // order of its days is still shown, since that is the programme's own.
+    expect(find.textContaining(RegExp(r'Cycle \d')), findsNothing);
+    expect(find.text('Cycle order'), findsOneWidget);
   });
 
   testWidgets('switching tabs switches the day under them', (tester) async {

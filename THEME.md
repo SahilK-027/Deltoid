@@ -900,6 +900,65 @@ state.
   is numbered, including the ones no cycle has reached**: the numbers are what
   make four gridlines a chart of cycles rather than a scale with no subject.
 
+### Cycle order
+
+The regime editor's first tab, and the one place the order of a cycle is drawn
+rather than listed.
+
+**The card.** One row of tiles per cycle, in a `surface` card. A tile is 40
+tall at `Radii.cell`, its label `label` at weight 600, one line, ellipsized. A
+regime whose days never alternate is a single row with no name over it. One
+that alternates is a row per cycle until the order repeats, three at most, each
+named in `label` above its tiles: `This cycle`, `Next cycle`,
+`Following cycle`.
+
+- **The columns line up, and that is the whole drawing.** Every row holds the
+  same positions in the same order, so the position that alternates is the one
+  column whose tiles differ. Nothing else needs marking.
+- **The tile that alternates takes the selected chip's pair**, `accent` under
+  `onAccent`. The rest are the resting chip, `surfaceHigh` under `textPrimary`.
+  No hue: which day a cycle trains is the order of the programme, and it is
+  neither progress nor a deload.
+- **A cycle that has not started is drawn a step down, all of it.** Below the
+  first row the resting tiles take `textTertiary` and the marked tile fills
+  with `textSecondary`. A marked tile as bright as the one above it would claim
+  the day is as current as that one.
+- **Five positions share the width; six scroll.** Five tiles of a day's name
+  fit a narrow phone at `label`. A sixth would ellipsize all of them, so past
+  five the tiles keep a fixed width and every row scrolls together, which
+  keeps the columns aligned while they move.
+- **One clause under the rows names what alternates**: `Leg 1 and Leg 2
+  alternate in position 3`. Two rotations are two sentences.
+
+**The list under it** is a list card of rows, one per day, under a heading that
+counts the days and carries `Add day`. While the Cycle tab is open the strip
+does not offer `Add day` as well, because a control states its action once.
+
+- **A row leads with its position**: the number in a 28dp `surfaceHigh` circle,
+  the mark a set number wears on the log. The row's subtitle is the day's
+  movements on one line, every name in order, ellipsized. No `+2 more`, which
+  beside an ellipsis is a second way of saying the line was cut.
+- **Days that alternate are consecutive rows under one number**, the day due
+  first. The others lead with a 10dp ring in `textTertiary` where the number
+  would be, a 2px `surfaceHighest` line joins the marks, and no hairline is
+  drawn between them. Each carries a pill at the head of its subtitle: solid
+  `This cycle` on the day due, the quiet pill for `Next cycle` and after.
+- **The order follows the turn.** When a cycle closes the next day moves up to
+  the number and takes the solid pill. The list is read top to bottom as what
+  happens next, so it is never left in the order the days were created in.
+- **A row opens a sheet of what can be done to its position**, and trails the
+  `···` a regime's card trails for the same reason: add a day that alternates,
+  alternate with a day that already exists, or stop alternating. Each is one
+  question, so each is one sheet.
+
+**The tab itself** is told apart from the days by a glyph before its label and
+a 1px `surfaceHighest` rule after it. Its selected and resting colours are the
+other tabs' own. A hue would make chrome read as data.
+
+A note in an outlined box closes the page, saying that rest days are not
+scheduled. The app has no rest day to place, and a list of training days in
+order invites the reader to look for one.
+
 ### Lift row
 
 The regime screen's list: the movement, the session it belongs to and the two
@@ -1409,6 +1468,7 @@ text is rendered, counted in `label`, turning `negative` on the last character.
 | The one chart                                                   | `lib/core/widgets/trend_chart.dart`              |
 | The day picker                                                  | `lib/core/widgets/calendar.dart`                 |
 | The re-order sheet                                              | `lib/core/widgets/reorder_sheet.dart`            |
+| The cycle order card, position marks and the line between them  | `lib/core/widgets/cycle_order.dart`              |
 | Scroll physics                                                  | `lib/core/widgets/scroll.dart`                   |
 | Table, keypad, stopwatch pad                                    | `lib/features/log/widgets/`                      |
 | Bar list                                                        | `lib/features/workouts/widgets/volume_bars.dart` |

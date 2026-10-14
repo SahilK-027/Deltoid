@@ -4,6 +4,7 @@ import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/cycle_engine.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/prefill.dart';
 import 'package:deltoid/domain/rest.dart';
@@ -3224,5 +3225,187 @@ void main() {
 
       expect(await repo.firstLoggedDayKey(), dayKeyOf(old));
     });
+  });
+
+  group('days that alternate', () {
+    Future<void> train(String regimeId, Session session) async {
+      final id =
+          await repo.startWorkout(regimeId: regimeId, sessionId: session.id);
+      final detail = await repo.workoutDetail(id);
+      final set = detail!.entries.first.sets.first;
+      await repo.updateSet(set.id,
+          weight: const Value(20), reps: const Value(8), isDone: const Value(true));
+      await repo.completeWorkout(id);
+    }
+
+    /// The template with Leg 2 folded into Leg 1's position, and every day
+    /// by name.
+    Future<({Regime regime, Map<String, Session> day})> alternatingLegs() async {
+      final regime = await activeRegime();
+      await regimes.alternateSessions(
+        (await sessionNamed('Leg 2')).id,
+        (await sessionNamed('Leg 1')).id,
+      );
+      final all = await db.select(db.sessions).get();
+      return (regime: regime, day: {for (final s in all) s.name: s});
+    }
+
+    String? dueLeg(CycleStatus status) => status.positions
+        .firstWhere((p) => p.alternates)
+        .dueSessionId;
+
+    test('a cycle closes on one of the two, and the next asks for the other',
+        () async {
+      final (:regime, :day) = await alternatingLegs();
+
+      var status = (await repo.cycleStatus(regime.id))!;
+      expect(status.total, 5);
+      expect(dueLeg(status), day['Leg 1']!.id);
+
+      for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Push 2', 'Pull 2']) {
+        await train(regime.id, day[name]!);
+      }
+
+      // Five days closed a cycle of six: Leg 2 was never owed.
+      status = (await repo.cycleStatus(regime.id))!;
+      expect(status.cycleIndex, 2);
+      expect(status.done, 0);
+      expect(dueLeg(status), day['Leg 2']!.id);
+
+      await train(regime.id, day['Push 1']!);
+      await train(regime.id, day['Pull 1']!);
+      status = (await repo.cycleStatus(regime.id))!;
+      expect(status.nextSessionId, day['Leg 2']!.id);
+
+      for (final name in ['Leg 2', 'Push 2', 'Pull 2']) {
+        await train(regime.id, day[name]!);
+      }
+      status = (await repo.cycleStatus(regime.id))!;
+      expect(status.cycleIndex, 3);
+      expect(dueLeg(status), day['Leg 1']!.id);
+    });
+
+    test('a cycle closed early leaves the same day due', () async {
+      final (:regime, :day) = await alternatingLegs();
+      await train(regime.id, day['Push 1']!);
+
+      await repo.advanceCycle(regime.id);
+
+      // A counter would have moved on to Leg 2 and skipped Leg 1 altogether.
+      final status = (await repo.cycleStatus(regime.id))!;
+      expect(status.cycleIndex, 2);
+      expect(dueLeg(status), day['Leg 1']!.id);
+    });
+
+    test('training the day that was not due spends the position', () async {
+      final (:regime, :day) = await alternatingLegs();
+
+      await train(regime.id, day['Leg 2']!);
+
+      var status = (await repo.cycleStatus(regime.id))!;
+      expect(status.done, 1);
+      expect(status.remainingSessionIds, isNot(contains(day['Leg 1']!.id)));
+
+      for (final name in ['Push 1', 'Pull 1', 'Push 2', 'Pull 2']) {
+        await train(regime.id, day[name]!);
+      }
+      // The rotation follows what was trained: Leg 2 went, so Leg 1 is next.
+      status = (await repo.cycleStatus(regime.id))!;
+      expect(status.cycleIndex, 2);
+      expect(dueLeg(status), day['Leg 1']!.id);
+    });
+
+    test('folding an owed day into a trained one closes the cycle', () async {
+      final regime = await activeRegime();
+      for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Push 2', 'Pull 2']) {
+        await train(regime.id, await sessionNamed(name));
+      }
+      expect((await repo.cycleStatus(regime.id))!.cycleIndex, 1);
+
+      await regimes.alternateSessions(
+        (await sessionNamed('Leg 2')).id,
+        (await sessionNamed('Leg 1')).id,
+      );
+      expect(await repo.closeCycleIfSatisfied(regime.id), isTrue);
+
+      final status = (await repo.cycleStatus(regime.id))!;
+      expect(status.cycleIndex, 2);
+      expect(dueLeg(status), (await sessionNamed('Leg 2')).id);
+    });
+
+    test('stopping the alternation makes the cycle ask for both again',
+        () async {
+      final (:regime, :day) = await alternatingLegs();
+      for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Push 2']) {
+        await train(regime.id, day[name]!);
+      }
+
+      await regimes.stopAlternating(day['Leg 1']!.id);
+
+      final status = (await repo.cycleStatus(regime.id))!;
+      expect(status.total, 6);
+      expect(status.done, 4);
+      expect(status.remainingSessionIds,
+          [day['Leg 2']!.id, day['Pull 2']!.id]);
+    });
+
+    test('a session logged under each day keeps its own prefill', () async {
+      // The one rule, under the feature most likely to be mistaken for a
+      // reason to share numbers: two days in one position are still two days.
+      final (:regime, :day) = await alternatingLegs();
+      await train(regime.id, day['Leg 1']!);
+
+      final id = await repo.startWorkout(
+          regimeId: regime.id, sessionId: day['Leg 2']!.id);
+      final detail = (await repo.workoutDetail(id))!;
+      for (final entry in detail.entries) {
+        for (final set in entry.sets) {
+          expect(set.weight, isNull,
+              reason: '${entry.exercise.name} opened with a number that '
+                  'could only have come from Leg 1');
+        }
+      }
+    });
+
+    test('reading the order of a regime not being trained opens no cycle',
+        () async {
+      final other = await regimes.createRegime('Other', activate: false);
+      final a = await regimes.addSession(other, 'A');
+      await regimes.addAlternatingSession(a, 'B');
+
+      final positions = await repo.cyclePositionsOf(other);
+
+      expect(positions, hasLength(1));
+      expect(positions.single.dueSessionId, a);
+      final cycles = await (db.select(db.cycles)
+            ..where((t) => t.regimeId.equals(other)))
+          .get();
+      expect(cycles, isEmpty);
+    });
+  });
+
+  test('a day with no exercises is still owed by the cycle', () async {
+    // The regime editor says so on the empty day, and Workouts sends the user
+    // to fill it in rather than starting it. A day that held nothing and was
+    // quietly skipped would close a cycle the user had not finished building.
+    final regime = await activeRegime();
+    final empty = await regimes.addSession(regime.id, 'Conditioning');
+
+    final status = (await repo.cycleStatus(regime.id))!;
+    expect(status.total, 7);
+    expect(status.remainingSessionIds, contains(empty));
+
+    for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Push 2', 'Pull 2', 'Leg 2']) {
+      final id = await repo.startWorkout(
+          regimeId: regime.id, sessionId: (await sessionNamed(name)).id);
+      final detail = await repo.workoutDetail(id);
+      await repo.updateSet(detail!.entries.first.sets.first.id,
+          weight: const Value(20), reps: const Value(8), isDone: const Value(true));
+      await repo.completeWorkout(id);
+    }
+
+    final after = (await repo.cycleStatus(regime.id))!;
+    expect(after.cycleIndex, 1);
+    expect(after.nextSessionId, empty);
   });
 }

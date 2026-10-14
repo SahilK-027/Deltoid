@@ -14,6 +14,7 @@ import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'exercise_catalog_screen.dart';
+import 'regime_cycle.dart';
 import 'regime_settings.dart';
 import 'exercise_screen.dart';
 
@@ -73,6 +74,10 @@ class RegimeEditorScreen extends ConsumerStatefulWidget {
 
 class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
   int _day = 0;
+
+  /// Whether the Cycle tab is open rather than a day. The editor opens on it:
+  /// the cycle is the regime read whole, and a day is one tap further in.
+  bool _onCycle = true;
 
   @override
   Widget build(BuildContext context) {
@@ -142,8 +147,18 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
                   UnderlineTabs(
                     labels: [for (final s in sessions) s.name],
                     index: day,
-                    onSelect: (i) => setState(() => _day = i),
-                    trailingLabel: 'Add day',
+                    onSelect: (i) => setState(() {
+                      _day = i;
+                      _onCycle = false;
+                    }),
+                    leadingLabel: 'Cycle',
+                    leadingIcon: Icons.sync_rounded,
+                    leadingSelected: _onCycle,
+                    onLeading: () => setState(() => _onCycle = true),
+                    // The Cycle tab carries `Add day` beside its count of
+                    // days, and a control states its action once (THEME
+                    // rule 6), so the strip offers it on the day tabs only.
+                    trailingLabel: _onCycle ? null : 'Add day',
                     onTrailing: () => _addDay(regime.id, sessions.length),
                   ),
               ],
@@ -161,11 +176,17 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
                       onPressed: () => _addDay(regime.id, 0),
                     ),
                   )
-                : _DayBody(
-                    key: ValueKey(sessions[day].id),
-                    regimeId: regime.id,
-                    session: sessions[day],
-                  ),
+                : _onCycle
+                    ? CycleBody(
+                        regimeId: regime.id,
+                        sessions: sessions,
+                        onAddDay: () => _addDay(regime.id, sessions.length),
+                      )
+                    : _DayBody(
+                        key: ValueKey(sessions[day].id),
+                        regimeId: regime.id,
+                        session: sessions[day],
+                      ),
           ),
         ],
       ),
@@ -177,7 +198,10 @@ class _RegimeEditorScreenState extends ConsumerState<RegimeEditorScreen> {
     if (!mounted) return;
     // Land on what was just made, rather than leaving it as a tab off the
     // right-hand edge that nothing points at.
-    setState(() => _day = position);
+    setState(() {
+      _day = position;
+      _onCycle = false;
+    });
   }
 }
 
@@ -391,10 +415,13 @@ class _DayBody extends ConsumerWidget {
         if (slots.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: Space.gutter),
+            // The cycle counts a day whether or not it holds anything, so
+            // the box says that rather than calling the day a rest: a day
+            // left empty is owed, and the cycle waits on it.
             child: EmptyBox(
-              icon: Icons.self_improvement_rounded,
-              message: 'This day is a rest day until it holds an exercise. '
-                  'Add one and the cycle will expect you to train it.',
+              icon: Icons.playlist_add_rounded,
+              message: 'This day has no exercises yet. The cycle still counts '
+                  'it, so add one or delete the day.',
             ),
           )
         else

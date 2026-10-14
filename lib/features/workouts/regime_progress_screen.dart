@@ -356,6 +356,12 @@ class _HowIsThisMeasuredState extends State<_HowIsThisMeasured> {
           'carries on from the next cycle number.',
     ),
     (
+      title: 'Days that alternate count together',
+      body: 'When two days alternate in one position, a cycle that trains '
+          'one of them counts the other at its last result. The figure then '
+          'follows your strength rather than whichever day was due.',
+    ),
+    (
       title: 'Deload cycles are left out',
       body: 'The weights are lighter on purpose, so a deload is marked in '
           'orange and scores nothing.',
@@ -419,7 +425,7 @@ class _HowIsThisMeasuredState extends State<_HowIsThisMeasured> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // A numbered badge rather than a bare figure: the
-                            // five points are a sequence to be read in order,
+                            // points are a sequence to be read in order,
                             // and a grey digit beside a bold line reads as a
                             // footnote marker.
                             Container(

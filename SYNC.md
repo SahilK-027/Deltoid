@@ -161,6 +161,12 @@ The nine tables carrying `SyncColumns`, and those only:
 `exercises`, `regimes`, `sessions`, `session_exercises`, `cycles`, `workouts`,
 `workout_exercises`, `set_logs`, `bodyweight_logs`.
 
+**A rotation is a column on `sessions` and nothing else.** `rotation_id` names
+which days of a regime alternate in one position of the cycle, and it merges
+like any other column, last write wins. Which day is due is not sent: every
+phone derives it from the workouts it holds, so a session logged on one phone
+moves the rotation on the other by arriving.
+
 **`app_settings` never syncs.** It holds `device_id`, the unit preference and
 the theme — which phone you are on, and how that phone should look. Syncing
 `device_id` in particular would break the tie-break it exists for.

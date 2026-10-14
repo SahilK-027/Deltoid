@@ -371,6 +371,120 @@ void main() {
   // regimes must never wear the same colour. There are six, which makes six the
   // number of regimes that can exist at once.
 
+  group('days that alternate', () {
+    final ppl = regimeTemplates.firstWhere((t) => t.key == 'ppl6');
+
+    Future<List<Session>> days(String regimeId) => (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+
+    Session named(List<Session> all, String name) =>
+        all.firstWhere((s) => s.name == name);
+
+    test('a new alternating day shares a rotation and stands after its partner',
+        () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final leg1 = named(await days(regime), 'Leg 1');
+
+      final id = await repo.addAlternatingSession(leg1.id, 'Leg 3');
+
+      final after = await days(regime);
+      expect(after.map((s) => s.name),
+          ['Push 1', 'Pull 1', 'Leg 1', 'Leg 3', 'Push 2', 'Pull 2', 'Leg 2']);
+      final added = after.firstWhere((s) => s.id == id);
+      expect(added.rotationId, isNotNull);
+      expect(named(after, 'Leg 1').rotationId, added.rotationId);
+      // Nobody else was drawn into it.
+      expect(after.where((s) => s.rotationId != null), hasLength(2));
+    });
+
+    test('an existing day moves beside the day it alternates with', () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final before = await days(regime);
+
+      await repo.alternateSessions(
+          named(before, 'Leg 2').id, named(before, 'Leg 1').id);
+
+      final after = await days(regime);
+      expect(after.map((s) => s.name),
+          ['Push 1', 'Pull 1', 'Leg 1', 'Leg 2', 'Push 2', 'Pull 2']);
+      expect(named(after, 'Leg 2').rotationId, isNotNull);
+      expect(named(after, 'Leg 2').rotationId, named(after, 'Leg 1').rotationId);
+      // The same row, moved: a day keeps its id, and with it its history.
+      expect(named(after, 'Leg 2').id, named(before, 'Leg 2').id);
+    });
+
+    test('a third day joins the rotation the first two already share',
+        () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final before = await days(regime);
+      await repo.alternateSessions(
+          named(before, 'Leg 2').id, named(before, 'Leg 1').id);
+
+      await repo.addAlternatingSession(named(before, 'Leg 2').id, 'Leg 3');
+
+      final after = await days(regime);
+      expect(after.map((s) => s.name),
+          ['Push 1', 'Pull 1', 'Leg 1', 'Leg 2', 'Leg 3', 'Push 2', 'Pull 2']);
+      expect({
+        for (final s in after)
+          if (s.rotationId != null) s.name,
+      }, {'Leg 1', 'Leg 2', 'Leg 3'});
+      expect(after.map((s) => s.rotationId).whereType<String>().toSet(),
+          hasLength(1));
+    });
+
+    test('stopping gives every day of the rotation its own position back',
+        () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final before = await days(regime);
+      await repo.alternateSessions(
+          named(before, 'Leg 2').id, named(before, 'Leg 1').id);
+
+      await repo.stopAlternating(named(before, 'Leg 1').id);
+
+      final after = await days(regime);
+      expect(after.where((s) => s.rotationId != null), isEmpty);
+      expect(after, hasLength(6));
+    });
+
+    test('an alternating day cannot take a name the regime already has',
+        () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final leg1 = named(await days(regime), 'Leg 1');
+
+      await expectLater(
+        repo.addAlternatingSession(leg1.id, 'leg 2 '),
+        throwsA(isA<SessionNameTakenException>()),
+      );
+      expect(await days(regime), hasLength(6));
+    });
+
+    test('a rotation never reaches into another regime', () async {
+      final first = await createRegimeFromTemplate(db, ppl, name: 'One');
+      final second = await createRegimeFromTemplate(db, ppl, name: 'Two');
+      final a = named(await days(first), 'Leg 1');
+      final b = named(await days(second), 'Leg 2');
+
+      await repo.alternateSessions(b.id, a.id);
+
+      expect((await days(first)).where((s) => s.rotationId != null), isEmpty);
+      expect((await days(second)).where((s) => s.rotationId != null), isEmpty);
+    });
+
+    test('an empty rotation id is refused by the column', () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final leg1 = named(await days(regime), 'Leg 1');
+
+      await expectLater(
+        (db.update(db.sessions)..where((t) => t.id.equals(leg1.id)))
+            .write(const SessionsCompanion(rotationId: Value(''))),
+        throwsA(anything),
+      );
+    });
+  });
+
   test('every regime gets a colour of its own', () async {
     final ids = [
       for (var i = 0; i < identitySlots; i++) await repo.createRegime('R$i'),

@@ -413,6 +413,151 @@ class RegimeRepository {
     return id;
   }
 
+  /// Adds a day that alternates with [partnerId], and returns its id.
+  ///
+  /// The new day joins the partner's rotation, or the two start one, and it
+  /// is placed directly after the rotation's last member. The cycle engine
+  /// does not need them adjacent, since a position stands where its earliest
+  /// member does; the day strip does, because two tabs that share a position
+  /// read as sharing it only when they sit together.
+  ///
+  /// One transaction, so the name check, the insert and the renumber cannot be
+  /// separated by a second writer.
+  Future<String> addAlternatingSession(String partnerId, String name) async {
+    if (name.trim().isEmpty) throw const BlankNameException('session');
+    final id = newId();
+    await db.transaction(() async {
+      final partner = await _liveSession(partnerId);
+      if (partner == null) return;
+      if (await isSessionNameTaken(partner.regimeId, name)) {
+        throw SessionNameTakenException(name);
+      }
+      final live = await _liveSessions(partner.regimeId);
+      await db.into(db.sessions).insert(
+            SessionsCompanion.insert(
+              id: Value(id),
+              regimeId: partner.regimeId,
+              name: name,
+              orderIndex: nextPosition([for (final s in live) s.orderIndex]),
+            ),
+          );
+      await _joinRotation(id, partner);
+    });
+    return id;
+  }
+
+  /// Makes an existing day alternate with [partnerId].
+  ///
+  /// The day leaves any rotation it was in and joins the partner's. Nothing
+  /// logged under either day is touched: a rotation decides which day a cycle
+  /// asks for, and has no say over what a past cycle held.
+  Future<void> alternateSessions(String sessionId, String partnerId) async {
+    if (sessionId == partnerId) return;
+    await db.transaction(() async {
+      final session = await _liveSession(sessionId);
+      final partner = await _liveSession(partnerId);
+      if (session == null || partner == null) return;
+      if (session.regimeId != partner.regimeId) return;
+      if (session.rotationId != null &&
+          session.rotationId == partner.rotationId) {
+        return;
+      }
+      await _joinRotation(sessionId, partner);
+    });
+  }
+
+  /// Gives every day of [sessionId]'s rotation a position of its own.
+  ///
+  /// The whole rotation rather than the one day: two days alternate with each
+  /// other, and a pair with one member removed is not a smaller rotation but
+  /// no rotation at all.
+  Future<void> stopAlternating(String sessionId) async {
+    await db.transaction(() async {
+      final session = await _liveSession(sessionId);
+      final rotation = session?.rotationId;
+      if (session == null || rotation == null) return;
+      await (db.update(db.sessions)
+            ..where((t) =>
+                t.regimeId.equals(session.regimeId) &
+                t.rotationId.equals(rotation) &
+                t.deletedAt.isNull()))
+          .write(
+        SessionsCompanion(
+          rotationId: const Value(null),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+    });
+  }
+
+  Future<Session?> _liveSession(String id) => (db.select(db.sessions)
+        ..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
+      .getSingleOrNull();
+
+  Future<List<Session>> _liveSessions(String regimeId) =>
+      (db.select(db.sessions)
+            ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
+
+  /// Puts [sessionId] in [partner]'s rotation and directly after its last
+  /// member. Runs inside the caller's transaction.
+  Future<void> _joinRotation(String sessionId, Session partner) async {
+    final rotation = partner.rotationId ?? newId();
+    final stamp = nowMs();
+    await (db.update(db.sessions)
+          ..where((t) =>
+              t.id.isIn([
+                sessionId,
+                if (partner.rotationId == null) partner.id,
+              ])))
+        .write(
+      SessionsCompanion(
+        rotationId: Value(rotation),
+        deviceId: Value(currentDeviceId),
+        updatedAt: Value(stamp),
+        dirty: const Value(true),
+      ),
+    );
+
+    final live = await _liveSessions(partner.regimeId);
+    final order = [
+      for (final s in live)
+        if (s.id != sessionId) s.id,
+    ];
+    final last = live.lastIndexWhere(
+      (s) => s.id != sessionId && s.rotationId == rotation,
+    );
+    final anchor = last < 0 ? partner.id : live[last].id;
+    order.insert(order.indexOf(anchor) + 1, sessionId);
+    if (_sameOrder(order, [for (final s in live) s.id])) return;
+
+    await renumber(
+      order,
+      scope: {for (final s in live) s.id: s.orderIndex},
+      write: (id, orderIndex) async {
+        await (db.update(db.sessions)..where((t) => t.id.equals(id))).write(
+          SessionsCompanion(
+            orderIndex: Value(orderIndex),
+            deviceId: Value(currentDeviceId),
+            updatedAt: Value(nowMs()),
+            dirty: const Value(true),
+          ),
+        );
+      },
+    );
+  }
+
+  bool _sameOrder(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   /// Whether a live session of [regimeId] already answers to this name.
   ///
   /// Trimmed and case-insensitive, matching [isNameTaken] and matching the

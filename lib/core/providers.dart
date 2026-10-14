@@ -299,6 +299,15 @@ Future<void> setKeepScreenOn(AppDatabase db, bool on) {
       );
 }
 
+/// The positions of any regime's cycle, each naming the day due.
+///
+/// What the regime editor reads, where [cycleStatusProvider] below answers
+/// only for the active regime and opens a cycle to do it.
+final cyclePositionsProvider =
+    StreamProvider.family<List<CyclePosition>, String>((ref, regimeId) {
+  return ref.watch(trainingRepositoryProvider).watchCyclePositions(regimeId);
+});
+
 /// Recomputed whenever a workout or cycle row changes, so Today reflects a
 /// finished session the moment it is saved.
 final cycleStatusProvider = StreamProvider<CycleStatus?>((ref) {

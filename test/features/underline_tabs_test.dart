@@ -52,4 +52,36 @@ void main() {
       Space.gutter + Space.md,
     );
   });
+
+  testWidgets('a leading tab is drawn selected instead of the indexed one',
+      (tester) async {
+    var opened = 0;
+    await tester.pumpWidget(
+      host(
+        UnderlineTabs(
+          labels: const ['Push 1', 'Pull 1'],
+          index: 0,
+          onSelect: (_) {},
+          leadingLabel: 'Cycle',
+          leadingIcon: Icons.sync_rounded,
+          leadingSelected: true,
+          onLeading: () => opened++,
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    const c = DeltoidColors.dark;
+    Color? colourOf(String label) =>
+        tester.widget<Text>(find.text(label)).style?.color;
+    // One tab reads as open, and it is the leading one although `index` still
+    // names the first day.
+    expect(colourOf('Cycle'), c.textPrimary);
+    expect(colourOf('Push 1'), c.textSecondary);
+    // It is told apart by its glyph.
+    expect(find.byIcon(Icons.sync_rounded), findsOneWidget);
+
+    await tester.tap(find.text('Cycle'));
+    expect(opened, 1);
+  });
 }

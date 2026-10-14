@@ -88,6 +88,16 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
     await addColumnIfMissing(db, m, db.exercises, db.exercises.bodyweightPct);
     await backfillSeededBodyweightShares(db);
   }
+
+  // 5 → 6 · Days that alternate in one position of the cycle.
+  //
+  // `sessions.rotation_id`, null by default and not backfilled. Null means the
+  // day is trained every cycle, which is what every existing day meant when it
+  // was written, and no existing regime holds an answer the app could know
+  // better. See [Sessions.rotationId].
+  if (from < 6) {
+    await addColumnIfMissing(db, m, db.sessions, db.sessions.rotationId);
+  }
 }
 
 /// `CREATE INDEX IF NOT EXISTS` for every generated index whose name [where]

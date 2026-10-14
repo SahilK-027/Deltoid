@@ -43,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
   /// [RULES.md § 3](RULES.md#3-schema-and-migrations) for the protocol a change
   /// follows.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
