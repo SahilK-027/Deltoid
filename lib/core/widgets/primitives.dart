@@ -1279,8 +1279,16 @@ class _UnderlineTabsState extends State<UnderlineTabs> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    // 48 at the standard font, and taller by whatever the label grows. A tab
+    // is one line of its label over a fixed 23 of padding and underline, so a
+    // fixed 48 left a larger system font overflowing every tab in the strip.
+    final style = context.t.titleMedium;
+    final size = style?.fontSize ?? 16;
+    final line = style?.height ?? 1.375;
+    final grown =
+        (MediaQuery.textScalerOf(context).scale(size) - size) * line;
     return SizedBox(
-      height: 48,
+      height: 48 + math.max(0.0, grown),
       // Full width, or the strip is only as wide as the tabs in it — and a
       // `Column` centres a child narrower than itself, so a regime with one day
       // would put `Legs` and `Add day +` in the middle of the band while a

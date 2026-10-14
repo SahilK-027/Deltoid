@@ -84,4 +84,27 @@ void main() {
     await tester.tap(find.text('Cycle'));
     expect(opened, 1);
   });
+
+  testWidgets('a larger system font grows the strip rather than overflowing',
+      (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(
+      host(
+        UnderlineTabs(
+          labels: const ['Push 1', 'Pull 1'],
+          index: 0,
+          onSelect: (_) {},
+          leadingLabel: 'Cycle',
+          leadingIcon: Icons.sync_rounded,
+          trailingLabel: 'Add day',
+          onTrailing: () {},
+        ),
+      ),
+    );
+
+    // A fixed 48 overflowed by four points at this size, on every tab.
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(UnderlineTabs)).height, greaterThan(48));
+  });
 }
