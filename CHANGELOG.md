@@ -15,6 +15,32 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-10-14
+
+Minor release letting two training days alternate in one position of the cycle.
+
+### Added
+
+- **Regimes:** Two or more days can alternate in one position of the cycle, and each cycle trains one of them. A regime that trains Leg 1 in one cycle and Leg 2 in the next now finishes each cycle on five days rather than waiting for both.
+  - On a regime's Cycle tab, select a day and choose `Alternate with an existing day` or `Add an alternating day`. `Stop alternating` gives each day its own position again.
+  - Which day is due follows what you trained. Closing a cycle early leaves the same day due, and training the other day instead counts as that cycle's turn.
+  - Each day keeps its own progression and its own history. Pairing two days never shares their numbers.
+- **Regimes:** The regime editor opens on a Cycle tab, which shows the order of this cycle and the next and lists the days by position.
+
+### Changed
+
+- **Workouts:** The cycle bar and `Up next` count positions, so a cycle with two alternating days shows five segments rather than six. `Start a session` marks the alternating day that is not due with `Not due this cycle`.
+- **Progress:** In a regime with alternating days, a cycle counts the day that was not trained at its last result, so the figure follows your strength rather than whichever day was due. `How is this measured?` explains this.
+- **Regimes:** A day with no exercises now says that the cycle still counts it. It used to call the day a rest day, which the cycle never treated it as.
+
+### Fixed
+
+- **Regimes:** With a larger system font, the day tabs fit their strip. They used to be cut off at the bottom.
+
+### Upgrade notes
+
+- If you sync to your own server, apply `supabase/migrations/20261014120000_session_rotation.sql` before installing this build. Without the new column the server refuses the app's backups.
+
 ## [1.15.3] - 2026-10-13
 
 Patch release correcting where the log goes after the last set of an exercise is completed out of order.
@@ -474,7 +500,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...HEAD
+[1.16.0]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...v1.16.0
 [1.15.3]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...v1.15.3
 [1.15.2]: https://github.com/SahilK-027/Deltoid/compare/v1.15.1...v1.15.2
 [1.15.1]: https://github.com/SahilK-027/Deltoid/compare/v1.15.0...v1.15.1
