@@ -1,0 +1,293 @@
+# Deltoid roadmap: 1.17.0 to 1.20.0
+
+The plan agreed on 15 October 2026. Nothing in it is built yet.
+
+- **Prototype:** [`prototype.html`](prototype.html) opens in any browser. It draws every
+  screen in the app's own tokens, greys out everything that stays exactly as it is
+  today, and has a switch to simulate having no connection. A hosted copy is at
+  <https://claude.ai/artifact/NkQuNBQ9RV6WxfCXd8mwqH>.
+- **Chart audit:** [`chart-audit.md`](chart-audit.md) ranks 33 chart problems found by
+  rendering every chart from one entry to twenty years of data. Its screenshots
+  were written to an untracked `docs-scratch/` folder and are not kept here.
+
+The redesign is a change of navigation, not of design. Every screen and card that
+exists today keeps its current look, and only what is new is allowed to look new.
+
+---
+
+## 1.17.0: Navigation
+
+### Five tabs
+
+**Home · Regimes · Progress · History · More.** More uses a circle with three dots
+as its icon (`Icons.pending_outlined`, filled when selected).
+
+### Home
+
+Home replaces Workouts. It is the page you land on and the place you enter things.
+
+- **Masthead:** the date, the title `Home`, the rest line (`Rested 3 days`) and the
+  backup button, as today.
+- **Today's session:** the current hero, unchanged.
+- **Habits:** two tiles side by side.
+  - `Weigh-ins` and `Workouts`, each with a 30-day grid and `N/7 this week`.
+  - Weigh-ins carries a grey round + button that opens the weigh-in sheet.
+  - Workouts carries a grey round play button that starts the session that is due.
+  - Tapping either tile opens its full map: Workouts opens today's Consistency
+    screen; Weigh-ins opens a new screen with today's bodyweight trend card, the
+    weigh-in year maps in today's year-map design, and a Log weight button.
+- **Past sessions:** a card holding `Log a past session`. It replaces the calendar
+  icon in the masthead.
+- The card order is fixed. Customise Home was considered and cut.
+
+### Regimes, History
+
+Unchanged, including the exercise catalog under Movements on Regimes.
+
+### Progress
+
+Cycle progress and Weekly volume move here from Workouts, unchanged. The AI card
+joins them in 1.20.0.
+
+### More
+
+Today's Settings without its Bodyweight section, plus:
+
+- A profile header when signed in: a 46px initials circle in the accent colour, the
+  name from the Google sign-in, and `Backed up since` the date the account was created.
+- The Account row reads `Account` with the email beneath it and opens the sign-out sheet.
+- The About card text becomes: "A training tracker that puts you in full control of
+  your programs. Design your own routines, log every set and rep, and track your
+  strength over time with clear, organised records." The spelling `programs` is the
+  owner's choice and deliberate.
+
+---
+
+## 1.18.0: Phases
+
+- **Data:** a syncable `phases` table holding the kind (bulk, cut or maintenance), the
+  start day and an optional planned length of 8, 12 or 16 weeks. It needs the full
+  migration ladder and the server rung.
+- **Phase card on Home:** the phase and its icon, `Since 3 Sep 2026`, a `Week 7 of 12`
+  pill, a bodyweight sparkline tinted by phase, and three figures: bodyweight, change
+  since the start and change per week. `Change` opens the phase sheet.
+- **Keeping it current:** the card itself, never a notification, asks what comes next
+  once the planned length has passed, or when the weigh-ins have run against the
+  declared phase for about three weeks.
+- **Cycle progress chart:** each cycle's slot is tinted by the phase most of its
+  sessions ran in: maintenance grey, bulk lavender, cut cyan. The readout names the
+  phase: `Cycle 6 · Cut · +6.4% on cycle 1`. The legend adds the three phases.
+- **Deloads stay exactly as today:** an orange band 80% of the slot at 14%, no point,
+  an orange cycle number and a dashed line across. Phase tints stop at the deload
+  band's edges and are never drawn under it.
+- **The bodyweight trend chart carries no phase bands.**
+
+---
+
+## 1.19.0: Charts
+
+Work through [`chart-audit.md`](chart-audit.md) in the order it recommends:
+
+1. One shared function for the y range of every chart.
+2. One shared, measured ladder of date labels.
+3. Lines break at empty buckets, and regime jumps are dashed on the cycle chart.
+4. Density decided by pixels rather than counts: markers, tiles and labels.
+5. Deload treatment on long cycle charts and sparklines.
+6. Bodyweight trend parity with the exercise trend.
+7. Text-scale fixes for the bar list and the year heatmap.
+8. An outlier policy, written into THEME first.
+
+Spacing to settle on the way: three line-chart heights, four legend implementations,
+a range control that sits below the chart only on bodyweight, and uneven card padding.
+
+---
+
+## 1.20.0: AI analysis
+
+### The card
+
+An `AI analysis` section at the top of Progress. The card has a 2px multicolour
+border that turns slowly (pink, lavender, cyan, green and yellow, never the reserved
+progress blue or deload orange) and holds, top to bottom:
+
+- Mr Delta beside a speech bubble. At rest it reads `I am Mr Delta. Ask me anything
+  about your training.`; while working, `Looking through your log…` then `Working it
+  out…`; once an answer lands, the span of data it rests on, such as `Based on six
+  cycles of bench press and your current cut.`
+- A question field.
+- Suggested questions as full-width rows.
+- While an answer is being worked out: the question as its heading; under `Reading`,
+  the figures being gathered appear one by one as tags; once Mr Delta starts writing,
+  the label becomes `Worked out from` and three pulsing placeholder lines stand in
+  for the answer. The question field and the suggestions are locked meanwhile.
+- While an answer is open: the question as its heading with a close button, the
+  answer revealed paragraph by paragraph, and a `Worked out from` row naming the
+  figures it used. The remaining questions sit under `Ask something else`.
+- The line `Needs a connection. Deltoid works out the figures on this phone and sends
+  only those.`
+
+### Mr Delta
+
+A pixel-art mascot drawn from the owner's design: an open delta on top, a solid
+lavender body carrying the face (dark eyes with a glint, a white mouth with a pink
+tongue, pink cheeks), raised arms, two legs and a shadow. Every motion moves in whole
+pixels with stepped timing, and every motion stops under reduced motion.
+
+| Mood | When | What he does |
+|---|---|---|
+| Rest | Waiting | Bobs and blinks |
+| Workout | At rest, every 8 to 12 seconds, for 5 seconds | Presses a barbell overhead, with a sweat drop |
+| Searching | While the figures are gathered | Sweeps a magnifying glass across his face |
+| Thinking | While the answer is written | Looks up while three dots appear |
+| Happy | For 3 seconds after the answer lands | Arms up, a hop, sparkles |
+| Asleep | With no connection | Eyes closed, breathing, Zs rising |
+
+In the app the searching and thinking moods follow the real request rather than
+fixed timers.
+
+### With no connection
+
+- Mr Delta sleeps and the card is muted. The bubble reads `I need a connection to
+  answer.` There is no way to save a question for later; it is asked again once the
+  connection is back.
+- The question field is disabled: `Available when you are back online`.
+- **Answers already received stay readable**, listed under `Your recent answers`
+  and marked `Answered earlier, saved on this phone`.
+- A note states that cycle progress, weekly volume and everything logged keep working,
+  and that only Mr Delta needs the internet.
+
+### Under the hood
+
+- The API key lives in a Supabase server function and never in the app.
+- The app computes the figures and sends only those with the question. The model asks
+  the app for exact figures rather than doing arithmetic on raw logs.
+- Model: Claude Opus 5.5 (`claude-opus-5-5`) at `medium` effort. At four or five
+  questions a month the cost is a few cents.
+- The server function is the only place that names a provider, so changing provider
+  later is a one-file change.
+
+### Architecture: the same cost and speed at any amount of history
+
+**The raw log never leaves the phone.** A question never carries sets or workouts.
+It carries a few hundred folded figures, so twenty years of training costs the same
+to ask about as two months.
+
+1. **Facts layer, on the phone, in Dart.** A new set of pure functions in
+   `lib/domain/` (tested without a database, like everything there) answers fixed
+   questions about the log: one lift's best set by cycle, a muscle's weekly sets,
+   bodyweight by week, the phases and their dates, the regimes and their spells.
+   They reuse the queries and the bucketing the charts already use
+   (`chart_buckets.dart`), so every figure Mr Delta quotes is the figure the chart
+   draws, and every result is capped at about sixty points, the same rule the charts
+   follow. One implementation of the maths, in one language.
+2. **The brief.** With each question the app sends a short standing summary: units,
+   the active regime and its cycle, the current phase, the last 12 weeks of volume and
+   bodyweight, and each lift's best set per year. About 3,000 tokens, whatever the
+   length of the history.
+3. **Two passes, not an open loop.** The first call gives the model the question, the
+   brief and a catalogue of the facts it can request, and it replies with a structured
+   list of the facts it needs (at most five). The app computes those on the phone and
+   sends them back in a second call, which writes the answer. Two round trips at most,
+   a bounded wait, and the `Worked out from` tags are exactly the facts requested.
+4. **Server function.** A Supabase Edge Function holds the API key, accepts only a
+   signed-in user's token, limits each account to a handful of questions a day, and
+   relays the two calls. It never reads the synced tables, so it never needs its own
+   copy of the training maths.
+5. **Saved answers.** Each answer is stored on the phone in a new drift table with the
+   question, the text, the facts it used and the date it was asked, as a snapshot in
+   the way a set log is. That is what keeps past answers readable offline. Whether the
+   table syncs is decided when it is built.
+6. **Checking the numbers.** The prompt requires every number in the answer to come
+   from the supplied facts. The app then checks that each number in the reply appears
+   in those facts and, if one does not, shows the answer with a line saying a figure
+   could not be checked rather than presenting it as fact.
+7. **What is never sent.** Notes, exercise names the user typed beyond the ones the
+   question needs, account details and device identifiers stay on the phone.
+8. **Failure states Mr Delta must have.** Offline (asleep), timed out after 30
+   seconds, the daily limit reached, the model declining the question, and a server
+   error. Each gets a plain sentence in the bubble and leaves the card usable.
+9. **Tests.** Domain tests for every fact function, a fixed brief built from a seeded
+   database and compared against a stored copy, and an evaluation of about ten real
+   questions with known answers, run before each model change.
+
+At four or five questions a month, prompt caching, batching and cost tuning are not
+worth building; the design keeps each question small instead.
+
+### After 1.20: Mr Delta elsewhere (ideas, not agreed)
+
+- **One home, many doors.** The card on Progress stays the only place Mr Delta
+  answers. Other screens get an `Ask Mr Delta` link that opens the card with a question
+  already filled in: a lift's history (`Why has this lift stalled?`), a past workout
+  (`How did this session compare?`), the Phase card (`How is this phase going?`).
+- **Never on the log screen.** Nothing may stand between the thumb and a set.
+- **Drafting a regime.** Describe what you want (days a week, time per session,
+  equipment, anything to avoid) and Mr Delta drafts a regime from exercises already in
+  the catalog. The draft opens in the ordinary regime editor, nothing is saved until
+  you save it, and every slot can be changed like any other. A structured output keeps
+  the draft to real catalog exercises and valid set counts, and the app validates it
+  before showing it.
+- **This conflicts with two written rules.** THEME says creation never offers to
+  "build you a plan" because "the user is the planner", and RULES § 6 lists AI coaching
+  as deliberately absent. Drafting a regime only fits if those are rewritten to say the
+  user still decides and Mr Delta only proposes a starting point.
+- **A smaller step that conflicts with nothing:** Mr Delta reviewing a regime you
+  built, for example pointing out that back gets 18 sets a week and chest 10, and
+  leaving every change to you.
+
+---
+
+## Separate fix: deleted regimes on All time
+
+Keep each deleted regime's name from its tombstone row, so the legend and run list
+read `Push pull legs (deleted)` in grey. Fall back to a single `Deleted programme`
+entry only when no name survives.
+
+---
+
+## Documents to amend before building
+
+These decisions contradict the rules as written, so the rules change first and the
+code follows.
+
+- **RULES § 6:** allow streak and habit counts, the Progress tab, and AI analysis,
+  which § 6 currently rules out by name as AI coaching. Record each reason.
+- **THEME:** the five-tab navigation and the Home composition; the colour rule that
+  every hue except the deload orange and the progress blue may be reused, which puts
+  lavender on bulk, the Arms bar, the weigh-in habit and Mr Delta, and cyan on cut and
+  the Back bar; and one exception for the AI card covering its gradient border, the
+  mascot and its animation.
+- **CLAUDE.md rule 11:** an exception for Mr Delta's voice, and a note that `programs`
+  in the About text is deliberate.
+
+## Order of work
+
+One piece at a time. Each step that changes the app ends with `flutter analyze &&
+flutter test` passing, a run on the Android emulator to check it behaves correctly,
+and screenshots of every new or changed screen. The next step starts only after the
+owner approves those screenshots.
+
+**1.17.0, navigation**
+
+1. Commit this roadmap folder.
+2. Amend the documents for 1.17: THEME (five tabs, Home, More, the Habits tile, the
+   Weigh-ins screen), RULES § 6 (habit counts, the Progress tab, bodyweight's new home)
+   and the CLAUDE.md note on `programs`.
+3. The tab shell: five tabs, the More icon, Settings renamed More, its Bodyweight
+   section removed.
+4. Home: the Workouts hero moved unchanged, the Past sessions card, the calendar icon
+   removed from the masthead.
+5. Habits: the two tiles, their + and play buttons, and the Weigh-ins screen with the
+   trend card and the year maps.
+6. Progress: Cycle progress and Weekly volume moved unchanged.
+7. More: the profile header, the Account row and the new About text.
+8. Release 1.17.0: version bump and changelog entry.
+
+**Then** 1.18.0 phases, 1.19.0 charts, 1.20.0 AI analysis, each broken down the same
+way when it starts. The deleted-regime legend fix can land in any patch release.
+
+## Versioning
+
+Every release above is a minor version under the changelog's Semantic Versioning
+rule. A 2.0.0 would only be right if a release broke something for older installs,
+such as a backup an older version cannot restore or sync that stops until every phone
+is updated. None of this work requires that.
