@@ -508,22 +508,7 @@ class HomeScreen extends ConsumerWidget {
         (_, _, _?, false) when cycles.isLoading => const SizedBox.shrink(),
         (_, _, final r?, false) => Column(
           children: [
-            _HomeHeader(
-              last: today!.lastCompleted,
-              actions: [
-                CircleIconButton(
-                  icon: Icons.edit_calendar_outlined,
-                  tooltip: 'Log a past session',
-                  onTap: () => _logPastSession(
-                    context,
-                    ref,
-                    regimeId: r.id,
-                    sessions: sessions,
-                    hasOpenWorkout: open != null,
-                  ),
-                ),
-              ],
-            ),
+            _HomeHeader(last: today!.lastCompleted),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.only(bottom: Space.huge),
@@ -581,6 +566,16 @@ class HomeScreen extends ConsumerWidget {
                           data: today.heatmap,
                           hasHistory: today.hasHistory,
                         ),
+                        const SizedBox(height: Space.section),
+                        _PastSessionsCard(
+                          onTap: () => _logPastSession(
+                            context,
+                            ref,
+                            regimeId: r.id,
+                            sessions: sessions,
+                            hasOpenWorkout: open != null,
+                          ),
+                        ),
                         // Under the grid, because they answer the same
                         // question one level down: the heatmap says whether you
                         // turned up, this says what you trained when you did.
@@ -618,8 +613,8 @@ class HomeScreen extends ConsumerWidget {
 /// The empty states carry it too. Centring a lone card on a blank page instead
 /// reads as a different screen than the one the tab bar says you are on, and on
 /// a fresh install leaves no way to reach More, which is where restoring a
-/// backup lives. More is always here for that reason; anything that needs
-/// sessions to exist is passed in by the caller.
+/// backup lives. More is always here for that reason, and nothing in the band
+/// needs sessions to exist.
 ///
 /// The title is the screen's name, with the date as its eyebrow, rather than
 /// the other way round: the nav label is 11sp at the far end of the screen, and
@@ -635,11 +630,9 @@ class HomeScreen extends ConsumerWidget {
 /// `NO SESSIONS YET` at 27sp is the loudest thing on a screen whose whole
 /// message is that nothing has happened yet.
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.last, this.actions = const []});
+  const _HomeHeader({required this.last});
 
   final ({Workout workout, String? sessionName})? last;
-  final List<Widget> actions;
-
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -662,8 +655,41 @@ class _HomeHeader extends StatelessWidget {
         below: _RestGap(last: last),
         // No cog: More is a destination on the nav bar, and a screen
         // reachable two ways is a screen you have to decide about twice.
-        actions: [const BackupMark(), ...actions],
+        actions: const [BackupMark()],
       ),
+    );
+  }
+}
+
+/// The way into a session logged after the fact.
+///
+/// A row rather than the calendar glyph that once sat in the masthead: a row
+/// says what it does, where a glyph in the band could say it only through a
+/// tooltip, which needs a long press. It sits under the Consistency grid
+/// because that is where the gap it fills is seen.
+class _PastSessionsCard extends StatelessWidget {
+  const _PastSessionsCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Past sessions'),
+        ListCard(
+          children: [
+            AppRow(
+              icon: Icons.event_outlined,
+              title: 'Log a past session',
+              subtitle: 'For a day you trained without the app',
+              chevron: true,
+              onTap: onTap,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -871,7 +897,8 @@ class _NoSessionsState extends ConsumerWidget {
     // in each builds the split rather than starting a workout.
     return Column(
       children: [
-        // No backfill action: there is nothing to log a past session against.
+        // No Past sessions card: there is nothing to log a past session
+        // against.
         _HomeHeader(last: last),
         Expanded(
           child: ListView(

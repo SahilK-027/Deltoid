@@ -220,6 +220,67 @@ void main() {
     expect(find.text('Nothing logged'), findsOneWidget);
   });
 
+  group('past sessions', () {
+    testWidgets('a row under Consistency replaces the masthead calendar',
+        (tester) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+
+      // THEME § 8: the calendar glyph in the band said what it did only
+      // through a tooltip. The row says it in words, so the glyph is gone.
+      expect(find.byIcon(Icons.edit_calendar_outlined), findsNothing);
+      expect(find.byTooltip('Log a past session'), findsNothing);
+
+      final row = find.text('Log a past session');
+      await tester.ensureVisible(row);
+      await tester.pump();
+      expect(find.text('Past sessions'), findsOneWidget);
+      expect(
+        find.text('For a day you trained without the app'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(row).dy,
+        greaterThan(tester.getTopLeft(find.byType(ConsistencyHeatmap)).dy),
+        reason: 'the row sits under the grid, where the gap it fills is seen',
+      );
+    });
+
+    testWidgets('the row opens the backfill sheet', (tester) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+
+      final row = find.text('Log a past session');
+      await tester.ensureVisible(row);
+      await tester.pump();
+      await tester.tap(row);
+      await frames(tester);
+
+      // The sheet the calendar icon opened: the day, defaulting to
+      // yesterday, over the sessions of the active regime.
+      expect(find.textContaining('Yesterday'), findsOneWidget);
+      expect(find.text('Which session'), findsOneWidget);
+      expect(find.text('Push 1'), findsWidgets);
+    });
+
+    testWidgets('is absent while there is nothing to log against',
+        (tester) async {
+      await pumpWorkouts(tester);
+      await frames(tester);
+      expect(find.text('Past sessions'), findsNothing);
+
+      await createRegimeFromTemplate(
+        db,
+        regimeTemplates.firstWhere((t) => t.key == 'blank'),
+      );
+      await frames(tester);
+      expect(find.text('Add a session'), findsOneWidget);
+      expect(find.text('Past sessions'), findsNothing);
+    });
+  });
+
   group('this week', () {
     /// A finished session with every set of the first exercise ticked.
     Future<void> logSession(String regimeId) async {

@@ -11,8 +11,8 @@ import '../../data/sync/sync_state.dart';
 /// The header's backup button: whether training is on the account, and how
 /// much of it is still only on this phone.
 ///
-/// The same `CircleIconButton` as the calendar beside it on Workouts, so the
-/// header holds two buttons of one kind rather than a button and a stray glyph.
+/// A `CircleIconButton`, the kind every other button in a masthead is, so the
+/// header never holds a button and a stray glyph side by side.
 /// Drawn whenever an account is signed in, because *is my training backed up*
 /// is asked at the gym and should be answered at a glance. Absent without an
 /// account: there is nothing to back up to, and Settings offers the sign-in.
