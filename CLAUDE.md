@@ -88,6 +88,13 @@ explained in full in [RULES.md](RULES.md).
     plain vocabulary, and Commonwealth spelling throughout.
     [THEME § 4 "The words"](THEME.md#the-words) governs the app's strings and
     is the arbiter wherever this rule is less specific.
+
+    One deliberate exception: the About card on More reads "A training
+    tracker that puts you in full control of your programs. Design your own
+    routines, log every set and rep, and track your strength over time with
+    clear, organised records." The spelling `programs` is the owner's choice
+    and stays. Do not correct it to `programmes`, and do not take it as
+    licence to use `programs` anywhere else.
 12. **Running tests for verification** Whenever you run tests suite for verification run suite in such a way that in one go you will know which test broke you can save test results output in one file. Don't run tests only and then rerun them again to find which tests are broken this causes wastage of time since we run same tests twice which could have been done in one go. 
 
 A load-bearing rule should be enforced by a mechanism rather than a comment: an

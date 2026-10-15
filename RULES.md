@@ -451,7 +451,7 @@ requirement, and the answer to "should we add…" is usually no.
 
 **Deliberately absent, and staying that way:** social features, macros /
 nutrition, AI coaching, an exercise GIF or video library, Apple Health /
-Google Fit, 1RM testing protocols, streaks, levels, muscle maps, motivational
+Google Fit, 1RM testing protocols, levels, muscle maps, motivational
 copy, programme sharing or marketplaces, and **effort / RIR ratings** — a
 number you rate yourself with after the set, which is one more thing to answer
 at the bar and nothing downstream reads.
@@ -488,7 +488,7 @@ else has to pass: **no new screen, and no new question asked.**
 
 - **The bodyweight pill** is the fourth, and the one that comes nearest to a
   new question. It adds no screen: a pill on the log page of a movement that is
-  already open, and a sheet whose one button opens the weigh-in sheet Settings
+  already open, and a sheet whose one button opens the weigh-in sheet the app
   already has. It does ask, but only when the answer is missing or more than a
   week old, only on a movement whose score reads the answer, and it never
   stands between the thumb and a set. What stays ruled out is the reminder as
@@ -504,6 +504,41 @@ else has to pass: **no new screen, and no new question asked.**
   it did. What stays ruled out is everything a schedule usually drags with it:
   no calendar, no weekdays, no rest days to place, no periodised blocks, and
   no week-by-week editor in which every week is its own programme.
+
+- **Habit counts** are the sixth, and they took streaks off the list with them.
+  Each habit tile on Home states how many days of this calendar week the habit
+  was kept, `3/7 this week`, and a count of weeks or days kept in a row may be
+  stated the same way. They ask no new question: every figure is counted from
+  workouts and weigh-ins already logged. They are here because the two things
+  the app reads most depend on being done regularly. A missed weigh-in is what
+  turns the bodyweight pill yellow, and a month of training was visible only as
+  a grid to be read cell by cell. What stays ruled out is everything a streak
+  usually drags with it: a flame or any other mark of a run, a warning that a
+  run is about to break, a reward at the end of one, a target the app sets, a
+  notification, and any copy that praises or scolds. A count is stated, and the
+  person reading it decides what it means.
+
+- **The Progress tab** is the seventh, and it fails the test outright: it is a
+  new destination on the nav bar. It holds nothing new. Cycle progress and
+  Weekly volume moved there from Workouts unchanged, because Workouts had
+  become two screens in one, a place to enter a session and a place to read
+  the training, and Home is the first of those only. Moving the two cards adds
+  no number to the app and asks nothing. What stays ruled out is what stayed
+  ruled out for each card on its own: a dashboard of figures the app invents,
+  targets to fail against, and a feed. Anything else proposed for Progress
+  passes the same test Cycle progress did, and is written down here before it
+  is built.
+
+- **Bodyweight's move out of Settings** is the eighth. Settings held the
+  fourth tab partly because bodyweight lived in it, and bodyweight is not a
+  setting: it is data, entered every few days, that every bodyweight lift in
+  the app is scored on. Behind a tab named for configuration it was two taps
+  from the person asked to enter it, which is how a weigh-in goes unlogged. It
+  now has a habit tile on Home with its own `+`, and a Weigh-ins screen behind
+  the tile in place of the Bodyweight screen behind Settings, so the screen
+  count is unchanged and the question is the one the weigh-in sheet always
+  asked. The tile states and never asks: no notification, no badge, and no
+  prompt on opening the app, as the bodyweight pill already promises.
 
 **Accounts came off it too, and did _not_ pass that test — so the reason has to
 be written down rather than assumed.** Sync across your own phones needs an

@@ -46,7 +46,7 @@ For any decision not covered below.
    `kg` one step down in grey.
 6. **Say it once.** A fact appears in one place on a screen. When it appears
    twice, one is **deleted** — not shrunk, not moved somewhere quieter.
-   - The screen's subject is named once. A card inside Workouts does not say
+   - The screen's subject is named once. A card inside Home does not say
      "today".
    - A number gets one representation: a bar _or_ a count. Where a graphic and a
      figure say the same thing, the graphic stays only if it says it faster.
@@ -143,6 +143,7 @@ shout where the others may not: a destructive action.
 | `chartLines`  | `progress`, then `identity[]` in order                | The lines of a chart that draws more than one            |
 | `warmup`      | cyan                                                  | A warm-up set on the log                                 |
 | `dropSet`     | lavender                                              | A drop or rest-pause set on the log                      |
+| `weighIn`     | lavender                                              | A day with a weigh-in, on its tile and its year maps     |
 | `heatEmpty`   | `surfaceHighest`                                      | A day not trained, and an untrained muscle               |
 
 **The identity order alternates warm and cool.** The muscle regions draw in this
@@ -157,11 +158,18 @@ always the blue one. Past seven, the oldest are left out and the chart says
 `Showing 7 of 9 sessions` under it. Repeating a colour would draw two
 progressions as one, which is the mistake the per-session chart exists to avoid.
 
-Two rules stop those colliding:
+Two rules decide how the hues are shared:
 
-- **A closed set may be reused only where the two never share a screen.** The
-  six serve programme identity, muscle regions and extra chart lines, and no
-  screen shows two of those at once.
+- **Every hue may be reused except blue and orange.** The six serve programme
+  identity, muscle regions, extra chart lines, the set types on the log and the
+  weigh-in habit, and one of them may carry two of those meanings, on one
+  screen if need be: lavender is a drop set, the Arms bar and a day weighed.
+  A reused hue is always read beside the label that says which meaning it
+  carries, and six hues spread over every meaning the app has would otherwise
+  run out or borrow blue and orange, the one borrowing that costs something.
+  Those two are never reused, because each means the same thing everywhere,
+  and a second meaning on any screen would cost every other screen its
+  reading. Red stays outside the palette altogether.
 - **Identity marks appear only where they separate programmes** — the regime
   library. Elsewhere a mark means _what kind of day this was_: `progress` for a
   session, `deload` for a light week. That is what a feed of trained days is
@@ -331,7 +339,7 @@ with a spinner.
 
 **A spinner on a control is allowed only where the app is genuinely waiting on
 somebody else**, which is the sign-in on the threshold screen and the sign-in
-row in Settings, and nowhere else — every other screen reads local disk and
+row in More, and nowhere else — every other screen reads local disk and
 waits on nothing ([SYNC § 15](SYNC.md#15-what-sync-may-never-do) rule 1). Where
 it is allowed, **busy must not look disabled**: the control keeps its fill and
 swaps its glyph for `RowSpinner`, because a button that greys itself out has
@@ -652,9 +660,41 @@ the tiles already agree on.
 chart is scaled against and how many periods it covers — and names the period
 under your finger while scrubbing.
 
+### Habit tile
+
+Two to a row under the `Habits` heading on Home, Weigh-ins on the left and
+Workouts on the right, each answering one question: was the habit kept this
+week. A `surface` card at padding 16, shaped as a stat tile is: the name in
+`title` with `Last 30 days` in `body` under it, a round button at the top
+right, the grid, a hairline, then the figure, `3/7` in `valueSm` with
+`this week` in `body`, and a chevron. The two tiles are the same shape, so the
+row is `CrossAxisAlignment.start` for the reason a row of stat tiles is.
+
+- **The grid is the last thirty days, ten to a row**, oldest first and today
+  last, square cells at radius 4 in `heatEmpty`. Workouts fills a trained day
+  with `progress` and a deload with `deload`, the colours its own map uses;
+  Weigh-ins fills a day with a weigh-in in `weighIn`. No legend: the screen
+  each tile opens carries one.
+- **The figure counts days, not entries, in the calendar week**, Monday to
+  today, as the Consistency card's `this week` did. Two weigh-ins on one day
+  are one day kept. A day is a day, so the denominator is always 7.
+- **The figure is a count and says nothing else.** No flame, no colour that
+  changes with the number, nothing at `7/7` that `6/7` lacks. The app counts
+  the habit and leaves the judging to the person reading it.
+- **The round button is the habit's one action**, there so the habit is kept
+  without opening anything first: `+` on Weigh-ins opens the weigh-in sheet,
+  and play on Workouts starts the session that is due. A circular icon button
+  at 36 rather than 40, because it shares a corner with two lines of text
+  rather than a row of buttons, with the label every circular icon button is
+  required to carry. With no session due there is nothing for play to start,
+  and the button is absent rather than disabled.
+- **The rest of the tile opens the full map.** Workouts opens Consistency;
+  Weigh-ins opens the Weigh-ins screen. A tap on the button never also opens
+  the tile.
+
 ### Strength card
 
-`surface` card, shared by Workouts and the regime screen, answering one
+`surface` card, shared by Progress and the regime screen, answering one
 question: is the programme working. Top to bottom — the regime's name as a
 caption, the figure with its trend pill, the range pill, the readout, the chart,
 its legend, then the row that opens the detail.
@@ -1215,20 +1255,56 @@ in the middle, unmarked.
 **A control that governs the page pins; content scrolls under it.** What you
 change stays reachable, and what you read never permanently owns half the screen.
 
+**Home's quiet line is the rest line**: `Rested 3 days`, `Rested 1 day`,
+`Trained today` or `Nothing logged`, under the date and the title, with the
+backup button the only thing in the action slot. It counts rest rather than
+dating the last session, because the question on opening the app is whether a
+session is due.
+
+**More's profile header is the block under the bar.** While an account is
+signed in, a `surface` block directly under the masthead, sharing its colour,
+holds a 46dp circle in `accent` with the initials in `onAccent` at weight 800,
+then the name the Google sign-in gives in `section` and, under it in `body`,
+`Backed up since 31 May 2025`: the date the account was created, which is the
+day this history began to be kept anywhere but the phone. `accent` and not a
+hue, because the circle is chrome: a person is not a series, a deload or a
+regime. It is not a card and opens nothing. Without an account there is no
+header, and the screen begins at its first section.
+
 ### Bottom navigation
 
 `surface` bar, 1px top hairline, height 62 plus safe area. Selected is a white
 icon and white `micro` label at weight 700; unselected `textSecondary` for both.
 **No pill, no indicator, no hue** — weight and brightness carry the state.
 
+**Five destinations, in this order: Home · Regimes · Progress · History ·
+More.** Home is where the app opens and where things are entered, Progress is
+where the training is read, and More holds everything that is set rather than
+logged. Home is first because it is the tab opened every day, and More last
+because it is the tab opened least.
+
+**Each tab has an outlined icon, filled when it is selected.** Home is a house,
+`Icons.home_outlined` and `Icons.home_rounded`. The drawn stack of plates
+Workouts wore is retired with the tab, since the tab that opens the app is now
+named for where it is rather than for what is trained. Regimes and History keep
+their icons. Progress is the Material Symbols `monitoring` glyph, bars under a
+line. Flutter's `Icons` does not ship it, so it is drawn from the symbol's own
+path, in the way the plates were drawn, and is never replaced by a near-miss
+such as `insights` or `show_chart`.
+
+**More is a circle with three dots**, `Icons.pending_outlined`, filled when
+selected. A cog names the tab after one part of what it holds, and the account
+is not a setting. Three bare dots read as an overflow menu that opens over the
+page, which More is not; inside a circle they are a destination of their own.
+
 ### Backup button
 
-The same `CircleIconButton` as the calendar beside it: `surfaceHigh` fill, 40dp,
-in the header's action slot on Workouts (left of the calendar), History (left of
-the total), Regimes and Settings, and between the title and `Finish` on the
-log. Drawn whenever an account is signed in; absent without one. On Settings
-the account row beside it names the account and says nothing about its state,
-so the button is where that screen says it, once (rule 6).
+The header's `CircleIconButton`: `surfaceHigh` fill, 40dp, in the action slot
+of every destination, which is Home, Regimes, Progress, History (left of the
+total) and More, and between the title and `Finish` on the log. Drawn whenever
+an account is signed in; absent without one. On More the profile header and
+the account row under it name the account and say nothing about its state, so
+the button is where that screen says it, once (rule 6).
 
 **Two faces.** `cloud_done_outlined` in `positive` while the phone is online and
 no attempt has failed. `cloud_off_outlined` in `warning` when there is no
@@ -1262,7 +1338,7 @@ headings are sentence case in `textSecondary`, not uppercase.
 **Two backups, two names.** The account is a backup and so is the file the app
 writes to the phone after each finished session, and each has a time. They are
 never both called a backup with a time beside it. The account's is `Last backed
-up`, in the sheet. The file's row on Settings is `Backup file on this phone`,
+up`, in the sheet. The file's row on More is `Backup file on this phone`,
 `Last written 9 Oct 2026, 19:22`.
 
 ### Badges
@@ -1377,7 +1453,7 @@ stays inside the rule while all of this holds:
   button of the same size, shape and type as the one above it — not greyed, not
   small print, not a corner `Skip`. Only the fill differs, `surfaceHigh` with a
   `border` hairline against the `accent` above, because one of the two opens
-  somebody else's sheet. Final and repairable: Settings offers the same
+  somebody else's sheet. Final and repairable: More offers the same
   connection later, and nothing nags.
 - **A rule reading `OR` between them.** The two are alternatives, not a
   sequence, and a gap alone says "and then".
@@ -1462,6 +1538,81 @@ Two standing exceptions, both narrow, both here rather than argued in a comment:
 
 **Free text is capped and the counter says so** — a limit that fits where the
 text is rendered, counted in `label`, turning `negative` on the last character.
+
+### The destinations
+
+**The redesign that made five tabs out of four moved screens, not looks.**
+Every card and screen that existed before it keeps its appearance on the
+destination it moved to, and only what was new at the time looks new: the
+habit tiles, the Past sessions card, the Weigh-ins screen and More's profile
+header.
+
+**Home** is the screen the app opens on, and the place things are entered.
+Four parts, in an order that does not change:
+
+1. **The masthead**: the date as the eyebrow, `Home` as the title, the rest
+   line, and the backup button.
+2. **Today's session**: the hero, on the band's own `surface`, exactly as
+   Workouts drew it — the session due or the session open, and the screen's one
+   primary action.
+3. **Habits**: the two habit tiles. The Workouts tile takes the place of the
+   Consistency card, and opens the same Consistency screen.
+4. **Past sessions**: a list card holding one row, `Log a past session`, with
+   `For a day you trained without the app` under it, which opens the day picker
+   and then the log for the day picked. It replaces the calendar button that
+   sat in the masthead, because a row says what it does where a glyph in the
+   band could say it only through a tooltip, which needs a long press.
+
+**The order is fixed and Home cannot be customised.** A page that rearranges
+itself is a page learned twice, and four parts fit one scroll. Cycle progress
+and Weekly volume are not on Home: they are read rather than entered, so they
+are on Progress.
+
+**Progress** holds Cycle progress and Weekly volume, moved from Workouts as
+they were: the same headings, the same cards, the same `All time` links and the
+same screens behind them. Its eyebrow is `Cycles and volume`, the inventory of
+the page. Nothing on it asks a question.
+
+**Weigh-ins** is pushed from its habit tile, so it wears the app bar, titled
+`Weigh-ins`. Top to bottom:
+
+- the bodyweight trend card, as the Bodyweight screen drew it, with its range
+  control;
+- a line counting every weigh-in since the first, `48 weigh-ins since March
+  2025`, over a legend of `No weigh-in` and `Weighed`;
+- a year map per year, newest first, each under a heading carrying the year
+  and its count, in the card and the year-map design Consistency uses. A day
+  with a weigh-in is `weighIn` and a day without is `heatEmpty`.
+
+`Log weight` floats at the bottom right as the compact primary, because it adds
+one more entry to what the screen lists, and it opens the weigh-in sheet the
+tile's `+` opens. This screen is where bodyweight lives once Settings no longer
+holds it ([RULES § 6](RULES.md#6-scope)).
+
+**A past weigh-in is corrected through the calendar in the app bar.** A circular
+icon button, `edit_calendar_outlined`, labelled `Correct a weigh-in`, opens the
+[day picker](#day-picker) with every weighed day ringed in `weighIn` and every
+day after today out of range. A weighed day opens the weigh-in sheet on that
+entry, titled `Edit bodyweight`, with its red `Delete this weight` row last. A
+day with no weigh-in opens the same sheet as `Log bodyweight`, dated that day.
+The screen has no list of entries by month, so this is the one way to reach an
+old weigh-in, and it lives here and nowhere else: Home's tile and its `+` log
+today's weight only. A year map stays a map, and a tap on one of its days only
+names the day in its caption.
+
+**More** is Settings under a name that fits what it holds: the account and
+backup, the training defaults, the appearance and the About card, in the same
+order and the same look, without the Bodyweight section that opened it. The
+masthead keeps `On this device` as its eyebrow. Two things are new, and both
+appear only while an account is signed in:
+
+- **The profile header**, under the masthead, as
+  [Mastheads and app bars](#mastheads-and-app-bars) describes.
+- **The account row** is the first row of `Account & backup`. It reads
+  `Account`, with the email under it in `body`, and opens the sign-out sheet.
+  The email was the row's title once, over `Your training is backed up to this
+  account`; the header says that now, so the row names the thing and the
+  address is its detail (rule 6).
 
 ---
 

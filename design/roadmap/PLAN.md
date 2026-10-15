@@ -275,10 +275,24 @@ owner approves those screenshots.
 3. The tab shell: five tabs, the More icon, Settings renamed More, its Bodyweight
    section removed.
 4. Home: the Workouts hero moved unchanged, the Past sessions card, the calendar icon
-   removed from the masthead.
+   removed from the masthead. The tab's code is renamed to match, as its own
+   refactor commit before any behaviour changes: `lib/features/workouts/` becomes
+   `lib/features/home/`, `workouts_screen.dart` and `workouts_providers.dart` become
+   `home_screen.dart` and `home_providers.dart`, `WorkoutsScreen` and
+   `workoutsProvider` become `HomeScreen` and `homeProvider`, and
+   `test/features/workouts_screen_test.dart` becomes `home_screen_test.dart`. RULES
+   § 2's "Workouts loads through one snapshot" is renamed with them. Names that
+   mean a workout itself stay: `workout_notifications.dart`,
+   `workout_detail_screen.dart`, `live_workout_vs_editing_test.dart`, the `Workout`
+   table and everything in `lib/data/` and `lib/domain/`.
 5. Habits: the two tiles, their + and play buttons, and the Weigh-ins screen with the
    trend card and the year maps.
-6. Progress: Cycle progress and Weekly volume moved unchanged.
+6. Progress: Cycle progress and Weekly volume moved unchanged. Their files move from
+   `lib/features/home/` to `lib/features/progress/`: `all_time_screen.dart`,
+   `cycle_progress_providers.dart`, `regime_progress_screen.dart`,
+   `region_volume_screen.dart`, `volume_history_screen.dart`, `volume_providers.dart`,
+   and the strength card and volume widgets. The consistency heatmap files stay
+   with Home, whose Workouts tile opens them.
 7. More: the profile header, the Account row and the new About text.
 8. Release 1.17.0: version bump and changelog entry.
 
