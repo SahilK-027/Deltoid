@@ -239,7 +239,7 @@ lib/
     providers.dart · sync_providers.dart · sync_scope.dart · progress.dart
     ids.dart · rest_alert.dart · failure.dart · workout_notifications.dart
 
-  features/                 workouts · log · history · regime · settings
+  features/                 home · log · history · regime · progress · more
                             account · welcome · shell
 
 test/                       domain · data · features · core

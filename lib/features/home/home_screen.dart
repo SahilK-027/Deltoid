@@ -27,7 +27,7 @@ import 'cycle_progress_providers.dart';
 import 'regime_progress_screen.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
-import 'workouts_providers.dart';
+import 'home_providers.dart';
 import 'volume_history_screen.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/strength_card.dart';
@@ -433,14 +433,14 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
 /// live in a sheet. Drawing the cycle twice — labelled bars inside the hero
 /// card and the same sessions again as a tappable list — pushes the consistency
 /// grid off the bottom of the screen.
-class WorkoutsScreen extends ConsumerWidget {
-  const WorkoutsScreen({super.key});
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // One value, one frame. `valueOrNull` keeps the last snapshot on screen
     // while a reload runs, so a write on another tab never blanks this one.
-    final today = ref.watch(workoutsProvider).valueOrNull;
+    final today = ref.watch(homeProvider).valueOrNull;
     // Warmed here, drawn two screens away. `Consistency` and the backfill
     // calendar both read every day ever logged, and starting that query when
     // they open means both open empty and fill in. Workouts is where you are
@@ -491,7 +491,7 @@ class WorkoutsScreen extends ConsumerWidget {
           volume: volume!,
         ),
         // The masthead and the one action are a single band, and the record
-        // scrolls under it. See [_WorkoutsHeader] for why the hero is not a card:
+        // scrolls under it. See [_HomeHeader] for why the hero is not a card:
         // `AppCard` and `HeaderBand` are the same grey, so a card here grouped
         // nothing — it drew a rounded seam between two identical surfaces,
         // 16pt below a band it matched exactly. The band is also the answer to
@@ -508,7 +508,7 @@ class WorkoutsScreen extends ConsumerWidget {
         (_, _, _?, false) when cycles.isLoading => const SizedBox.shrink(),
         (_, _, final r?, false) => Column(
           children: [
-            _WorkoutsHeader(
+            _HomeHeader(
               last: today!.lastCompleted,
               actions: [
                 CircleIconButton(
@@ -634,8 +634,8 @@ class WorkoutsScreen extends ConsumerWidget {
 /// opened with, but it is not the page's name and does not want title type:
 /// `NO SESSIONS YET` at 27sp is the loudest thing on a screen whose whole
 /// message is that nothing has happened yet.
-class _WorkoutsHeader extends StatelessWidget {
-  const _WorkoutsHeader({required this.last, this.actions = const []});
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({required this.last, this.actions = const []});
 
   final ({Workout workout, String? sessionName})? last;
   final List<Widget> actions;
@@ -779,7 +779,7 @@ class _NoRegimeState extends ConsumerWidget {
     // seen rather than replacing one.
     return Column(
       children: [
-        _WorkoutsHeader(last: last),
+        _HomeHeader(last: last),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.only(bottom: Space.huge),
@@ -872,7 +872,7 @@ class _NoSessionsState extends ConsumerWidget {
     return Column(
       children: [
         // No backfill action: there is nothing to log a past session against.
-        _WorkoutsHeader(last: last),
+        _HomeHeader(last: last),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.only(bottom: Space.huge),

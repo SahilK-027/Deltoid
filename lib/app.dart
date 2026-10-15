@@ -16,7 +16,7 @@ import 'core/sync_providers.dart';
 import 'core/sync_scope.dart';
 import 'features/shell/app_shell.dart';
 import 'features/welcome/welcome_screen.dart';
-import 'features/workouts/workouts_providers.dart';
+import 'features/home/home_providers.dart';
 
 class DeltoidApp extends ConsumerWidget {
   const DeltoidApp({super.key});
@@ -253,7 +253,7 @@ Brightness _iconsFor(BuildContext context) =>
 class _ShellWhenReady extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final today = ref.watch(workoutsProvider);
+    final today = ref.watch(homeProvider);
     return today.hasValue ? const _Ready(child: AppShell()) : const _Holding();
   }
 }

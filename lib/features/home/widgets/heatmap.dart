@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../heatmap_data.dart';
-import '../workouts_providers.dart';
+import '../home_providers.dart';
 
 /// One day's colour, shared by the compact grid on Workouts and the full-history
 /// one behind it so the two can never drift apart.

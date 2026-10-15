@@ -4,7 +4,7 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/domain/cycle_progress.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/metrics.dart';
-import 'package:deltoid/features/workouts/widgets/strength_card.dart';
+import 'package:deltoid/features/home/widgets/strength_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

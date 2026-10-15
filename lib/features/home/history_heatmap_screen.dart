@@ -6,7 +6,7 @@ import '../../core/ids.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import 'heatmap_data.dart';
-import 'workouts_providers.dart';
+import 'home_providers.dart';
 import 'widgets/heatmap.dart';
 import 'widgets/year_heatmap.dart';
 

@@ -14,7 +14,7 @@ import '../history/history_providers.dart';
 /// frame later. The read is on local disk; it should be sitting there when the
 /// screen is built.
 final activeRegimeProgressProvider = StreamProvider<RegimeProgress?>((ref) {
-  // Gated on the seeder for the reason `workoutsProvider` is: a first launch
+  // Gated on the seeder for the reason `homeProvider` is: a first launch
   // would otherwise score an empty database and immediately re-score it when
   // the starter rows land.
   final init = ref.watch(appInitProvider);

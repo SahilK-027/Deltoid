@@ -22,8 +22,8 @@ const heatmapWeeks = 18;
 /// See [TodaySnapshot] for why this is a single query rather than the dozen
 /// watched providers it replaced. The screen holds the last value while a
 /// reload is in flight, so a write elsewhere never blanks it either.
-class WorkoutsData {
-  const WorkoutsData({required this.snapshot, required this.heatmap});
+class HomeData {
+  const HomeData({required this.snapshot, required this.heatmap});
 
   final TodaySnapshot snapshot;
   final HeatmapData heatmap;
@@ -56,7 +56,7 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
 
 /// This week's hard sets per muscle, for the bar list under the heatmap.
 ///
-/// Its own provider rather than a field on [WorkoutsData], and this is the one
+/// Its own provider rather than a field on [HomeData], and this is the one
 /// place that split is right: `todaySnapshot` is what the screen *is* — a
 /// missing field there is a frame where "no sessions" is indistinguishable from
 /// "not loaded yet" (RULES § Data). The bars are a section further down that
@@ -79,7 +79,7 @@ final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
 
 /// Ticked and total sets in the open workout, kept in step with the log.
 ///
-/// Its own query rather than a field read off [workoutsProvider], for the same
+/// Its own query rather than a field read off [homeProvider], for the same
 /// reason [weeklyVolumeProvider] is one: `todaySnapshot` does not watch
 /// `set_logs`, and must not, or every keystroke in a live session would re-run
 /// the whole screen's read. But the resume card counts sets and the stale
@@ -105,7 +105,7 @@ final openWorkoutSetsProvider =
   );
 });
 
-final workoutsProvider = StreamProvider<WorkoutsData>((ref) {
+final homeProvider = StreamProvider<HomeData>((ref) {
   // Gated on the seeder rather than racing it: this watches `exercises` for
   // renames, and a first launch would otherwise load an empty catalog and then
   // immediately reload when the starter rows land.
@@ -127,7 +127,7 @@ final workoutsProvider = StreamProvider<WorkoutsData>((ref) {
     () async {
       final from = dayKeyOf(daysBefore(DateTime.now(), heatmapWeeks * 7 + 7));
       final snapshot = await repo.todaySnapshot(heatmapFromDayKey: from);
-      return WorkoutsData(
+      return HomeData(
         snapshot: snapshot,
         heatmap: buildHeatmap(snapshot.recentCompleted),
       );

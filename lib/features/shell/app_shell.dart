@@ -9,7 +9,7 @@ import '../history/history_screen.dart';
 import '../regime/regimes_screen.dart';
 import '../more/more_screen.dart';
 import '../progress/progress_screen.dart';
-import '../workouts/workouts_screen.dart';
+import '../home/home_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -25,7 +25,7 @@ class _AppShellState extends State<AppShell>
   // Kept alive across tab switches so scroll position and in-progress edits
   // survive navigation.
   final _pages = const [
-    WorkoutsScreen(),
+    HomeScreen(),
     RegimesScreen(),
     ProgressScreen(),
     HistoryScreen(),

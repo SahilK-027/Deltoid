@@ -5,7 +5,7 @@ import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
-import 'package:deltoid/features/workouts/volume_providers.dart';
+import 'package:deltoid/features/home/volume_providers.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

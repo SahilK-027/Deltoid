@@ -8,7 +8,7 @@ import 'package:deltoid/features/more/more_screen.dart';
 import 'package:deltoid/features/progress/progress_screen.dart';
 import 'package:deltoid/features/regime/regimes_screen.dart';
 import 'package:deltoid/features/shell/app_shell.dart';
-import 'package:deltoid/features/workouts/workouts_screen.dart';
+import 'package:deltoid/features/home/home_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +25,7 @@ void main() {
 
   const labels = ['Home', 'Regimes', 'Progress', 'History', 'More'];
   const screens = [
-    WorkoutsScreen,
+    HomeScreen,
     RegimesScreen,
     ProgressScreen,
     HistoryScreen,

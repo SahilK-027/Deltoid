@@ -1,7 +1,7 @@
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/domain/enums.dart';
-import 'package:deltoid/features/workouts/heatmap_data.dart';
+import 'package:deltoid/features/home/heatmap_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Wednesday 15 July 2026.

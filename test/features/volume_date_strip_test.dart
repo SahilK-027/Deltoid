@@ -1,7 +1,7 @@
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/domain/chart_buckets.dart';
 import 'package:deltoid/domain/volume_history.dart';
-import 'package:deltoid/features/workouts/widgets/volume_chart.dart';
+import 'package:deltoid/features/home/widgets/volume_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
