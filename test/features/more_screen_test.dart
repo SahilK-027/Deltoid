@@ -7,15 +7,15 @@ import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/domain/rest.dart';
 import 'package:deltoid/domain/units.dart';
-import 'package:deltoid/features/settings/bodyweight_screen.dart';
-import 'package:deltoid/features/settings/settings_screen.dart';
+import 'package:deltoid/features/more/bodyweight_screen.dart';
+import 'package:deltoid/features/more/more_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:deltoid/domain/session_prefs.dart';
 
-/// Settings and the bodyweight log, pumped against a real database.
+/// More and the bodyweight log, pumped against a real database.
 ///
 /// Bodyweight had never once been logged through the UI, so nothing here had
 /// ever been exercised outside the repository — the screens could have been
@@ -97,14 +97,14 @@ void main() {
   Future<void> openUnitSheet(WidgetTester tester) =>
       openRow(tester, 'Weight units');
 
-  group('Settings', () {
+  group('More', () {
     testWidgets('with nothing logged: the masthead, and an invitation', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('More'), findsOneWidget);
       expect(find.text('Not logged'), findsOneWidget);
       // Nothing to look back at yet, so no link to the past.
       expect(find.text('History'), findsNothing);
@@ -114,7 +114,7 @@ void main() {
       tester,
     ) async {
       await TrainingRepository(db).logBodyweight(DateTime.now(), 76.5);
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
 
       expect(tester.takeException(), isNull);
       expect(find.text('76.5 kg'), findsOneWidget);
@@ -126,7 +126,7 @@ void main() {
     testWidgets('the figure is one tap from the sheet that logs it', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
 
       await tester.tap(find.text('Not logged'));
       for (var i = 0; i < 20; i++) {
@@ -140,7 +140,7 @@ void main() {
     testWidgets('the masthead carries the backup button the other tabs do', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       // In the tree on every build. It draws nothing until an account is
       // signed in, which is `backup_mark_test`'s to show.
       expect(find.byType(BackupMark), findsOneWidget);
@@ -149,7 +149,7 @@ void main() {
     testWidgets('the file backup is named as a file on the phone', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await scrollTo(tester, 'Backup file on this phone');
       expect(find.text('Backup file on this phone'), findsOneWidget);
       expect(find.text('Automatic backup'), findsNothing);
@@ -162,7 +162,7 @@ void main() {
     });
 
     testWidgets('every section renders, top to bottom', (tester) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
 
       expect(tester.takeException(), isNull);
       expect(find.text('Bodyweight'), findsOneWidget);
@@ -190,7 +190,7 @@ void main() {
 
     testWidgets('rest ships at two minutes, and the steps are quarter-minutes',
         (tester) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await openRestSheet(tester);
 
       // Both numbers, before anything has been stored: the shipped default.
@@ -218,7 +218,7 @@ void main() {
 
     testWidgets('the tone can be turned off; the buzz is not part of it',
         (tester) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await openRestSheet(tester);
 
       expect(
@@ -268,7 +268,7 @@ void main() {
     testWidgets('the three session switches store what they are set to', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
 
       // Shipped defaults: on, with nothing written to say so.
       expect(
@@ -311,7 +311,7 @@ void main() {
     testWidgets('vibration is its own switch, not half of the tone', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await openRestSheet(tester);
 
       await tester.tap(
@@ -337,7 +337,7 @@ void main() {
     testWidgets('the unit asks before it restates every number in the app', (
       tester,
     ) async {
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await openUnitSheet(tester);
 
       await tester.tap(find.text('Pounds'));
@@ -386,7 +386,7 @@ void main() {
           const TrendWindow.rolling(ChartRange.month);
 
       // Leave, and come back to a screen built from scratch.
-      await pump(tester, const SettingsScreen());
+      await pump(tester, const MoreScreen());
       await pump(tester, const BodyweightScreen());
 
       expect(container.read(bodyweightWindowProvider).range, ChartRange.month);

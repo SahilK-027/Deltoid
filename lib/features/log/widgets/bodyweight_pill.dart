@@ -10,7 +10,7 @@ import '../../../domain/enums.dart';
 import '../../../domain/metrics.dart';
 import '../../../domain/set_format.dart';
 import '../../../domain/units.dart';
-import '../../settings/bodyweight_screen.dart';
+import '../../more/bodyweight_screen.dart';
 import '../log_providers.dart';
 
 /// The bodyweight a bodyweight movement is being scored against today, and how

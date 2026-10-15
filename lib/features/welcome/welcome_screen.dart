@@ -270,9 +270,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                       ? 'Sign in with Google to back up your training data, '
                             'so that a lost phone doesn\'t mean lost progress. '
                             'The app works fully offline regardless, and you '
-                            'can connect to Google at any time from Settings.'
+                            'can connect to Google at any time from More.'
                       : 'Everything you log stays on this phone. Back it up '
-                            'whenever you like from Settings, and keep the '
+                            'whenever you like from More, and keep the '
                             'file wherever you keep your own files.',
                   textAlign: TextAlign.center,
                   style: context.t.bodySmall?.copyWith(

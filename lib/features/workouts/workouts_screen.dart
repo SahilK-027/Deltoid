@@ -617,8 +617,8 @@ class WorkoutsScreen extends ConsumerWidget {
 ///
 /// The empty states carry it too. Centring a lone card on a blank page instead
 /// reads as a different screen than the one the tab bar says you are on, and on
-/// a fresh install leaves no way to reach Settings, which is where restoring a
-/// backup lives. Settings is always here for that reason; anything that needs
+/// a fresh install leaves no way to reach More, which is where restoring a
+/// backup lives. More is always here for that reason; anything that needs
 /// sessions to exist is passed in by the caller.
 ///
 /// The title is the screen's name, with the date as its eyebrow, rather than
@@ -649,7 +649,7 @@ class _WorkoutsHeader extends StatelessWidget {
         // is 11sp at the bottom of the screen, so titling this with the date
         // instead would leave the one screen you land on the only one you have
         // to identify by inference. The date sits over the title.
-        title: 'Workouts',
+        title: 'Home',
         eyebrow: DateFormat('EEEE d MMMM').format(now),
         // Tight to the date: the rest gap is a line about it, not the next
         // thing on the page.
@@ -660,7 +660,7 @@ class _WorkoutsHeader extends StatelessWidget {
         // first real section starting somewhere down the page with no boundary
         // to mark it.
         below: _RestGap(last: last),
-        // No cog: Settings is a destination on the nav bar, and a screen
+        // No cog: More is a destination on the nav bar, and a screen
         // reachable two ways is a screen you have to decide about twice.
         actions: [const BackupMark(), ...actions],
       ),

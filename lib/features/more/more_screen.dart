@@ -28,8 +28,8 @@ import '../../core/failure.dart';
 // finished session, and the screen that reports it is not the screen that
 // writes it.
 
-class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+class MoreScreen extends ConsumerWidget {
+  const MoreScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,9 +48,9 @@ class SettingsScreen extends ConsumerWidget {
           // which reads as a screen from a different app.
           const HeaderBand(
             child: PageHeader(
-              title: 'Settings',
+              title: 'More',
               eyebrow: 'On this device',
-              // The same button the other three tabs carry, in the same
+              // The same button the other tabs carry, in the same
               // corner. It draws nothing without an account.
               actions: [BackupMark()],
             ),
@@ -382,7 +382,7 @@ class _BodyweightCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     // Watched *here*, not at the top of the screen. One line in
-    // `SettingsScreen.build` would make switching kg to lb rebuild the whole
+    // `MoreScreen.build` would make switching kg to lb rebuild the whole
     // page — masthead, every section, the three painted theme miniatures — to
     // change the two words in this row and the tick in the units card. This is
     // the screen the switch is on, so it is the one that would hitch.
@@ -597,8 +597,8 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
   /// [SYNC.md § 11](SYNC.md#11-signing-out): *sign out and remove the history
   /// from this phone*, after a confirmation naming the number of sessions. The
   /// count is the whole point — a prompt that says *everything* is a prompt
-  /// nobody can weigh, and this is the one control in Settings that cannot be
-  /// undone from Settings.
+  /// nobody can weigh, and this is the one control on More that cannot be
+  /// undone from More.
   ///
   /// The rows are hard-deleted rather than tombstoned. This is not *the user
   /// deleted their training*, which every other phone would then hear about and

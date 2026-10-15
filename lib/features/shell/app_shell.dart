@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/tokens.dart';
-import '../../core/widgets/plate_icon.dart';
+import '../../core/widgets/monitoring_icon.dart';
 import '../history/history_screen.dart';
 import '../regime/regimes_screen.dart';
-import '../settings/settings_screen.dart';
+import '../more/more_screen.dart';
+import '../progress/progress_screen.dart';
 import '../workouts/workouts_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -26,14 +27,15 @@ class _AppShellState extends State<AppShell>
   final _pages = const [
     WorkoutsScreen(),
     RegimesScreen(),
+    ProgressScreen(),
     HistoryScreen(),
-    SettingsScreen(),
+    MoreScreen(),
   ];
 
   /// Drives the fade-and-rise. A controller rather than a
   /// `TweenAnimationBuilder` keyed on the index: changing a key throws away the
   /// element subtree under it, and the subtree here is the `IndexedStack`. Keyed
-  /// that way every tab switch **rebuilds all four screens from scratch** — the
+  /// that way every tab switch **rebuilds all five screens from scratch** — the
   /// thing `IndexedStack` is there to prevent — dropping their scroll positions
   /// and their providers' warm state, and doing all of it on the same frame the
   /// nav bar's ripple is trying to animate, which hitches the switch and freezes
@@ -83,33 +85,30 @@ class _AppShellState extends State<AppShell>
   }
 }
 
-// Not `Today`: the screen backfills a session logged on Tuesday and resumes one
-// left open yesterday, so a tab named after a day shows other days. The page
-// keeps the date as its own title (THEME → Composing a screen).
+// Five destinations, in THEME's order: Home, where the app opens and things are
+// entered; Regimes; Progress, where the training is read; History; and More,
+// which holds everything that is set rather than logged.
 //
-// Settings holds the fourth slot, and not for symmetry: bodyweight logging
-// lives in there and is not a setting. It is data entered weekly that feeds
-// every pull-up and dip score in the app, and two taps deep behind a cog is
-// where it goes unlogged.
+// Not `Today`: Home backfills a session logged on Tuesday and resumes one left
+// open yesterday, so a tab named after a day shows other days. The page keeps
+// the date as its eyebrow (THEME → Composing a screen).
 //
-// Workouts wears a drawn stack of plates rather than Material's dumbbell.
-// Material ships exactly one piece of gym equipment, and it is the icon every
-// training app on the phone already has; plates are what this app is actually
-// about, and the taper reads as load at 24dp where a figure or a barbell does
-// not.
+// More is a circle with three dots rather than a cog. A cog names the tab after
+// one part of what it holds, and the account is not a setting; three bare dots
+// read as an overflow menu that opens over the page, which More is not.
+//
+// Progress has no glyph in `Icons`, so it draws the Material Symbols
+// `monitoring` path itself, and its outlined and filled forms are one shape.
 const _destinations = [
-  (icon: null, active: null, label: 'Workouts'),
+  (icon: Icons.home_outlined, active: Icons.home_rounded, label: 'Home'),
   (
     icon: Icons.dashboard_outlined,
     active: Icons.dashboard_rounded,
     label: 'Regimes'
   ),
+  (icon: null, active: null, label: 'Progress'),
   (icon: Icons.history_rounded, active: Icons.history_rounded, label: 'History'),
-  (
-    icon: Icons.settings_outlined,
-    active: Icons.settings_rounded,
-    label: 'Settings'
-  ),
+  (icon: Icons.pending_outlined, active: Icons.pending, label: 'More'),
 ];
 
 /// The app's own bar rather than Material's.
@@ -167,7 +166,7 @@ class _NavItem extends StatelessWidget {
   });
 
   /// A null glyph pair means the destination draws its own icon — today that is
-  /// Workouts and its plates.
+  /// Progress and its `monitoring` symbol.
   final ({IconData? icon, IconData? active, String label}) destination;
   final bool selected;
   final VoidCallback onTap;
@@ -215,7 +214,7 @@ class _NavItem extends StatelessWidget {
             duration: Motion.base,
             curve: Motion.overshoot,
             child: destination.icon == null
-                ? PlateIcon(size: 27, color: tint, filled: selected)
+                ? MonitoringIcon(size: 24, color: tint)
                 : Icon(
                     selected ? destination.active : destination.icon,
                     size: 24,

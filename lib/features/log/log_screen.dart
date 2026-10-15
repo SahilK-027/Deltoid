@@ -819,7 +819,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
         // Leaving without finishing is fine — the session keeps running and
         // survives a force-stop — but it has to be said out loud, or the sets
         // logged so far look lost.
-        showToast(context, 'Session still running. Resume it from Workouts.');
+        showToast(context, 'Session still running. Resume it from Home.');
         Navigator.of(context).pop();
       },
       child: Scaffold(
