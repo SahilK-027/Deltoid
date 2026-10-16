@@ -1024,15 +1024,19 @@ state.
   `maintenance` at 16%, the colours the Phase card uses. A cycle split evenly
   between two phases takes the one it ended in, the open cycle is tinted by
   the sessions it has so far, and a cycle trained with no phase set has no
-  tint. Under blocks a block takes the phase most of its sessions ran in.
-  Adjacent cycles in one phase meet without a seam, so a phase reads as one
-  stretch of the axis rather than as a row of boxes.
+  tint. Under blocks a block, the run of cycles between two deloads, takes
+  the phase most of the sessions of all its cycles ran in, and every cycle of
+  the run wears it. Adjacent cycles in one phase meet without a seam, so a
+  phase reads as one stretch of the axis rather than as a row of boxes. The
+  sparkline form on an All time card carries no tint, because it has no
+  legend to name one.
 - **A deload is drawn exactly as it is with no phases at all**: the band at
   80% of its slot, no point, the orange number, the line dashed across it.
   **No tint is ever drawn under it.** The tints of the cycles either side run
   to the deload band's edges and stop there, so a light week never reads as
   part of a cut, and orange is never mixed with another hue into a colour
-  that means neither.
+  that means neither. Under blocks they stop at the same edges either side
+  of the hairline.
 - **Gridlines over a tint are `textTertiary`.** A 20% tint lifts the ground,
   and `border` over it reads as a scratch (see [Charts](#charts)). While any
   tint is drawn, every gridline on the plot takes `textTertiary`, so one line

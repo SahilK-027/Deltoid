@@ -17,6 +17,7 @@ import 'dart:math' as math;
 import '../core/ids.dart';
 import 'enums.dart';
 import 'metrics.dart';
+import 'phases.dart';
 import 'set_format.dart';
 
 /// A lift: one exercise as it is trained in one session.
@@ -80,9 +81,14 @@ class CycleInput {
     this.isOpen = false,
     this.startDayKey,
     this.endDayKey,
+    this.sessionDays = const [],
   });
 
   final String cycleId;
+
+  /// The day of each session completed in the cycle, one entry per session,
+  /// which is what the cycle's phase tint is counted over.
+  final List<int> sessionDays;
 
   /// The regime's own cycle number, which continues across a spell on another
   /// regime rather than restarting when this one is picked up again.
@@ -162,12 +168,19 @@ class CyclePoint {
     required this.lifts,
     this.startDayKey,
     this.endDayKey,
+    this.sessions = const [],
   });
 
   final String cycleId;
   final int index;
   final bool isDeload;
   final bool isOpen;
+
+  /// Each session the cycle holds so far, with the phase it ran in.
+  ///
+  /// Kept per session rather than as the one answer, because under `All` a
+  /// block is tinted by every session of its cycles counted together.
+  final List<SessionPhase> sessions;
 
   /// The mean change across the lifts trained in the cycle, as a percentage.
   ///
@@ -184,6 +197,11 @@ class CyclePoint {
   final int? endDayKey;
 
   bool get isScored => value != null;
+
+  /// The phase most of the cycle's sessions ran in, which tints its slot and
+  /// is named in the readout. Null on a deload, which is never tinted, and on
+  /// a cycle trained with no phase set.
+  PhaseKind? get phase => isDeload ? null : mostCommonPhase(sessions);
 }
 
 /// The direction of the last few scored cycles, as the pill beside the figure.
@@ -372,6 +390,7 @@ CycleProgress computeCycleProgress({
   required List<CycleInput> cycles,
   List<({int dayKey, double weightKg})> bodyweightLog = const [],
   Map<String, String> rotations = const {},
+  List<PhaseSpan> phases = const [],
 }) {
   if (cycles.isEmpty) {
     return const CycleProgress(cycles: [], latest: null, trend: null);
@@ -459,6 +478,7 @@ CycleProgress computeCycleProgress({
         lifts: lifts,
         startDayKey: c.startDayKey,
         endDayKey: c.endDayKey,
+        sessions: sessionPhases(c.sessionDays, phases),
       ),
     );
   }
@@ -590,6 +610,39 @@ CycleWindow cycleWindow(CycleProgress progress, CycleRange range) {
 
 /// The number of cycles above which All draws one point per block.
 const blockThreshold = 24;
+
+/// The phase each of [points] is tinted by, position for position.
+///
+/// A cycle takes the phase most of its sessions ran in. Under [isBlocks] a
+/// block — the run of cycles between two deloads — takes the phase most of
+/// the sessions of all its cycles ran in, and every cycle of the run wears it,
+/// so a block reads as one stretch the way its one point does. A deload is
+/// never tinted either way: a light week is not part of a cut
+/// ([THEME → The cycle axis](THEME.md#the-cycle-axis)).
+List<PhaseKind?> cycleTints(List<CyclePoint> points, {bool isBlocks = false}) {
+  if (!isBlocks) return [for (final p in points) p.phase];
+
+  final out = List<PhaseKind?>.filled(points.length, null);
+  var from = 0;
+  while (from < points.length) {
+    if (points[from].isDeload) {
+      from++;
+      continue;
+    }
+    var to = from;
+    while (to + 1 < points.length && !points[to + 1].isDeload) {
+      to++;
+    }
+    final kind = mostCommonPhase([
+      for (var i = from; i <= to; i++) ...points[i].sessions,
+    ]);
+    for (var i = from; i <= to; i++) {
+      out[i] = kind;
+    }
+    from = to + 1;
+  }
+  return out;
+}
 
 /// One session, as the All time timeline reads it.
 class TrainedDay {

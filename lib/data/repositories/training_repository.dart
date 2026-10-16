@@ -6,6 +6,7 @@ import '../../domain/cycle_progress.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/muscle_volume.dart';
+import '../../domain/phases.dart';
 import '../../domain/prefill.dart';
 import '../../domain/rest.dart';
 import '../../domain/session_diff.dart';
@@ -13,6 +14,7 @@ import '../../domain/units.dart';
 import '../db/database.dart';
 import '../db/renumber.dart';
 import '../db/watch.dart';
+import 'phase_repository.dart';
 import '../../domain/session_name.dart';
 
 /// A workout exercise joined with its catalog row — what every log and history
@@ -2459,7 +2461,9 @@ class TrainingRepository {
     final cycleRows = await db.customSelect(
       'SELECT c.id AS cycle_id, c.cycle_index AS cycle_index, '
       'c.is_deload AS is_deload, c.completed_at AS completed_at, '
-      'MIN(wo.day_key) AS first_day, MAX(wo.day_key) AS last_day '
+      'MIN(wo.day_key) AS first_day, MAX(wo.day_key) AS last_day, '
+      // One day per session, which the cycle's phase tint is counted over.
+      'GROUP_CONCAT(wo.day_key) AS days '
       'FROM cycles c '
       'LEFT JOIN workouts wo ON wo.cycle_id = c.id '
       '  AND wo.deleted_at IS NULL AND wo.status = \'completed\' '
@@ -2589,6 +2593,10 @@ class TrainingRepository {
           isOpen: r.readNullable<int>('completed_at') == null,
           startDayKey: r.readNullable<int>('first_day'),
           endDayKey: r.readNullable<int>('last_day'),
+          sessionDays: [
+            for (final day in (r.readNullable<String>('days') ?? '').split(','))
+              if (day.isNotEmpty) int.parse(day),
+          ],
           performances:
               performances[r.read<String>('cycle_id')] ?? const [],
         ),
@@ -2603,6 +2611,7 @@ class TrainingRepository {
         cycles: cycles,
         bodyweightLog: bodyweight,
         rotations: await _rotations(regimeId),
+        phases: phaseSpans(await PhaseRepository(db).phases()),
       ),
       labels: labels,
     );
@@ -2626,6 +2635,8 @@ class TrainingRepository {
         db.exercises,
         // Which days alternate decides which lifts a cycle is scored on.
         db.sessions,
+        // Which phase each session ran in decides how its cycle is tinted.
+        db.phases,
       ],
       activeRegimeProgress,
     );
@@ -2642,6 +2653,8 @@ class TrainingRepository {
         db.exercises,
         // Which days alternate decides which lifts a cycle is scored on.
         db.sessions,
+        // Which phase each session ran in decides how its cycle is tinted.
+        db.phases,
       ],
       () => regimeProgress(regimeId),
     );

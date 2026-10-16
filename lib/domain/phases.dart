@@ -251,16 +251,39 @@ PhaseSparklineData phaseSparkline(
 /// reads as the phase it finished in, which is the phase its last reading was
 /// taken under. A day falls in one phase only, so two tied answers never
 /// share a latest day and the tie always resolves.
-PhaseKind? dominantPhase(Iterable<int> sessionDays, List<PhaseSpan> spans) {
-  final days = [...sessionDays]..sort();
-  if (days.isEmpty) return null;
+PhaseKind? dominantPhase(Iterable<int> sessionDays, List<PhaseSpan> spans) =>
+    mostCommonPhase(sessionPhases(sessionDays, spans));
+
+/// One session's day and the phase it ran in.
+typedef SessionPhase = ({int dayKey, PhaseKind? kind});
+
+/// Each of [sessionDays] with the phase it ran in, or null where none did.
+///
+/// What a cycle keeps of the phases, so a run of cycles can be tinted by the
+/// sessions of all of them together without the spans travelling with it.
+List<SessionPhase> sessionPhases(
+  Iterable<int> sessionDays,
+  List<PhaseSpan> spans,
+) =>
+    [
+      for (final day in sessionDays)
+        (dayKey: day, kind: phaseOn(day, spans)?.kind),
+    ];
+
+/// The phase most of [sessions] ran in, with a tie going to the one the
+/// latest session held, as [dominantPhase] describes.
+///
+/// Separate so a block under `All` is tinted by the same count over every
+/// session of its cycles ([THEME → The cycle axis](THEME.md#the-cycle-axis)).
+PhaseKind? mostCommonPhase(Iterable<SessionPhase> sessions) {
+  final ordered = [...sessions]..sort((a, b) => a.dayKey.compareTo(b.dayKey));
+  if (ordered.isEmpty) return null;
 
   final counts = <PhaseKind?, int>{};
   final latest = <PhaseKind?, int>{};
-  for (final day in days) {
-    final kind = phaseOn(day, spans)?.kind;
-    counts[kind] = (counts[kind] ?? 0) + 1;
-    latest[kind] = day;
+  for (final session in ordered) {
+    counts[session.kind] = (counts[session.kind] ?? 0) + 1;
+    latest[session.kind] = session.dayKey;
   }
 
   final most = counts.values.reduce(math.max);

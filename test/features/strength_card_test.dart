@@ -4,6 +4,7 @@ import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/domain/cycle_progress.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/metrics.dart';
+import 'package:deltoid/domain/phases.dart';
 import 'package:deltoid/features/progress/widgets/strength_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,6 +114,92 @@ void main() {
     expect(find.text('Deload'), findsNothing);
   });
 
+  group('phases', () {
+    final spans = phaseSpans(const [
+      PhaseEntry(id: 'a', kind: PhaseKind.maintenance, startKey: 20260525),
+      PhaseEntry(id: 'b', kind: PhaseKind.bulk, startKey: 20260601),
+    ]);
+
+    CycleInput phased(int index, double weight, int day, {bool isDeload = false}) =>
+        CycleInput(
+          cycleId: 'c$index',
+          index: index,
+          isDeload: isDeload,
+          startDayKey: day,
+          endDayKey: day,
+          sessionDays: [day],
+          performances: [lift(bench, weight, dayKey: day)],
+        );
+
+    RegimeProgress phasedRegime(List<CycleInput> cycles) => RegimeProgress(
+          regimeId: 'r',
+          regimeName: 'Upper lower',
+          identityIndex: 0,
+          isActive: true,
+          progress: computeCycleProgress(cycles: cycles, phases: spans),
+          labels: const {},
+        );
+
+    testWidgets('the legend names the phases on screen, in order, and no '
+        'others', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          phasedRegime([
+            phased(1, 100, 20260526),
+            phased(2, 110, 20260602),
+            phased(3, 60, 20260609, isDeload: true),
+            phased(4, 120, 20260616),
+          ]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Maintenance'), findsOneWidget);
+      expect(find.text('Bulk'), findsOneWidget);
+      expect(find.text('Cut'), findsNothing);
+      expect(find.text('Deload'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Maintenance')).dx,
+        lessThan(tester.getTopLeft(find.text('Bulk')).dx),
+      );
+      // The readout opens on the latest cycle and names its phase.
+      expect(
+        find.textContaining('Bulk  ·  +20.0%', findRichText: true),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a regime trained with no phase has no phase in its legend',
+        (tester) async {
+      await tester.pumpWidget(harness(trained()));
+      await tester.pumpAndSettle();
+
+      for (final name in ['Maintenance', 'Bulk', 'Cut']) {
+        expect(find.text(name), findsNothing);
+      }
+    });
+
+    testWidgets('a phase only off screen has no swatch', (tester) async {
+      // Twenty cycles: the maintenance cycle is the first, outside Last 12.
+      await tester.pumpWidget(
+        harness(
+          phasedRegime([
+            phased(1, 100, 20260526),
+            for (var i = 2; i <= 20; i++) phased(i, 100.0 + i, 20260600 + i),
+          ]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bulk'), findsOneWidget);
+      expect(find.text('Maintenance'), findsNothing);
+
+      await tester.tap(find.text('All'));
+      await tester.pumpAndSettle();
+      expect(find.text('Maintenance'), findsOneWidget);
+    });
+  });
+
   testWidgets('the open cycle is named in the legend', (tester) async {
     await tester.pumpWidget(
       harness(
@@ -182,6 +269,7 @@ void main() {
       bool isOpen = false,
       int? from,
       int? to,
+      PhaseKind? phase,
     }) =>
         CyclePoint(
           cycleId: 'c$index',
@@ -192,6 +280,9 @@ void main() {
           lifts: const [],
           startDayKey: from,
           endDayKey: to,
+          sessions: [
+            if (from != null) (dayKey: from, kind: phase),
+          ],
         );
 
     test('names the cycle, its dates and its score', () {
@@ -234,6 +325,37 @@ void main() {
           isBaseline: true,
         ),
         'Cycle 1  ·  25 May to 31 May 2026',
+      );
+    });
+
+    test('a cycle that ran in a phase names it after the days', () {
+      expect(
+        cycleReadout(
+          point(6, value: 6.4, from: 20260903, to: 20260909, phase: PhaseKind.cut),
+        ),
+        'Cycle 6  ·  3 Sep to 9 Sep 2026  ·  Cut  ·  +6.4%',
+      );
+    });
+
+    test('a cycle with no phase says nothing extra', () {
+      expect(
+        cycleReadout(point(6, value: 6.4, from: 20260903, to: 20260909)),
+        'Cycle 6  ·  3 Sep to 9 Sep 2026  ·  +6.4%',
+      );
+    });
+
+    test('a deload names no phase, whatever it ran in', () {
+      expect(
+        cycleReadout(
+          point(
+            5,
+            from: 20260622,
+            to: 20260628,
+            isDeload: true,
+            phase: PhaseKind.cut,
+          ),
+        ),
+        'Cycle 5  ·  22 Jun to 28 Jun 2026  ·  Deload',
       );
     });
 

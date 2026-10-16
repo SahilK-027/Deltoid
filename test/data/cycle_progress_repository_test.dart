@@ -1,4 +1,5 @@
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
@@ -178,6 +179,39 @@ void main() {
     // it has no dates rather than the dates of the row that created it.
     expect(progress.cycles.last.startDayKey, isNull);
     expect(progress.cycles.last.isOpen, isTrue);
+  });
+
+  test('a cycle is tinted by the phase its sessions ran in', () async {
+    await trainCycle(50);
+    final before = (await repo.activeRegimeProgress())!.progress;
+    expect(before.cycles.first.phase, isNull);
+    // One session per workout, which is what the tint is counted over.
+    final workouts = await db.select(db.workouts).get();
+    expect(workouts, isNotEmpty);
+    expect(before.cycles.first.sessions.length, workouts.length);
+
+    await PhaseRepository(db).startPhase(PhaseKind.cut, from: DateTime.now());
+
+    final after = (await repo.activeRegimeProgress())!.progress;
+    expect(after.cycles.first.phase, PhaseKind.cut);
+    // The cycle closing the first one opened has no sessions, and no tint.
+    expect(after.cycles.last.sessions, isEmpty);
+    expect(after.cycles.last.phase, isNull);
+  });
+
+  test('declaring a phase re-reads the progress', () async {
+    await trainCycle(50);
+    final stream = repo.watchActiveRegimeProgress();
+    final seen = <PhaseKind?>[];
+    final sub = stream.listen((r) => seen.add(r!.progress.cycles.first.phase));
+    await pumpEventQueue();
+
+    await PhaseRepository(db).startPhase(PhaseKind.bulk, from: DateTime.now());
+    await pumpEventQueue();
+    await sub.cancel();
+
+    expect(seen.first, isNull);
+    expect(seen.last, PhaseKind.bulk);
   });
 
   test('a workout logged before the regime had a cycle is scored by nothing',

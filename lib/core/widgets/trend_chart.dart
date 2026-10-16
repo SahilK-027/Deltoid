@@ -6,8 +6,10 @@ import 'package:intl/intl.dart';
 
 import '../../domain/chart_buckets.dart';
 import '../../domain/cycle_progress.dart';
+import '../../domain/enums.dart';
 import '../ids.dart';
 import '../theme/tokens.dart';
+import 'phase_sparkline.dart';
 import 'primitives.dart';
 
 /// The one line chart in the app, and the one range control above it.
@@ -1246,6 +1248,10 @@ class CycleAxisChart extends StatelessWidget {
     final openIndex = drawn.keys.where((i) => points[i].isOpen).firstOrNull;
     final closed = drawn.keys.where((i) => !points[i].isOpen).toList()..sort();
 
+    // The sparkline carries no tints: it has no legend to name them, and a
+    // hue is read beside the label that says which meaning it carries.
+    final tints = small ? const <_Tint>[] : _tints(points, isBlocks: isBlocks);
+
     final gutter = small
         ? 0.0
         : axisGutter(context, _yTicks(minY, maxY, step).map(formatValue));
@@ -1283,8 +1289,10 @@ class CycleAxisChart extends StatelessWidget {
             show: true,
             drawVerticalLine: false,
             horizontalInterval: step,
+            // `border` over a 20% tint reads as a scratch, and one gridline
+            // changing colour from slot to slot reads as two.
             getDrawingHorizontalLine: (_) => FlLine(
-              color: c.border,
+              color: tints.isEmpty ? c.border : c.textTertiary,
               strokeWidth: 1,
               dashArray: gridlineDash,
             ),
@@ -1296,12 +1304,19 @@ class CycleAxisChart extends StatelessWidget {
           // not count" without claiming a number for it.
           rangeAnnotations: RangeAnnotations(
             verticalRangeAnnotations: [
+              // Behind everything, and never under a deload: see [_tints].
+              for (final t in tints)
+                VerticalRangeAnnotation(
+                  x1: t.from,
+                  x2: t.to,
+                  color: c.phaseTint(t.kind),
+                ),
               if (!isBlocks)
                 for (var i = 0; i < n; i++)
                   if (points[i].isDeload)
                     VerticalRangeAnnotation(
-                      x1: i - 0.4,
-                      x2: i + 0.4,
+                      x1: i - _deloadHalfWidth,
+                      x2: i + _deloadHalfWidth,
                       color: c.deload.withValues(alpha: 0.14),
                     ),
             ],
@@ -1529,6 +1544,41 @@ class CycleAxisChart extends StatelessWidget {
     );
   }
 
+  /// The phase tints behind the plot, one per stretch of a phase.
+  ///
+  /// Adjacent cycles in one phase are one stretch, so a phase reads as a
+  /// length of the axis rather than as a row of boxes. A stretch runs to the
+  /// edge of its slots, or to the edge of a deload's band where one is next to
+  /// it, and stops there: a deload is drawn exactly as it is with no phases at
+  /// all, and orange is never laid over another hue. Under blocks the deload
+  /// is a hairline, and the tints stop at the same edges, so the hairline is
+  /// never drawn over a tint either.
+  static List<_Tint> _tints(List<CyclePoint> points, {required bool isBlocks}) {
+    final kinds = cycleTints(points, isBlocks: isBlocks);
+    final out = <_Tint>[];
+    var i = 0;
+    while (i < kinds.length) {
+      final kind = kinds[i];
+      if (kind == null) {
+        i++;
+        continue;
+      }
+      var j = i;
+      while (j + 1 < kinds.length && kinds[j + 1] == kind) {
+        j++;
+      }
+      final afterDeload = i > 0 && points[i - 1].isDeload;
+      final beforeDeload = j + 1 < points.length && points[j + 1].isDeload;
+      out.add((
+        kind: kind,
+        from: afterDeload ? i - 1 + _deloadHalfWidth : i - 0.5,
+        to: beforeDeload ? j + 1 - _deloadHalfWidth : j + 0.5,
+      ));
+      i = j + 1;
+    }
+    return out;
+  }
+
   /// One two-point segment of the line, solid or dashed.
   LineChartBarData _segment(
     DeltoidColors c, {
@@ -1549,6 +1599,12 @@ class CycleAxisChart extends StatelessWidget {
     );
   }
 }
+
+/// Half a deload band's width, in slots: the band is 80% of its slot.
+const _deloadHalfWidth = 0.4;
+
+/// One stretch of phase tint on the cycle axis, in slot positions.
+typedef _Tint = ({PhaseKind kind, double from, double to});
 
 /// The gap two axis labels keep between them, so `36` and `37` read as two
 /// numbers rather than one long one.

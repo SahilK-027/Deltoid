@@ -1,6 +1,9 @@
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/widgets/trend_chart.dart';
+import 'package:deltoid/core/theme/tokens.dart';
+import 'package:deltoid/core/widgets/phase_sparkline.dart';
 import 'package:deltoid/domain/cycle_progress.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +17,7 @@ CyclePoint point(
   double? value,
   bool isDeload = false,
   bool isOpen = false,
+  PhaseKind? phase,
 }) =>
     CyclePoint(
       cycleId: 'c$index',
@@ -22,6 +26,7 @@ CyclePoint point(
       isOpen: isOpen,
       value: value,
       lifts: const [],
+      sessions: [(dayKey: index, kind: phase)],
     );
 
 Widget harness(
@@ -369,5 +374,122 @@ void main() {
       for (var i = 1; i < printed.length; i++) printed[i] - printed[i - 1],
     };
     expect(gaps.length, 1, reason: 'the axis printed $printed');
+  });
+
+  group('phase tints', () {
+    final dark = DeltoidColors.dark;
+
+    List<VerticalRangeAnnotation> bands(WidgetTester tester) =>
+        dataOf(tester).rangeAnnotations.verticalRangeAnnotations;
+
+    // To the tenth, so `1 + 0.4` and `1.4` are one edge.
+    double r(double x) => (x * 10).round() / 10;
+
+    testWidgets('each cycle is tinted by its phase, and one phase is one '
+        'stretch', (tester) async {
+      await tester.pumpWidget(
+        harness([
+          point(1, value: 0, phase: PhaseKind.maintenance),
+          point(2, value: 2, phase: PhaseKind.bulk),
+          point(3, value: 3, phase: PhaseKind.bulk),
+          point(4, value: 4, phase: PhaseKind.cut),
+          point(5, value: 5),
+        ]),
+      );
+
+      final tints = bands(tester);
+      expect(tints.map((b) => (r(b.x1), r(b.x2))), [
+        (-0.5, 0.5),
+        // Cycles 2 and 3 meet without a seam.
+        (0.5, 2.5),
+        (2.5, 3.5),
+      ]);
+      expect(tints.map((b) => b.color), [
+        dark.phaseTint(PhaseKind.maintenance),
+        dark.phaseTint(PhaseKind.bulk),
+        dark.phaseTint(PhaseKind.cut),
+      ]);
+      // THEME's strengths: bulk and cut at 20%, maintenance at 16%.
+      expect(tints[0].color!.a, closeTo(0.16, 0.01));
+      expect(tints[1].color!.a, closeTo(0.20, 0.01));
+      expect(tints[2].color!.a, closeTo(0.20, 0.01));
+    });
+
+    testWidgets('no tint is drawn under a deload, and the deload is unchanged',
+        (tester) async {
+      await tester.pumpWidget(
+        harness([
+          point(1, value: 0, phase: PhaseKind.cut),
+          point(2, isDeload: true, phase: PhaseKind.cut),
+          point(3, value: 4, phase: PhaseKind.cut),
+        ]),
+      );
+
+      final all = bands(tester);
+      final deload = all.where((b) => b.color == dark.deload.withValues(alpha: 0.14));
+      expect(deload.map((b) => (r(b.x1), r(b.x2))), [(0.6, 1.4)]);
+      final tints = all.where((b) => b.color == dark.phaseTint(PhaseKind.cut));
+      // The tints either side run to the band's edges and stop there.
+      expect(tints.map((b) => (r(b.x1), r(b.x2))), [(-0.5, 0.6), (1.4, 2.5)]);
+      // Still no point on the deload, and its number is still orange.
+      expect(dataOf(tester).lineBarsData.last.spots.map((s) => s.x), [0, 2]);
+      final two = tester.widget<Text>(find.text('2'));
+      expect(two.style?.color, dark.deload);
+    });
+
+    testWidgets('a chart with no phases draws no tints and keeps its '
+        'gridlines', (tester) async {
+      await tester.pumpWidget(
+        harness([point(1, value: 0), point(2, value: 4)]),
+      );
+
+      expect(bands(tester), isEmpty);
+      final grid = dataOf(tester).gridData.getDrawingHorizontalLine(0);
+      expect(grid.color, dark.border);
+    });
+
+    testWidgets('gridlines over a tint are textTertiary', (tester) async {
+      await tester.pumpWidget(
+        harness([point(1, value: 0, phase: PhaseKind.bulk), point(2, value: 4)]),
+      );
+
+      final grid = dataOf(tester).gridData.getDrawingHorizontalLine(0);
+      expect(grid.color, dark.textTertiary);
+    });
+
+    testWidgets('under blocks a block takes one tint, which stops short of '
+        'the hairline', (tester) async {
+      final points = [
+        point(1, value: 0, phase: PhaseKind.bulk),
+        point(2, value: 1, phase: PhaseKind.bulk),
+        point(3, value: 2, phase: PhaseKind.cut),
+        point(4, isDeload: true, phase: PhaseKind.cut),
+        point(5, value: 3, phase: PhaseKind.cut),
+      ];
+      await tester.pumpWidget(
+        harness(points, isBlocks: true, plotted: {'c3', 'c5'}),
+      );
+
+      expect(
+        bands(tester).map((b) => (r(b.x1), r(b.x2), b.color)),
+        [
+          (-0.5, 2.6, dark.phaseTint(PhaseKind.bulk)),
+          (3.4, 4.5, dark.phaseTint(PhaseKind.cut)),
+        ],
+      );
+      // The hairline is where it was.
+      expect(
+        dataOf(tester).extraLinesData.verticalLines.map((l) => l.x),
+        [3],
+      );
+    });
+
+    testWidgets('the sparkline carries no tints', (tester) async {
+      await tester.pumpWidget(
+        harness([point(1, value: 0, phase: PhaseKind.bulk)], small: true),
+      );
+
+      expect(bands(tester), isEmpty);
+    });
   });
 }

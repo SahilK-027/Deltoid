@@ -3,10 +3,13 @@ import 'package:intl/intl.dart';
 
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/phase_sparkline.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/trend_chart.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../domain/cycle_progress.dart';
+import '../../../domain/enums.dart';
+import '../../../domain/phases.dart';
 
 /// How much stronger a regime has made you, as one card.
 ///
@@ -346,10 +349,15 @@ class _Readout extends StatelessWidget {
 /// percentage. It is the cycle everything else is measured against, and
 /// `+0.0%` beside it reads as a fact about the training rather than as the
 /// definition it actually is.
+///
+/// A cycle that ran in a phase names it after the days. One with no phase
+/// leaves the item out rather than printing `No phase`.
 String cycleReadout(CyclePoint point, {bool isBaseline = false}) {
   final parts = <String>['Cycle ${point.index}'];
   final span = cycleSpan(point);
   if (span != null) parts.add(span);
+  final phase = point.phase;
+  if (phase != null) parts.add(phase.label);
   if (point.isDeload) {
     parts.add('Deload');
   } else if (point.value != null && !isBaseline) {
@@ -396,55 +404,81 @@ class _Legend extends StatelessWidget {
     final style = context.t.labelSmall?.copyWith(color: c.textSecondary);
     final hasDeload = window.points.any((p) => p.isDeload);
     final open = window.points.where((p) => p.isOpen && p.isScored).firstOrNull;
+    // The phases the window shows, in the order they appear, each once. A
+    // phase no cycle on screen ran in has no swatch, for the reason `Deload`
+    // appears only where a deload does.
+    final phases = <PhaseKind>[];
+    for (final kind in cycleTints(window.points, isBlocks: window.isBlocks)) {
+      if (kind != null && !phases.contains(kind)) phases.add(kind);
+    }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Cycle', style: style),
-        const Spacer(),
-        if (hasDeload) ...[
+        const SizedBox(width: Space.md),
+        // Wrapping onto a second line rather than running off the card: a
+        // deload, the open cycle and three phases are more than one line of a
+        // phone holds.
+        Expanded(
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: Space.md,
+            runSpacing: Space.xs,
+            children: [
+              if (hasDeload)
+                _swatch(c.deload.withValues(alpha: 0.5), 'Deload', style),
+              if (open != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Dashed, because the line it stands for is: a solid rule
+                    // in the legend names a mark the chart never draws.
+                    SizedBox(
+                      width: 14,
+                      height: 2,
+                      child: Row(
+                        children: [
+                          for (var i = 0; i < 3; i++) ...[
+                            if (i > 0) const SizedBox(width: 2),
+                            Expanded(
+                              child: DecoratedBox(
+                                decoration:
+                                    BoxDecoration(color: c.textTertiary),
+                                child: const SizedBox(height: 2),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: Space.xs),
+                    Text('Cycle ${open.index} so far', style: style),
+                  ],
+                ),
+              for (final kind in phases)
+                _swatch(c.phase(kind), kind.label, style),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// A 10 square in [color] and its name.
+  Widget _swatch(Color color, String label, TextStyle? style) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: c.deload.withValues(alpha: 0.5),
+              color: color,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(width: Space.xs),
-          Text('Deload', style: style),
+          Text(label, style: style),
         ],
-        if (open != null) ...[
-          if (hasDeload) const SizedBox(width: Space.md),
-          // Dashed, because the line it stands for is: a solid rule in the
-          // legend names a mark the chart never draws.
-          SizedBox(
-            width: 14,
-            height: 2,
-            child: Row(
-              children: [
-                for (var i = 0; i < 3; i++) ...[
-                  if (i > 0) const SizedBox(width: 2),
-                  Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(color: c.textTertiary),
-                      child: const SizedBox(height: 2),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: Space.xs),
-          Flexible(
-            child: Text(
-              'Cycle ${open.index} so far',
-              style: style,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+      );
 }
