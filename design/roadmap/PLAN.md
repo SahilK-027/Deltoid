@@ -319,7 +319,9 @@ owner approves those screenshots.
    the weigh-ins have run against the phase for about three weeks. Never a notification.
 5. The cycle progress chart: phase tints behind each cycle, the phase in the readout, and
    the legend; deloads drawn exactly as today with no tint beneath them.
-6. Release 1.18.0.
+6. Release 1.18.0. Before the release commit, run the pgTAP tests with Docker and the
+   local Supabase stack up: `phases_rls_test.sql` (added in `d5741ac`) has not run yet.
+   The changelog needs Upgrade notes for schema 7 and `supabase db push`.
 
 **Then** 1.19.0 charts and 1.20.0 AI analysis, each broken down the same way when it
 starts. The deleted-regime legend fix can land in any patch release.
