@@ -132,4 +132,21 @@ void main() {
       expect(formatBodyweightDelta(76.4, 76.4, WeightUnit.kg), isNull);
     });
   });
+
+  group('formatBodyweightChange', () {
+    test('carries its sign, the minus a true minus', () {
+      expect(formatBodyweightChange(1.2, WeightUnit.kg), '+1.2');
+      expect(formatBodyweightChange(-3.3, WeightUnit.kg), '−3.3');
+      expect(formatBodyweightChange(-2.0, WeightUnit.kg), '−2');
+    });
+
+    test('a change that rounds to nothing is 0, not +0 or −0', () {
+      expect(formatBodyweightChange(0.04, WeightUnit.kg), '0');
+      expect(formatBodyweightChange(-0.04, WeightUnit.kg), '0');
+    });
+
+    test('is converted to pounds', () {
+      expect(formatBodyweightChange(-1, WeightUnit.lb), '−2.2');
+    });
+  });
 }

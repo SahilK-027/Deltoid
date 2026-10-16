@@ -89,6 +89,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 - [x] The data: a syncable `phases` table, kind, start day, planned length, end day and the day a prompt was answered. Schema 6 → 7, server rung and its RLS case included; pushed, pulled, backed up and restored, two invariants, and the two-device fuzz starts, edits and clears phases. The RLS case has not yet run against a real Postgres.
 - [x] What is read off it, in `domain/phases.dart`: the phase on a day, the phase most of a cycle ran in, the change and weekly rate during a phase, and the two staleness checks.
+- [x] The Phase card on Home and the phase sheet: set, change, correct or clear a phase, its start day from the day picker and an optional planned length, with a bodyweight sparkline tinted by phase and three figures. The staleness prompts and the cycle chart tints are still to come.
 
 ### Sync
 

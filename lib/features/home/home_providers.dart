@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../data/db/database.dart';
 import '../../data/db/watch.dart';
 import '../../data/repositories/training_repository.dart';
+import '../../domain/phases.dart';
 import 'heatmap_data.dart';
 
 /// How far back the consistency grid looks.
@@ -128,4 +129,27 @@ final homeProvider = StreamProvider<HomeData>((ref) {
       );
     },
   );
+});
+
+/// What the Phase card draws: every phase as the days it covers, and every
+/// weigh-in, oldest first.
+///
+/// One value over both tables, so the card's figures and its sparkline never
+/// disagree for a frame about which weigh-ins a phase holds. Unbounded on both
+/// counts, and neither needs a bound: a few phases a year, and the weigh-in log
+/// the Weigh-ins screen already reads whole.
+typedef PhaseCardData = ({
+  List<PhaseSpan> spans,
+  List<({int dayKey, double weightKg})> log,
+});
+
+final phaseCardProvider = StreamProvider<PhaseCardData>((ref) {
+  final db = ref.watch(databaseProvider);
+  final phases = ref.watch(phaseRepositoryProvider);
+  final repo = ref.watch(trainingRepositoryProvider);
+  return db.watchQuery([db.phases, db.bodyweightLogs], () async {
+    final entries = await phases.phases();
+    final log = await repo.bodyweightSeries();
+    return (spans: phaseSpans(entries), log: log);
+  });
 });

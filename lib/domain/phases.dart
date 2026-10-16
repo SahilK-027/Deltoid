@@ -14,6 +14,7 @@ library;
 import 'dart:math' as math;
 
 import '../core/ids.dart';
+import 'chart_buckets.dart';
 import 'enums.dart';
 import 'metrics.dart';
 
@@ -126,6 +127,114 @@ PhaseSpan? currentPhase(List<PhaseSpan> spans, {required int todayKey}) =>
 /// Thursday turns its week on Thursdays rather than on Mondays.
 int phaseWeek(PhaseSpan span, {required int todayKey}) =>
     daysBetweenKeys(span.startKey, todayKey) ~/ 7 + 1;
+
+/// A phase's name as the app writes it: `Bulk`, `Cut` or `Maintenance`.
+extension PhaseKindName on PhaseKind {
+  String get label => switch (this) {
+        PhaseKind.bulk => 'Bulk',
+        PhaseKind.cut => 'Cut',
+        PhaseKind.maintenance => 'Maintenance',
+      };
+}
+
+/// The shortest stretch the Phase card's sparkline covers: twelve weeks.
+///
+/// A phase younger than that is drawn with the weeks before it, so a cut a
+/// fortnight old is seen against the bulk it followed rather than as two
+/// points ([THEME → Phase card](THEME.md#phase-card)).
+const phaseSparklineMinimumDays = 84;
+
+/// What the Phase card's sparkline draws, as plain values.
+///
+/// Positions are in days from [fromKey], so the painter maps one number to
+/// one pixel column and never reads a calendar. [weeks] are means of each
+/// week's weigh-ins in kilograms, oldest first, placed at the middle of the
+/// days the week shares with the window; a week with no weigh-in is absent.
+/// [bands] are the stretches each phase covers, `toDay` exclusive.
+class PhaseSparklineData {
+  const PhaseSparklineData({
+    required this.fromKey,
+    required this.toKey,
+    required this.weeks,
+    required this.bands,
+  });
+
+  final int fromKey;
+  final int toKey;
+  final List<({double day, double weightKg})> weeks;
+  final List<({PhaseKind kind, int fromDay, int toDay})> bands;
+
+  /// Days the window covers, both ends included.
+  int get days => daysBetweenKeys(fromKey, toKey) + 1;
+
+  /// The phases the sparkline shows, in the order they appear, each once:
+  /// what its legend names.
+  List<PhaseKind> get kinds => [
+        for (final band in bands) band.kind,
+      ].fold(<PhaseKind>[], (seen, k) => seen.contains(k) ? seen : [...seen, k]);
+}
+
+/// The Phase card's sparkline for [current]: bodyweight from the phase's
+/// start, or over the last [phaseSparklineMinimumDays] when the phase is
+/// younger, folded into weeks, over the phases each stretch ran in.
+///
+/// Weeks are Monday weeks, as every chart in the app folds them, and a week is
+/// the mean of its weigh-ins because the mean of a week of weigh-ins is a
+/// weigh-in. Days no phase covered carry no band.
+PhaseSparklineData phaseSparkline(
+  PhaseSpan current,
+  List<PhaseSpan> spans,
+  List<({int dayKey, double weightKg})> log, {
+  required int todayKey,
+}) {
+  final today = dateFromDayKey(todayKey);
+  final floor = dayKeyOf(daysBefore(today, phaseSparklineMinimumDays - 1));
+  final fromKey = math.min(current.startKey, floor);
+  final from = dateFromDayKey(fromKey);
+
+  final weeks = [
+    for (final bucket in bucketize(
+      rows: [for (final e in log) (dayKey: e.dayKey, value: e.weightKg)],
+      by: Granularity.weekly,
+      from: from,
+      to: today,
+    ))
+      if (bucket.value != null)
+        (
+          // The middle of the days the week shares with the window: the
+          // first week may start before it, and the last runs past today.
+          day: (math.max(0, daysBetween(from, bucket.start)) +
+                  math.min(
+                    daysBetween(from, bucket.end),
+                    daysBetween(from, today),
+                  ) +
+                  1) /
+              2,
+          weightKg: bucket.value!,
+        ),
+  ];
+
+  final bands = [
+    for (final span in spans)
+      if (span.startKey <= todayKey && (span.lastKey ?? todayKey) >= fromKey)
+        (
+          kind: span.kind,
+          fromDay: daysBetweenKeys(fromKey, math.max(span.startKey, fromKey)),
+          toDay: daysBetweenKeys(
+                fromKey,
+                math.min(span.lastKey ?? todayKey, todayKey),
+              ) +
+              1,
+        ),
+  ];
+
+  return PhaseSparklineData(
+    fromKey: fromKey,
+    toKey: todayKey,
+    weeks: weeks,
+    bands: bands,
+  );
+}
 
 /// The phase most of a cycle's sessions ran in, or null for no tint.
 ///

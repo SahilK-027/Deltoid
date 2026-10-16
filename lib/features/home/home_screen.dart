@@ -24,6 +24,7 @@ import 'history_heatmap_screen.dart';
 import 'home_providers.dart';
 import 'weigh_ins_screen.dart';
 import 'widgets/habit_tile.dart';
+import 'widgets/phase_card.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/failure.dart';
 import '../account/backup_mark.dart';
@@ -442,6 +443,8 @@ class HomeScreen extends ConsumerWidget {
     // The Weigh-ins tile, waited for with the rest so the Habits row arrives
     // with the page rather than half of it a frame later.
     final weighIns = ref.watch(weighInDaysProvider).valueOrNull;
+    // The Phase card, waited for on the same terms.
+    final phase = ref.watch(phaseCardProvider).valueOrNull;
     final regime = today?.regime;
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;
@@ -454,11 +457,12 @@ class HomeScreen extends ConsumerWidget {
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
         (null, _, _) => const SizedBox.shrink(),
-        _ when weighIns == null => const SizedBox.shrink(),
+        _ when weighIns == null || phase == null => const SizedBox.shrink(),
         (_, null, _) => _NoRegimeState(
           last: today!.lastCompleted,
           heatmap: today.heatmap,
           weighIns: weighIns,
+          phase: phase,
           hasHistory: today.hasHistory,
         ),
         (_, final r?, true) => _NoSessionsState(
@@ -466,6 +470,7 @@ class HomeScreen extends ConsumerWidget {
           last: today!.lastCompleted,
           heatmap: today.heatmap,
           weighIns: weighIns,
+          phase: phase,
           hasHistory: today.hasHistory,
         ),
         // The masthead and the one action are a single band, and the record
@@ -546,6 +551,8 @@ class HomeScreen extends ConsumerWidget {
                             preview: today.snapshot.exerciseNamesBySession,
                           ),
                         ),
+                        const SizedBox(height: Space.section),
+                        PhaseSection(data: phase),
                         const SizedBox(height: Space.section),
                         _PastSessionsCard(
                           onTap: () => _logPastSession(
@@ -749,12 +756,14 @@ class _NoRegimeState extends ConsumerWidget {
     required this.last,
     required this.heatmap,
     required this.weighIns,
+    required this.phase,
     required this.hasHistory,
   });
 
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
   final Set<int> weighIns;
+  final PhaseCardData phase;
   final bool hasHistory;
 
   @override
@@ -806,6 +815,10 @@ class _NoRegimeState extends ConsumerWidget {
                     AccountRecoveryNote(hasHistory: hasHistory),
                     // No play button: there is no session to start.
                     _HabitsSection(heatmap: heatmap, weighIns: weighIns),
+                    // Not about the regime either: a phase is what the person
+                    // is eating for, with or without a split to train.
+                    const SizedBox(height: Space.section),
+                    PhaseSection(data: phase),
                   ],
                 ),
               ),
@@ -826,6 +839,7 @@ class _NoSessionsState extends ConsumerWidget {
     required this.last,
     required this.heatmap,
     required this.weighIns,
+    required this.phase,
     required this.hasHistory,
   });
 
@@ -833,6 +847,7 @@ class _NoSessionsState extends ConsumerWidget {
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
   final Set<int> weighIns;
+  final PhaseCardData phase;
   final bool hasHistory;
 
   @override
@@ -889,6 +904,10 @@ class _NoSessionsState extends ConsumerWidget {
                     AccountRecoveryNote(hasHistory: hasHistory),
                     // No play button: there is no session to start.
                     _HabitsSection(heatmap: heatmap, weighIns: weighIns),
+                    // Not about the regime either: a phase is what the person
+                    // is eating for, with or without a split to train.
+                    const SizedBox(height: Space.section),
+                    PhaseSection(data: phase),
                   ],
                 ),
               ),

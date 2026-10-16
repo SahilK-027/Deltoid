@@ -97,6 +97,15 @@ class PhaseRepository {
   Future<void> clearPhase(String id, {required DateTime on}) =>
       _write(id, PhasesCompanion(endDayKey: Value(dayKeyOf(on))));
 
+  /// Removes the phase [id] altogether, as a tombstone.
+  ///
+  /// For `Clear phase` on the day the phase began: an end day before its
+  /// start is refused by the schema, and an end day on its start would leave
+  /// it current until midnight, when the sheet promises Home no phase. A phase
+  /// that covered no finished day has nothing to keep tinting, so it goes.
+  Future<void> discardPhase(String id) =>
+      _write(id, PhasesCompanion(deletedAt: Value(nowMs())));
+
   /// Answers the planned-length prompt with `Keep going`.
   ///
   /// The phase becomes open-ended, so [plannedLengthPassed] is false from here

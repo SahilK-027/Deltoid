@@ -555,4 +555,74 @@ void main() {
       );
     });
   });
+
+  group('phaseSparkline — the Phase card\'s graph', () {
+    const today = 20261016;
+    final spans = phaseSpans([
+      phase('a', PhaseKind.bulk, 20260801),
+      phase('b', PhaseKind.cut, 20261001),
+    ]);
+    final cut = spans.last;
+
+    test('a phase younger than twelve weeks is drawn with the weeks before',
+        () {
+      final data = phaseSparkline(cut, spans, const [], todayKey: today);
+      expect(data.fromKey, 20260725);
+      expect(data.toKey, today);
+      expect(data.days, phaseSparklineMinimumDays);
+    });
+
+    test('a phase older than twelve weeks is drawn from its start', () {
+      final old = phaseSpans([phase('a', PhaseKind.cut, 20260601)]);
+      final data = phaseSparkline(old.single, old, const [], todayKey: today);
+      expect(data.fromKey, 20260601);
+      expect(data.bands.single.fromDay, 0);
+      expect(data.bands.single.toDay, data.days);
+    });
+
+    test('each phase is tinted over the days it covered, and no others', () {
+      final data = phaseSparkline(cut, spans, const [], todayKey: today);
+      expect(data.bands, [
+        (kind: PhaseKind.bulk, fromDay: 7, toDay: 68),
+        (kind: PhaseKind.cut, fromDay: 68, toDay: 84),
+      ]);
+      expect(data.kinds, [PhaseKind.bulk, PhaseKind.cut]);
+    });
+
+    test('a phase declared twice is named in the legend once', () {
+      final again = phaseSpans([
+        phase('a', PhaseKind.cut, 20260801),
+        phase('b', PhaseKind.maintenance, 20260901),
+        phase('c', PhaseKind.cut, 20261001),
+      ]);
+      final data =
+          phaseSparkline(again.last, again, const [], todayKey: today);
+      expect(data.kinds, [PhaseKind.cut, PhaseKind.maintenance]);
+    });
+
+    test('weeks are Monday weeks, at the middle of their days in the window',
+        () {
+      final data = phaseSparkline(
+        cut,
+        spans,
+        [w(20261005, 80), w(20261007, 82), w(20261012, 79), w(today, 78)],
+        todayKey: today,
+      );
+      expect(data.weeks, [
+        (day: (72 + 78 + 1) / 2, weightKg: 81.0),
+        // The current week runs past today, so its middle is today's side.
+        (day: (79 + 83 + 1) / 2, weightKg: 78.5),
+      ]);
+    });
+
+    test('a week with no weigh-in is left out rather than drawn at zero', () {
+      final data = phaseSparkline(
+        cut,
+        spans,
+        [w(20260803, 80), w(today, 78)],
+        todayKey: today,
+      );
+      expect(data.weeks, hasLength(2));
+    });
+  });
 }

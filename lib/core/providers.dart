@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/backup/backup_service.dart';
 import '../data/db/database.dart';
+import '../data/repositories/phase_repository.dart';
 import '../data/repositories/repairs.dart';
 import '../data/repositories/training_repository.dart';
 import '../domain/cycle_engine.dart';
@@ -114,6 +115,11 @@ final activeSessionsProvider = StreamProvider<List<Session>>((ref) {
     ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]);
   return query.watch();
 });
+
+/// The writes the phase sheet and the Phase card make.
+final phaseRepositoryProvider = Provider<PhaseRepository>(
+  (ref) => PhaseRepository(ref.watch(databaseProvider)),
+);
 
 final trainingRepositoryProvider = Provider<TrainingRepository>(
   (ref) => TrainingRepository(ref.watch(databaseProvider)),

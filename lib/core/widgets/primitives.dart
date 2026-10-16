@@ -1431,9 +1431,15 @@ class IconTile extends StatelessWidget {
     required this.color,
     this.size = 44,
     this.solid = true,
+    this.glyph,
   });
 
   final IconData icon;
+
+  /// Overrides the glyph's colour, for a tile whose fill is chrome rather
+  /// than a hue: the Phase card's `surfaceHigh` tile, whose glyph is
+  /// `textPrimary` because a phase is not an identity (THEME → Phase card).
+  final Color? glyph;
 
   /// Required rather than defaulted. A tile's colour is what it means, and a
   /// default would be a meaning no caller chose: every tile reached for one
@@ -1456,7 +1462,11 @@ class IconTile extends StatelessWidget {
         color: solid ? tint : tint.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(size * 0.3),
       ),
-      child: Icon(icon, size: size * 0.5, color: solid ? glyphOn(tint) : tint),
+      child: Icon(
+        icon,
+        size: size * 0.5,
+        color: glyph ?? (solid ? glyphOn(tint) : tint),
+      ),
     );
   }
 
@@ -1717,6 +1727,39 @@ class Pill extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// The compact pill (THEME → Buttons): 36 tall, radius 999, `surfaceHigh`,
+/// `label` text.
+///
+/// Without [onTap] it is a fact in a pill's shape, the Phase card's
+/// `Week 7 of 12`, and opens nothing.
+class CompactPill extends StatelessWidget {
+  const CompactPill(this.text, {super.key, this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: Space.md),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: context.c.surfaceHigh,
+        borderRadius: BorderRadius.circular(Radii.pill),
+      ),
+      child: Text(
+        text,
+        style: context.t.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+    if (onTap == null) return pill;
+    return Pressable(onTap: onTap, scale: 0.96, child: pill);
   }
 }
 

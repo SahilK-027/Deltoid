@@ -297,6 +297,19 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// weigh-in drawn in [progress] would read as a trained day.
   Color get weighIn => lavender;
 
+  /// A bulk, as a tint on the Phase card's sparkline and the cycle chart.
+  /// Lavender, a third meaning for the hue, read beside the legend that names
+  /// it (THEME → Semantic assignments).
+  Color get bulk => lavender;
+
+  /// A cut, as a tint on the same two charts. Cyan, a third meaning for the
+  /// warm-up's hue, for the same reason.
+  Color get cut => cyan;
+
+  /// Maintenance: [textSecondary], because it has no direction to give a hue
+  /// to. It is the ground the other two depart from.
+  Color get maintenance => textSecondary;
+
   @override
   DeltoidColors copyWith({
     Color? bg,

@@ -130,6 +130,22 @@ String? formatBodyweightDelta(double kg, double previousKg, WeightUnit unit) {
   return '${difference > 0 ? '+' : '−'}$magnitude';
 }
 
+/// A change in bodyweight of [kg], signed, at bodyweight precision.
+///
+/// For a figure that is itself a change rather than the gap between two
+/// readings: the Phase card's `Since start` and `Each week`. The minus is a
+/// true minus, as in [formatBodyweightDelta]. A change that rounds to nothing
+/// prints `0`, because unlike a delta beside a reading, this figure stands on
+/// its own and must say something.
+String formatBodyweightChange(double kg, WeightUnit unit) {
+  final v = roundToDecimals(unit.fromKg(kg), 1);
+  if (v.abs() < bodyweightIncrement / 2) return '0';
+  final magnitude = v.abs() == v.abs().roundToDouble()
+      ? v.abs().toStringAsFixed(0)
+      : v.abs().toStringAsFixed(1);
+  return '${v > 0 ? '+' : '−'}$magnitude';
+}
+
 /// Rounds [v] to [places] decimal places.
 ///
 /// Used where a raw double would otherwise render fifteen decimal places of

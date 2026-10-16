@@ -58,6 +58,15 @@ void main() {
         expect(reserved, isNot(contains(c.weighIn)));
         expect(c.weighIn, DeltoidColors.lavender);
       });
+
+      test('the phases never borrow a reserved colour', () {
+        for (final hue in [c.bulk, c.cut, c.maintenance]) {
+          expect(reserved, isNot(contains(hue)), reason: '$hue is reserved');
+        }
+        expect(c.bulk, DeltoidColors.lavender);
+        expect(c.cut, DeltoidColors.cyan);
+        expect(c.maintenance, c.textSecondary);
+      });
     });
   }
 }
