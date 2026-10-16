@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
@@ -72,6 +73,9 @@ enum SyncOp {
   createRegime,
   activateRegime,
   deleteRegime,
+  startPhase,
+  editPhase,
+  clearPhase,
 
   /// Pull then push, which is the order the engine runs them in.
   sync,
@@ -247,6 +251,7 @@ const _syncedTables = [
   'workout_exercises',
   'set_logs',
   'bodyweight_logs',
+  'phases',
 ];
 
 /// A small pool, so two phones collide on purpose.
@@ -517,6 +522,41 @@ Future<bool> applyStep(Phones phones, Step step) async {
       final regime = Phones.pick(live, picks[0]);
       if (regime == null) return false;
       await regimes.deleteRegime(regime.id);
+      return true;
+
+    case SyncOp.startPhase:
+      // The same five-day window as bodyweight, so two phones start a phase
+      // on one day often enough to reach `idx_phases_start_live`.
+      final day = daysBefore(DateTime.now(), picks[0] % 5);
+      await PhaseRepository(db).startPhase(
+        PhaseKind.values[picks[1] % PhaseKind.values.length],
+        from: day,
+        plannedWeeks: const [null, 8, 12, 16][picks[2] % 4],
+      );
+      return true;
+
+    case SyncOp.editPhase:
+      // Only what the sheet allows: the current phase, to a day no earlier
+      // than the previous phase's start and no later than today, and onto no
+      // other phase's day.
+      final phases = await PhaseRepository(db).phases();
+      if (phases.isEmpty) return false;
+      final current = phases.last;
+      final day = dayKeyOf(daysBefore(DateTime.now(), picks[0] % 5));
+      final floor = phases.length > 1 ? phases[phases.length - 2].startKey : 0;
+      if (day <= floor) return false;
+      if (current.endKey != null && day > current.endKey!) return false;
+      await PhaseRepository(db).editPhase(
+        current.id,
+        from: dateFromDayKey(day),
+        plannedWeeks: const [null, 8, 12, 16][picks[1] % 4],
+      );
+      return true;
+
+    case SyncOp.clearPhase:
+      final phases = await PhaseRepository(db).phases();
+      if (phases.isEmpty || phases.last.endKey != null) return false;
+      await PhaseRepository(db).clearPhase(phases.last.id, on: DateTime.now());
       return true;
   }
 }

@@ -23,10 +23,19 @@ import 'database.dart';
 Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // 1 → 2 · What is owed, countable without a scan.
   //
-  // Nine partial indexes on `dirty`, one per syncable table. Declared in
-  // `tables.dart` so a fresh install gets them from `createAll`, and created
-  // here for a database that already exists.
-  if (from < 2) await createIndexesIfMissing(db, (name) => name.endsWith('_dirty'));
+  // Nine partial indexes on `dirty`, one per syncable table of the time.
+  // Declared in `tables.dart` so a fresh install gets them from `createAll`,
+  // and created here for a database that already exists.
+  //
+  // `idx_phases_dirty` is left to the rung that creates its table. At this
+  // rung the table does not exist yet, and an index on a missing table throws
+  // at open.
+  if (from < 2) {
+    await createIndexesIfMissing(
+      db,
+      (name) => name.endsWith('_dirty') && !name.startsWith('idx_phases_'),
+    );
+  }
 
   // 2 → 3 · When a regime was made active, so two phones can agree which is.
   //
@@ -97,6 +106,22 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // better. See [Sessions.rotationId].
   if (from < 6) {
     await addColumnIfMissing(db, m, db.sessions, db.sessions.rotationId);
+  }
+
+  // 6 → 7 · Bulk, cut and maintenance.
+  //
+  // A table of its own, `phases`, and its two indexes: one live phase per
+  // start day and the partial index on `dirty`. `createTable` writes
+  // `CREATE TABLE IF NOT EXISTS`, so the step is as safe to replay as the
+  // column steps above. Nothing is backfilled, because no existing install
+  // has declared a phase and the app does not infer one from the weigh-ins
+  // ([RULES § 6](RULES.md#6-scope)). See [Phases].
+  if (from < 7) {
+    await m.createTable(db.phases);
+    await createIndexesIfMissing(
+      db,
+      (name) => name.startsWith('idx_phases_'),
+    );
   }
 }
 

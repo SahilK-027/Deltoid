@@ -478,7 +478,12 @@ class PullService {
   /// difference [_parkMovers] turns on. `bodyweight_logs.day_key` and
   /// `regimes.identity_index` are unique too and are deliberately absent: no
   /// operation in the app moves a reading to another day or a programme to
-  /// another hue, so two of those can never trade places.
+  /// another hue, so two of those can never trade places. `phases.day_key` is
+  /// absent for the same reason by a different route: a start day is moved,
+  /// but only on the current phase and never to before the previous phase's
+  /// start, so phases keep their order and no batch is a permutation of them.
+  /// A start moved onto another phase's day is a collision, decided by
+  /// [_resolveOnePerDay].
   /// [parent] is the column each unique index is scoped to, because every one
   /// of them is: two regimes may both hold a `Push 1`, and two workouts may
   /// both hold a slot at position 0.
@@ -711,7 +716,8 @@ class PullService {
       'regimes' => await _resolveRegime(row),
       'cycles' => await _resolveCycle(row),
       'workouts' => await _resolveWorkout(row),
-      'bodyweight_logs' => await _resolveBodyweight(row),
+      'bodyweight_logs' => await _resolveOnePerDay('bodyweight_logs', row),
+      'phases' => await _resolveOnePerDay('phases', row),
       _ => row,
     };
   }
@@ -1016,14 +1022,21 @@ class PullService {
     });
   }
 
-  /// One person, one morning, one scale.
-  Future<Map<String, dynamic>> _resolveBodyweight(
+  /// Two rows that are one statement made twice: one live row per day.
+  ///
+  /// `bodyweight_logs` is one person, one morning, one scale, and `phases` is
+  /// one declaration that a phase began on a day. In both the two rows say the
+  /// same thing, so the newer stands and the other is tombstoned rather than
+  /// re-slotted — there is no second slot to move either to, and no logged work
+  /// hangs off either ([SYNC.md § 9](SYNC.md#9-collision--two-rows-one-slot)).
+  Future<Map<String, dynamic>> _resolveOnePerDay(
+    String table,
     Map<String, dynamic> row,
   ) async {
     final id = row['id'] as String;
     final sameDay = await _db
         .customSelect(
-          'SELECT id, updated_at, device_id FROM bodyweight_logs '
+          'SELECT id, updated_at, device_id FROM $table '
           'WHERE day_key = ? AND deleted_at IS NULL AND id != ?',
           variables: [
             Variable<int>(row['dayKey'] as int),
@@ -1049,12 +1062,12 @@ class PullService {
     );
 
     if (remoteWins) {
-      await _restamp('bodyweight_logs', other.read<String>('id'), {
+      await _restamp(table, other.read<String>('id'), {
         'deleted_at': nowMs(),
       });
       return row;
     }
-    // There is no second slot to move a reading to, so the loser is tombstoned
+    // There is no second slot to move the row to, so the loser is tombstoned
     // rather than re-slotted — and a tombstone is still a row.
     return _ours(row, {'deletedAt': nowMs()});
   }

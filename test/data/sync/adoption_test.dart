@@ -4,11 +4,13 @@ import 'dart:io';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
 import 'package:deltoid/data/sync/adoption.dart';
 import 'package:deltoid/data/sync/catalog_dedup.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -170,6 +172,26 @@ void main() {
         await devices.push(other);
 
         expect((await adoptionOf(phone).survey()).shape, AdoptionShape.pull);
+      },
+    );
+
+    test(
+      'a phase is not a history — a cut declared on an install is a pull',
+      () async {
+        await install(phone, 'device-b');
+        await devices.as(
+          'device-b',
+          () => PhaseRepository(phone).startPhase(
+            PhaseKind.cut,
+            from: DateTime(2026, 9, 3),
+          ),
+        );
+        await train(other, 'device-a', day: DateTime(2026, 3, 3));
+        await devices.push(other);
+
+        expect((await adoptionOf(phone).survey()).shape, AdoptionShape.pull,
+            reason: 'SYNC.md § 10: phases are not training for the three '
+                'shapes, and nothing about them is a question at sign-in');
       },
     );
 

@@ -815,6 +815,91 @@ class BodyweightLogs extends Table with SyncColumns {
       ];
 }
 
+/// A bulk, a cut or maintenance, declared from a day onwards.
+///
+/// One row per declaration, and never a row per day: a phase runs from its
+/// `dayKey` until the next live phase starts, or to its own [endDayKey] if
+/// that comes first. Where a phase ends is therefore derived rather than
+/// written ([SYNC.md § 4](SYNC.md#4-what-the-server-holds)), so starting a new
+/// phase writes one row and never touches the one before it, and no decision
+/// spans two rows for last-write-wins to split.
+///
+/// Clearing a phase is [endDayKey] on the row being cleared, not a row of its
+/// own that means "no phase". The cleared phase keeps tinting the cycles it
+/// covered, which needs its last day to be a fact on it; a marker row would be
+/// a phase with no kind, which the `kind` CHECK and every reader of it would
+/// have to treat as an exception; and the merge that matters — one phone
+/// clearing while the other edits the same phase — stays one row with two
+/// versions, which row last-write-wins already decides
+/// ([SYNC.md § 12](SYNC.md#12-every-edge-case-and-what-it-does), row 21).
+///
+/// Names no regime. A phase is a fact about the person rather than the
+/// programme, so it has no foreign key and switching regime leaves it alone.
+///
+/// One live phase per start day, enforced here rather than only in the
+/// repository, because a restore and a merge are the writers that never pass
+/// through it. Two phases starting on one day leave that span with two answers
+/// and the cycle tints with none. Partial, so a phase replaced on its own start
+/// day — how a mis-tapped phase is corrected — leaves a tombstone that blocks
+/// nothing.
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_phases_start_live '
+  'ON phases (day_key) WHERE deleted_at IS NULL',
+)
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_phases_dirty '
+  'ON phases (dirty) WHERE dirty = 1',
+)
+class Phases extends Table with SyncColumns {
+  TextColumn get kind => textEnum<PhaseKind>()();
+
+  /// The day the phase starts, as `yyyyMMdd`.
+  IntColumn get dayKey => integer()();
+
+  /// 8, 12 or 16, or null for a phase with no planned end.
+  ///
+  /// A plan rather than an end: nothing stops at the planned length. It is
+  /// read only to decide when the Phase card asks what comes next, and
+  /// `Keep going` answers that question by setting it back to null.
+  IntColumn get plannedWeeks => integer().nullable()();
+
+  /// The last day the phase covers, set by `Clear phase`; null while it runs.
+  ///
+  /// Only ever the end of a cleared phase. A phase followed by another one
+  /// keeps null here, because its end is the next one's start and writing it
+  /// would be a second copy of that fact for two phones to disagree about.
+  IntColumn get endDayKey => integer().nullable()();
+
+  /// The day `Keep going` last answered the weigh-in prompt, or null.
+  ///
+  /// The prompt is not asked again until three more weeks of weigh-ins have
+  /// run against the phase after this day. On the row rather than in
+  /// `app_settings`, because a question answered on one phone is answered,
+  /// and the other phone must not ask it again.
+  IntColumn get keptDayKey => integer().nullable()();
+
+  /// Each one reachable only through a restore or a merged row, since the
+  /// phase sheet offers none of them.
+  ///
+  /// `end_day_key` may equal `day_key`: a phase cleared on the day it began
+  /// covered that one day. `kept_day_key` is held only to the calendar, because
+  /// a start day corrected to after the day `Keep going` was tapped is an
+  /// ordinary edit, and refusing it would refuse the correction.
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        "CHECK (kind IN ('bulk', 'cut', 'maintenance'))",
+        'CHECK (day_key BETWEEN 19000101 AND 21001231)',
+        'CHECK (planned_weeks IS NULL OR planned_weeks IN (8, 12, 16))',
+        'CHECK (end_day_key IS NULL OR '
+            '(end_day_key >= day_key AND end_day_key <= 21001231))',
+        'CHECK (kept_day_key IS NULL OR '
+            'kept_day_key BETWEEN 19000101 AND 21001231)',
+      ];
+}
+
 /// Key/value store for local preferences and sync bookkeeping
 /// (`last_pull_at`, `device_id`, `user_id`, `units`). Not synced.
 class AppSettings extends Table {

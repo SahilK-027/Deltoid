@@ -93,10 +93,10 @@ Stream<SyncState> watchSyncState(AppDatabase db, {required bool signedIn}) {
   return db.watchQuery(
     [...specs.map((s) => s.table), db.appSettings],
     () async {
-      // One statement over nine partial indexes, each of them empty whenever
-      // that table owes nothing — so the common answer costs nine index probes
-      // rather than a scan of 168k set logs, on a query re-run every time a set
-      // is ticked.
+      // One statement over a partial index per table, each of them empty
+      // whenever that table owes nothing — so the common answer costs one
+      // index probe per table rather than a scan of 168k set logs, on a query
+      // re-run every time a set is ticked.
       final counted = await db
           .customSelect(
             'SELECT $owedSql AS owed, '
@@ -154,6 +154,15 @@ class WaitingItem {
         dayKey = null,
         inProgress = false;
 
+  /// Phases declared, changed or cleared on this phone. One line, counted in
+  /// changes, because a phase is neither training nor the programme.
+  const WaitingItem.phase(this.count)
+      : kind = WaitingKind.phase,
+        workoutId = null,
+        sessionName = null,
+        dayKey = null,
+        inProgress = false;
+
   const WaitingItem.programme(this.count)
       : kind = WaitingKind.programme,
         workoutId = null,
@@ -170,12 +179,12 @@ class WaitingItem {
   final bool inProgress;
 
   /// Sets for a session — or 1 when only the session's own details changed —
-  /// entries for bodyweight, and rows for the programme. The header's badge is
-  /// the sum, so it counts the same things the sheet lists.
+  /// entries for bodyweight, and rows for phases and the programme. The
+  /// header's badge is the sum, so it counts the same things the sheet lists.
   final int count;
 }
 
-enum WaitingKind { session, removed, bodyweight, programme }
+enum WaitingKind { session, removed, bodyweight, phase, programme }
 
 /// The most recent finished session the account holds in full.
 class BackedUpSession {
@@ -203,9 +212,9 @@ class OwedSummary {
 ///
 /// A set, the exercise it sits in and the workout around it are three tables
 /// and one thing to a person, so every dirty row under a workout is folded into
-/// that workout's line, counted by its sets. Everything that is neither a
-/// logged session nor bodyweight — exercises, regimes, days, planned exercises,
-/// cycles — is the programme. Each part starts from `dirty = 1`, which the
+/// that workout's line, counted by its sets. Phases have a line of their own.
+/// Everything that is neither a logged session, bodyweight nor a phase —
+/// exercises, regimes, days, planned exercises, cycles — is the programme. Each part starts from `dirty = 1`, which the
 /// partial indexes answer without a scan, so this is cheap to re-run on every
 /// write, the same bet [watchSyncState] makes.
 Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
@@ -243,6 +252,7 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
 
     final others = await db.customSelect(
       'SELECT (SELECT COUNT(*) FROM bodyweight_logs WHERE dirty = 1) AS bw, '
+      '(SELECT COUNT(*) FROM phases WHERE dirty = 1) AS phases, '
       '($programmeSql) AS programme',
     ).getSingle();
 
@@ -265,6 +275,7 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
     ''').getSingleOrNull();
 
     final bodyweight = others.read<int>('bw');
+    final phases = others.read<int>('phases');
     final programme = others.read<int>('programme');
     // A tombstone and everything under it is one removal, not a session.
     final live = [
@@ -284,6 +295,7 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
           ),
         if (removed > 0) WaitingItem.removed(removed),
         if (bodyweight > 0) WaitingItem.bodyweight(bodyweight),
+        if (phases > 0) WaitingItem.phase(phases),
         if (programme > 0) WaitingItem.programme(programme),
       ],
       last: last == null

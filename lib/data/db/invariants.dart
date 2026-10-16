@@ -170,6 +170,24 @@ const _rules = <String, String>{
     GROUP BY day_key HAVING COUNT(*) > 1
   ''',
 
+  // ── One phase per day ─────────────────────────────────────────────────
+  //
+  // Where a phase ends is derived from where the next one starts, so two live
+  // phases on one start day leave that span with two answers: the tint, the
+  // readout and the Phase card each pick whichever the query returned first.
+  'a day starts two phases': '''
+    SELECT CAST(day_key AS TEXT) AS detail FROM phases
+    WHERE deleted_at IS NULL
+    GROUP BY day_key HAVING COUNT(*) > 1
+  ''',
+  // A cleared phase covers its start through its end. An end before the start
+  // is a phase that covers no day at all while still being live, and every
+  // reader of the spans would have to decide what that means.
+  'a phase ends before it starts': '''
+    SELECT id AS detail FROM phases
+    WHERE end_day_key IS NOT NULL AND end_day_key < day_key
+  ''',
+
   // ── A session is logged on one day ────────────────────────────────────
   //
   // `day_key` is what the heatmap groups on and `started_at` is what History

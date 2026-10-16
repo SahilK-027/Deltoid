@@ -2,10 +2,12 @@ import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/db/table_spec.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/units.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -70,6 +72,11 @@ void main() {
     }
     await repo.completeWorkout(id);
     await repo.logBodyweight(DateTime(2026, 7, 20), 72.4);
+    await PhaseRepository(db).startPhase(
+      PhaseKind.cut,
+      from: DateTime(2026, 7, 1),
+      plannedWeeks: 12,
+    );
   }
 
   /// One serialised row per table, as both readers meet them: the export writes
@@ -182,14 +189,14 @@ void main() {
   });
 
   test('only app_settings stays off the server', () async {
-    // SYNC.md § 4: the nine tables carrying `SyncColumns`, and those only.
+    // SYNC.md § 4: the ten tables carrying `SyncColumns`, and those only.
     // `app_settings` holds `device_id`, which is the tie-break — syncing it
     // would break the very thing it exists for.
     expect(
       [for (final spec in tableSpecs(db)) if (!spec.syncs) spec.name],
       ['app_settings'],
     );
-    expect(tableSpecs(db).where((s) => s.syncs).length, 9);
+    expect(tableSpecs(db).where((s) => s.syncs).length, 10);
 
     // And a syncable table is exactly one carrying the sync columns, which is
     // what makes that count a fact about the schema rather than a list somebody
@@ -262,5 +269,11 @@ const _presentInEveryRowEverWritten = <String, Set<String>>{
   'bodyweight_logs': {
     'id', 'updatedAt', 'deviceId', 'dirty', //
     'dayKey', 'weightKg',
+  },
+  // The table arrived whole at schema 7, so every row ever written carries
+  // every column; the nullable ones read as null without a default.
+  'phases': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'kind', 'dayKey',
   },
 };

@@ -93,6 +93,7 @@ class TwoDevices {
       'workout_exercises',
       'set_logs',
       'bodyweight_logs',
+      'phases',
     ];
     return {
       for (final table in tables)

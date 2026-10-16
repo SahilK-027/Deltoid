@@ -7120,6 +7120,642 @@ class BodyweightLogsCompanion extends UpdateCompanion<BodyweightLog> {
   }
 }
 
+class $PhasesTable extends Phases with TableInfo<$PhasesTable, Phase> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PhasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: newId,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    clientDefault: nowMs,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAt = GeneratedColumn<int>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => currentDeviceId,
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<PhaseKind, String> kind =
+      GeneratedColumn<String>(
+        'kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<PhaseKind>($PhasesTable.$converterkind);
+  static const VerificationMeta _dayKeyMeta = const VerificationMeta('dayKey');
+  @override
+  late final GeneratedColumn<int> dayKey = GeneratedColumn<int>(
+    'day_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _plannedWeeksMeta = const VerificationMeta(
+    'plannedWeeks',
+  );
+  @override
+  late final GeneratedColumn<int> plannedWeeks = GeneratedColumn<int>(
+    'planned_weeks',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endDayKeyMeta = const VerificationMeta(
+    'endDayKey',
+  );
+  @override
+  late final GeneratedColumn<int> endDayKey = GeneratedColumn<int>(
+    'end_day_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _keptDayKeyMeta = const VerificationMeta(
+    'keptDayKey',
+  );
+  @override
+  late final GeneratedColumn<int> keptDayKey = GeneratedColumn<int>(
+    'kept_day_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    updatedAt,
+    deletedAt,
+    deviceId,
+    dirty,
+    kind,
+    dayKey,
+    plannedWeeks,
+    endDayKey,
+    keptDayKey,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'phases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Phase> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    if (data.containsKey('day_key')) {
+      context.handle(
+        _dayKeyMeta,
+        dayKey.isAcceptableOrUnknown(data['day_key']!, _dayKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dayKeyMeta);
+    }
+    if (data.containsKey('planned_weeks')) {
+      context.handle(
+        _plannedWeeksMeta,
+        plannedWeeks.isAcceptableOrUnknown(
+          data['planned_weeks']!,
+          _plannedWeeksMeta,
+        ),
+      );
+    }
+    if (data.containsKey('end_day_key')) {
+      context.handle(
+        _endDayKeyMeta,
+        endDayKey.isAcceptableOrUnknown(data['end_day_key']!, _endDayKeyMeta),
+      );
+    }
+    if (data.containsKey('kept_day_key')) {
+      context.handle(
+        _keptDayKeyMeta,
+        keptDayKey.isAcceptableOrUnknown(
+          data['kept_day_key']!,
+          _keptDayKeyMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Phase map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Phase(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
+      kind: $PhasesTable.$converterkind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}kind'],
+        )!,
+      ),
+      dayKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day_key'],
+      )!,
+      plannedWeeks: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}planned_weeks'],
+      ),
+      endDayKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_day_key'],
+      ),
+      keptDayKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}kept_day_key'],
+      ),
+    );
+  }
+
+  @override
+  $PhasesTable createAlias(String alias) {
+    return $PhasesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<PhaseKind, String, String> $converterkind =
+      const EnumNameConverter<PhaseKind>(PhaseKind.values);
+}
+
+class Phase extends DataClass implements Insertable<Phase> {
+  final String id;
+  final int updatedAt;
+  final int? deletedAt;
+  final String deviceId;
+  final bool dirty;
+  final PhaseKind kind;
+
+  /// The day the phase starts, as `yyyyMMdd`.
+  final int dayKey;
+
+  /// 8, 12 or 16, or null for a phase with no planned end.
+  ///
+  /// A plan rather than an end: nothing stops at the planned length. It is
+  /// read only to decide when the Phase card asks what comes next, and
+  /// `Keep going` answers that question by setting it back to null.
+  final int? plannedWeeks;
+
+  /// The last day the phase covers, set by `Clear phase`; null while it runs.
+  ///
+  /// Only ever the end of a cleared phase. A phase followed by another one
+  /// keeps null here, because its end is the next one's start and writing it
+  /// would be a second copy of that fact for two phones to disagree about.
+  final int? endDayKey;
+
+  /// The day `Keep going` last answered the weigh-in prompt, or null.
+  ///
+  /// The prompt is not asked again until three more weeks of weigh-ins have
+  /// run against the phase after this day. On the row rather than in
+  /// `app_settings`, because a question answered on one phone is answered,
+  /// and the other phone must not ask it again.
+  final int? keptDayKey;
+  const Phase({
+    required this.id,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.deviceId,
+    required this.dirty,
+    required this.kind,
+    required this.dayKey,
+    this.plannedWeeks,
+    this.endDayKey,
+    this.keptDayKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(deletedAt);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    map['dirty'] = Variable<bool>(dirty);
+    {
+      map['kind'] = Variable<String>($PhasesTable.$converterkind.toSql(kind));
+    }
+    map['day_key'] = Variable<int>(dayKey);
+    if (!nullToAbsent || plannedWeeks != null) {
+      map['planned_weeks'] = Variable<int>(plannedWeeks);
+    }
+    if (!nullToAbsent || endDayKey != null) {
+      map['end_day_key'] = Variable<int>(endDayKey);
+    }
+    if (!nullToAbsent || keptDayKey != null) {
+      map['kept_day_key'] = Variable<int>(keptDayKey);
+    }
+    return map;
+  }
+
+  PhasesCompanion toCompanion(bool nullToAbsent) {
+    return PhasesCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      deviceId: Value(deviceId),
+      dirty: Value(dirty),
+      kind: Value(kind),
+      dayKey: Value(dayKey),
+      plannedWeeks: plannedWeeks == null && nullToAbsent
+          ? const Value.absent()
+          : Value(plannedWeeks),
+      endDayKey: endDayKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDayKey),
+      keptDayKey: keptDayKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(keptDayKey),
+    );
+  }
+
+  factory Phase.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Phase(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      deletedAt: serializer.fromJson<int?>(json['deletedAt']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
+      kind: $PhasesTable.$converterkind.fromJson(
+        serializer.fromJson<String>(json['kind']),
+      ),
+      dayKey: serializer.fromJson<int>(json['dayKey']),
+      plannedWeeks: serializer.fromJson<int?>(json['plannedWeeks']),
+      endDayKey: serializer.fromJson<int?>(json['endDayKey']),
+      keptDayKey: serializer.fromJson<int?>(json['keptDayKey']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'deletedAt': serializer.toJson<int?>(deletedAt),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'dirty': serializer.toJson<bool>(dirty),
+      'kind': serializer.toJson<String>(
+        $PhasesTable.$converterkind.toJson(kind),
+      ),
+      'dayKey': serializer.toJson<int>(dayKey),
+      'plannedWeeks': serializer.toJson<int?>(plannedWeeks),
+      'endDayKey': serializer.toJson<int?>(endDayKey),
+      'keptDayKey': serializer.toJson<int?>(keptDayKey),
+    };
+  }
+
+  Phase copyWith({
+    String? id,
+    int? updatedAt,
+    Value<int?> deletedAt = const Value.absent(),
+    String? deviceId,
+    bool? dirty,
+    PhaseKind? kind,
+    int? dayKey,
+    Value<int?> plannedWeeks = const Value.absent(),
+    Value<int?> endDayKey = const Value.absent(),
+    Value<int?> keptDayKey = const Value.absent(),
+  }) => Phase(
+    id: id ?? this.id,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    deviceId: deviceId ?? this.deviceId,
+    dirty: dirty ?? this.dirty,
+    kind: kind ?? this.kind,
+    dayKey: dayKey ?? this.dayKey,
+    plannedWeeks: plannedWeeks.present ? plannedWeeks.value : this.plannedWeeks,
+    endDayKey: endDayKey.present ? endDayKey.value : this.endDayKey,
+    keptDayKey: keptDayKey.present ? keptDayKey.value : this.keptDayKey,
+  );
+  Phase copyWithCompanion(PhasesCompanion data) {
+    return Phase(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      dayKey: data.dayKey.present ? data.dayKey.value : this.dayKey,
+      plannedWeeks: data.plannedWeeks.present
+          ? data.plannedWeeks.value
+          : this.plannedWeeks,
+      endDayKey: data.endDayKey.present ? data.endDayKey.value : this.endDayKey,
+      keptDayKey: data.keptDayKey.present
+          ? data.keptDayKey.value
+          : this.keptDayKey,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Phase(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('dirty: $dirty, ')
+          ..write('kind: $kind, ')
+          ..write('dayKey: $dayKey, ')
+          ..write('plannedWeeks: $plannedWeeks, ')
+          ..write('endDayKey: $endDayKey, ')
+          ..write('keptDayKey: $keptDayKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    updatedAt,
+    deletedAt,
+    deviceId,
+    dirty,
+    kind,
+    dayKey,
+    plannedWeeks,
+    endDayKey,
+    keptDayKey,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Phase &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.deviceId == this.deviceId &&
+          other.dirty == this.dirty &&
+          other.kind == this.kind &&
+          other.dayKey == this.dayKey &&
+          other.plannedWeeks == this.plannedWeeks &&
+          other.endDayKey == this.endDayKey &&
+          other.keptDayKey == this.keptDayKey);
+}
+
+class PhasesCompanion extends UpdateCompanion<Phase> {
+  final Value<String> id;
+  final Value<int> updatedAt;
+  final Value<int?> deletedAt;
+  final Value<String> deviceId;
+  final Value<bool> dirty;
+  final Value<PhaseKind> kind;
+  final Value<int> dayKey;
+  final Value<int?> plannedWeeks;
+  final Value<int?> endDayKey;
+  final Value<int?> keptDayKey;
+  final Value<int> rowid;
+  const PhasesCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.dayKey = const Value.absent(),
+    this.plannedWeeks = const Value.absent(),
+    this.endDayKey = const Value.absent(),
+    this.keptDayKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhasesCompanion.insert({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.dirty = const Value.absent(),
+    required PhaseKind kind,
+    required int dayKey,
+    this.plannedWeeks = const Value.absent(),
+    this.endDayKey = const Value.absent(),
+    this.keptDayKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       dayKey = Value(dayKey);
+  static Insertable<Phase> custom({
+    Expression<String>? id,
+    Expression<int>? updatedAt,
+    Expression<int>? deletedAt,
+    Expression<String>? deviceId,
+    Expression<bool>? dirty,
+    Expression<String>? kind,
+    Expression<int>? dayKey,
+    Expression<int>? plannedWeeks,
+    Expression<int>? endDayKey,
+    Expression<int>? keptDayKey,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (dirty != null) 'dirty': dirty,
+      if (kind != null) 'kind': kind,
+      if (dayKey != null) 'day_key': dayKey,
+      if (plannedWeeks != null) 'planned_weeks': plannedWeeks,
+      if (endDayKey != null) 'end_day_key': endDayKey,
+      if (keptDayKey != null) 'kept_day_key': keptDayKey,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhasesCompanion copyWith({
+    Value<String>? id,
+    Value<int>? updatedAt,
+    Value<int?>? deletedAt,
+    Value<String>? deviceId,
+    Value<bool>? dirty,
+    Value<PhaseKind>? kind,
+    Value<int>? dayKey,
+    Value<int?>? plannedWeeks,
+    Value<int?>? endDayKey,
+    Value<int?>? keptDayKey,
+    Value<int>? rowid,
+  }) {
+    return PhasesCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deviceId: deviceId ?? this.deviceId,
+      dirty: dirty ?? this.dirty,
+      kind: kind ?? this.kind,
+      dayKey: dayKey ?? this.dayKey,
+      plannedWeeks: plannedWeeks ?? this.plannedWeeks,
+      endDayKey: endDayKey ?? this.endDayKey,
+      keptDayKey: keptDayKey ?? this.keptDayKey,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(deletedAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(
+        $PhasesTable.$converterkind.toSql(kind.value),
+      );
+    }
+    if (dayKey.present) {
+      map['day_key'] = Variable<int>(dayKey.value);
+    }
+    if (plannedWeeks.present) {
+      map['planned_weeks'] = Variable<int>(plannedWeeks.value);
+    }
+    if (endDayKey.present) {
+      map['end_day_key'] = Variable<int>(endDayKey.value);
+    }
+    if (keptDayKey.present) {
+      map['kept_day_key'] = Variable<int>(keptDayKey.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhasesCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('dirty: $dirty, ')
+          ..write('kind: $kind, ')
+          ..write('dayKey: $dayKey, ')
+          ..write('plannedWeeks: $plannedWeeks, ')
+          ..write('endDayKey: $endDayKey, ')
+          ..write('keptDayKey: $keptDayKey, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AppSettingsTable extends AppSettings
     with TableInfo<$AppSettingsTable, AppSetting> {
   @override
@@ -7344,6 +7980,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SetLogsTable setLogs = $SetLogsTable(this);
   late final $BodyweightLogsTable bodyweightLogs = $BodyweightLogsTable(this);
+  late final $PhasesTable phases = $PhasesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final Index idxExercisesDirty = Index(
     'idx_exercises_dirty',
@@ -7473,6 +8110,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_bodyweight_logs_dirty',
     'CREATE INDEX idx_bodyweight_logs_dirty ON bodyweight_logs (dirty) WHERE dirty = 1',
   );
+  late final Index idxPhasesStartLive = Index(
+    'idx_phases_start_live',
+    'CREATE UNIQUE INDEX idx_phases_start_live ON phases (day_key) WHERE deleted_at IS NULL',
+  );
+  late final Index idxPhasesDirty = Index(
+    'idx_phases_dirty',
+    'CREATE INDEX idx_phases_dirty ON phases (dirty) WHERE dirty = 1',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7487,6 +8132,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     workoutExercises,
     setLogs,
     bodyweightLogs,
+    phases,
     appSettings,
     idxExercisesDirty,
     idxRegimesSingleActive,
@@ -7520,6 +8166,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxBodyweightDay,
     idxBodyweightDayLive,
     idxBodyweightLogsDirty,
+    idxPhasesStartLive,
+    idxPhasesDirty,
   ];
 }
 
@@ -12911,6 +13559,300 @@ typedef $$BodyweightLogsTableProcessedTableManager =
       BodyweightLog,
       PrefetchHooks Function()
     >;
+typedef $$PhasesTableCreateCompanionBuilder =
+    PhasesCompanion Function({
+      Value<String> id,
+      Value<int> updatedAt,
+      Value<int?> deletedAt,
+      Value<String> deviceId,
+      Value<bool> dirty,
+      required PhaseKind kind,
+      required int dayKey,
+      Value<int?> plannedWeeks,
+      Value<int?> endDayKey,
+      Value<int?> keptDayKey,
+      Value<int> rowid,
+    });
+typedef $$PhasesTableUpdateCompanionBuilder =
+    PhasesCompanion Function({
+      Value<String> id,
+      Value<int> updatedAt,
+      Value<int?> deletedAt,
+      Value<String> deviceId,
+      Value<bool> dirty,
+      Value<PhaseKind> kind,
+      Value<int> dayKey,
+      Value<int?> plannedWeeks,
+      Value<int?> endDayKey,
+      Value<int?> keptDayKey,
+      Value<int> rowid,
+    });
+
+class $$PhasesTableFilterComposer
+    extends Composer<_$AppDatabase, $PhasesTable> {
+  $$PhasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<PhaseKind, PhaseKind, String> get kind =>
+      $composableBuilder(
+        column: $table.kind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<int> get dayKey => $composableBuilder(
+    column: $table.dayKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get plannedWeeks => $composableBuilder(
+    column: $table.plannedWeeks,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endDayKey => $composableBuilder(
+    column: $table.endDayKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get keptDayKey => $composableBuilder(
+    column: $table.keptDayKey,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PhasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PhasesTable> {
+  $$PhasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dayKey => $composableBuilder(
+    column: $table.dayKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get plannedWeeks => $composableBuilder(
+    column: $table.plannedWeeks,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endDayKey => $composableBuilder(
+    column: $table.endDayKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get keptDayKey => $composableBuilder(
+    column: $table.keptDayKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PhasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PhasesTable> {
+  $$PhasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<PhaseKind, String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get dayKey =>
+      $composableBuilder(column: $table.dayKey, builder: (column) => column);
+
+  GeneratedColumn<int> get plannedWeeks => $composableBuilder(
+    column: $table.plannedWeeks,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get endDayKey =>
+      $composableBuilder(column: $table.endDayKey, builder: (column) => column);
+
+  GeneratedColumn<int> get keptDayKey => $composableBuilder(
+    column: $table.keptDayKey,
+    builder: (column) => column,
+  );
+}
+
+class $$PhasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PhasesTable,
+          Phase,
+          $$PhasesTableFilterComposer,
+          $$PhasesTableOrderingComposer,
+          $$PhasesTableAnnotationComposer,
+          $$PhasesTableCreateCompanionBuilder,
+          $$PhasesTableUpdateCompanionBuilder,
+          (Phase, BaseReferences<_$AppDatabase, $PhasesTable, Phase>),
+          Phase,
+          PrefetchHooks Function()
+        > {
+  $$PhasesTableTableManager(_$AppDatabase db, $PhasesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PhasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PhasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PhasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<PhaseKind> kind = const Value.absent(),
+                Value<int> dayKey = const Value.absent(),
+                Value<int?> plannedWeeks = const Value.absent(),
+                Value<int?> endDayKey = const Value.absent(),
+                Value<int?> keptDayKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhasesCompanion(
+                id: id,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                deviceId: deviceId,
+                dirty: dirty,
+                kind: kind,
+                dayKey: dayKey,
+                plannedWeeks: plannedWeeks,
+                endDayKey: endDayKey,
+                keptDayKey: keptDayKey,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                required PhaseKind kind,
+                required int dayKey,
+                Value<int?> plannedWeeks = const Value.absent(),
+                Value<int?> endDayKey = const Value.absent(),
+                Value<int?> keptDayKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhasesCompanion.insert(
+                id: id,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                deviceId: deviceId,
+                dirty: dirty,
+                kind: kind,
+                dayKey: dayKey,
+                plannedWeeks: plannedWeeks,
+                endDayKey: endDayKey,
+                keptDayKey: keptDayKey,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PhasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PhasesTable,
+      Phase,
+      $$PhasesTableFilterComposer,
+      $$PhasesTableOrderingComposer,
+      $$PhasesTableAnnotationComposer,
+      $$PhasesTableCreateCompanionBuilder,
+      $$PhasesTableUpdateCompanionBuilder,
+      (Phase, BaseReferences<_$AppDatabase, $PhasesTable, Phase>),
+      Phase,
+      PrefetchHooks Function()
+    >;
 typedef $$AppSettingsTableCreateCompanionBuilder =
     AppSettingsCompanion Function({
       required String key,
@@ -13072,6 +14014,8 @@ class $AppDatabaseManager {
       $$SetLogsTableTableManager(_db, _db.setLogs);
   $$BodyweightLogsTableTableManager get bodyweightLogs =>
       $$BodyweightLogsTableTableManager(_db, _db.bodyweightLogs);
+  $$PhasesTableTableManager get phases =>
+      $$PhasesTableTableManager(_db, _db.phases);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
 }

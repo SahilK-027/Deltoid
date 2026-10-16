@@ -209,6 +209,7 @@ lib/
     session_diff.dart         Today's improvisation compared with the template
     sync_merge.dart           resolveRow — which of two row versions wins
     catalog_merge.dart        Folding two seeded catalogs into one
+    phases.dart               Which phase a day or a cycle ran in, and the two prompts
     slots.dart · plates.dart · units.dart · set_format.dart · enums.dart
 
   data/
@@ -219,6 +220,7 @@ lib/
     repositories/           training_repository: logging, cycles, history,
                                                  progress, volume
                             regime_repository:   programmes, sessions, catalog
+                            phase_repository:    bulk, cut and maintenance
     seed/                   Starter exercise catalog and optional templates
     backup/                 Whole-database JSON export and restore, Downloads writer
     sync/                   sync_backend.dart (the transport interface),
@@ -327,7 +329,7 @@ same importer, and installs the finished database directly.
 
 ### Schema changes
 
-`schemaVersion` is currently **6**, and the migration ladder is live. A schema
+`schemaVersion` is currently **7**, and the migration ladder is live. A schema
 change consists of four steps: edit `tables.dart`, regenerate with
 `build_runner`, add a default in `data/db/table_spec.dart`, and add an
 idempotent step to `upgradeSchema`. Read

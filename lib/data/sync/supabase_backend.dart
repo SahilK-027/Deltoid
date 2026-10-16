@@ -47,7 +47,7 @@ class SupabaseBackend implements SyncBackend {
 
   late final SyncAuth auth = _GoogleSupabaseAuth(client, _config);
 
-  /// Upserts on the primary key, which is `id` on all nine tables.
+  /// Upserts on the primary key, which is `id` on all ten tables.
   ///
   /// `user_id` is never in [rows]: the column defaults to `auth.uid()` and RLS
   /// checks it with `with check`, so the one value a client must not be trusted

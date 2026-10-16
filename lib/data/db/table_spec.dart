@@ -162,6 +162,16 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
         parse: BodyweightLog.fromJson,
         syncs: true,
       ),
+      // Points at nothing, so it may sit anywhere in the walk; last because it
+      // is the newest. Every column has existed since the table did, at schema
+      // 7, so a file without phases simply has no rows for it and needs no
+      // default.
+      TableSpec(
+        name: 'phases',
+        table: db.phases,
+        parse: Phase.fromJson,
+        syncs: true,
+      ),
     ];
 
 /// The zone offset a workout written before `tz_offset_minutes` existed implies.

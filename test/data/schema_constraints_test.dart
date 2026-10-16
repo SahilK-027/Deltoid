@@ -485,6 +485,45 @@ void main() {
       );
     });
 
+    test('every phase kind is accepted, and a fourth is refused', () async {
+      // Its own test because a phase hangs off nothing: no regime or workout
+      // is needed to write one.
+      for (var i = 0; i < PhaseKind.values.length; i++) {
+        await db.into(db.phases).insert(PhasesCompanion.insert(
+              kind: PhaseKind.values[i],
+              dayKey: 20260901 + i,
+            ));
+      }
+      await expectLater(
+        db.customStatement("UPDATE phases SET kind = 'recomp'"),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('a phase length or day the sheet cannot offer is refused', () async {
+      await db.into(db.phases).insert(
+            PhasesCompanion.insert(kind: PhaseKind.cut, dayKey: 20260910),
+          );
+      for (final length in phasePlannedWeeks) {
+        await db.customStatement('UPDATE phases SET planned_weeks = $length');
+      }
+      for (final bad in [
+        'planned_weeks = 10',
+        'planned_weeks = 0',
+        'end_day_key = 20260909',
+        'day_key = 0',
+        'kept_day_key = 0',
+      ]) {
+        await expectLater(
+          db.customStatement('UPDATE phases SET $bad'),
+          throwsA(isA<SqliteException>()),
+          reason: bad,
+        );
+      }
+      // A phase cleared on the day it began covered that one day.
+      await db.customStatement('UPDATE phases SET end_day_key = 20260910');
+    });
+
     test('every member of every enum is accepted', () async {
       // The checks are written out by hand, so this is what catches a member
       // added to the enum and not to the column.

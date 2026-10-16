@@ -8,10 +8,11 @@
 --
 --   supabase test db
 --
--- Nine tables, and `set_logs` is the one exercised in full: the policies are
+-- Ten tables, and `set_logs` is the one exercised in full: the policies are
 -- generated identically, so the interesting question is whether the *shape* is
 -- right, not whether the ninth copy was pasted correctly. The last test holds
--- all nine to having it at all.
+-- all ten to having it at all. `phases` arrived in a migration of its own and
+-- has its own case, in `phases_rls_test.sql`.
 
 begin;
 
@@ -97,7 +98,7 @@ select is(
   'and Alice''s row is exactly as she left it'
 );
 
--- Every one of the nine, not only the one above.
+-- Every one of the ten, not only the one above.
 select results_eq(
   $$select count(*)::int from pg_tables
     where schemaname = 'public' and rowsecurity = false$$,

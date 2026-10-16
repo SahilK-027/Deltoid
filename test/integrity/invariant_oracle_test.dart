@@ -1,9 +1,11 @@
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/db/database.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/seed/seeder.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +143,36 @@ void main() {
 
       await repo.logBodyweight(DateTime(2026, 3, 2), 82);
       await expectInvariants(db, after: 'logBodyweight same day');
+    });
+
+    test('phases started, replaced, edited, answered and cleared', () async {
+      final phases = PhaseRepository(db);
+      final bulk = await phases.startPhase(PhaseKind.bulk,
+          from: DateTime(2026, 3, 1), plannedWeeks: 12);
+      await expectInvariants(db, after: 'startPhase');
+
+      await phases.startPhase(PhaseKind.cut, from: DateTime(2026, 3, 1));
+      await expectInvariants(db, after: 'startPhase on the same day');
+
+      final cut = await phases.startPhase(PhaseKind.cut,
+          from: DateTime(2026, 6, 1), plannedWeeks: 8);
+      await expectInvariants(db, after: 'startPhase another day');
+
+      await phases.editPhase(cut, from: DateTime(2026, 6, 3), plannedWeeks: 16);
+      await expectInvariants(db, after: 'editPhase');
+
+      await phases.keepGoingPastPlan(cut);
+      await phases.keepGoingAgainstWeighIns(cut, on: DateTime(2026, 7, 1));
+      await expectInvariants(db, after: 'keepGoing');
+
+      await phases.clearPhase(cut, on: DateTime(2026, 6, 3));
+      await expectInvariants(db, after: 'clearPhase on its start day');
+
+      expect(
+        (await phases.phases()).map((p) => p.id),
+        isNot(contains(bulk)),
+        reason: 'the phase replaced on its own day is a tombstone',
+      );
     });
 
     test('a cycle advanced by training through a whole rotation', () async {
@@ -441,6 +473,35 @@ void main() {
       expect(await broken(), contains('a day carries two bodyweights'));
     });
 
+    test('a day starts two phases', () async {
+      await PhaseRepository(db)
+          .startPhase(PhaseKind.bulk, from: DateTime(2026, 3, 1));
+      await db.customStatement('DROP INDEX idx_phases_start_live');
+      await db.into(db.phases).insert(
+            PhasesCompanion.insert(
+              id: Value(newId()),
+              kind: PhaseKind.cut,
+              dayKey: dayKeyOf(DateTime(2026, 3, 1)),
+            ),
+          );
+
+      expect(await broken(), contains('a day starts two phases'));
+    });
+
+    test('a phase ends before it starts', () async {
+      final id = await PhaseRepository(db)
+          .startPhase(PhaseKind.cut, from: DateTime(2026, 3, 10));
+      // A CHECK, stood down for one statement — see the workout below.
+      await db.customStatement('PRAGMA ignore_check_constraints = ON');
+      await db.customStatement(
+        'UPDATE phases SET end_day_key = 20260309 WHERE id = ?',
+        [id],
+      );
+      await db.customStatement('PRAGMA ignore_check_constraints = OFF');
+
+      expect(await broken(), contains('a phase ends before it starts'));
+    });
+
     // ── A session is logged on one day ──────────────────────────────────
 
     test('a workout claims two different days', () async {
@@ -559,6 +620,8 @@ void main() {
         'two live regimes wear one identity',
         'two live cycles share an index',
         'a day carries two bodyweights',
+        'a day starts two phases',
+        'a phase ends before it starts',
         'a workout claims two different days',
       };
       expect(invariantRuleNames.toSet(), perturbed,

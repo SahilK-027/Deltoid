@@ -209,6 +209,26 @@ extension SkipReasonX on SkipReason {
       };
 }
 
+/// What the person is eating for over a stretch of days.
+///
+/// Declared, never inferred: the app does not guess a bulk from a rising line
+/// ([RULES § 6](RULES.md#6-scope)). Its only reader is the reading of a chart
+/// — the same eight weeks of flat strength are a stall in a bulk and a success
+/// in a cut — so it carries no target, no calories and no rate to meet.
+///
+/// Stored by name in `phases.kind`, which carries a hand-written CHECK, so a
+/// member added here and not there fails `schema_constraints_test` rather than
+/// a restore.
+enum PhaseKind { bulk, cut, maintenance }
+
+/// The planned lengths the phase sheet offers, in weeks.
+///
+/// Held as data rather than as a free number because `phases.planned_weeks`
+/// carries a CHECK naming exactly these, and a length the sheet cannot offer
+/// is a row only a restore or a merge could have written. Null, open-ended,
+/// is the fourth answer and is not a member.
+const phasePlannedWeeks = [8, 12, 16];
+
 /// How many identity hues exist, and therefore how many regimes can be live at
 /// once.
 ///

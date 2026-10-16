@@ -112,6 +112,10 @@ class AdoptionService {
   /// A catalog is not a history: a phone that has been opened once and never
   /// used has 120 exercises on it and nothing to lose, and asking that user
   /// which history to keep would be asking them about nothing.
+  ///
+  /// `phases` is deliberately absent ([SYNC.md § 10](SYNC.md#10-adoption)).
+  /// A phone on which a cut was declared and nothing was logged has no history
+  /// to lose, and its phases are pushed with everything else.
   static const _historyTables = ['workouts', 'regimes', 'bodyweight_logs'];
 
   /// The table the prompt counts. Sessions, in the user's language.
@@ -228,9 +232,9 @@ class AdoptionService {
 
   /// How many rows the account holds in total, for a bar with a denominator.
   ///
-  /// Nine counts, and they are worth it exactly once: this runs only where a
-  /// human is watching a first pull land. Every background drain passes no
-  /// progress and so never asks.
+  /// One count per table, and they are worth it exactly once: this runs only
+  /// where a human is watching a first pull land. Every background drain
+  /// passes no progress and so never asks.
   Future<int> _accountRows() async {
     var total = 0;
     for (final spec in tableSpecs(_db).where((s) => s.syncs)) {

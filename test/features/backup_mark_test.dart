@@ -113,6 +113,24 @@ void main() {
     expect(find.text('Try again now'), findsOneWidget);
   });
 
+  testWidgets('a phase waiting is its own line, counted in changes',
+      (tester) async {
+    await pump(
+      tester,
+      state: pending,
+      online: false,
+      owed: const OwedSummary(
+        waiting: [WaitingItem.bodyweight(1), WaitingItem.phase(2)],
+        last: null,
+      ),
+    );
+    await tester.tap(find.byIcon(Icons.cloud_off_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Phase'), findsOneWidget);
+    expect(find.text('2 changes'), findsOneWidget);
+  });
+
   testWidgets('backed up: the title is the state, and the time is a sentence '
       'under it', (tester) async {
     final at = DateTime.now().subtract(const Duration(minutes: 5));

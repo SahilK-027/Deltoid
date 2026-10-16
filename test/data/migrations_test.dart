@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/db/migrations.dart';
+import 'package:deltoid/domain/enums.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,12 +97,15 @@ void main() {
 
     final file = aFile();
     final old = AppDatabase.forTesting(NativeDatabase(file));
-    // A v1 database is today's minus everything the ladder adds.
+    // A v1 database is today's minus everything the ladder adds. The `phases`
+    // table goes with its indexes, which is also what proves the first rung
+    // does not reach for `idx_phases_dirty` before the table exists.
     for (final name in (await indexesOf(old)).keys) {
       if (name.endsWith('_dirty')) {
         await old.customStatement('DROP INDEX $name');
       }
     }
+    await old.customStatement('DROP TABLE phases');
     await old.customStatement('PRAGMA user_version = 1');
     await old.close();
 
@@ -109,6 +113,50 @@ void main() {
     addTearDown(upgraded.close);
 
     expect(await indexesOf(upgraded), await indexesOf(fresh));
+    expect(await tablesOf(upgraded), await tablesOf(fresh));
+  });
+
+  test('a phone on schema 6 gains phases and keeps everything it had',
+      () async {
+    final fresh = AppDatabase.forTesting(NativeDatabase(aFile()));
+    addTearDown(fresh.close);
+
+    final file = aFile();
+    final old = AppDatabase.forTesting(NativeDatabase(file));
+    await old.into(old.bodyweightLogs).insert(
+          BodyweightLogsCompanion.insert(dayKey: 20261001, weightKg: 72.5),
+        );
+    // Schema 6 is today's without the `phases` table; dropping the table
+    // takes its two indexes with it.
+    await old.customStatement('DROP TABLE phases');
+    await old.customStatement('PRAGMA user_version = 6');
+    await old.close();
+
+    final upgraded = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(upgraded.close);
+
+    Future<String?> createOf(AppDatabase db) async => (await db
+            .customSelect(
+              "SELECT sql FROM sqlite_master WHERE name = 'phases'",
+            )
+            .getSingle())
+        .read<String?>('sql');
+
+    expect(await createOf(upgraded), await createOf(fresh),
+        reason: 'the table the ladder creates is the one a fresh install has');
+    expect(await indexesOf(upgraded), await indexesOf(fresh));
+
+    final kept = await upgraded.select(upgraded.bodyweightLogs).getSingle();
+    expect(kept.weightKg, 72.5, reason: 'the upgrade lost a row');
+
+    // And the new table takes a row, which is the launch that follows.
+    await upgraded.into(upgraded.phases).insert(
+          PhasesCompanion.insert(kind: PhaseKind.cut, dayKey: 20261001),
+        );
+    expect(await upgraded.select(upgraded.phases).get(), hasLength(1));
+
+    final stamp = await upgraded.customSelect('PRAGMA user_version').getSingle();
+    expect(stamp.data.values.first, 7);
   });
 
   test('what is owed is counted through an index rather than a scan', () async {
@@ -133,8 +181,8 @@ void main() {
 
     final indexes = await indexesOf(db);
     final dirty = indexes.keys.where((n) => n.endsWith('_dirty')).toList();
-    expect(dirty, hasLength(9),
-        reason: 'nine syncable tables, nine partial indexes — SYNC.md § 17');
+    expect(dirty, hasLength(10),
+        reason: 'ten syncable tables, ten partial indexes — SYNC.md § 17');
 
     for (final name in dirty) {
       // Partial, so the index is *empty* whenever nothing is owed. An unpartial

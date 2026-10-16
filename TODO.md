@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,285 tests and nine pgTAP tests, analyzer clean.**
+**1,352 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -84,6 +84,11 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Consistency and Weigh-ins share one year-map design.
 - [x] Progress holds Cycle progress and Weekly volume, moved from Home unchanged.
 - [x] More: a profile header while signed in, an `Account` row with the email beneath it, and the new About text. Bodyweight is no longer a section of it.
+
+### Phases
+
+- [x] The data: a syncable `phases` table, kind, start day, planned length, end day and the day a prompt was answered. Schema 6 → 7, server rung and its RLS case included; pushed, pulled, backed up and restored, two invariants, and the two-device fuzz starts, edits and clears phases. The RLS case has not yet run against a real Postgres.
+- [x] What is read off it, in `domain/phases.dart`: the phase on a day, the phase most of a cycle ran in, the change and weekly rate during a phase, and the two staleness checks.
 
 ### Sync
 

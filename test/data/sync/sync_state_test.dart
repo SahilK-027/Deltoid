@@ -49,14 +49,24 @@ void main() {
       "day_key, weight_kg) VALUES ('bw', 0, 'd', 1, 20260924, 82.4)",
     );
 
+    await db.customStatement(
+      "INSERT INTO phases (id, updated_at, device_id, dirty, kind, day_key) "
+      "VALUES ('ph', 0, 'd', 1, 'cut', 20260903)",
+    );
+
     final summary = await watchOwedSummary(db).first;
     final session = summary.waiting.first;
     expect(session.kind, WaitingKind.session);
     expect(session.sessionName, 'Push 1');
     expect(session.count, 2, reason: 'a session is counted by its sets');
     expect(session.inProgress, isTrue);
-    expect(summary.waiting.last.kind, WaitingKind.bodyweight);
-    expect(summary.count, 3);
+    expect(
+      [for (final item in summary.waiting.skip(1)) item.kind],
+      [WaitingKind.bodyweight, WaitingKind.phase],
+      reason: 'a phase is neither training nor the programme',
+    );
+    expect(summary.count, 4,
+        reason: 'the badge counts every row the pending state counts');
     expect(summary.last, isNull, reason: 'nothing finished has been sent');
   });
 

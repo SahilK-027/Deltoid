@@ -6,6 +6,7 @@ import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/data/backup/backup_service.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/db/invariants.dart';
+import 'package:deltoid/data/repositories/phase_repository.dart';
 import 'package:deltoid/data/repositories/regime_repository.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
@@ -70,6 +71,18 @@ void main() {
     }
     await repo.completeWorkout(id);
     await repo.logBodyweight(DateTime(2026, 7, 20), 72.4);
+
+    // Two phases and a tombstone: a bulk mis-tapped as a cut and corrected on
+    // its own day, then a cut that has been answered and cleared, so every
+    // column of the table carries a value.
+    final phases = PhaseRepository(db);
+    await phases.startPhase(PhaseKind.cut, from: DateTime(2026, 6, 1));
+    await phases.startPhase(PhaseKind.bulk,
+        from: DateTime(2026, 6, 1), plannedWeeks: 8);
+    final cut = await phases.startPhase(PhaseKind.cut,
+        from: DateTime(2026, 7, 1), plannedWeeks: 12);
+    await phases.keepGoingAgainstWeighIns(cut, on: DateTime(2026, 7, 15));
+    await phases.clearPhase(cut, on: DateTime(2026, 7, 20));
   }
 
   test('export captures every table', () async {
@@ -93,6 +106,9 @@ void main() {
         .get();
     expect(liveSets, hasLength(3));
     expect(counts['bodyweight_logs'], 1);
+    // The phase replaced on its own day is a tombstone, and a backup that
+    // dropped it would let the replaced phase come back on the next pull.
+    expect(counts['phases'], 3);
   });
 
   test('restoring into an empty database reproduces it exactly', () async {
@@ -156,6 +172,28 @@ void main() {
 
     final bodyweight = await db.select(db.bodyweightLogs).getSingle();
     expect(bodyweight.weightKg, 72.4);
+
+    final phases = await PhaseRepository(db).phases();
+    expect([for (final p in phases) p.kind], [PhaseKind.bulk, PhaseKind.cut]);
+    expect(phases.first.plannedWeeks, 8);
+    expect(phases.last.plannedWeeks, 12);
+    expect(phases.last.keptKey, 20260715);
+    expect(phases.last.endKey, 20260720);
+  });
+
+  test('a file written before phases existed restores with none', () async {
+    await logASession();
+    final payload = await backup.buildPayload();
+
+    // A schema 6 export: no phases in the counts or the data at all.
+    payload['schemaVersion'] = 6;
+    (payload['counts'] as Map).remove('phases');
+    (payload['data'] as Map).remove('phases');
+
+    await backup.restore(jsonEncode(payload));
+
+    expect(await db.select(db.phases).get(), isEmpty);
+    expect((await db.select(db.workouts).get()), hasLength(1));
   });
 
   test('a file written before a column existed still restores', () async {

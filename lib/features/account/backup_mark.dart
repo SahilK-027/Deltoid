@@ -181,6 +181,7 @@ class _BackupSheet extends ConsumerWidget {
                 WaitingKind.session => Icons.fitness_center_rounded,
                 WaitingKind.removed => Icons.delete_outline_rounded,
                 WaitingKind.bodyweight => Icons.monitor_weight_outlined,
+                WaitingKind.phase => Icons.trending_flat_rounded,
                 WaitingKind.programme => Icons.view_list_rounded,
               },
               title: _title(item),
@@ -238,6 +239,7 @@ String _title(WaitingItem item) => switch (item.kind) {
   WaitingKind.session => _sessionTitle(item.sessionName, item.dayKey!),
   WaitingKind.removed => 'Discarded and deleted sessions',
   WaitingKind.bodyweight => 'Bodyweight',
+  WaitingKind.phase => 'Phase',
   WaitingKind.programme => 'Programme and exercises',
 };
 
@@ -250,6 +252,7 @@ String _subtitle(WaitingItem item) {
     ].join(', '),
     WaitingKind.removed => n == 1 ? '1 session' : '$n sessions',
     WaitingKind.bodyweight => n == 1 ? '1 entry' : '$n entries',
+    WaitingKind.phase => n == 1 ? '1 change' : '$n changes',
     WaitingKind.programme => n == 1 ? '1 change' : '$n changes',
   };
 }
