@@ -53,6 +53,11 @@ void main() {
         expect(reserved, isNot(contains(c.warmup)));
         expect(reserved, isNot(contains(c.dropSet)));
       });
+
+      test('a weigh-in never borrows a reserved colour', () {
+        expect(reserved, isNot(contains(c.weighIn)));
+        expect(c.weighIn, DeltoidColors.lavender);
+      });
     });
   }
 }

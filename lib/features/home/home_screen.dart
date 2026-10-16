@@ -14,7 +14,7 @@ import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/cycle_progress.dart';
-import '../../domain/consistency.dart';
+import '../../domain/habits.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/muscle_volume.dart';
 import '../history/workout_detail_screen.dart';
@@ -28,8 +28,9 @@ import 'regime_progress_screen.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'home_providers.dart';
+import 'weigh_ins_screen.dart';
 import 'volume_history_screen.dart';
-import 'widgets/heatmap.dart';
+import 'widgets/habit_tile.dart';
 import 'widgets/strength_card.dart';
 import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
@@ -456,6 +457,9 @@ class HomeScreen extends ConsumerWidget {
     // dropped in afterwards — the staged reveal the rest of this screen exists
     // to avoid. Started here, both are in flight in the same frame.
     final volume = ref.watch(weeklyVolumeProvider).valueOrNull;
+    // The Weigh-ins tile, waited for with the rest so the Habits row arrives
+    // with the page rather than half of it a frame later.
+    final weighIns = ref.watch(weighInDaysProvider).valueOrNull;
     final regime = today?.regime;
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;
@@ -477,9 +481,11 @@ class HomeScreen extends ConsumerWidget {
         // costs a frame or two, and a section that appears after the page did
         // costs the user's attention every time they land here.
         (null, _, _, _) || (_, null, _, _) => const SizedBox.shrink(),
+        _ when weighIns == null => const SizedBox.shrink(),
         (_, _, null, _) => _NoRegimeState(
           last: today!.lastCompleted,
           heatmap: today.heatmap,
+          weighIns: weighIns,
           hasHistory: today.hasHistory,
           volume: volume!,
         ),
@@ -487,6 +493,7 @@ class HomeScreen extends ConsumerWidget {
           regime: r,
           last: today!.lastCompleted,
           heatmap: today.heatmap,
+          weighIns: weighIns,
           hasHistory: today.hasHistory,
           volume: volume!,
         ),
@@ -562,9 +569,16 @@ class HomeScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _ConsistencyCard(
-                          data: today.heatmap,
-                          hasHistory: today.hasHistory,
+                        _HabitsSection(
+                          heatmap: today.heatmap,
+                          weighIns: weighIns,
+                          play: _PlayAction(
+                            regimeId: r.id,
+                            open: open,
+                            status: status,
+                            sessions: sessions,
+                            preview: today.snapshot.exerciseNamesBySession,
+                          ),
                         ),
                         const SizedBox(height: Space.section),
                         _PastSessionsCard(
@@ -576,9 +590,10 @@ class HomeScreen extends ConsumerWidget {
                             hasOpenWorkout: open != null,
                           ),
                         ),
-                        // Under the grid, because they answer the same
-                        // question one level down: the heatmap says whether you
-                        // turned up, this says what you trained when you did.
+                        // Under the habits, because they answer the same
+                        // question one level down: the Workouts tile says
+                        // whether you turned up, this says what you trained
+                        // when you did.
                         //
                         // Not gated on history. Appearing only once something
                         // was logged would make the section arrive out of
@@ -665,8 +680,8 @@ class _HomeHeader extends StatelessWidget {
 ///
 /// A row rather than the calendar glyph that once sat in the masthead: a row
 /// says what it does, where a glyph in the band could say it only through a
-/// tooltip, which needs a long press. It sits under the Consistency grid
-/// because that is where the gap it fills is seen.
+/// tooltip, which needs a long press. It sits under the Workouts tile because
+/// that is where the gap it fills is seen.
 class _PastSessionsCard extends StatelessWidget {
   const _PastSessionsCard({required this.onTap});
 
@@ -787,12 +802,14 @@ class _NoRegimeState extends ConsumerWidget {
   const _NoRegimeState({
     required this.last,
     required this.heatmap,
+    required this.weighIns,
     required this.hasHistory,
     required this.volume,
   });
 
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
+  final Set<int> weighIns;
   final bool hasHistory;
   final WeeklyVolume volume;
 
@@ -843,7 +860,8 @@ class _NoRegimeState extends ConsumerWidget {
                     // the difference between waiting and reinstalling in a
                     // panic (SYNC.md § 2).
                     AccountRecoveryNote(hasHistory: hasHistory),
-                    _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
+                    // No play button: there is no session to start.
+                    _HabitsSection(heatmap: heatmap, weighIns: weighIns),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
                     const SizedBox(height: Space.section),
@@ -871,6 +889,7 @@ class _NoSessionsState extends ConsumerWidget {
     required this.regime,
     required this.last,
     required this.heatmap,
+    required this.weighIns,
     required this.hasHistory,
     required this.volume,
   });
@@ -878,14 +897,15 @@ class _NoSessionsState extends ConsumerWidget {
   final Regime regime;
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
+  final Set<int> weighIns;
   final bool hasHistory;
   final WeeklyVolume volume;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // **The same page it will be once the regime has days in it**, which is the
-    // rule the sibling state above follows too. Consistency, This week and Last
-    // session are not about the regime — a heatmap and a week's volume are read
+    // rule the sibling state above follows too. Habits, This week and Last
+    // session are not about the regime — the habit grids and a week's volume are read
     // off logged work, and a regime with no sessions yet says nothing about
     // whether there is any. Dropping them for a lone centred card would make
     // adding the first session look like it built three cards, when all it does
@@ -934,7 +954,8 @@ class _NoSessionsState extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AccountRecoveryNote(hasHistory: hasHistory),
-                    _ConsistencyCard(data: heatmap, hasHistory: hasHistory),
+                    // No play button: there is no session to start.
+                    _HabitsSection(heatmap: heatmap, weighIns: weighIns),
                     const SizedBox(height: Space.section),
                     _VolumeCard(volume: volume),
                     const SizedBox(height: Space.section),
@@ -1531,157 +1552,138 @@ class _CycleTrack extends StatelessWidget {
   }
 }
 
-class _ConsistencyCard extends StatelessWidget {
-  const _ConsistencyCard({required this.data, required this.hasHistory});
+/// The two habit tiles, Weigh-ins on the left and Workouts on the right
+/// (THEME → Components → Habit tile). The Workouts tile takes the place the
+/// Consistency card had, and opens the same Consistency screen.
+class _HabitsSection extends ConsumerWidget {
+  const _HabitsSection({
+    required this.heatmap,
+    required this.weighIns,
+    this.play,
+  });
 
-  final HeatmapData data;
+  final HeatmapData heatmap;
 
-  /// An empty grid reads as a bug on a fresh install; with nothing logged the
-  /// card says so in words instead.
-  final bool hasHistory;
+  /// Every day with a weigh-in, as day keys.
+  final Set<int> weighIns;
+
+  /// The Workouts tile's button. Null on the states with no session to start.
+  final Widget? play;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final consistency = heatmap.consistency;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          'Consistency',
-          actionLabel: hasHistory ? 'All time' : null,
-          onAction: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const HistoryHeatmapScreen()),
-          ),
-        ),
-        // The volume tile (THEME → Components → Stat tile): caption, chart,
-        // hairline, figure + unit + chevron. Same padding, same gaps, same
-        // styles — see [VolumeTile], which is the widget this is deliberately
-        // shaped after.
-        //
-        // Without that tile's title row: a volume tile carries its own because
-        // six of them sit in a header-less grid, and here the section heading
-        // above the card already names it. Two headings, one card.
-        //
-        // A grid over a three-fact sentence would be a shape no other card in
-        // the app has.
-        AppCard(
-          padding: const EdgeInsets.all(Space.lg),
-          onTap: !hasHistory
-              ? null
-              : () => Navigator.of(context).push(
+        const SectionHeader('Habits'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: HabitTile(
+                title: 'Weigh-ins',
+                fill: (key) => weighIns.contains(key) ? c.weighIn : null,
+                thisWeek: weighIns.isEmpty
+                    ? null
+                    : daysKeptThisWeek(weighIns, today: DateTime.now()),
+                action: HabitAction(
+                  icon: Icons.add_rounded,
+                  tooltip: 'Log weight',
+                  onTap: () => logTodaysWeight(context, ref),
+                ),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const WeighInsScreen()),
+                ),
+              ),
+            ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: HabitTile(
+                title: 'Workouts',
+                // The colours the Consistency map draws in: a trained day in
+                // progress blue, a deload in orange.
+                fill: (key) => switch (heatmap.days[key]) {
+                  null => null,
+                  final day => day.isDeload ? c.deload : c.progress,
+                },
+                // Counted as the Consistency card counted it, a dash included
+                // while nothing has been trained in its window.
+                thisWeek: consistency.isEmpty ? null : consistency.thisWeek,
+                action: play,
+                onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const HistoryHeatmapScreen(),
                   ),
                 ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // The caption slot, where a volume tile names the span its bars
-              // cover — and this one names the span its cells cover, in days,
-              // because the grid draws whole weeks either side of today.
-              Text(
-                'Last ${heatmapWeeks * 7} days',
-                style: context.t.bodyMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: Space.lg),
-              ConsistencyHeatmap(days: data.days),
-              const SizedBox(height: Space.lg),
-              const Divider(),
-              const SizedBox(height: Space.md),
-              // No legend here. It is reference material rather than something
-              // you read at a glance, and the screen this card opens carries it
-              // in full.
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _thisWeek(data.consistency),
-                            style: context.t.labelLarge,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: Space.xs),
-                        Flexible(
-                          child: Text(
-                            'this week',
-                            style: context.t.bodyMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: Space.sm),
-                        Text('·', style: context.t.bodyMedium),
-                        const SizedBox(width: Space.sm),
-                        // Both figures are `valueSm` and both units are `body`:
-                        // a number is a number, and the row is one column of
-                        // them read left to right.
-                        Flexible(
-                          child: Text(
-                            _average(data.consistency),
-                            style: context.t.labelLarge,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: Space.xs),
-                        Flexible(
-                          child: Text(
-                            'avg/wk',
-                            style: context.t.bodyMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (hasHistory)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color: context.c.textSecondary,
-                    ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
   }
+}
 
-  /// The figure the card is about, under the hairline, with `this week` beside
-  /// it where a volume tile prints `sets/wk`.
-  ///
-  /// Out of seven, because that is what the row of cells above it shows — a
-  /// bare `4` under a week of squares invites you to count them to find out
-  /// what it is four of. It counts **days trained**, not sessions: two sessions
-  /// on a Tuesday are one cell, and a figure the grid contradicts is worse than
-  /// no figure.
-  ///
-  /// A dash rather than `0` with nothing logged — a zero is a measurement and a
-  /// dash is "nothing here yet" (THEME rule 4) — and the row keeps its shape
-  /// either way, which is the stat tile's zero state.
-  static String _thisWeek(Consistency c) =>
-      c.isEmpty ? '—/7' : '${c.thisWeek}/7';
+/// The Workouts tile's play button: the hero's own action, one tap from the
+/// habit it keeps.
+///
+/// It starts the session that is due through the same path as `Start` on the
+/// hero, so a second tap while the first is starting is refused in the same
+/// way. While a session is open it resumes that one instead, which is what the
+/// hero above it offers then: starting a second would leave two open, and only
+/// one of them could ever be finished. It is absent when there is nothing to
+/// start, which includes a due session with no exercises in it, where the hero
+/// offers to add exercises rather than to start an empty log.
+class _PlayAction extends ConsumerWidget {
+  const _PlayAction({
+    required this.regimeId,
+    required this.open,
+    required this.status,
+    required this.sessions,
+    required this.preview,
+  });
 
-  /// Sessions per week over [Consistency.windowDays], beside the week's count.
-  ///
-  /// Whole sessions and rounded **down** — the app never reports a session it
-  /// cannot point at — and an em dash under a fortnight of history, where the
-  /// rate would be a number divided by weeks that have not happened yet (see
-  /// [computeConsistency]). The dash keeps the row's shape rather than dropping
-  /// the fact, so the card does not change width the day it becomes true.
-  static String _average(Consistency c) {
-    final perWeek = c.perWeek;
-    return perWeek == null ? '—' : '${perWeek.floor()}';
+  final String regimeId;
+  final Workout? open;
+  final CycleStatus? status;
+  final List<Session> sessions;
+
+  /// Exercise names by session, to tell an empty session from a startable one.
+  final Map<String, List<String>> preview;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final open = this.open;
+    if (open != null) {
+      return HabitAction(
+        icon: Icons.play_arrow_rounded,
+        tooltip: 'Resume session',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => LogScreen(workoutId: open.id)),
+        ),
+      );
+    }
+
+    final nextId = status?.nextSessionId;
+    if (nextId == null || (preview[nextId] ?? const []).isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final name = sessions.where((s) => s.id == nextId).firstOrNull?.name;
+    return HabitAction(
+      icon: Icons.play_arrow_rounded,
+      tooltip: 'Start ${name ?? 'session'}',
+      onTap: ref.watch(_startingProvider)
+          ? null
+          : () => _startSession(
+              context,
+              ref,
+              regimeId: regimeId,
+              sessionId: nextId,
+            ),
+    );
   }
 }
 

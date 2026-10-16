@@ -5,6 +5,88 @@ import '../../../core/theme/tokens.dart';
 import '../heatmap_data.dart';
 import 'heatmap.dart' show heatColourIn;
 
+/// What a year map draws: the colour of a day that has happened, and what a
+/// picked day says about itself.
+///
+/// The map is one design for every habit the app counts. Training days and
+/// weigh-in days differ only in what fills a cell and in the words under the
+/// grid, so those two answers are all a kind of day supplies, and the grid,
+/// the month strip, the dimmed future and the tap stay in one place.
+///
+/// Equal when the days behind it are the same object, which is what a
+/// provider hands over until something changes. The painter repaints on a
+/// different set of days, and a fresh wrapper around the same map built on
+/// every frame must not count as one.
+abstract class YearMapDays {
+  const YearMapDays();
+
+  /// The fill of a day up to today. A day after today is drawn dim by the map
+  /// itself, whatever the kind.
+  Color fill(DeltoidColors c, int dayKey);
+
+  /// What follows the date when a day is picked, such as `rest day` or
+  /// `weighed`. Empty for nothing but the date.
+  String describe(int dayKey, {required bool isFuture});
+
+  /// The object a repaint is decided on.
+  Object get source;
+
+  @override
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      identical((other as YearMapDays).source, source);
+
+  @override
+  int get hashCode => identityHashCode(source);
+}
+
+/// Training days, in the colours the compact grid on Home draws:
+/// [DeltoidColors.progress] for a session and [DeltoidColors.deload] for a
+/// light week.
+class TrainingYearDays extends YearMapDays {
+  const TrainingYearDays(this.days);
+
+  final Map<int, HeatDay> days;
+
+  @override
+  Object get source => days;
+
+  @override
+  Color fill(DeltoidColors c, int dayKey) =>
+      heatColourIn(c, days[dayKey], isFuture: false);
+
+  @override
+  String describe(int dayKey, {required bool isFuture}) {
+    final day = days[dayKey];
+    if (day == null) return 'rest day';
+    final n = day.workouts;
+    return '$n session${n == 1 ? '' : 's'}${day.isDeload ? ' · deload' : ''}';
+  }
+}
+
+/// Days with a weigh-in, in [DeltoidColors.weighIn]. A day either holds one or
+/// it does not, because a second weigh-in on the same day replaces the first.
+class WeighInYearDays extends YearMapDays {
+  const WeighInYearDays(this.days);
+
+  final Set<int> days;
+
+  @override
+  Object get source => days;
+
+  @override
+  Color fill(DeltoidColors c, int dayKey) =>
+      days.contains(dayKey) ? c.weighIn : c.heatEmpty;
+
+  /// A day that has not happened yet is named and nothing more: `no weigh-in`
+  /// under a date next month reads as a weigh-in missed.
+  @override
+  String describe(int dayKey, {required bool isFuture}) {
+    if (days.contains(dayKey)) return 'weighed';
+    return isFuture ? '' : 'no weigh-in';
+  }
+}
+
 /// One calendar year, drawn rather than built.
 ///
 /// A year is one `CustomPaint`: 366 rounded rectangles on a canvas, no
@@ -18,15 +100,14 @@ import 'heatmap.dart' show heatColourIn;
 /// It also fits the width instead of scrolling. A year you have to drag through
 /// is not a year at a glance, which is the only reason to open this screen —
 /// so the cells shrink to fit fifty-three weeks and the horizontal scroll goes.
+///
+/// Consistency draws training days with it and Weigh-ins draws weigh-in days;
+/// [days] decides which.
 class YearHeatmap extends StatefulWidget {
-  const YearHeatmap({
-    super.key,
-    required this.year,
-    required this.days,
-  });
+  const YearHeatmap({super.key, required this.year, required this.days});
 
   final int year;
-  final Map<int, HeatDay> days;
+  final YearMapDays days;
 
   @override
   State<YearHeatmap> createState() => _YearHeatmapState();
@@ -83,33 +164,39 @@ class _YearHeatmapState extends State<YearHeatmap> {
         final gridWidth = weeks * cell + (weeks - 1) * gap;
         final gridHeight = 7 * cell + 6 * gap;
 
+        final caption = _caption(dayKeyOf(now));
         return GestureDetector(
           onTapUp: (details) => _pick(details.localPosition, start,
               cell: cell, gap: gap, weeks: weeks),
-          child: CustomPaint(
-            size: Size(gridWidth, gridHeight + _monthRow),
-            painter: _YearPainter(
-              year: widget.year,
-              days: widget.days,
-              start: start,
-              weeks: weeks,
-              cell: cell,
-              gap: gap,
-              monthRow: _monthRow,
-              todayKey: dayKeyOf(now),
-              picked: _picked,
-              // The readout replaces 366 tooltips, and it takes over the month
-              // strip rather than adding a row of its own. A reserved line
-              // under the strip was empty almost always, and an empty line is
-              // just padding the card can't see — which is why the bottom of
-              // every year sat lower than its top.
-              caption: _caption(),
-              colours: _Palette(
-                days: c,
-                label: c.textSecondary,
-                ring: c.textPrimary,
+          // The caption is painted, so it is named here as well: a screen
+          // reader reads nothing on a canvas.
+          child: Semantics(
+            label: caption.isEmpty ? '${widget.year}' : caption,
+            child: CustomPaint(
+              size: Size(gridWidth, gridHeight + _monthRow),
+              painter: _YearPainter(
+                year: widget.year,
+                days: widget.days,
+                start: start,
+                weeks: weeks,
+                cell: cell,
+                gap: gap,
+                monthRow: _monthRow,
+                todayKey: dayKeyOf(now),
+                picked: _picked,
+                // The readout replaces 366 tooltips, and it takes over the month
+                // strip rather than adding a row of its own. A reserved line
+                // under the strip was empty almost always, and an empty line is
+                // just padding the card can't see — which is why the bottom of
+                // every year sat lower than its top.
+                caption: caption,
+                colours: _Palette(
+                  days: c,
+                  label: c.textSecondary,
+                  ring: c.textPrimary,
+                ),
+                labelStyle: context.t.labelSmall!,
               ),
-              labelStyle: context.t.labelSmall!,
             ),
           ),
         );
@@ -117,15 +204,12 @@ class _YearHeatmapState extends State<YearHeatmap> {
     );
   }
 
-  String _caption() {
+  String _caption(int todayKey) {
     final key = _picked;
     if (key == null) return '';
-    final day = widget.days[key];
     final stamp = _stamp(dateFromDayKey(key));
-    if (day == null) return '$stamp · rest day';
-    final n = day.workouts;
-    return '$stamp · $n session${n == 1 ? '' : 's'}'
-        '${day.isDeload ? ' · deload' : ''}';
+    final said = widget.days.describe(key, isFuture: key > todayKey);
+    return said.isEmpty ? stamp : '$stamp · $said';
   }
 
   static String _stamp(DateTime date) {
@@ -175,8 +259,7 @@ class _Palette {
     required this.ring,
   });
 
-  /// What a day's cell is filled with, read through [heatColourIn] — the same
-  /// rule the compact grid on Workouts draws with.
+  /// The palette a day's fill is read from, through [YearMapDays.fill].
   final DeltoidColors days;
 
   final Color label;
@@ -200,7 +283,7 @@ class _YearPainter extends CustomPainter {
   });
 
   final int year;
-  final Map<int, HeatDay> days;
+  final YearMapDays days;
   final DateTime start;
   final int weeks;
   final double cell;
@@ -236,7 +319,6 @@ class _YearPainter extends CustomPainter {
         if (date.year != year) continue;
 
         final key = dayKeyOf(date);
-        final day = days[key];
         final rect = Rect.fromLTWH(
           w * (cell + gap),
           d * (cell + gap),
@@ -244,7 +326,7 @@ class _YearPainter extends CustomPainter {
           cell,
         );
 
-        fill.color = _colourFor(day, isFuture: key > todayKey);
+        fill.color = _colourFor(key, isFuture: key > todayKey);
         canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), fill);
 
         if (key == picked) {
@@ -332,9 +414,11 @@ class _YearPainter extends CustomPainter {
           )..layout(),
       };
 
-  Color _colourFor(HeatDay? day, {required bool isFuture}) {
-    return heatColourIn(colours.days, day, isFuture: isFuture);
-  }
+  /// A day after today is dim whatever the kind, so every year map shows the
+  /// rest of the current year the same way.
+  Color _colourFor(int key, {required bool isFuture}) => isFuture
+      ? colours.days.heatEmpty.withValues(alpha: 0.4)
+      : days.fill(colours.days, key);
 
   static String _monthName(int month) => const [
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

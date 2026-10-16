@@ -291,6 +291,12 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// it used to borrow now means a deload and nothing else.
   Color get dropSet => lavender;
 
+  /// A day with a weigh-in, on the Weigh-ins habit tile and its year maps.
+  /// Lavender, a second meaning for the drop set's hue, because every hue may
+  /// be reused except the two reserved ones (THEME → Semantic assignments). A
+  /// weigh-in drawn in [progress] would read as a trained day.
+  Color get weighIn => lavender;
+
   @override
   DeltoidColors copyWith({
     Color? bg,

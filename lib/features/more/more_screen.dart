@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../account/backup_mark.dart';
-import '../../core/ids.dart';
 import '../../core/providers.dart';
 import '../../core/sync_providers.dart';
 import '../../core/theme/tokens.dart';
@@ -19,7 +18,6 @@ import '../../data/backup/downloads.dart';
 import '../../data/sync/forget.dart';
 import '../../domain/rest.dart';
 import '../account/sign_in_flow.dart';
-import 'bodyweight_screen.dart';
 import '../../domain/units.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/failure.dart';
@@ -33,9 +31,6 @@ class MoreScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bodyweight =
-        ref.watch(bodyweightSummaryProvider).valueOrNull ??
-        (latest: null, count: 0);
     final lastBackup = ref.watch(lastBackupProvider).valueOrNull;
     final c = context.c;
 
@@ -55,7 +50,7 @@ class MoreScreen extends ConsumerWidget {
               actions: [BackupMark()],
             ),
           ),
-          Expanded(child: _body(context, ref, bodyweight, lastBackup, c)),
+          Expanded(child: _body(context, ref, lastBackup, c)),
         ],
       ),
     );
@@ -64,7 +59,6 @@ class MoreScreen extends ConsumerWidget {
   Widget _body(
     BuildContext context,
     WidgetRef ref,
-    BodyweightSummary bodyweight,
     DateTime? lastBackup,
     DeltoidColors c,
   ) {
@@ -76,22 +70,6 @@ class MoreScreen extends ConsumerWidget {
         Space.huge,
       ),
       children: [
-        SectionHeader(
-          'Bodyweight',
-          actionLabel: bodyweight.latest == null ? null : 'History',
-          onAction: bodyweight.latest == null
-              ? null
-              : () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BodyweightScreen()),
-                ),
-        ),
-        // The figure logs one, it does not open a screen that offers to.
-        // Behind a cog, then behind a card that pushes a screen with a `+` in
-        // its bar, bodyweight is three taps to type a number you are asked for
-        // daily — which is how it goes unlogged. Tapping the figure is the log;
-        // the past is a link.
-        _BodyweightCard(bodyweight: bodyweight),
-        const SizedBox(height: Space.section),
         const SectionHeader('Account & backup'),
         ListCard(
           inset: Space.lg,
@@ -370,58 +348,6 @@ class MoreScreen extends ConsumerWidget {
 }
 
 enum _ExportTo { downloads, share }
-
-class _BodyweightCard extends ConsumerWidget {
-  const _BodyweightCard({required this.bodyweight});
-
-  /// The newest entry and the number of them — the two figures this card shows,
-  /// rather than every row in the table for it to work them out from.
-  final BodyweightSummary bodyweight;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.c;
-    // Watched *here*, not at the top of the screen. One line in
-    // `MoreScreen.build` would make switching kg to lb rebuild the whole
-    // page — masthead, every section, the three painted theme miniatures — to
-    // change the two words in this row and the tick in the units card. This is
-    // the screen the switch is on, so it is the one that would hitch.
-    final unit = ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
-    final today = dayKeyOf(DateTime.now());
-    final latest = bodyweight.latest;
-    final loggedToday = latest != null && latest.dayKey == today;
-
-    return ListCard(
-      inset: Space.lg,
-      children: [
-        AppRow(
-          icon: Icons.monitor_weight_outlined,
-          title: latest == null
-              ? 'Not logged'
-              : '${formatBodyweight(latest.weightKg, unit)} ${unit.label}',
-          subtitle: latest == null
-              ? 'Used to score your bodyweight lifts'
-              : loggedToday
-              ? 'Logged today  ·  ${bodyweight.count} entries'
-              : 'Last entry '
-                    '${DateFormat('d MMM').format(dateFromDayKey(latest.dayKey))}'
-                    '  ·  ${bodyweight.count} entries',
-          onTap: () => logBodyweightPrompt(
-            context,
-            ref,
-            date: loggedToday ? dateFromDayKey(latest.dayKey) : null,
-            initial: loggedToday ? latest.weightKg : null,
-          ),
-          trailing: Icon(
-            loggedToday ? Icons.edit_outlined : Icons.add,
-            size: 20,
-            color: c.textTertiary,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// Kilograms or pounds.
 ///

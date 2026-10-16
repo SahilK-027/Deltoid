@@ -54,6 +54,25 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
   );
 });
 
+/// Every day with a weigh-in, as day keys.
+///
+/// For the Weigh-ins habit tile and the year maps behind it, which ask only
+/// whether a day was weighed. One column, and one row per day, because a
+/// second weigh-in on a day replaces the first. Kept alive and warmed on Home
+/// for the reason [fullHeatmapProvider] is: the screen it feeds should open
+/// with its maps already drawn.
+final weighInDaysProvider = StreamProvider<Set<int>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchQuery([db.bodyweightLogs], () async {
+    final rows = await db.customSelect(
+      'SELECT DISTINCT day_key AS day_key FROM bodyweight_logs '
+      'WHERE deleted_at IS NULL',
+      readsFrom: {db.bodyweightLogs},
+    ).get();
+    return {for (final r in rows) r.read<int>('day_key')};
+  });
+});
+
 /// This week's hard sets per muscle, for the bar list under the heatmap.
 ///
 /// Its own provider rather than a field on [HomeData], and this is the one

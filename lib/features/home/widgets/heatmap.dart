@@ -221,9 +221,15 @@ class ConsistencyHeatmap extends StatelessWidget {
   }
 }
 
-/// Legend explaining the two colour families.
+/// Legend explaining the colours a year map draws in: rest, trained and
+/// deload on Consistency, or no weigh-in and weighed on Weigh-ins.
 class HeatmapLegend extends StatelessWidget {
-  const HeatmapLegend({super.key});
+  const HeatmapLegend({super.key}) : _weighIns = false;
+
+  /// The Weigh-ins screen's legend, for maps drawn with `WeighInYearDays`.
+  const HeatmapLegend.weighIns({super.key}) : _weighIns = true;
+
+  final bool _weighIns;
 
   @override
   Widget build(BuildContext context) {
@@ -237,6 +243,20 @@ class HeatmapLegend extends StatelessWidget {
             border: border == null ? null : Border.all(color: border),
           ),
         );
+
+    if (_weighIns) {
+      return Row(
+        children: [
+          swatch(c.heatEmpty),
+          const SizedBox(width: Space.xs),
+          Text('No weigh-in', style: context.t.labelSmall),
+          const SizedBox(width: Space.lg),
+          swatch(c.weighIn),
+          const SizedBox(width: Space.xs),
+          Text('Weighed', style: context.t.labelSmall),
+        ],
+      );
+    }
 
     return Row(
       children: [

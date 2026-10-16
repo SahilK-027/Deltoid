@@ -9,7 +9,10 @@ import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
 import 'package:deltoid/features/home/home_screen.dart';
 import 'package:deltoid/features/home/widgets/volume_bars.dart';
-import 'package:deltoid/features/home/widgets/heatmap.dart';
+import 'package:deltoid/features/home/history_heatmap_screen.dart';
+import 'package:deltoid/features/home/weigh_ins_screen.dart';
+import 'package:deltoid/features/home/widgets/habit_tile.dart';
+import 'package:deltoid/features/log/log_screen.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -143,11 +146,11 @@ void main() {
     expect(clock(), isNot(first));
   });
 
-  testWidgets('the consistency grid clears the fold on a six-session split',
+  testWidgets('the habit grids clear the fold on a six-session split',
       (tester) async {
     // A cycle drawn twice — a row of labelled bars in the hero card and then
-    // the same sessions again as a list — pushes the grid off the bottom of the
-    // screen on every phone.
+    // the same sessions again as a list — pushes the grids off the bottom of
+    // the screen on every phone.
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -156,14 +159,15 @@ void main() {
     await pumpWorkouts(tester);
     await frames(tester);
 
-    final grid = tester.getRect(find.byType(ConsistencyHeatmap));
-
-    expect(
-      grid.bottom,
-      lessThanOrEqualTo(844),
-      reason: 'six sessions is the widest split the templates ship; if the '
-          'grid does not fit that, it fits nothing',
-    );
+    for (final grid in find.byType(HabitGrid).evaluate()) {
+      expect(
+        tester.getRect(find.byWidget(grid.widget)).bottom,
+        lessThanOrEqualTo(844),
+        reason: 'six sessions is the widest split the templates ship; if the '
+            'grids do not fit that, they fit nothing',
+      );
+    }
+    expect(find.byType(HabitGrid), findsNWidgets(2));
   });
 
   testWidgets('a fresh install offers a regime instead of a blank page',
@@ -176,9 +180,10 @@ void main() {
     // And it never claimed a regime existed on the way there.
     expect(seen.where((f) => f.contains('Cycle 1')), isEmpty);
 
-    // The screen keeps its own shape with nothing in it: the record is the
-    // page's second section on a fresh install exactly as it is on a full one.
-    expect(find.byType(ConsistencyHeatmap), findsOneWidget);
+    // The screen keeps its own shape with nothing in it: the habits are the
+    // page's second section on a fresh install exactly as on a full one.
+    expect(find.text('Habits'), findsOneWidget);
+    expect(find.byType(HabitTile), findsNWidgets(2));
 
     // The empty state is still this screen: the masthead survives it. It is the
     // date and the rest gap, not the screen's name — on a fresh install there
@@ -197,7 +202,7 @@ void main() {
   testWidgets('a regime with no sessions keeps the page it will have',
       (tester) async {
     // THEME: a thing with no data still has a page, and it is the page it will
-    // have once there is some. A lone centred card here — Consistency, Weekly
+    // have once there is some. A lone centred card here — Habits, Weekly
     // volume and the masthead's count all gone — would make adding the first
     // session look like it built three sections when all it did was fill
     // one.
@@ -212,8 +217,8 @@ void main() {
 
     // The sections are read off logged work, not off the regime, so a split
     // with no days in it says nothing about whether they should be here.
-    expect(find.text('Consistency'), findsOneWidget);
-    expect(find.byType(ConsistencyHeatmap), findsOneWidget);
+    expect(find.text('Habits'), findsOneWidget);
+    expect(find.byType(HabitTile), findsNWidgets(2));
     expect(find.text('Weekly volume'), findsOneWidget);
 
     // Same masthead as every other state on this screen.
@@ -221,7 +226,7 @@ void main() {
   });
 
   group('past sessions', () {
-    testWidgets('a row under Consistency replaces the masthead calendar',
+    testWidgets('a row under the habits replaces the masthead calendar',
         (tester) async {
       await createRegimeFromTemplate(db, ppl);
       await pumpWorkouts(tester);
@@ -242,8 +247,9 @@ void main() {
       );
       expect(
         tester.getTopLeft(row).dy,
-        greaterThan(tester.getTopLeft(find.byType(ConsistencyHeatmap)).dy),
-        reason: 'the row sits under the grid, where the gap it fills is seen',
+        greaterThan(tester.getTopLeft(find.byType(HabitGrid).last).dy),
+        reason: 'the row sits under the Workouts tile, where the gap it fills '
+            'is seen',
       );
     });
 
@@ -365,6 +371,231 @@ void main() {
       }
       // Chest is not compound, so it has nothing to open and does not offer to.
       expect(find.text('Chest'), findsOneWidget);
+    });
+  });
+
+  group('habits', () {
+    /// The ppl split's sessions, in cycle order.
+    Future<List<Session>> sessionsOf(String regimeId) =>
+        (db.select(db.sessions)
+              ..where((t) => t.regimeId.equals(regimeId))
+              ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+            .get();
+
+    /// A finished session today, with every set of the first exercise ticked.
+    Future<void> trainToday(String regimeId) async {
+      final repo = TrainingRepository(db);
+      final id = await repo.startWorkout(
+        regimeId: regimeId,
+        sessionId: (await sessionsOf(regimeId)).first.id,
+      );
+      final detail = await repo.workoutDetail(id);
+      for (final set in detail!.entries.first.sets) {
+        await repo.updateSet(
+          set.id,
+          weight: const Value(40),
+          reps: const Value(8),
+          isDone: const Value(true),
+        );
+      }
+      await repo.completeWorkout(id);
+    }
+
+    /// The figure under a tile's hairline, by the tile's name.
+    String figureOf(WidgetTester tester, String title) {
+      final tile = find.ancestor(
+        of: find.text(title),
+        matching: find.byType(HabitTile),
+      );
+      return tester
+          .widgetList<Text>(find.descendant(of: tile, matching: find.byType(Text)))
+          .map((t) => t.data ?? '')
+          .firstWhere((s) => s.endsWith('/7'));
+    }
+
+    /// A widget test that unmounts the screen before it ends, so drift's
+    /// stream-closing timers run out before the harness checks for pending
+    /// timers. These tests leave a weigh-in query and a pushed screen open,
+    /// and without this one of them trips that check about one run in three.
+    void habitTest(String name, Future<void> Function(WidgetTester) body) {
+      testWidgets(name, (tester) async {
+        await body(tester);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 1));
+      });
+    }
+
+    Future<void> reveal(WidgetTester tester) async {
+      await tester.ensureVisible(find.byType(HabitTile).first);
+      await tester.pump();
+    }
+
+    habitTest('two tiles take the place of the Consistency card', (
+      tester,
+    ) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      expect(find.text('Habits'), findsOneWidget);
+      expect(find.text('Weigh-ins'), findsOneWidget);
+      expect(find.text('Workouts'), findsOneWidget);
+      expect(find.text('Last 30 days'), findsNWidgets(2));
+      expect(find.text('Consistency'), findsNothing);
+      // Weigh-ins on the left, Workouts on the right.
+      expect(
+        tester.getCenter(find.text('Weigh-ins')).dx,
+        lessThan(tester.getCenter(find.text('Workouts')).dx),
+      );
+      // Nothing logged yet: a dash, not a zero.
+      expect(figureOf(tester, 'Weigh-ins'), '—/7');
+      expect(figureOf(tester, 'Workouts'), '—/7');
+    });
+
+    habitTest('count days kept this week, not entries', (tester) async {
+      final regimeId = await createRegimeFromTemplate(db, ppl);
+      final repo = TrainingRepository(db);
+      // Two weigh-ins and two sessions, all today: one day each.
+      await repo.logBodyweight(DateTime.now(), 77.0);
+      await repo.logBodyweight(DateTime.now(), 76.8);
+      await trainToday(regimeId);
+      await trainToday(regimeId);
+
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      expect(figureOf(tester, 'Weigh-ins'), '1/7');
+      expect(figureOf(tester, 'Workouts'), '1/7');
+    });
+
+    habitTest('the tile updates when a weight is logged', (tester) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+      expect(figureOf(tester, 'Weigh-ins'), '—/7');
+
+      await TrainingRepository(db).logBodyweight(DateTime.now(), 77.0);
+      await frames(tester);
+
+      expect(figureOf(tester, 'Weigh-ins'), '1/7');
+    });
+
+    habitTest('+ opens the weigh-in sheet and not the screen', (
+      tester,
+    ) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      await tester.tap(find.byTooltip('Log weight'));
+      await frames(tester);
+
+      expect(find.text('Log bodyweight'), findsOneWidget);
+      expect(find.byType(WeighInsScreen), findsNothing);
+
+    });
+
+    habitTest('+ over a weight logged today opens it for correcting', (
+      tester,
+    ) async {
+      await createRegimeFromTemplate(db, ppl);
+      await TrainingRepository(db).logBodyweight(DateTime.now(), 76.5);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      await tester.tap(find.byTooltip('Log weight'));
+      await frames(tester);
+
+      expect(find.text('Edit bodyweight'), findsOneWidget);
+    });
+
+    habitTest('the Weigh-ins tile opens the Weigh-ins screen', (
+      tester,
+    ) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      await tester.tap(find.text('Weigh-ins'));
+      await frames(tester);
+
+      expect(find.byType(WeighInsScreen), findsOneWidget);
+    });
+
+    habitTest('the Workouts tile opens Consistency', (tester) async {
+      await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      await tester.tap(find.text('Workouts'));
+      await frames(tester);
+
+      expect(find.byType(HistoryHeatmapScreen), findsOneWidget);
+    });
+
+    habitTest('play starts the session that is due', (tester) async {
+      final regimeId = await createRegimeFromTemplate(db, ppl);
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      await tester.tap(find.byTooltip('Start Push 1'));
+      await frames(tester);
+
+      // The hero's own path: the workout is created and the log opens on it.
+      final open = await (db.select(db.workouts)
+            ..where((t) => t.endedAt.isNull()))
+          .get();
+      expect(open, hasLength(1));
+      expect(open.single.regimeId, regimeId);
+      expect(open.single.sessionId, (await sessionsOf(regimeId)).first.id);
+      expect(find.byType(LogScreen), findsOneWidget);
+    });
+
+    habitTest('with a session open, play resumes it', (tester) async {
+      final regimeId = await createRegimeFromTemplate(db, ppl);
+      await TrainingRepository(db).startWorkout(
+        regimeId: regimeId,
+        sessionId: (await sessionsOf(regimeId)).first.id,
+      );
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+
+      expect(find.byTooltip('Start Push 1'), findsNothing);
+      await tester.tap(find.byTooltip('Resume session'));
+      await frames(tester);
+
+      // Resumed, not a second session alongside the first.
+      final open = await (db.select(db.workouts)
+            ..where((t) => t.endedAt.isNull()))
+          .get();
+      expect(open, hasLength(1));
+      expect(find.byType(LogScreen), findsOneWidget);
+    });
+
+    habitTest('with nothing to start, play is absent', (tester) async {
+      await pumpWorkouts(tester);
+      await frames(tester);
+      await reveal(tester);
+      expect(find.byType(HabitTile), findsNWidgets(2));
+      expect(find.byType(HabitAction), findsOneWidget, reason: 'only +');
+
+      await createRegimeFromTemplate(
+        db,
+        regimeTemplates.firstWhere((t) => t.key == 'blank'),
+      );
+      await frames(tester);
+      expect(find.text('Add a session'), findsOneWidget);
+      await reveal(tester);
+      expect(find.byType(HabitAction), findsOneWidget, reason: 'only +');
     });
   });
 }

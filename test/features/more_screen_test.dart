@@ -1,13 +1,10 @@
 import 'package:deltoid/features/account/backup_mark.dart';
-import 'package:deltoid/core/ids.dart';
 import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
-import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/domain/rest.dart';
 import 'package:deltoid/domain/units.dart';
-import 'package:deltoid/features/more/bodyweight_screen.dart';
 import 'package:deltoid/features/more/more_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -15,11 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:deltoid/domain/session_prefs.dart';
 
-/// More and the bodyweight log, pumped against a real database.
-///
-/// Bodyweight had never once been logged through the UI, so nothing here had
-/// ever been exercised outside the repository — the screens could have been
-/// rendering anything.
+/// More, pumped against a real database. The bodyweight log it used to hold
+/// is tested with the Weigh-ins screen, in `weigh_ins_screen_test.dart`.
 ///
 /// Harness rules are `regime_screen_test.dart`'s: never `pumpAndSettle` (a
 /// watched query that has not answered yet renders a spinner, which never
@@ -98,43 +92,17 @@ void main() {
       openRow(tester, 'Weight units');
 
   group('More', () {
-    testWidgets('with nothing logged: the masthead, and an invitation', (
-      tester,
-    ) async {
-      await pump(tester, const MoreScreen());
-
-      expect(tester.takeException(), isNull);
-      expect(find.text('More'), findsOneWidget);
-      expect(find.text('Not logged'), findsOneWidget);
-      // Nothing to look back at yet, so no link to the past.
-      expect(find.text('History'), findsNothing);
-    });
-
-    testWidgets('a weight logged today reads as today, and offers the edit', (
-      tester,
-    ) async {
+    testWidgets('carries no bodyweight, logged or not', (tester) async {
+      // The Bodyweight section moved to Home, as the Weigh-ins habit tile and
+      // the screen behind it. Its figure and its link go with it.
       await TrainingRepository(db).logBodyweight(DateTime.now(), 76.5);
       await pump(tester, const MoreScreen());
 
       expect(tester.takeException(), isNull);
-      expect(find.text('76.5 kg'), findsOneWidget);
-      expect(find.text('Logged today  ·  1 entries'), findsOneWidget);
-      expect(find.text('History'), findsOneWidget);
-      expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
-    });
-
-    testWidgets('the figure is one tap from the sheet that logs it', (
-      tester,
-    ) async {
-      await pump(tester, const MoreScreen());
-
-      await tester.tap(find.text('Not logged'));
-      for (var i = 0; i < 20; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-
-      expect(tester.takeException(), isNull);
-      expect(find.text('Log bodyweight'), findsOneWidget);
+      expect(find.text('More'), findsOneWidget);
+      expect(find.text('76.5 kg'), findsNothing);
+      expect(find.text('Not logged'), findsNothing);
+      expect(find.text('History'), findsNothing);
     });
 
     testWidgets('the masthead carries the backup button the other tabs do', (
@@ -165,7 +133,9 @@ void main() {
       await pump(tester, const MoreScreen());
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Bodyweight'), findsOneWidget);
+      // Bodyweight moved to the Weigh-ins screen behind its habit tile on
+      // Home, so More opens on the account (RULES § 6).
+      expect(find.text('Bodyweight'), findsNothing);
       expect(find.text('Account & backup'), findsOneWidget);
       expect(find.text('Export a backup file'), findsOneWidget);
       expect(find.text('Restore from a file'), findsOneWidget);
@@ -366,219 +336,6 @@ void main() {
       }
 
       expect(await savedUnit(), WeightUnit.lb);
-    });
-  });
-
-  group('Bodyweight screen', () {
-    testWidgets('the chart range survives leaving the screen', (tester) async {
-      // The range lived in the route's `State`, so picking 1M and coming back
-      // later drew 3M again — the widget had been rebuilt from its
-      // initialiser and nothing remembered the answer.
-      await TrainingRepository(db).logBodyweight(DateTime.now(), 76.5);
-      await pump(tester, const BodyweightScreen());
-
-      expect(
-        container.read(bodyweightWindowProvider).range,
-        ChartRange.threeMonths,
-      );
-
-      container.read(bodyweightWindowProvider.notifier).state =
-          const TrendWindow.rolling(ChartRange.month);
-
-      // Leave, and come back to a screen built from scratch.
-      await pump(tester, const MoreScreen());
-      await pump(tester, const BodyweightScreen());
-
-      expect(container.read(bodyweightWindowProvider).range, ChartRange.month);
-    });
-
-
-    testWidgets('with no entries: the full-page empty state', (tester) async {
-      await pump(tester, const BodyweightScreen());
-
-      expect(tester.takeException(), isNull);
-      expect(find.text('No weights logged'), findsOneWidget);
-    });
-
-    testWidgets('months are summaries; the newest one is open', (
-      tester,
-    ) async {
-      final repo = TrainingRepository(db);
-      await repo.logBodyweight(DateTime(2026, 7, 28), 75.0);
-      await repo.logBodyweight(DateTime(2026, 8, 1), 76.0);
-      await pump(tester, const BodyweightScreen());
-
-      expect(tester.takeException(), isNull);
-      await tester.scrollUntilVisible(find.text('August 2026'), 120,
-          scrollable: find.byType(Scrollable).first);
-      await tester.pumpAndSettle();
-      expect(find.text('August 2026'), findsOneWidget);
-      expect(find.text('July 2026'), findsOneWidget);
-
-      // The current month is open, so its days are on screen.
-      expect(find.text('Sat 1 Aug'), findsOneWidget);
-      // Every older month is one row until it is asked for — this is the whole
-      // point of the screen: a year is twelve rows, not 365.
-      expect(find.text('Tue 28 Jul'), findsNothing);
-
-      // The chart leads the screen, so the older months are below the fold.
-      await tester.scrollUntilVisible(find.text('July 2026'), 120,
-          scrollable: find.byType(Scrollable).first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('July 2026'));
-      await tester.pumpAndSettle();
-      expect(find.text('Tue 28 Jul'), findsOneWidget);
-    });
-
-    testWidgets('a month row states what it averaged and which way it went', (
-      tester,
-    ) async {
-      final repo = TrainingRepository(db);
-      // Chosen so the month's own figure is one no entry row can produce:
-      // July averages 75, August averages 78, and the change between the two
-      // averages (+3) is neither of August's entry-to-entry steps (+2 and +1).
-      // With numbers that collide, this passed on the entry row alone and
-      // proved nothing about the month.
-      await repo.logBodyweight(DateTime(2026, 7, 14), 74.0);
-      await repo.logBodyweight(DateTime(2026, 7, 20), 75.0);
-      await repo.logBodyweight(DateTime(2026, 7, 28), 76.0);
-      await repo.logBodyweight(DateTime(2026, 8, 1), 77.0);
-      await repo.logBodyweight(DateTime(2026, 8, 3), 79.0);
-      await pump(tester, const BodyweightScreen());
-
-      // `.builder`: a month below the fold is not built until it is scrolled
-      // to, which is the point of the change.
-      await tester.scrollUntilVisible(find.text('July 2026'), 120,
-          scrollable: find.byType(Scrollable).first);
-      await tester.pumpAndSettle();
-      expect(find.text('3 weigh-ins'), findsOneWidget);
-      expect(find.text('2 weigh-ins'), findsOneWidget);
-      // August averaged 78 against July's 75 — the month row's own figure.
-      expect(find.text('+3'), findsOneWidget);
-    });
-
-    testWidgets('a month of one weigh-in claims no trend of its own', (
-      tester,
-    ) async {
-      final repo = TrainingRepository(db);
-      // July averages 76.0 while *ending* at 77.0, so the two comparisons
-      // available here point opposite ways: August's single weigh-in is 0.5
-      // above July's average and 0.5 below the weigh-in before it.
-      await repo.logBodyweight(DateTime(2026, 7, 20), 75.0);
-      await repo.logBodyweight(DateTime(2026, 7, 28), 77.0);
-      await repo.logBodyweight(DateTime(2026, 8, 1), 76.5);
-      await pump(tester, const BodyweightScreen());
-      await tester.pumpAndSettle();
-
-      // The month row printed `+0.5` directly above its only entry printing
-      // `−0.5`, against the identical weight. Both were arithmetically right
-      // and the pair was unreadable, so the summary of a month that has no
-      // shape yet says nothing at all.
-      expect(find.text('1 weigh-in'), findsOneWidget);
-      expect(find.text('+0.5'), findsNothing);
-      // The entry keeps the comparison it can make honestly.
-      expect(find.text('−0.5'), findsOneWidget);
-    });
-
-    testWidgets('a row opens the sheet that corrects and deletes it', (
-      tester,
-    ) async {
-      await TrainingRepository(db).logBodyweight(DateTime(2026, 8, 1), 76.0);
-      await pump(tester, const BodyweightScreen());
-
-      await tester.scrollUntilVisible(find.text('Sat 1 Aug'), 120,
-          scrollable: find.byType(Scrollable).first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Sat 1 Aug'));
-      for (var i = 0; i < 20; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-
-      expect(tester.takeException(), isNull);
-      expect(find.text('Edit bodyweight'), findsOneWidget);
-      // Delete lives in the sheet, not on eighty rows.
-      expect(find.text('Delete this weight'), findsOneWidget);
-    });
-  });
-
-  /// The log is summarised in SQLite and read a month at a time — four queries
-  /// rather than a grouping function over the whole table. Fifty years of daily
-  /// weighing is 18 250 rows, and holding them all to show eight month rows is
-  /// what makes this screen slow to open.
-  group('the log is summarised, not loaded', () {
-    Future<void> log(int dayKey, double kg) => TrainingRepository(db)
-        .logBodyweight(dateFromDayKey(dayKey), kg);
-
-    test('an empty log has no months', () async {
-      expect(await container.read(bodyweightMonthsProvider.future), isEmpty);
-      final summary = await container.read(bodyweightSummaryProvider.future);
-      expect(summary.latest, isNull);
-      expect(summary.count, 0);
-    });
-
-    test('a month is its count and its average, newest first', () async {
-      await log(20260803, 76.4);
-      await log(20260801, 76.6);
-      await log(20260728, 77.0);
-
-      final months = await container.read(bodyweightMonthsProvider.future);
-
-      expect(months.map((m) => m.label), ['August 2026', 'July 2026']);
-      expect(months.first.ym, 202608);
-      expect(months.first.count, 2);
-      expect(months.first.averageKg, closeTo(76.5, 1e-9));
-      expect(months.last.count, 1);
-    });
-
-    test('the same month a year apart is two months, not one', () async {
-      await log(20260801, 76);
-      await log(20250801, 78);
-
-      final months = await container.read(bodyweightMonthsProvider.future);
-      expect(months.map((m) => m.label), ['August 2026', 'August 2025']);
-    });
-
-    test('a month loads only its own days, and the one before them', () async {
-      await log(20260803, 76.4);
-      await log(20260801, 76.6);
-      await log(20260728, 77.0);
-
-      final august = await container.read(bodyweightMonthProvider(202608).future);
-
-      expect(august.entries.map((e) => e.dayKey), [20260803, 20260801]);
-      // The seam: August's oldest row still has something to read against.
-      expect(august.before?.dayKey, 20260728);
-
-      final july = await container.read(bodyweightMonthProvider(202607).future);
-      expect(july.entries.single.dayKey, 20260728);
-      expect(july.before, isNull);
-    });
-
-    test('the chart reads the whole log, and cuts the window itself', () async {
-      final today = DateTime.now();
-      await TrainingRepository(db)
-          .logBodyweight(today.subtract(const Duration(days: 2)), 76);
-      await TrainingRepository(db)
-          .logBodyweight(today.subtract(const Duration(days: 200)), 80);
-
-      final all = await container.read(bodyweightRangeProvider.future);
-
-      // Oldest first, and nothing dropped: the range chips are a zoom over
-      // one provider, not a query per range.
-      expect(all.map((p) => p.weightKg).toList(), [80, 76]);
-
-      const month = TrendWindow.rolling(ChartRange.month);
-      final window = [for (final p in all) if (month.contains(p.dayKey)) p];
-      expect(window.single.weightKg, 76);
-    });
-
-    test('the summary is the newest weight and how many there are', () async {
-      await log(20260801, 76.6);
-      await log(20260803, 76.4);
-
-      final summary = await container.read(bodyweightSummaryProvider.future);
-      expect(summary.latest?.dayKey, 20260803);
-      expect(summary.count, 2);
     });
   });
 }

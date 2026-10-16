@@ -93,7 +93,12 @@ void main() {
     final xs = [for (final l in labels) centreOf(tester, navLabel(tester, l)).dx];
     expect(xs, orderedEquals([...xs]..sort()));
     expect(find.text('Settings'), findsNothing);
-    expect(find.text('Workouts'), findsNothing);
+    // `Workouts` is a habit tile on Home now, so the old tab's name is looked
+    // for on the bar alone.
+    final bar = centreOf(tester, navLabel(tester, 'Home')).dy;
+    for (final e in find.text('Workouts').evaluate()) {
+      expect(centreOf(tester, e).dy, lessThan(bar - 20), reason: 'not a tab');
+    }
 
     expect(weightOf(navLabel(tester, 'Home')), FontWeight.w700);
     for (final l in labels.skip(1)) {

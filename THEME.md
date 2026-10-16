@@ -1630,6 +1630,8 @@ appear only while an account is signed in:
 | Scroll physics                                                  | `lib/core/widgets/scroll.dart`                   |
 | Table, keypad, stopwatch pad                                    | `lib/features/log/widgets/`                      |
 | Bar list                                                        | `lib/features/home/widgets/volume_bars.dart` |
+| Habit tile and its thirty-day grid                              | `lib/features/home/widgets/habit_tile.dart`  |
+| The year map, for training days and weigh-in days               | `lib/features/home/widgets/year_heatmap.dart` |
 
 Feature code composes these; it does not restyle them. **A component nothing
 calls is deleted**, not left for later — it is a second answer to a question

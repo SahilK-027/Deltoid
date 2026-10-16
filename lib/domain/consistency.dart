@@ -1,4 +1,5 @@
 import '../core/ids.dart';
+import 'habits.dart';
 
 /// The window over which a sessions-per-week average is calculated, once
 /// sufficient history exists.
@@ -97,16 +98,11 @@ Consistency computeConsistency({
   );
   final sessions = completedDayKeys.where((k) => k >= cutoff).length;
 
-  // Monday of the week containing today. `weekday` returns 1 for Monday, so
-  // subtracting `weekday - 1` days lands on it and subtracts nothing when today
-  // is a Monday.
-  final startOfWeek = dayKeyOf(
-    daysBefore(dateFromDayKey(todayKey), today.weekday - 1),
-  );
-
   return Consistency(
     sessions: sessions,
-    thisWeek: completedDayKeys.where((k) => k >= startOfWeek).toSet().length,
+    // The habit tiles' count, so the Workouts tile and this figure can never
+    // disagree about what a week is.
+    thisWeek: daysKeptThisWeek(completedDayKeys, today: today),
     windowDays: windowDays,
     historyDays: historyDays,
     perWeek: historyDays < consistencyMinDays

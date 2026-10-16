@@ -115,7 +115,10 @@ class _Years extends StatelessWidget {
                 // in the card.
                 padding: const EdgeInsets.fromLTRB(
                     Space.md, Space.md, Space.md, Space.sm),
-                child: YearHeatmap(year: year, days: days),
+                child: YearHeatmap(
+                  year: year,
+                  days: TrainingYearDays(days),
+                ),
               ),
             ],
           ),
