@@ -328,8 +328,44 @@ owner approves those screenshots.
    local Supabase stack up: `phases_rls_test.sql` (added in `d5741ac`) has not run yet.
    The changelog needs Upgrade notes for schema 7 and `supabase db push`.
 
-**Then** 1.19.0 charts and 1.20.0 AI analysis, each broken down the same way when it
-starts. The deleted-regime legend fix can land in any patch release.
+1.18.0 shipped on 16 October 2026 (`1f8208a`, tag `v1.18.0`), with its server migration
+applied the same day.
+
+**1.19.0, charts**
+
+Each step works through the findings in [`chart-audit.md`](chart-audit.md); the
+numbers in brackets are its finding numbers.
+
+1. Amend THEME's chart sections first: the outlier policy (23), the line-chart heights
+   (two at most), one legend component, card padding, and where the range control sits.
+2. One shared y-range function for every chart: the line leaving the plot past +200%
+   (1), labels that repeat or misstate their gridline (3), a single value drawing one
+   gridline (4), the volume chart's pile of labels (7), the cycle axis drawing one
+   gridline instead of three (11) and its half-empty band (24).
+3. One shared, measured ladder of date labels: colliding labels (5), bar charts whose
+   last label is not today (8), repeated months on 3M (9), uneven years on long ranges
+   (10), and the cliff to yearly bars at five years (19).
+4. Gaps and jumps: lines break at empty buckets (2) and a resumed regime's jump is
+   dashed (12).
+5. Density decided by pixels rather than counts: clumping or vanishing markers (15),
+   volume tiles merging into texture at 52 weeks (18), and the one-week slab and
+   collapsing gutter on the volume chart (17).
+6. Long cycle charts and sparklines: deload hairlines turning long charts orange (13),
+   sparklines that keep chart furniture (14), and too many orange labels (25).
+7. Bodyweight parity and text scale: bodyweight refusing one dot and captioning an
+   empty range (16), dropped or truncated units (21), the bar list count column at
+   three digits (6), year-heatmap labels below 11 sp (22), the readout wrapping (26),
+   and the exercise trend's `Change` figure mixing sessions and painting a drop red
+   (20).
+8. Spacing across chart cards: the spacing table at the end of the audit (heights,
+   legends, gaps, padding, the range control's position) plus the remaining polish
+   findings (27 to 33).
+9. Release 1.19.0. Before the release commit, re-run the audit's chart harness at every
+   data size and confirm each finding is fixed or deliberately kept, then the version
+   bump, the changelog and a final emulator pass.
+
+**Then** 1.20.0 AI analysis, broken down the same way when it starts. The deleted-regime
+legend fix can land in any patch release.
 
 ## Versioning
 

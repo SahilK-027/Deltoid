@@ -288,7 +288,7 @@ Every string the user reads is a sentence, or a fragment that could start one.
 | Where                        | Value                                                                                        |
 | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | Page gutter                  | 16                                                                                           |
-| Card padding                 | 16 (dense rows 12)                                                                           |
+| Card padding                 | 16 (dense rows 12; a chart card is always 16, see Charts)                                    |
 | Section header → its content | 12                                                                                           |
 | Section → section            | 28                                                                                           |
 | Row height                   | 56, or 72 with a subtitle                                                                    |
@@ -854,7 +854,13 @@ calendar-aware ticks. A chart is a language, not a per-screen widget.
 picker, then the averaging chip. A screen may offer _fewer_ chips than that — a
 week of weekly bars is one bar, so volume starts at `1M` — but never different
 ones, never in a different order, and never a second control of its own
-somewhere else on the page. **The one chart this does not govern is the cycle
+somewhere else on the page. **The row sits above the chart it drives, on every
+chart**: under the figure and its caption, at the full width of the card or the
+page, and over the plot. Bodyweight put it under the plot, where it is read
+after the chart it has already changed, and a control that moves between
+screens is two controls. A row that drives several cards at once, as the region
+volume screen's does, sits above the first of them, outside every card.
+**The one chart this does not govern is the cycle
 axis**, whose x axis is a regime's cycle numbers and has no dates to range over;
 it carries `Last 12 · Last 24 · All` instead, and the rules it keeps and the
 ones it cannot are below, under
@@ -887,25 +893,89 @@ resolution.
 - **Buckets are walked as calendar dates.** Adding seven days to a local date
   crosses a clock change correctly; adding `7 × 86400` seconds does not.
 
-- **Seven date labels, and the last one is today.** The count is fixed at every
-  range, and the ladder is anchored on the **right** and counted back, because
-  every rolling window ends on the day you are standing in. Laid out from the
-  left instead, `1W` printed whichever day the data happened to start on and
-  never printed today at all. The plot is padded half a step either side so the
-  first and last labels sit inside it with room to print.
+- **Seven date labels where seven fit, and the last one is today.** The ladder
+  is anchored on the **right** and counted back, because every rolling window
+  ends on the day you are standing in. Laid out from the left instead, `1W`
+  printed whichever day the data happened to start on and never printed today
+  at all. The plot is padded half a step either side so the first and last
+  labels sit inside it with room to print.
+- **Whether seven fit is a measurement, as it is on the cycle axis.** The widest
+  label is measured at the size it will be drawn, system font scale included.
+  When seven do not fit, the format steps down first (`d MMM` to the day with
+  the month printed where it changes, `MMM ''yy` to `yyyy`), and only then does
+  the count drop to four, still ending on today. A fixed count of seven, which
+  this rule used to state, collided at `1M` at a 1.3 font and on every `All`
+  range of one to eight years. Past about two years the ticks fall on 1 January,
+  every 1, 2, 5 or 10 years counted back from this year, so a decade does not
+  print `2006 2010 2013`.
 - **The labels are named by how much time is on screen**: a week by its weekdays
   (`Fri Sat Sun … Thu`), a season by dates, a year by months, a decade by years.
   Four ticks a day apart all render as the same month and read as mush.
 - Y bounds are the data plus air, snapped to a round step, and **never anchored
   at zero** unless zero is in the data — anchoring draws a year of bodyweight as
   a flat line an inch off the bottom.
+- **One wild value does not set the scale.** A typo of 260 kg in a year of
+  100s drew the year as a flat line along the floor with one spike: honest, and
+  a chart that looks broken about data that is almost all fine. The band is
+  fitted to the other points, and a point goes **off-scale** when all three
+  hold: it is a single bucket, the buckets either side of it lie inside the band
+  of the rest, and including it would more than double that band's height. At
+  most one point per edge goes off-scale, and a chart of two points or fewer has
+  none. A run of two or more such buckets is a trend rather than a typo and is
+  always inside the band, so a real climb is never clipped. The off-scale point
+  is a caret on the edge it left by, in the series colour, with the line running
+  to the edge and back; it is read by touch like any other point, and the
+  caption names its real value, so the entry can be found and corrected. **Bars
+  never go off-scale**: a bar chart is anchored at zero, a heavy week is a count
+  and not a typo, and the tallest bar sets the top.
 - Dashed horizontal gridlines only, in `border`, **4 drawn and 4 left out** on
   every chart. **No vertical gridlines, no chart border.**
 - Y labels **right** at `label` size; X labels below the baseline.
 - A series is a 2px line with open circle markers, filled `bg`, stroked in the
   series colour. Sparklines drop the axes entirely.
-- **Markers only while they mark something.** Past ~40 points the circles touch
-  and the line is lost inside them; drop them and offer zoom.
+- **Markers only while they mark something.** When neighbouring points are
+  closer than about 10 px the circles touch and the line is lost inside them;
+  drop them and offer zoom. The distance is measured in pixels for each series
+  on its own. A count of points across every series, which this rule used to
+  imply with "past ~40 points", clumped 26 markers into a quarter of a chart and
+  dropped them from two series that had room for them.
+- **Two heights for a line chart.** A chart that is the subject of its screen is
+  **220**: the exercise trend and the bodyweight trend on Weigh-ins. A chart in
+  a card among other cards is **150**: the Strength card's cycle axis, and the
+  region volume chart, which is a bar chart held to the same height. The height
+  is the plot and its date labels together, so two charts of one height take
+  the same room. A sparkline is sized by the card or tile that holds it and is
+  neither. The empty chart and the frame of a chart still loading take the
+  height of the chart they stand in for; a placeholder of 260 in front of a
+  chart of 190 moved the page when the chart arrived.
+- **One legend, `ChartLegend`, under the plot.** It keys every chart that needs
+  a key: the trend chart's series, the Strength card's marks, the All time
+  groups, the year maps and the Phase card's tints. An entry is a swatch, 4, and
+  a name in `labelSmall` `textSecondary`, never in the swatch's hue (see
+  [Semantic assignments](#semantic-assignments)). A line is keyed by a 14 by 2
+  rule, dashed where the line it names is dashed; an area (a band, a tint, a
+  heat cell) by a 10 square at radius 2. Entries start at the left, 12 apart,
+  and wrap 4 apart; a legend may lead with a title in the same style, as the
+  Strength card's `Cycle` does, and the timeline strip's `Regimes` and `Weeks`
+  are two of them (see [Timeline strip](#timeline-strip)). It names only what
+  the chart draws now, and a chart of one series has none, since the screen
+  already names it. **It never grows past two rows**: the last entry that fits
+  reads `and 3 more`, so the header does not change height when a range brings a
+  ninth session into view. Five legends, in circles at 8 and squares at 10,
+  `bodySmall` and `labelSmall`, 12 and 16 apart, are what this replaces.
+- **Every chart card is padded 16 and spaced the same way inside.** Top to
+  bottom: the figure and its caption, 16, the range control, 12, the readout
+  where there is one, 16, then the plot. Under the plot: 8 to a hint or caption,
+  12 to the legend, and 16 to whatever follows (a row of figures, a hairline,
+  the row that opens the detail). The plot reserves half its top label's
+  measured height inside its own box, so the top value never touches what sits
+  over it. Figures in a row under a chart are 12 apart. On the page with no card
+  around it, as the exercise trend is, the page gutter stands in for the padding
+  and every gap is the same. **The dense-row 12 of
+  [§ 5](#5-space-radius-elevation) is for rows of a list, not for a chart
+  card**: the weekly-volume bar list takes 16, and a year map takes 16 with 12
+  at the foot, because its month strip carries 4 of its own slack under the
+  labels.
 - **A bucket is a bar, not a point on a line.** A line between two weeks claims
   the value between them means something, and weekly counts have no between —
   eleven that week, nine the next.
@@ -1018,7 +1088,10 @@ state.
   point at the floor of the chart would report a planned week as a collapse. The
   band is `deload` at 14%, and its cycle number under the axis is orange to
   match. Past 24 cycles, where `All` draws one point per block, the bands become
-  hairlines at 45% — forty bands at four points each is an orange chart.
+  hairlines at 20% — forty bands at four points each is an orange chart, and so,
+  it turned out, were thirty-five hairlines at the 45% this rule used to state.
+  The sparkline on an All time card draws no deloads at all, since it is read as
+  a shape.
 - **A cycle is tinted by the phase most of its sessions ran in.** Its slot is
   filled the plot's full height, behind the line, `bulk` and `cut` at 20% and
   `maintenance` at 16%, the colours the Phase card uses. A cycle split evenly
@@ -1060,12 +1133,20 @@ state.
   third too narrow and `fl_chart` clips the title without a word — the axis
   printed `+60` where it meant `+60%`. This is every chart's rule, not this
   one's: they all size their gutter through `axisGutter`.
-- **Three gridlines, all of them labelled.** The band is two steps tall from a
-  rounded floor, in steps of 1, 2, 4, 5, 10, 20, 25 or 50 percentage points —
-  2.5% is not a figure anybody reads a block of training in. The time axis drops
-  the labels on its bounds because dates there collide; three short percentages
-  down a gutter do not, and an unlabelled top and bottom is a scale the reader
-  has to infer.
+- **Three or four gridlines, all of them labelled.** The band is two steps tall
+  from a rounded floor, or three where two would leave more than 40% of it
+  empty, in steps of 1, 2, 4, 5, 10, 20, 25 or 50 percentage points and on up
+  the same way (100, 200, 250, 500) — 2.5% is not a figure anybody reads a
+  block of training in. **The ladder has no top.** It stopped at 50 and then
+  100, so a band of two steps reached at most 200 points over its floor, and a
+  regime at +259% drew its latest cycles over the readout. The time axis drops
+  the labels on its bounds because dates there collide; three or four short
+  percentages down a gutter do not, and an unlabelled top and bottom is a scale
+  the reader has to infer.
+- **One wild cycle goes off-scale as a wild point does on the trend chart**
+  (see [Charts](#charts)): one isolated cycle that would more than double the
+  band is a caret on its edge, and the readout names its real percentage. A
+  run of strong cycles is the programme working and is never clipped.
 - **The range control is `Last 12 · Last 24 · All` in a segmented pill** — the
   one chart in the app not driven by the row of date chips above, because a
   cycle axis has no dates to range over. Every chip stays selectable on a short
