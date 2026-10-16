@@ -144,6 +144,9 @@ shout where the others may not: a destructive action.
 | `warmup`      | cyan                                                  | A warm-up set on the log                                 |
 | `dropSet`     | lavender                                              | A drop or rest-pause set on the log                      |
 | `weighIn`     | lavender                                              | A day with a weigh-in, on its tile and its year maps     |
+| `bulk`        | lavender                                              | A bulk, as a tint on the Phase card and the cycle chart  |
+| `cut`         | cyan                                                  | A cut, as a tint on the Phase card and the cycle chart   |
+| `maintenance` | `textSecondary`                                       | Maintenance, as a tint on the same two charts            |
 | `heatEmpty`   | `surfaceHighest`                                      | A day not trained, and an untrained muscle               |
 
 **The identity order alternates warm and cool.** The muscle regions draw in this
@@ -161,15 +164,25 @@ progressions as one, which is the mistake the per-session chart exists to avoid.
 Two rules decide how the hues are shared:
 
 - **Every hue may be reused except blue and orange.** The six serve programme
-  identity, muscle regions, extra chart lines, the set types on the log and the
-  weigh-in habit, and one of them may carry two of those meanings, on one
-  screen if need be: lavender is a drop set, the Arms bar and a day weighed.
+  identity, muscle regions, extra chart lines, the set types on the log, the
+  weigh-in habit and the training phases, and one of them may carry two of
+  those meanings, on one screen if need be: lavender is a drop set, the Arms
+  bar, a day weighed and a bulk, and cyan is a warm-up, the Back bar and a cut.
   A reused hue is always read beside the label that says which meaning it
   carries, and six hues spread over every meaning the app has would otherwise
   run out or borrow blue and orange, the one borrowing that costs something.
   Those two are never reused, because each means the same thing everywhere,
   and a second meaning on any screen would cost every other screen its
   reading. Red stays outside the palette altogether.
+- **Maintenance is grey because it has no direction.** A bulk and a cut each
+  move the bodyweight one way, and each takes a hue. Maintenance holds it
+  still, and a third hue would claim it as a change of the same kind. It is
+  `textSecondary`, the grey every neutral label already wears, so it reads as
+  the ground the other two depart from. A phase is drawn only as a tint and a
+  legend swatch, never as text in its hue: cyan on a white card is 1.7:1, so
+  the phase is named in words in the colour of the text around it.
+  `test/core/palette_test.dart` holds `bulk` and `cut` to the rule the other
+  identity uses keep: neither may equal `progress`, `deload` or `negative`.
 - **Identity marks appear only where they separate programmes** — the regime
   library. Elsewhere a mark means _what kind of day this was_: `progress` for a
   session, `deload` for a light week. That is what a feed of trained days is
@@ -692,6 +705,100 @@ row is `CrossAxisAlignment.start` for the reason a row of stat tiles is.
   Weigh-ins opens the Weigh-ins screen. A tap on the button never also opens
   the tile.
 
+### Phase card
+
+One `surface` card under the `Phase` heading on Home, answering one question:
+what the person is eating for, and whether the scale agrees. The heading
+carries `Change` as its trailing link, which opens the phase sheet. Top to
+bottom:
+
+- **The phase row.** A 44 rounded-square tile in `surfaceHigh` holding a bare
+  glyph, `trending_up` for a bulk, `trending_down` for a cut and
+  `trending_flat` for maintenance; the phase's name in `value` with
+  `Since 3 Sep 2026` in `body` under it; and at the right a grey pill,
+  `surfaceHigh` at radius 999 and 36 tall, reading `Week 7 of 12` in `label`.
+  The tile is grey because a phase is not an identity, and the glyph says the
+  direction before the name is read. An open-ended phase reads `Week 7`. The
+  pill opens nothing: the heading's link is the card's one control (rule 6).
+- **The sparkline**, 72 tall: bodyweight from the start of the current phase,
+  or over the last 12 weeks where the phase is younger than that, folded into
+  weeks as every chart folds. The line is `progress` with the latest week as a
+  filled dot. Behind it each stretch is tinted by the phase it ran in, `bulk`
+  and `cut` at 20% and `maintenance` at 16%, with no tint where no phase was
+  set. A legend under it names only the phases the sparkline shows. It has no
+  axis, as no sparkline does.
+- **A hairline**, then **three figures** in equal columns, each a `label` over
+  a dense `ValueUnit`: `Bodyweight`, the latest weigh-in; `Since start`, the
+  change from the bodyweight on the phase's first day; and `Each week`, that
+  change as a weekly rate. A change carries its sign, `+1.2 kg` and
+  `−3.3 kg`, the minus a true minus. A figure the weigh-ins cannot support
+  prints `——` (rule 4): `Each week` needs weigh-ins at least a week apart
+  since the start.
+
+**The figures are not judged.** No figure turns `positive` or `warning` for
+moving the way the phase intends or against it. A cut losing a kilogram a week
+and a bulk gaining nothing are stated the same way, and the one place the card
+remarks on the direction is the prompt below.
+
+**With no phase set**, the card keeps its place and says what it is for: `——`
+in `value`, then `Set a bulk, a cut or maintenance, and Cycle progress shows
+which one each cycle ran in.` in `body`, then a grey `Set a phase` button that
+opens the same sheet. The heading drops `Change`, because the button says it.
+A phase that has been cleared shows this state too.
+
+**The card asks what comes next, and nothing else does.** Two conditions put
+one inset panel at the foot of the card, under the figures. It holds a
+sentence in `body` and two grey buttons side by side, and it leaves as soon as
+either is tapped.
+
+- **The planned length has passed**: `12 weeks are up. Start the next phase,
+  or keep this one going.` `Change phase` opens the sheet; `Keep going` makes
+  the phase open-ended, so the question is answered once.
+- **The weigh-ins have run against the phase for about three weeks** — losing
+  on a bulk, gaining on a cut, or drifting either way on maintenance:
+  `Your weight has fallen for three weeks during this bulk.` Then the same two
+  buttons. `Keep going` records the day it was tapped, and the question is not
+  asked again until three more weeks of weigh-ins run against the phase. The
+  thresholds belong to `lib/domain/` and are tested there.
+
+Neither is ever a notification, a badge on the Home tab, a toast or a prompt
+on opening the app ([RULES § 6](RULES.md#6-scope)). A person who never opens
+Home is never asked.
+
+**The tints are this card's and the cycle chart's alone.** The bodyweight
+trend chart on the Weigh-ins screen draws no phase bands, because it is read
+for the weight itself, across years, where a band per phase becomes stripes.
+
+### Phase sheet
+
+The sheet the Phase card's `Change` and `Set a phase` open, titled `Phase`,
+with no subtitle: the title names the thing. Top to bottom:
+
+- **Bulk · Cut · Maintenance** as a segmented pill across the sheet's width.
+  Three short words and one choice, so it is the one sheet in the app that
+  asks with a pill rather than a list of radio rows. With no phase set the
+  pill shows no selection, and `Save` stays off until one is chosen, because a
+  pre-set phase is a guess that would tint every cycle from that day.
+- **`Started`**: the day in an inset panel, `label` over `valueSm`, opening the
+  [day picker](#day-picker). A new phase defaults to today, which is a true
+  default: a phase is usually set on the day it begins. Days after today are
+  out of range. So is every day before the current phase's start when a new
+  phase is being started, and every day before the previous phase's start
+  when the current one is being corrected, because phases follow one another
+  and never overlap.
+- **`Planned length`**: an inset panel reading `12 weeks`, opening a picker of
+  `12 weeks`, `8 weeks`, `16 weeks` and `Open-ended`, commonest first.
+- **`Clear phase`**, a grey button, present only while a phase is set. It ends
+  the current phase today and leaves Home with no phase. It is not red: the
+  phase it ends stays in the history and keeps tinting the cycles it covered.
+- **`Save`**, the sheet's one primary button.
+
+**Choosing a different phase starts a new one; keeping the phase edits it.**
+With the same phase selected, `Save` changes the current phase's start day and
+length. With a different one, it starts a new phase on the chosen day, and the
+one before it ends there. A new phase started on the same day as the current
+one replaces it, which is how a mis-tapped phase is corrected.
+
 ### Strength card
 
 `surface` card, shared by Progress and the regime screen, answering one
@@ -718,7 +825,10 @@ its legend, then the row that opens the detail.
 - **The readout is a filled strip, not a line of prose.** It is the one thing on
   the card that changes when the chart is tapped, and grey text quietly
   rewording itself is not visibly an answer to the tap. The cycle is named in
-  `text` at the head of it; a deload says so in `deload`.
+  `text` at the head of it; a deload says so in `deload`. A cycle that ran in a
+  phase names it after the days, in the strip's own text colour:
+  `Cycle 6 · 3 Sep to 9 Sep 2026 · Cut · +6.4%`. A cycle with no phase leaves
+  the item out rather than printing `No phase`.
 - **Three states, one card** — trained, a first cycle with nothing to compare,
   and nothing trained at all. The last two print `——` where the figure goes and
   keep the chart's height as empty space, so the page does not change shape on
@@ -899,6 +1009,28 @@ state.
   band is `deload` at 14%, and its cycle number under the axis is orange to
   match. Past 24 cycles, where `All` draws one point per block, the bands become
   hairlines at 45% — forty bands at four points each is an orange chart.
+- **A cycle is tinted by the phase most of its sessions ran in.** Its slot is
+  filled the plot's full height, behind the line, `bulk` and `cut` at 20% and
+  `maintenance` at 16%, the colours the Phase card uses. A cycle split evenly
+  between two phases takes the one it ended in, the open cycle is tinted by
+  the sessions it has so far, and a cycle trained with no phase set has no
+  tint. Under blocks a block takes the phase most of its sessions ran in.
+  Adjacent cycles in one phase meet without a seam, so a phase reads as one
+  stretch of the axis rather than as a row of boxes.
+- **A deload is drawn exactly as it is with no phases at all**: the band at
+  80% of its slot, no point, the orange number, the line dashed across it.
+  **No tint is ever drawn under it.** The tints of the cycles either side run
+  to the deload band's edges and stop there, so a light week never reads as
+  part of a cut, and orange is never mixed with another hue into a colour
+  that means neither.
+- **Gridlines over a tint are `textTertiary`.** A 20% tint lifts the ground,
+  and `border` over it reads as a scratch (see [Charts](#charts)). While any
+  tint is drawn, every gridline on the plot takes `textTertiary`, so one line
+  does not change colour from slot to slot.
+- **The legend adds a swatch for each phase the window shows**, after `Deload`
+  and the open cycle's entry, each a 10 square in the phase's colour, named
+  `Maintenance`, `Bulk` or `Cut`. A phase that no cycle on screen ran in has no
+  swatch, for the reason `Deload` appears only where a deload does.
 - **The open cycle is drawn as unfinished**: a dashed segment to a marker stroked
   in `textTertiary`. Its point is real and partial, and a solid one would claim a
   finished cycle two sessions in.
@@ -1548,7 +1680,7 @@ habit tiles, the Past sessions card, the Weigh-ins screen and More's profile
 header.
 
 **Home** is the screen the app opens on, and the place things are entered.
-Four parts, in an order that does not change:
+Five parts, in an order that does not change:
 
 1. **The masthead**: the date as the eyebrow, `Home` as the title, the rest
    line, and the backup button.
@@ -1557,21 +1689,26 @@ Four parts, in an order that does not change:
    primary action.
 3. **Habits**: the two habit tiles. The Workouts tile takes the place of the
    Consistency card, and opens the same Consistency screen.
-4. **Past sessions**: a list card holding one row, `Log a past session`, with
+4. **Phase**: the [Phase card](#phase-card), the one place a bulk, a cut or
+   maintenance is set and the one place the app asks whether it still holds.
+   It sits under the habits because a weigh-in is what moves it.
+5. **Past sessions**: a list card holding one row, `Log a past session`, with
    `For a day you trained without the app` under it, which opens the day picker
    and then the log for the day picked. It replaces the calendar button that
    sat in the masthead, because a row says what it does where a glyph in the
    band could say it only through a tooltip, which needs a long press.
 
 **The order is fixed and Home cannot be customised.** A page that rearranges
-itself is a page learned twice, and four parts fit one scroll. Cycle progress
+itself is a page learned twice, and five parts fit one scroll. Cycle progress
 and Weekly volume are not on Home: they are read rather than entered, so they
 are on Progress.
 
 **Progress** holds Cycle progress and Weekly volume, moved from Workouts as
 they were: the same headings, the same cards, the same `All time` links and the
 same screens behind them. Its eyebrow is `Cycles and volume`, the inventory of
-the page. Nothing on it asks a question.
+the page. Nothing on it asks a question. Cycle progress has since gained the
+phase tints, under [The cycle axis](#the-cycle-axis), and the phases are set
+on Home rather than here, because Home is where things are entered.
 
 **Weigh-ins** is pushed from its habit tile, so it wears the app bar, titled
 `Weigh-ins`. Top to bottom:

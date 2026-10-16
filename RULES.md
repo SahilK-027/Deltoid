@@ -540,6 +540,25 @@ else has to pass: **no new screen, and no new question asked.**
   asked. The tile states and never asks: no notification, no badge, and no
   prompt on opening the app, as the bodyweight pill already promises.
 
+- **Phases** are the ninth, and they fail the test on its second half: they
+  are a new question. A Phase card on Home and the sheet behind it ask
+  whether the person is in a bulk, a cut or maintenance, from which day, and
+  for how long if they have decided. No screen is added, since the card sits
+  on a page already open and the sheet is one question. They are here because
+  every strength number in the app is read without the one fact that changes
+  what it means. Cycle progress flat for eight weeks is a stall during a bulk
+  and a success during a cut, and the chart could not tell the two apart.
+  With the phase recorded, each cycle is tinted by the phase it ran in, and
+  the reading is left to the person, as it always was. What stays ruled out
+  is everything that would turn a phase into a diet: no calories, no macros,
+  no target weight, no meal or food of any kind, all of which stay on the list
+  above. The phase is declared and never inferred, so the app does not guess
+  a bulk from a rising line. And the one place it may ask whether the phase
+  still holds is the Phase card itself, when the planned length has passed or
+  the weigh-ins have run against the phase for about three weeks: no
+  notification, no reminder badge on any tab, no toast, and no prompt
+  anywhere else, on opening the app or otherwise.
+
 **Accounts came off it too, and did _not_ pass that test — so the reason has to
 be written down rather than assumed.** Sync across your own phones needs an
 identity to sync to, and an identity needs somewhere to say who you are, which

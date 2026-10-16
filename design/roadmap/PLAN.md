@@ -296,12 +296,47 @@ owner approves those screenshots.
 7. More: the profile header, the Account row and the new About text.
 8. Release 1.17.0: version bump and changelog entry.
 
-**Then** 1.18.0 phases, 1.19.0 charts, 1.20.0 AI analysis, each broken down the same
-way when it starts. The deleted-regime legend fix can land in any patch release.
+1.17.0 shipped on 16 October 2026 (`bd35ca3`, tag `v1.17.0`).
+
+**1.18.0, phases**
+
+1. Amend the documents for 1.18: THEME (the Phase card, the phase sheet, the phase
+   tints on the cycle chart and the Phase card's graph, and the colours: bulk lavender,
+   cut cyan, maintenance grey), RULES § 6 (phases as a recorded exception, with the
+   reason), and SYNC.md (the new syncable table, how it merges, and that it is never a
+   question asked at the bar).
+2. The data: the `phases` table through the full migration ladder (`tables.dart`,
+   regeneration, a default in `table_spec.dart`, an idempotent `upgradeSchema` step),
+   the server rung with row-level security and its pgTAP test, push and pull, backup
+   export and restore, and the invariants. Plus the pure domain functions in
+   `lib/domain/` with their tests: the phase on a given day, the phase most of a cycle's
+   sessions ran in, the weekly rate of change, and the two staleness checks. No screen
+   changes in this step.
+3. The Phase card on Home and the phase sheet: set, change or clear a phase, its start
+   day from the existing day picker, and the optional planned length; the card's figures
+   and its bodyweight graph tinted by phase.
+4. The staleness prompts on the Phase card: when the planned length has passed, and when
+   the weigh-ins have run against the phase for about three weeks. Never a notification.
+5. The cycle progress chart: phase tints behind each cycle, the phase in the readout, and
+   the legend; deloads drawn exactly as today with no tint beneath them.
+6. Release 1.18.0.
+
+**Then** 1.19.0 charts and 1.20.0 AI analysis, each broken down the same way when it
+starts. The deleted-regime legend fix can land in any patch release.
 
 ## Versioning
 
-Every release above is a minor version under the changelog's Semantic Versioning
-rule. A 2.0.0 would only be right if a release broke something for older installs,
-such as a backup an older version cannot restore or sync that stops until every phone
-is updated. None of this work requires that.
+Every release above is a minor version, following the changelog's rule that a minor
+release adds behaviour and a patch release only corrects it. That is how this repository
+already treats schema changes: a new table or column is a minor release whose
+**Upgrade notes** say that the local schema migrates on first launch and that the server
+migration must be applied before installing on a synced phone. A backup written by the
+new schema is refused by older builds, which say so; that is expected, not a break.
+
+1.18.0 is such a release. Its changelog entry needs Upgrade notes for the `phases`
+table: the schema version it migrates to, and `supabase db push` before installing on a
+synced phone.
+
+A 2.0.0 would mean the app stops honouring something it has promised: no longer
+restoring backups written by older versions, a migration path removed so an old install
+cannot upgrade, or logged data reinterpreted. None of the planned work does that.

@@ -156,16 +156,55 @@ create policy "own rows only" on <table>
 
 ## 4. What the server holds
 
-The nine tables carrying `SyncColumns`, and those only:
+The ten tables carrying `SyncColumns`, and those only:
 
 `exercises`, `regimes`, `sessions`, `session_exercises`, `cycles`, `workouts`,
-`workout_exercises`, `set_logs`, `bodyweight_logs`.
+`workout_exercises`, `set_logs`, `bodyweight_logs`, `phases`.
 
 **A rotation is a column on `sessions` and nothing else.** `rotation_id` names
 which days of a regime alternate in one position of the cycle, and it merges
 like any other column, last write wins. Which day is due is not sent: every
 phone derives it from the workouts it holds, so a session logged on one phone
 moves the rotation on the other by arriving.
+
+**A phase is a row of its own, and every column of it syncs.** `phases` holds
+one row per bulk, cut or maintenance the person has declared:
+
+| Column          | Holds                                                                   |
+| --------------- | ----------------------------------------------------------------------- |
+| `kind`          | `bulk`, `cut` or `maintenance`, and nothing else                        |
+| `day_key`       | The day the phase starts                                                |
+| `planned_weeks` | 8, 12 or 16, or null for open-ended                                     |
+| `end_day_key`   | The last day the phase covers, set by `Clear phase`; null while it runs |
+| `kept_day_key`  | The day `Keep going` last answered the weigh-in prompt, or null         |
+
+The two prompt columns sync for the reason everything else does: a question
+answered on one phone is answered, and the other phone must not ask it again.
+Nothing about a phase is local to one device, so nothing about it joins
+`app_settings`. On the server it takes the shape of the other nine: `user_id`
+and `server_updated_at` beside it, RLS with `using` and `with check`, the
+trigger that stamps the clock, and its own case in the RLS test, all in a
+migration of its own under `supabase/migrations/`. That migration is applied
+(`supabase db push`) before the build that adds `phases` is installed on a
+synced phone, and the release's **Upgrade notes** say so, as they have for
+every server column before it. Installed first, the build's pushes of phase
+rows are refused, and they wait as `dirty` and are reported as
+[§ 13](#13-when-it-fails) describes until the server catches up.
+
+**A phase names no regime.** It is a fact about the person rather than the
+programme, so it has no foreign key, switching regime leaves it untouched,
+and a pull places it anywhere in the walk of parents before children.
+
+**Where one phase ends is derived, never written.** A phase runs from its
+`day_key` until the next live phase starts, or to its own `end_day_key` if
+that comes first. Starting a new phase therefore writes one row and never
+touches the one before it, so no decision ever spans two rows and
+last-write-wins is never asked to settle a pair, which is the trap
+[§ 8](#the-one-column-last-write-wins-cannot-decide) describes for
+`is_active`. Which phase a day ran in, which phase is current and whether a
+prompt is due are pure functions in `lib/domain/` over rows both phones hold,
+so both phones reach the same answer however the rows arrived. Like a
+rotation's next day, none of them is sent.
 
 **`app_settings` never syncs.** It holds `device_id`, the unit preference and
 the theme — which phone you are on, and how that phone should look. Syncing
@@ -361,8 +400,9 @@ of independent fields, it is **one physical event**: "60 kg for 8 reps."
 
 Inventing a PR is worse than losing an edit. The same argument holds for
 `bodyweight_logs` (one reading), `workouts` (`dayKey` and `startedAt` must move
-together, and a field merge could split them) and `cycles` (derived state, only
-coherent whole).
+together, and a field merge could split them), `cycles` (derived state, only
+coherent whole) and `phases` (a kind and its start day are one declaration, and
+a cut from one phone on a bulk's date from the other is a phase nobody set).
 
 The remaining tables are genuinely independent attributes, where a merge would
 be safe — but two devices editing one template row at once is rare enough that a
@@ -417,6 +457,7 @@ state without negotiating.
 | `cycles_regime_index_live`        | both advance the cycle → two "cycle 7"            | Both are real cycles. Loser renumbers to the next free index                                                                                                             |
 | `regimes_identity_live`           | both create a regime; both take the same free hue | Both live. Loser takes the next free slot, ordered by `id`. **A shelf with no free slot cannot wrap** — see below                                                        |
 | `cycles_regime_open_live`         | both advance a regime's cycle → two open cycles   | Newer stays open, older is **completed** — the same answer as `workouts_single_open`, and `healDuplicateOpenCycles` already writes it                                    |
+| `phases_start_live`               | both start a phase on the same day                | One declaration made twice. LWW, tombstone the loser, as `bodyweight_day_live` does. No logged work hangs off a phase, so nothing is orphaned                            |
 
 **The seventh regime.** This section said a full shelf wraps and two programmes
 share a colour, and the schema says otherwise: `identity_index` carries a
@@ -432,6 +473,13 @@ every session, workout and set under it still arrive and are kept: rule 2 of
 outright would orphan its children — the same loss with more steps. It is not on
 the shelf until a slot frees, and that is the honest price. Row 15 of
 [§ 12](#12-every-edge-case-and-what-it-does) is corrected to match.
+
+`phases_start_live` arrived with phases, after that count, and makes thirteen.
+It is the one index in the table whose loser is tombstoned without a second
+thought, because a phase is a statement about a span of days rather than work
+done in it: two phones that both say a phase began on 3 September are making
+one statement, and keeping both would leave the span with two phases and the
+tints with no answer.
 
 The twelfth, `set_logs_slot_identity`, needs no rule and is listed so the count
 stops drifting. It is not partial and it is not a rule about the data: it exists
@@ -556,8 +604,17 @@ both survivors and empty the catalog. **`workout_exercises.muscle` never moves.*
 It is a snapshot of what the movement trained the day it was logged, and only
 the id is repointed.
 
-Three global rules still apply to a merge: one active regime, one open workout,
-one bodyweight per day — resolved as [§ 9](#9-collision--two-rows-one-slot) says.
+Four global rules still apply to a merge: one active regime, one open workout,
+one bodyweight per day and one phase per start day — resolved as
+[§ 9](#9-collision--two-rows-one-slot) says. Two phase histories merge into one
+sequence without further work, because where each phase ends is derived from
+the next one's start ([§ 4](#4-what-the-server-holds)) and a union of starts is
+still a sequence.
+
+**Phases are not training for the purpose of the three shapes.** The question
+counts sessions, and a side holding phases and nothing else is empty: a phone
+on which a cut was declared and nothing was logged has no history to lose, and
+its phases are pushed with everything else.
 A merged shelf can also exceed the six identity hues, in which case two
 programmes share a colour until one is deleted.
 
@@ -603,6 +660,10 @@ fails a build rather than a history.
 | 16  | A pulled row fails a local CHECK             | Skipped, named through the failure channel, batch continues. [§ 13](#13-when-it-fails)                                                                                                                                                                                                                                            |
 | 17  | Sign out mid-sync                            | Nothing shared. The queue stays on the device and resumes if the same account signs back in.                                                                                                                                                                                                                                      |
 | 18  | Account holds rows from a newer build        | [§ 14](#14-two-builds-one-account). Unknown columns ignored, missing ones defaulted.                                                                                                                                                                                                                                              |
+| 19  | Both start a phase on the same day           | One statement made twice. LWW, loser tombstoned. [§ 9](#9-collision--two-rows-one-slot)                                                                                                                                                                                                                                           |
+| 20  | Both start a phase, on different days        | Both survive. The earlier runs until the later one starts, on both phones, because the end is derived and was never written.                                                                                                                                                                                                      |
+| 21  | A clears the phase, B changes its length     | One row, two edits. Row LWW on `server_updated_at`, so one phone's whole edit stands; a lost `Clear phase` is pressed again.                                                                                                                                                                                                      |
+| 22  | A phone on a build without phases pulls      | Its registry has no `phases`, so it never asks for them. The rows wait on the server and arrive when that phone is updated.                                                                                                                                                                                                       |
 
 ---
 
@@ -675,6 +736,11 @@ consequence of it. See [RULES.md § 3](RULES.md#3-schema-and-migrations).
 9. **A single bad row never stops a restore.** [§ 13](#13-when-it-fails)
 10. **A pulled row is written by the same code that writes a restored row.**
     [§ 7](#7-pull)
+11. **Sync never asks about a phase.** A phase arriving from another phone is
+    applied like any row, without a sheet, a toast or a question, and never on
+    the log screen. The only place the app asks whether a phase still holds is
+    the Phase card on Home ([RULES § 6](RULES.md#6-scope)), and a phase pulled
+    in changes what that card shows rather than prompting from anywhere else.
 
 ---
 
@@ -867,8 +933,8 @@ there is no second copy of the answer — which is the same reason
 Counting what is owed needs an index, though. `COUNT(*) WHERE dirty` across a
 `set_logs` holding 168k rows is a scan, re-run every time a set is ticked; a
 partial index on `dirty = 1` is empty whenever nothing is owed and costs nothing
-to carry. Nine of them, one per syncable table, and they are the first rung of
-the ladder.
+to carry. One per syncable table, nine on the first rung of the ladder and a
+tenth on the rung that added `phases`.
 
 ### What must never be re-stamped
 
