@@ -163,6 +163,11 @@ fixed timers.
   the app for exact figures rather than doing arithmetic on raw logs.
 - Model: Claude Opus 5.5 (`claude-opus-5-5`) at `medium` effort. At four or five
   questions a month the cost is a few cents.
+  A setting to choose Sonnet 5.5 instead was considered and left out of 1.20: the
+  difference is cents a month and it would add a question and a second set of evals.
+  If it is added later, it is one More row (`More thorough` / `Faster`), and the
+  server function accepts only an allowlist of `claude-opus-5-5` and
+  `claude-sonnet-5-5`, with the app sending a choice rather than a model ID.
 - The server function is the only place that names a provider, so changing provider
   later is a one-file change.
 
