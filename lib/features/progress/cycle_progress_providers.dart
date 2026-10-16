@@ -6,13 +6,12 @@ import '../../data/repositories/training_repository.dart';
 import '../../domain/cycle_progress.dart';
 import '../history/history_providers.dart';
 
-/// The active regime's cycle progress, for the Workouts card.
+/// The active regime's cycle progress, for the Cycle progress card on Progress.
 ///
-/// **Kept alive, and warmed beside the screen's other reads.** The card sits
-/// above the fold on the screen the app opens on, so a provider created by the
-/// first build of that card draws an empty card and then pops a chart into it a
-/// frame later. The read is on local disk; it should be sitting there when the
-/// screen is built.
+/// **Kept alive, and warmed beside the screen's other reads.** The card is the
+/// first thing on its tab, so a provider created by the first build of that
+/// card draws an empty card and then pops a chart into it a frame later. The
+/// read is on local disk; it should be sitting there when the screen is built.
 final activeRegimeProgressProvider = StreamProvider<RegimeProgress?>((ref) {
   // Gated on the seeder for the reason `homeProvider` is: a first launch
   // would otherwise score an empty database and immediately re-score it when

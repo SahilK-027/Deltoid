@@ -177,3 +177,26 @@ final volumeHistoryProvider = StreamProvider.autoDispose<VolumeHistory>((ref) {
     );
   });
 });
+
+/// This week's hard sets per muscle, for the Weekly volume card on Progress.
+///
+/// Its own query rather than a field on Home's snapshot, which it lived beside
+/// until the card moved: it reads `set_logs`, and folding it into
+/// `todaySnapshot` would re-run Home's whole read on every set ticked
+/// mid-session.
+///
+/// Not `autoDispose`, unlike [volumeHistoryProvider]: it is one aggregated
+/// query over seven days, and the card it feeds sits on a tab the shell keeps
+/// built, so dropping it on every tab change would only make the card arrive
+/// late the next time Progress is opened.
+final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
+  final db = ref.watch(databaseProvider);
+  final repo = ref.watch(trainingRepositoryProvider);
+
+  return db.watchQuery([db.setLogs, db.workoutExercises, db.workouts], () async {
+    // `volumeWindowDays - 1`, because the window includes today — the same
+    // off-by-one `computeConsistency` documents.
+    final from = dayKeyOf(daysBefore(DateTime.now(), volumeWindowDays - 1));
+    return computeWeeklyVolume(setsByMuscle: await repo.setsByMuscleSince(from));
+  });
+});

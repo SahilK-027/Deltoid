@@ -2428,7 +2428,7 @@ class TrainingRepository {
     return regimeProgress(regime.id);
   }
 
-  /// One regime scored cycle by cycle, for the Workouts card, the regime screen
+  /// One regime scored cycle by cycle, for the Cycle progress card, the regime screen
   /// and the All time cards.
   ///
   /// Three raw statements, for the reasons [exerciseProgress] gives at length:

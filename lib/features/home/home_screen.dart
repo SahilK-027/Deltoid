@@ -12,27 +12,18 @@ import '../../core/widgets/calendar.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
-import '../../data/repositories/training_repository.dart';
-import '../../domain/cycle_progress.dart';
 import '../../domain/habits.dart';
 import '../../domain/cycle_engine.dart';
-import '../../domain/muscle_volume.dart';
 import '../history/workout_detail_screen.dart';
 import '../log/log_screen.dart';
 import '../log/widgets/exercise_sheets.dart';
 import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
-import 'all_time_screen.dart';
-import 'cycle_progress_providers.dart';
-import 'regime_progress_screen.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'home_providers.dart';
 import 'weigh_ins_screen.dart';
-import 'volume_history_screen.dart';
 import 'widgets/habit_tile.dart';
-import 'widgets/strength_card.dart';
-import 'widgets/volume_bars.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/failure.dart';
 import '../account/backup_mark.dart';
@@ -448,15 +439,6 @@ class HomeScreen extends ConsumerWidget {
     // before you go to either, and this costs one aggregated query per change
     // to `workouts`.
     ref.watch(fullHeatmapProvider);
-    // **Warmed here for the same reason, and it is the stronger case.** This
-    // one is drawn *on this screen*, and watching it only where it is drawn
-    // made it strictly slower than everything around it: the card lives inside
-    // the branch that renders once `today` has arrived, so the query did not
-    // start until the snapshot had already landed. Two local reads that could
-    // have run together ran one after the other, and the section visibly
-    // dropped in afterwards — the staged reveal the rest of this screen exists
-    // to avoid. Started here, both are in flight in the same frame.
-    final volume = ref.watch(weeklyVolumeProvider).valueOrNull;
     // The Weigh-ins tile, waited for with the rest so the Habits row arrives
     // with the page rather than half of it a frame later.
     final weighIns = ref.watch(weighInDaysProvider).valueOrNull;
@@ -464,38 +446,27 @@ class HomeScreen extends ConsumerWidget {
     final sessions = today?.sessions ?? const <Session>[];
     final status = today?.snapshot.status;
     final open = today?.openWorkout;
-    // Watched here rather than inside the card, so the score is already in hand
-    // when the page is built. Created by the card's first build instead, the
-    // section draws empty and pops a chart into itself a frame later.
-    final cycles = ref.watch(activeRegimeProgressProvider);
 
     return Scaffold(
-      body: switch ((today, volume, regime, sessions.isEmpty)) {
+      body: switch ((today, regime, sessions.isEmpty)) {
         // Nothing has loaded yet. Blank, not a spinner: the answers are on
         // local disk, and a spinner that shows for two frames is worse than
         // nothing. Any empty state here would be a guess — the frame before
         // the snapshot arrives looks exactly like a fresh install.
-        //
-        // **Both reads, not just the snapshot.** The page arrives whole or not
-        // at all; waiting on the slower of two queries that started together
-        // costs a frame or two, and a section that appears after the page did
-        // costs the user's attention every time they land here.
-        (null, _, _, _) || (_, null, _, _) => const SizedBox.shrink(),
+        (null, _, _) => const SizedBox.shrink(),
         _ when weighIns == null => const SizedBox.shrink(),
-        (_, _, null, _) => _NoRegimeState(
+        (_, null, _) => _NoRegimeState(
           last: today!.lastCompleted,
           heatmap: today.heatmap,
           weighIns: weighIns,
           hasHistory: today.hasHistory,
-          volume: volume!,
         ),
-        (_, _, final r?, true) => _NoSessionsState(
+        (_, final r?, true) => _NoSessionsState(
           regime: r,
           last: today!.lastCompleted,
           heatmap: today.heatmap,
           weighIns: weighIns,
           hasHistory: today.hasHistory,
-          volume: volume!,
         ),
         // The masthead and the one action are a single band, and the record
         // scrolls under it. See [_HomeHeader] for why the hero is not a card:
@@ -508,12 +479,7 @@ class HomeScreen extends ConsumerWidget {
         // item in the list it would slide off the top the moment you looked at
         // the heatmap, taking the one thing you came for with it — the session,
         // and the button that starts it.
-        // Loading, not errored: the page waits for the score the way it waits
-        // for the snapshot and the volume, so it arrives whole. A score that
-        // *failed* is a different case — the page renders and the section is
-        // absent, rather than the whole screen being held hostage by one query.
-        (_, _, _?, false) when cycles.isLoading => const SizedBox.shrink(),
-        (_, _, final r?, false) => Column(
+        (_, final r?, false) => Column(
           children: [
             _HomeHeader(last: today!.lastCompleted),
             Expanded(
@@ -590,26 +556,6 @@ class HomeScreen extends ConsumerWidget {
                             hasOpenWorkout: open != null,
                           ),
                         ),
-                        // Under the habits, because they answer the same
-                        // question one level down: the Workouts tile says
-                        // whether you turned up, this says what you trained
-                        // when you did.
-                        //
-                        // Not gated on history. Appearing only once something
-                        // was logged would make the section arrive out of
-                        // nowhere on the day of the first workout — the screen
-                        // changing shape underneath you at the one moment you
-                        // are reading it. The zero state carries it too, so the
-                        // page is the same page before and after.
-                        const SizedBox(height: Space.section),
-                        _VolumeCard(volume: volume!),
-                        if (cycles.valueOrNull case final progress?) ...[
-                          const SizedBox(height: Space.section),
-                          _CycleProgressCard(
-                            regime: progress,
-                            plannedLifts: _plannedLifts(today.snapshot),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -804,14 +750,12 @@ class _NoRegimeState extends ConsumerWidget {
     required this.heatmap,
     required this.weighIns,
     required this.hasHistory,
-    required this.volume,
   });
 
   final ({Workout workout, String? sessionName})? last;
   final HeatmapData heatmap;
   final Set<int> weighIns;
   final bool hasHistory;
-  final WeeklyVolume volume;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -862,14 +806,6 @@ class _NoRegimeState extends ConsumerWidget {
                     AccountRecoveryNote(hasHistory: hasHistory),
                     // No play button: there is no session to start.
                     _HabitsSection(heatmap: heatmap, weighIns: weighIns),
-                    const SizedBox(height: Space.section),
-                    _VolumeCard(volume: volume),
-                    const SizedBox(height: Space.section),
-                    _CycleProgressCard(
-                      regime:
-                          ref.watch(activeRegimeProgressProvider).valueOrNull ??
-                          _noProgress,
-                    ),
                   ],
                 ),
               ),
@@ -891,7 +827,6 @@ class _NoSessionsState extends ConsumerWidget {
     required this.heatmap,
     required this.weighIns,
     required this.hasHistory,
-    required this.volume,
   });
 
   final Regime regime;
@@ -899,17 +834,15 @@ class _NoSessionsState extends ConsumerWidget {
   final HeatmapData heatmap;
   final Set<int> weighIns;
   final bool hasHistory;
-  final WeeklyVolume volume;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // **The same page it will be once the regime has days in it**, which is the
-    // rule the sibling state above follows too. Habits, This week and Last
-    // session are not about the regime — the habit grids and a week's volume are read
-    // off logged work, and a regime with no sessions yet says nothing about
-    // whether there is any. Dropping them for a lone centred card would make
-    // adding the first session look like it built three cards, when all it does
-    // is fill one.
+    // rule the sibling state above follows too. Habits is not about the
+    // regime — the habit grids are read off logged work, and a regime with no
+    // sessions yet says nothing about whether there is any. Dropping them for a
+    // lone centred card would make adding the first session look like it built
+    // a section, when all it does is fill one.
     //
     // Titled `Your split` rather than `Today's session` to match
     // [_NoRegimeState]: both are the same sentence at different depths — there
@@ -956,14 +889,6 @@ class _NoSessionsState extends ConsumerWidget {
                     AccountRecoveryNote(hasHistory: hasHistory),
                     // No play button: there is no session to start.
                     _HabitsSection(heatmap: heatmap, weighIns: weighIns),
-                    const SizedBox(height: Space.section),
-                    _VolumeCard(volume: volume),
-                    const SizedBox(height: Space.section),
-                    _CycleProgressCard(
-                      regime:
-                          ref.watch(activeRegimeProgressProvider).valueOrNull ??
-                          _noProgress,
-                    ),
                   ],
                 ),
               ),
@@ -1685,134 +1610,4 @@ class _PlayAction extends ConsumerWidget {
             ),
     );
   }
-}
-
-/// This week's sets per muscle (THEME → Components → Bar list).
-///
-/// A section on the page you already open rather than a screen you navigate to
-/// — a volume dashboard came off the non-goals list on exactly that condition,
-/// and a hero pager carrying it fails the test that a landing screen you have
-/// to swipe to use is a landing screen that failed.
-///
-/// **Handed its numbers rather than watching for them.** A provider starts when
-/// something first watches it, so reading [weeklyVolumeProvider] here would
-/// start it only once the card is being built — after the snapshot it should
-/// have been racing, which is what makes a section arrive late. The screen
-/// starts both reads in the same frame and does not draw until it has both, so
-/// there is nothing here to be absent.
-class _VolumeCard extends StatelessWidget {
-  const _VolumeCard({required this.volume});
-
-  final WeeklyVolume volume;
-
-  @override
-  Widget build(BuildContext context) {
-    void openHistory() => Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const VolumeHistoryScreen()));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // `Weekly volume`, not `This week`: the window is a rolling seven days
-        // ([volumeWindowDays]), and the heading sat directly under a
-        // Consistency section whose `this week` is calendar-bound — two
-        // different weeks on one screen, both called this one.
-        SectionHeader(
-          'Weekly volume',
-          // Nothing to open on a fresh install, and a link to an empty screen
-          // is a control that does nothing.
-          actionLabel: volume.isEmpty ? null : 'All time',
-          onAction: openHistory,
-        ),
-        AppCard(
-          padding: const EdgeInsets.all(Space.md),
-          onTap: volume.isEmpty ? null : openHistory,
-          // Just the bars. A sentence under them would restate what every row
-          // already prints — a total, a count of trained regions, and the
-          // window named in the heading — and no other card in the app explains
-          // its own chart in prose.
-          child: VolumeBars(volume: volume),
-        ),
-      ],
-    );
-  }
-}
-
-/// What the programme is actually doing, and the way into the detail.
-///
-/// It replaces the Last session card, which repeated the masthead above it and
-/// the History tab beside it. The question this answers — is the training
-/// working — is asked nowhere else in the app.
-/// The score a phone with no regime on it has.
-///
-/// The empty states carry the Cycle progress section like every other section
-/// on this page (THEME -> Empty states): the card already draws itself with no
-/// cycles in it, so hiding it made the first regime look as though it had built
-/// a card rather than filled one.
-const _noProgress = RegimeProgress(
-  regimeId: '',
-  regimeName: '',
-  identityIndex: 0,
-  isActive: false,
-  progress: CycleProgress(cycles: [], latest: null, trend: null),
-  labels: {},
-);
-
-class _CycleProgressCard extends StatelessWidget {
-  const _CycleProgressCard({required this.regime, this.plannedLifts});
-
-  final RegimeProgress regime;
-  final int? plannedLifts;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(
-          'Cycle progress',
-          // Nothing to open before anything is scored: an open cycle with no
-          // sets in it still fills the list of cycles, so the link is gated on
-          // there being a point to look at rather than on a row existing.
-          actionLabel: regime.progress.latest == null ? null : 'All time',
-          onAction: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AllTimeScreen()),
-          ),
-        ),
-        StrengthCard(
-          regime: regime,
-          plannedLifts: plannedLifts,
-          // Before a regime exists there is no name to caption the card with
-          // and no regime screen to open: the section is the shape it will
-          // have, with the figures printed as dashes.
-          showName: regime.regimeId.isNotEmpty,
-          onOpen: regime.regimeId.isEmpty
-              ? null
-              : () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        RegimeProgressScreen(regimeId: regime.regimeId),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-}
-
-/// How many lifts the active programme holds: every exercise in every session,
-/// counted once per session it appears in.
-///
-/// Per session rather than per exercise, because that is what a lift is — Push
-/// 1 bench and Push 2 bench are two progressions (CLAUDE.md rule 1), and a
-/// denominator that counted them once would leave `15 of 12 lifts recorded` on
-/// the card.
-int? _plannedLifts(TodaySnapshot snapshot) {
-  if (snapshot.exerciseNamesBySession.isEmpty) return null;
-  var total = 0;
-  for (final names in snapshot.exerciseNamesBySession.values) {
-    total += names.length;
-  }
-  return total == 0 ? null : total;
 }

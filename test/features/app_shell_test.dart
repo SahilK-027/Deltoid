@@ -142,7 +142,7 @@ void main() {
     expect(find.byIcon(Icons.pending_outlined), findsNothing);
   });
 
-  testWidgets('Progress is its masthead and nothing it does not hold', (
+  testWidgets('Progress wears the masthead with its inventory', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -158,7 +158,8 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Progress'), findsOneWidget);
-    // The eyebrow names cards the page does not hold yet.
-    expect(find.text('CYCLES AND VOLUME'), findsNothing);
+    // The eyebrow names the two cards the page holds; the cards themselves are
+    // covered by `progress_screen_test.dart`.
+    expect(find.text('CYCLES AND VOLUME'), findsOneWidget);
   });
 }

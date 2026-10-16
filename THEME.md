@@ -1629,7 +1629,7 @@ appear only while an account is signed in:
 | The cycle order card, position marks and the line between them  | `lib/core/widgets/cycle_order.dart`              |
 | Scroll physics                                                  | `lib/core/widgets/scroll.dart`                   |
 | Table, keypad, stopwatch pad                                    | `lib/features/log/widgets/`                      |
-| Bar list                                                        | `lib/features/home/widgets/volume_bars.dart` |
+| Bar list                                                        | `lib/features/progress/widgets/volume_bars.dart` |
 | Habit tile and its thirty-day grid                              | `lib/features/home/widgets/habit_tile.dart`  |
 | The year map, for training days and weigh-in days               | `lib/features/home/widgets/year_heatmap.dart` |
 

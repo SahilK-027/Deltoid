@@ -5,7 +5,6 @@ import '../../core/providers.dart';
 import '../../data/db/database.dart';
 import '../../data/db/watch.dart';
 import '../../data/repositories/training_repository.dart';
-import '../../domain/muscle_volume.dart';
 import 'heatmap_data.dart';
 
 /// How far back the consistency grid looks.
@@ -73,33 +72,10 @@ final weighInDaysProvider = StreamProvider<Set<int>>((ref) {
   });
 });
 
-/// This week's hard sets per muscle, for the bar list under the heatmap.
-///
-/// Its own provider rather than a field on [HomeData], and this is the one
-/// place that split is right: `todaySnapshot` is what the screen *is* — a
-/// missing field there is a frame where "no sessions" is indistinguishable from
-/// "not loaded yet" (RULES § Data). The bars are a section further down that
-/// has an
-/// honest empty state of its own, so a frame without them costs nothing, and
-/// they are the only thing in the app that reads `set_logs` for Workouts. Folding
-/// this query into the snapshot would re-run the whole screen's read on every
-/// set you tick mid-session.
-final weeklyVolumeProvider = StreamProvider<WeeklyVolume>((ref) {
-  final db = ref.watch(databaseProvider);
-  final repo = ref.watch(trainingRepositoryProvider);
-
-  return db.watchQuery([db.setLogs, db.workoutExercises, db.workouts], () async {
-    // `volumeWindowDays - 1`, because the window includes today — the same
-    // off-by-one `computeConsistency` documents.
-    final from = dayKeyOf(daysBefore(DateTime.now(), volumeWindowDays - 1));
-    return computeWeeklyVolume(setsByMuscle: await repo.setsByMuscleSince(from));
-  });
-});
-
 /// Ticked and total sets in the open workout, kept in step with the log.
 ///
 /// Its own query rather than a field read off [homeProvider], for the same
-/// reason [weeklyVolumeProvider] is one: `todaySnapshot` does not watch
+/// reason `weeklyVolumeProvider` is one: `todaySnapshot` does not watch
 /// `set_logs`, and must not, or every keystroke in a live session would re-run
 /// the whole screen's read. But the resume card counts sets and the stale
 /// session's prompts promise how many would be lost, and a number frozen at the

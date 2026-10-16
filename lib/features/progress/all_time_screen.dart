@@ -507,7 +507,7 @@ class _RunRow extends StatelessWidget {
 }
 
 /// One regime's whole life, as a card: its mark, its name, its sparkline and
-/// the two figures the Workouts card carries.
+/// the two figures the Cycle progress card carries.
 class _RegimeCard extends ConsumerWidget {
   const _RegimeCard({required this.regime});
 

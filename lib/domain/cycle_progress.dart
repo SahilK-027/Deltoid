@@ -1,6 +1,6 @@
 /// How much stronger a regime has made you, cycle by cycle.
 ///
-/// The Workouts card, the regime screen and the All time timeline all read
+/// The Cycle progress card, the regime screen and the All time timeline all read
 /// their numbers from here. Plain values in and plain values out, with no drift
 /// row anywhere in the file, which is what makes the arithmetic testable
 /// without a database (RULES § 7).

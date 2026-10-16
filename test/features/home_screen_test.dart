@@ -5,10 +5,7 @@ import 'package:deltoid/data/db/database.dart';
 import 'package:deltoid/data/seed/seed_data.dart';
 import 'package:deltoid/data/repositories/training_repository.dart';
 import 'package:deltoid/data/seed/seeder.dart';
-import 'package:deltoid/domain/enums.dart';
-import 'package:deltoid/domain/muscle_volume.dart';
 import 'package:deltoid/features/home/home_screen.dart';
-import 'package:deltoid/features/home/widgets/volume_bars.dart';
 import 'package:deltoid/features/home/history_heatmap_screen.dart';
 import 'package:deltoid/features/home/weigh_ins_screen.dart';
 import 'package:deltoid/features/home/widgets/habit_tile.dart';
@@ -202,10 +199,9 @@ void main() {
   testWidgets('a regime with no sessions keeps the page it will have',
       (tester) async {
     // THEME: a thing with no data still has a page, and it is the page it will
-    // have once there is some. A lone centred card here — Habits, Weekly
-    // volume and the masthead's count all gone — would make adding the first
-    // session look like it built three sections when all it did was fill
-    // one.
+    // have once there is some. A lone centred card here — Habits and the
+    // masthead's count both gone — would make adding the first session look
+    // like it built a section when all it did was fill one.
     await createRegimeFromTemplate(
       db,
       regimeTemplates.firstWhere((t) => t.key == 'blank'),
@@ -219,7 +215,9 @@ void main() {
     // with no days in it says nothing about whether they should be here.
     expect(find.text('Habits'), findsOneWidget);
     expect(find.byType(HabitTile), findsNWidgets(2));
-    expect(find.text('Weekly volume'), findsOneWidget);
+    // Read rather than entered, so on Progress whatever state Home is in.
+    expect(find.text('Weekly volume'), findsNothing);
+    expect(find.text('Cycle progress'), findsNothing);
 
     // Same masthead as every other state on this screen.
     expect(find.text('Nothing logged'), findsOneWidget);
@@ -287,91 +285,22 @@ void main() {
     });
   });
 
-  group('this week', () {
-    /// A finished session with every set of the first exercise ticked.
-    Future<void> logSession(String regimeId) async {
-      final repo = TrainingRepository(db);
-      final sessions = await (db.select(db.sessions)
-            ..where((t) => t.regimeId.equals(regimeId))
-            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
-          .get();
-      final id = await repo.startWorkout(
-        regimeId: regimeId,
-        sessionId: sessions.first.id,
-      );
-      final detail = await repo.workoutDetail(id);
-      for (final set in detail!.entries.first.sets) {
-        await repo.updateSet(
-          set.id,
-          weight: const Value(40),
-          reps: const Value(8),
-          isDone: const Value(true),
-        );
-      }
-      await repo.completeWorkout(id);
-    }
+  testWidgets('cycle progress and weekly volume are on Progress, not here',
+      (tester) async {
+    await createRegimeFromTemplate(db, ppl);
+    await pumpWorkouts(tester);
+    await frames(tester);
 
-    testWidgets('is there on a fresh install, at zero', (tester) async {
-      await createRegimeFromTemplate(db, ppl);
-      await pumpWorkouts(tester);
-      await frames(tester);
-
-      // Not held back until something is logged, on the grounds that six empty
-      // tracks is a chart of nothing: that costs the section appearing from
-      // nowhere on the day of the first workout, moving everything under it.
-      // The page keeps its shape instead.
-      expect(find.text('Weekly volume'), findsOneWidget);
-      expect(find.byType(VolumeBars), findsOneWidget);
-    });
-
-    testWidgets('draws all six rows once there is history, zeros included', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
-      tester.view.devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
-
-      final regimeId = await createRegimeFromTemplate(db, ppl);
-      await logSession(regimeId);
-      await pumpWorkouts(tester);
-      await frames(tester);
-
-      expect(find.text('Weekly volume'), findsOneWidget);
-      for (final region in MuscleRegion.values) {
-        expect(
-          find.text(region.label),
-          findsOneWidget,
-          reason: 'a muscle trained zero times is still a row',
-        );
-      }
-      // The session logged is a chest opener, so chest is the only row with
-      // anything in it — and the untrained ones say so out loud.
-      expect(find.text('0'), findsWidgets);
-    });
-
-    testWidgets('a compound row opens onto its own muscles', (tester) async {
-      tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
-      tester.view.devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
-
-      final regimeId = await createRegimeFromTemplate(db, ppl);
-      await logSession(regimeId);
-      await pumpWorkouts(tester);
-      await frames(tester);
-
-      expect(find.text('Quads'), findsNothing);
-
-      await tester.tap(find.text('Legs'));
-      await frames(tester);
-
-      // `Legs 18` is a number you cannot act on; `Quads 12 · Hamstrings 0` is
-      // the same week saying something you would train differently over.
-      for (final m in MuscleRegion.legs.parts) {
-        expect(find.text(m.label), findsOneWidget);
-      }
-      // Chest is not compound, so it has nothing to open and does not offer to.
-      expect(find.text('Chest'), findsOneWidget);
-    });
+    // THEME → The destinations: Home is where things are entered, and the two
+    // cards that are read rather than entered moved to Progress.
+    expect(find.text("Today's session"), findsOneWidget);
+    expect(find.text('Habits'), findsOneWidget);
+    await tester.ensureVisible(find.text('Log a past session'));
+    await tester.pump();
+    expect(find.text('Past sessions'), findsOneWidget);
+    expect(find.text('Cycle progress'), findsNothing);
+    expect(find.text('Weekly volume'), findsNothing);
+    expect(find.text('All time'), findsNothing);
   });
 
   group('habits', () {
