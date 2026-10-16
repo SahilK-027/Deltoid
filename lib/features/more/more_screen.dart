@@ -16,6 +16,7 @@ import '../../core/widgets/progress_sheet.dart';
 import '../../data/backup/backup_service.dart';
 import '../../data/backup/downloads.dart';
 import '../../data/sync/forget.dart';
+import '../../domain/initials.dart';
 import '../../domain/rest.dart';
 import '../account/sign_in_flow.dart';
 import '../../domain/units.dart';
@@ -50,6 +51,7 @@ class MoreScreen extends ConsumerWidget {
               actions: [BackupMark()],
             ),
           ),
+          const _ProfileHeader(),
           Expanded(child: _body(context, ref, lastBackup, c)),
         ],
       ),
@@ -436,13 +438,12 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
                   // for neither to finish the thought.
         : AppRow(
             icon: Icons.account_circle_outlined,
-            title: account.email ?? 'Signed in',
-            // Which account, and nothing about its state. The button in the
-            // header says whether it is backed up, and its sheet says how
-            // much is waiting and since when; a second copy here was the same
-            // fact twice on one screen.
-            subtitle: 'Your training is backed up to this account',
-            subtitleMaxLines: 3,
+            // The row names the thing and the address is its detail. The
+            // email was the title once, over a line saying the training was
+            // backed up to it; the profile header says that now, and the
+            // button in the masthead says whether it is (THEME rule 6).
+            title: 'Account',
+            subtitle: account.email,
             onTap: () => _openAccountSheet(context, ref),
             chevron: true,
           );
@@ -551,6 +552,84 @@ class _AccountSectionState extends ConsumerState<_AccountSection> {
     await auth.signOut();
     await forgetLocalHistory(db);
     showToastOn(messenger, 'Removed from this phone.');
+  }
+}
+
+/// Who is signed in, as the block under the masthead.
+///
+/// THEME → Mastheads and app bars: a `surface` block sharing the band's colour,
+/// the initials in an `accent` circle, the name the Google sign-in gives and
+/// the day the account was created. `accent` rather than a hue because the
+/// circle is chrome; a person is not a series. It opens nothing — the Account
+/// row below it does that.
+///
+/// The name is read off the sign-in on every build and kept nowhere. Without
+/// an account, or in a build with no sync at all, there is no block and the
+/// page begins at its first section.
+class _ProfileHeader extends ConsumerWidget {
+  const _ProfileHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(syncAuthProvider) == null) return const SizedBox.shrink();
+    final account = ref.watch(accountProvider).valueOrNull;
+    if (account == null) return const SizedBox.shrink();
+    final c = context.c;
+    final created = account.createdAt;
+
+    return Container(
+      width: double.infinity,
+      color: c.surface,
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        0,
+        Space.gutter,
+        Space.lg,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle),
+            child: ExcludeSemantics(
+              child: Text(
+                initialsOf(name: account.name, email: account.email),
+                style: context.t.titleMedium?.copyWith(
+                  color: c.onAccent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // The email stands in for a sign-in that gives no name, so
+                // the header always says whose it is.
+                Text(
+                  account.name ?? account.email ?? 'Signed in',
+                  style: context.t.headlineSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (created != null)
+                  Text(
+                    'Backed up since '
+                    '${DateFormat('d MMMM yyyy').format(created)}',
+                    style: context.t.bodyMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -862,8 +941,7 @@ class _ThemeMiniature extends StatelessWidget {
   }
 }
 
-/// The name of the app, the build actually installed, and the one sentence
-/// that says what makes it different from every other training log.
+/// The name of the app, the build actually installed, and what it is for.
 ///
 /// A card holding one `bodySmall` paragraph and nothing else is wrong twice
 /// over: the type sits a step below every other sentence on the page, so the
@@ -895,19 +973,15 @@ class _AboutCard extends ConsumerWidget {
           ),
           const SizedBox(height: Space.sm),
           Text(
-            // What the app is, then the one thing that makes it different
-            // from every other training log. The second sentence earns its
-            // place: session-scoped progression is the reason this exists
-            // (CLAUDE.md rule 1), and without it the paragraph describes any
-            // tracker on the store.
+            // The owner's own words, `programs` included: CLAUDE.md rule 11
+            // records the spelling as deliberate, and it is used nowhere else.
             //
             // Not "everything stays on this device" — the masthead's eyebrow
             // says that, and a fact stated twice on one screen is the rule
             // this app breaks most often (THEME rule 6).
-            'An exercise tracker for building your own training regimes and '
-            'logging your progress as you get stronger. Each session keeps '
-            'its own history, so the same movement progresses independently '
-            'in each one.',
+            'A training tracker that puts you in full control of your '
+            'programs. Design your own routines, log every set and rep, and '
+            'track your strength over time with clear, organised records.',
             style: context.t.bodyMedium?.copyWith(color: c.textSecondary),
           ),
         ],

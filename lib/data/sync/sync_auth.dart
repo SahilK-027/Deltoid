@@ -5,14 +5,30 @@ import 'package:crypto/crypto.dart';
 
 /// Who is signed in, if anyone.
 ///
-/// The id is what every server row is keyed to; the email is what Settings
-/// shows so the answer to *which account is this?* is on screen rather than
+/// The id is what every server row is keyed to; the email is what More shows
+/// so the answer to *which account is this?* is on screen rather than
 /// remembered.
+///
+/// [name] and [createdAt] are read off the sign-in each time and held nowhere
+/// else: no table stores them and sync never sends them. They feed More's
+/// profile header and nothing more.
 class SyncAccount {
-  const SyncAccount({required this.id, required this.email});
+  const SyncAccount({
+    required this.id,
+    required this.email,
+    this.name,
+    this.createdAt,
+  });
 
   final String id;
   final String? email;
+
+  /// The name the Google sign-in gives, or null when it gives none.
+  final String? name;
+
+  /// When the account was created, which is the day this history began to be
+  /// kept anywhere but the phone.
+  final DateTime? createdAt;
 }
 
 /// Sign in, sign out, who is signed in — and nothing about rows.

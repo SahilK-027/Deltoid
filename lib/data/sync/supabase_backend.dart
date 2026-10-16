@@ -166,8 +166,23 @@ class _GoogleSupabaseAuth implements SyncAuth {
       .map((event) => _accountOf(event.session?.user))
       .handleError((Object _) {});
 
-  SyncAccount? _accountOf(User? user) =>
-      user == null ? null : SyncAccount(id: user.id, email: user.email);
+  SyncAccount? _accountOf(User? user) => user == null ? null : _account(user);
+
+  /// The name comes from Google's claims, which Supabase keeps in the user's
+  /// metadata as `full_name` and, on some sign-ins, `name` alone.
+  static SyncAccount _account(User user) {
+    final meta = user.userMetadata ?? const <String, dynamic>{};
+    final name = [meta['full_name'], meta['name']]
+        .whereType<String>()
+        .map((n) => n.trim())
+        .firstWhere((n) => n.isNotEmpty, orElse: () => '');
+    return SyncAccount(
+      id: user.id,
+      email: user.email,
+      name: name.isEmpty ? null : name,
+      createdAt: DateTime.tryParse(user.createdAt)?.toLocal(),
+    );
+  }
 
   @override
   Future<SyncAccount> signInWithGoogle() async {
@@ -202,7 +217,7 @@ class _GoogleSupabaseAuth implements SyncAuth {
       if (user == null) {
         throw const SyncAuthFailure('That sign-in did not complete.');
       }
-      return SyncAccount(id: user.id, email: user.email);
+      return _account(user);
     } on AuthException {
       throw const SyncAuthFailure(
         "Your account couldn't be reached. Try again when you have signal.",

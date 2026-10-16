@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:deltoid/domain/session_prefs.dart';
+import 'package:deltoid/core/sync_providers.dart';
+import 'package:deltoid/data/sync/sync_auth.dart';
 
 /// More, pumped against a real database. The bodyweight log it used to hold
 /// is tested with the Weigh-ins screen, in `weigh_ins_screen_test.dart`.
@@ -338,4 +340,107 @@ void main() {
       expect(await savedUnit(), WeightUnit.lb);
     });
   });
+
+  group('the profile header', () {
+    /// More with [account] signed in, on a container of its own: the shared
+    /// one has no auth, which is the signed-out build every other test uses.
+    Future<void> pumpSignedIn(WidgetTester tester, SyncAccount account) async {
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          syncAuthProvider.overrideWithValue(_FakeAuth(account)),
+        ],
+      );
+      await pump(tester, const MoreScreen());
+    }
+
+    testWidgets('is absent without an account', (tester) async {
+      await pump(tester, const MoreScreen());
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Backed up since'), findsNothing);
+      expect(find.text('Account'), findsNothing);
+      // The masthead is unchanged either way.
+      expect(find.text('ON THIS DEVICE'), findsOneWidget);
+    });
+
+    testWidgets('names the account and the day it was created', (
+      tester,
+    ) async {
+      await pumpSignedIn(
+        tester,
+        SyncAccount(
+          id: 'u1',
+          email: 'ada@example.com',
+          name: 'Ada Lovelace',
+          createdAt: DateTime(2025, 5, 31),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('AL'), findsOneWidget);
+      expect(find.text('Ada Lovelace'), findsOneWidget);
+      expect(find.text('Backed up since 31 May 2025'), findsOneWidget);
+      expect(find.text('ON THIS DEVICE'), findsOneWidget);
+      // The row names the thing, and the address is its detail.
+      expect(find.text('Account'), findsOneWidget);
+      expect(find.text('ada@example.com'), findsOneWidget);
+    });
+
+    testWidgets('falls back to the email when the sign-in gives no name', (
+      tester,
+    ) async {
+      await pumpSignedIn(
+        tester,
+        SyncAccount(
+          id: 'u1',
+          email: 'lifter@example.com',
+          createdAt: DateTime(2025, 5, 31),
+        ),
+      );
+      expect(find.text('L'), findsOneWidget);
+      // In the header and under the Account row.
+      expect(find.text('lifter@example.com'), findsNWidgets(2));
+    });
+
+    testWidgets('the Account row opens the sign-out sheet', (tester) async {
+      await pumpSignedIn(
+        tester,
+        const SyncAccount(id: 'u1', email: 'ada@example.com', name: 'Ada'),
+      );
+      await tester.tap(find.text('Account'));
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.text('Sign out'), findsOneWidget);
+      expect(find.text('Sign out and delete data'), findsOneWidget);
+    });
+  });
+
+  testWidgets('the About card says what the app is for', (tester) async {
+    await pump(tester, const MoreScreen());
+    const about =
+        'A training tracker that puts you in full control of your programs. '
+        'Design your own routines, log every set and rep, and track your '
+        'strength over time with clear, organised records.';
+    await scrollTo(tester, about);
+    expect(find.text(about), findsOneWidget);
+  });
+}
+
+class _FakeAuth implements SyncAuth {
+  _FakeAuth(this._current);
+
+  SyncAccount? _current;
+
+  @override
+  SyncAccount? get current => _current;
+
+  @override
+  Stream<SyncAccount?> get changes => Stream.value(_current);
+
+  @override
+  Future<SyncAccount> signInWithGoogle() async => _current!;
+
+  @override
+  Future<void> signOut() async => _current = null;
 }
