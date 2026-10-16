@@ -73,9 +73,9 @@ is fully usable with the radio off, forever, whether or not anyone signs in.
 
 | State       | Means                                                 | How you can tell                                 |
 | ----------- | ----------------------------------------------------- | ------------------------------------------------ |
-| **Local**   | Never connected, or declined at first launch          | Settings offers `Back up to your Google account` |
-| **Synced**  | Signed in, nothing owed                               | Settings shows when it last ran                  |
-| **Pending** | Signed in, rows owed — offline, or a push that failed | Settings says how many and why; the header button turns yellow with a count once there is no connection or an attempt has failed |
+| **Local**   | Never connected, or declined at first launch          | More offers `Back up to your Google account`     |
+| **Synced**  | Signed in, nothing owed                               | More shows when it last ran                      |
+| **Pending** | Signed in, rows owed — offline, or a push that failed | More says how many and why; the header button turns yellow with a count once there is no connection or an attempt has failed |
 
 **Pending is normal, not an error.** A session logged in a basement gym is
 pending for an hour and that is the design working. The only thing that makes it
@@ -95,7 +95,7 @@ green and carry no number, so nothing blinks while you log. Behind the button, a
 sheet says that everything is saved on this phone, lists what is only on this
 phone by session, and names the last session the account holds in full. It
 exists because a person training offline should not have to leave the log for
-Settings to learn that nothing is lost.
+More to learn that nothing is lost.
 
 There is no state for "syncing right now". A spinner on a background job nobody
 is waiting for is a spinner that teaches the user to wait.
@@ -128,11 +128,11 @@ blocked, and it is not. Declining is a real answer — see
 it.
 
 **No internet at first launch needs no special handling.** Sign-in fails, the
-app is used offline, and connecting later is the same Settings row every
+app is used offline, and connecting later is the same More row every
 `Local` install already has. There is deliberately no remembered intent and no
 prompt that comes back when the network does: that is a flag, a listener bound
 to it and a decision about how often to reappear — which is a nag, and this app
-does not nag. The `Local` state is visible in Settings, and someone who wanted a
+does not nag. The `Local` state is visible on More, and someone who wanted a
 backup and could not get one will go and get it.
 
 ### Why the anon key stops being a problem
@@ -199,7 +199,7 @@ across devices — with `user_id` indexed beside it.
 A write goes to SQLite and returns. It sets `dirty`, as it already does. That is
 the whole of the UI's involvement with sync.
 
-**No screen ever awaits the network.** Not the log, not Settings, not the first
+**No screen ever awaits the network.** Not the log, not More, not the first
 launch. This is [RULES.md § 6](RULES.md#6-scope)'s offline-first rule and nothing
 in this document may override it: the app must behave identically with the radio
 off, including on the frame after a set is ticked.
@@ -611,7 +611,7 @@ fails a build rather than a history.
 | Failure                         | What happens                              | What the user sees                                 |
 | ------------------------------- | ----------------------------------------- | -------------------------------------------------- |
 | No network                      | Rows stay dirty, retry later              | The header button turns yellow; never a toast      |
-| Auth expired, refresh failed    | Queue keeps filling, no data lost         | Settings asks for a sign-in; the app keeps working |
+| Auth expired, refresh failed    | Queue keeps filling, no data lost         | More asks for a sign-in; the app keeps working     |
 | Push rejected — RLS, constraint | `dirty` stays set, backed off, reported   | The failure channel says it once                   |
 | Partial push                    | Upserts are idempotent; retry             | Nothing                                            |
 | Server row fails a local CHECK  | Row skipped and reported, batch continues | The failure channel; the rest still lands          |
@@ -627,7 +627,7 @@ already surfaces. Sync gets no error channel of its own.
 **A sentence said once is not an answer to _why is this still pending_.** A
 toast is gone in four seconds and a phone can be offline for a week, so the
 engine also carries a standing `SyncTrouble` — `offline` or `refused`, cleared
-by the first drain that lands — and Settings reads it under the account row. It
+by the first drain that lands — and More reads it under the account row. It
 is a state, not an event: it changes on change and says nothing per retry.
 
 ---
@@ -1006,7 +1006,7 @@ meeting the account's.
 
 ### 6 · The states, and the failures
 
-Settings says which of the three it is in, and for how long. The empty state for
+More says which of the three it is in, and for how long. The empty state for
 a phone that has never had signal says the history is probably on an account it
 has not signed into yet — the difference between a user who waits and a user who
 reinstalls in a panic. Every row of [§ 13](#13-when-it-fails) reaches

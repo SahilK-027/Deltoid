@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,227 tests and nine pgTAP tests, analyzer clean.**
+**1,285 tests and nine pgTAP tests, analyzer clean.**
 
 ---
 
@@ -27,10 +27,10 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Docked keypad, stepped by the plate increment, last time's value one tap away.
 - [x] Plate view inside the keypad, for a movement that knows its bar.
 - [x] Rest timer with tone, wakelock, an OS exact alarm and an ongoing notification.
-- [x] Rest is three numbers: per exercise in a day, a default in Settings, and one for the walk between exercises. The old fourth reading — the last rest a set happened to take — is gone.
+- [x] Rest is three numbers: per exercise in a day, a default on More, and one for the walk between exercises. The old fourth reading — the last rest a set happened to take — is gone.
 - [x] The alarm is armed as the rest starts, not as the app leaves; the app takes it back 400 ms early so exactly one alert lands, whichever half rings it.
 - [x] The session line is a foreground service, so the rest bar on it can drain a second at a time — a progress bar holds the last value posted to it, and a frozen app posts nothing. The chronometer went with it: the system draws that in the header's far corner, and the time left belongs beside the bar. Between sets there is no bar at all.
-- [x] The rest tone can be turned off in Settings. The buzz is not part of the switch.
+- [x] The rest tone can be turned off on More. The buzz is not part of the switch.
 - [x] The exercise's own screen opens from the log's ⋯ menu, so a day's rest, bar and targets are editable without leaving the session.
 - [x] The bar is per training day, and the bar a set was logged on is snapshotted onto the row — the plate diagram stopped reading the catalog live. Schema 3 → 4, server rung included.
 - [x] Ticking advances the keypad to the next open set, across pages, and closes on the last.
@@ -45,17 +45,17 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] History pages by keyset, indexes every exercise trained, opens a workout from its own snapshots.
 - [x] A set on a logged day can be corrected or removed from its own line: load, count, partials and type, never the tick or the time. Cycle progress re-reads on the correction.
 - [x] Trend chart: e1RM or top weight, one line per session slot, deloads excluded, stalls flagged, pinch to zoom, holds in seconds.
-- [x] Consistency heatmap, eighteen weeks on Workouts with the all-time view behind it.
+- [x] Consistency heatmap, opened from the Workouts habit tile on Home, with the all-time view behind it.
 - [x] Weekly muscle volume, six regions counted in SQL, arms and legs folding open.
 - [x] Volume history screen: six tiles, one bar per week, averages over every week in the span.
 - [x] A region opens onto a full chart plus the movements that produced its sets.
 - [x] `workout_exercises.muscle` snapshots what a movement trained when it was logged.
-- [x] Bodyweight log: monthly groups with deltas, its own trend, interpolated into every bodyweight lift.
+- [x] Bodyweight log: its own trend, interpolated into every bodyweight lift.
 - [x] The trend chart draws in the same frame as the list under it — 130ms to 26ms, same numbers.
 - [x] An empty chart is still a chart: axes, gridlines, no sentence written across it.
 - [x] History's exercise search falls through to the catalog.
 - [x] Every chart folds through `chart_buckets.dart` and shares one control row, one axis and one transition.
-- [x] Workouts arrives whole: every read it draws starts in the same frame, and no section drops in after the page.
+- [x] Home arrives whole: every read it draws starts in the same frame, and no section drops in after the page.
 
 ### Cycle progress
 
@@ -63,17 +63,27 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] A regime with alternating days is scored on every lift of the position, the resting day counted at its last reading, so the figure does not swing with whichever day was due.
 - [x] The read walks a regime through its cycles rather than scanning every workout ever logged, and is watched on the shape of the log rather than on `set_logs`, so a whole regime is not re-scored on every set ticked.
 - [x] The cycle axis on the one trend chart: deload bands, hairlines once `All` thins to blocks, a hollow open cycle, a tap-to-read line and a y band that never anchors at zero.
-- [x] The strength card replaces Last session on Workouts, and carries its three states — trained, a first cycle, nothing trained.
+- [x] The strength card replaced Last session on Workouts and now sits on Progress, and carries its three states — trained, a first cycle, nothing trained.
 - [x] The regime screen: the same card, how the number is arrived at folded away, and every lift grouped Stronger, No change and Weaker with the two sets behind each.
 - [x] All time: one year of weeks at a time with two legends, the spells behind a fold, and a card per regime.
 
 ### Around the edges
 
 - [x] Backup export, restore and auto-export after a session, on an isolate, round-trip tested.
-- [x] Settings: units, three themes drawn as miniatures, adaptive launcher icon.
+- [x] More: units, three themes drawn as miniatures, adaptive launcher icon.
 - [x] One day picker for backfill, bodyweight and re-dating. A ring on every day in range — its own colour when something is logged there, grey when nothing is — a dot on today, nothing on a day that cannot be picked, and a stated reason when one is tapped. Six full rows with the neighbouring months drawn back, turned by a drag or by either end of the month bar.
 - [x] Backfill asks for the day first and keeps it on screen.
 - [x] The system bars take their appearance from the app's own theme, said again once the launch window lifts — in the light theme the status bar had been white on white.
+
+### Navigation
+
+- [x] Five tabs: Home, Regimes, Progress, History and More. Home replaces Workouts, and More replaces Settings.
+- [x] Home: the masthead, Today's session, Habits and Past sessions, in a fixed order. `Log a past session` is a row of its own card, not a masthead icon.
+- [x] Habit tiles for weigh-ins and workouts: 30 days as a grid, `N/7 this week`, a + that opens the weigh-in sheet and a play button that starts the session due.
+- [x] The Weigh-ins screen replaces the Bodyweight screen: the trend card, a year map per year, `Log weight`, and a calendar for correcting a past weigh-in.
+- [x] Consistency and Weigh-ins share one year-map design.
+- [x] Progress holds Cycle progress and Weekly volume, moved from Home unchanged.
+- [x] More: a profile header while signed in, an `Account` row with the email beneath it, and the new About text. Bodyweight is no longer a section of it.
 
 ### Sync
 

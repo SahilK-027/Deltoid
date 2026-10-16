@@ -15,6 +15,36 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-10-16
+
+Minor release replacing the four tabs with five and giving bodyweight a place on Home.
+
+### Added
+
+- **Navigation:** The bottom bar reads Home, Regimes, Progress, History and More. Home replaces Workouts, Progress is a new tab, and More replaces Settings.
+- **Home:** A Habits section under Today's session holds a Weigh-ins tile and a Workouts tile side by side. Each shows the last 30 days as a grid and how many days of this week the habit was kept, such as `2/7 this week`.
+  - The + on the Weigh-ins tile opens the weigh-in sheet, or today's weigh-in when one is already logged.
+  - The play button on the Workouts tile starts the session that is due, or resumes the one that is open.
+  - Tapping the Workouts tile opens Consistency, and tapping the Weigh-ins tile opens Weigh-ins.
+- **Home:** A Past sessions card holds `Log a past session`, which opens the same sheet the calendar button in the masthead used to.
+- **Bodyweight:** A new Weigh-ins screen shows the bodyweight trend, a year map of the days you weighed in, and a `Log weight` button. It replaces the Bodyweight screen.
+  - The calendar button in its app bar opens the day picker with every weighed day ringed. A weighed day opens its weigh-in to correct or delete, and any other day logs one for that day.
+- **More:** While you are signed in, More opens with your initials, the name from your Google account, and `Backed up since` with the date the account was created.
+
+### Changed
+
+- **Bodyweight:** Weighing in moves from Settings to the Weigh-ins tile on Home and the Weigh-ins screen behind it.
+- **Progress:** Cycle progress and Weekly volume move from Workouts to the Progress tab, unchanged, with the same All time screens behind them.
+- **Consistency:** The Consistency card is replaced by the Workouts tile on Home, which opens the same screen. Its year map now shares one design with the Weigh-ins year map.
+- **More:** The first row of Account & backup reads `Account` with your email beneath it, and opens the sheet for signing out.
+- **More:** The About card describes Deltoid as a training tracker that puts you in full control of your programs.
+
+### Removed
+
+- **Settings:** The Bodyweight section, whose weigh-ins are now reached from Home.
+- **Bodyweight:** The list of weigh-ins grouped by month. The calendar on the Weigh-ins screen opens any past weigh-in instead.
+- **Home:** The calendar button in the masthead, replaced by the Past sessions card.
+
 ## [1.16.1] - 2026-10-14
 
 Patch release keeping the log on the exercise you move and redrawing the reorder handle.
@@ -515,7 +545,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...HEAD
+[1.17.0]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...v1.17.0
 [1.16.1]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...v1.16.1
 [1.16.0]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...v1.16.0
 [1.15.3]: https://github.com/SahilK-027/Deltoid/compare/v1.15.2...v1.15.3

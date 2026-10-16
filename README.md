@@ -158,7 +158,7 @@ build instead.
 
 ## Status
 
-The app is feature-complete and in daily use. All 1,227 Dart tests and nine
+The app is feature-complete and in daily use. All 1,285 Dart tests and nine
 pgTAP tests pass, and the analyzer reports no issues. [TODO.md](TODO.md) is the
 only place where status is recorded, and [CHANGELOG.md](CHANGELOG.md) says what
 each release changed.
@@ -259,15 +259,15 @@ Riverpod providers sit on top of drift streams, so any write re-renders whatever
 was watching that table. This remains true when sync is enabled: screens read
 local storage, and a sync is background reconciliation of the same tables.
 
-The app has four tabs. **Workouts** shows the next session, a consistency grid,
-and weekly volume. **Regime** holds programmes, the programme editor, and the
-exercise catalog. **History** contains the session feed, per-exercise history,
-and trend charts. **Settings** covers units, theme, bodyweight, backup, and the
-account.
+The app has five tabs. **Home** shows the next session, the weigh-in and
+workout habits, and logging a past session. **Regimes** holds programmes, the
+programme editor, and the exercise catalog. **Progress** carries cycle progress
+and weekly volume. **History** contains the session feed, per-exercise history,
+and trend charts. **More** covers units, theme, backup, and the account.
 
 ### Testing
 
-The suite contains 1,227 Dart tests, plus nine pgTAP tests that run behind
+The suite contains 1,285 Dart tests, plus nine pgTAP tests that run behind
 `supabase test db`. Alongside conventional unit and widget tests, three pieces
 are worth describing:
 
@@ -308,9 +308,9 @@ FUZZ_SEED=17 FUZZ_SEEDS=1 FUZZ_OPS=4000 flutter test test/integrity/model_fuzz_t
 ### Generating test data
 
 To exercise the app at a scale no fresh install reaches, generate a backup file
-and restore it through Settings → Backup. The generated history progresses over
-time, keeps each session's numbers separate, and includes deload weeks, missed
-weeks, and plateaus:
+and restore it through More → Account & backup. The generated history
+progresses over time, keeps each session's numbers separate, and includes deload
+weeks, missed weeks, and plateaus:
 
 ```bash
 dart run tool/seed_years.dart 20 --seed=7          # writes build/deltoid-seed-20y.json
