@@ -6,6 +6,7 @@ import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/trend_chart.dart';
 import '../../../domain/chart_buckets.dart';
+import '../../../domain/value_axis.dart';
 import '../../../domain/volume_history.dart';
 import 'volume_history_bars.dart';
 
@@ -44,13 +45,14 @@ class VolumeChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final gutter = _yAxisWidth(context, _Axis.of(series.peakPerWeek(by)));
+    final gutter =
+        _yAxisWidth(context, ValueAxis.bars(series.peakPerWeek(by)));
     // Coarsened against the weeks in hand — see [autoGranularityFor]. A window
     // and its data disagree for a frame when the range changes, and that frame
     // must not ask for two and a half thousand bars in a phone's width.
     final safe = autoGranularityFor(series.weeks.length, by);
     final bars = series.bars(safe);
-    final axis = _Axis.of(series.peakPerWeek(safe));
+    final axis = ValueAxis.bars(series.peakPerWeek(safe));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,7 +79,7 @@ class VolumeChart extends StatelessWidget {
                         child: CustomPaint(
                           key: ValueKey(axis.max),
                           painter: _Gridlines(
-                            ticks: axis.ticks,
+                            ticks: axis.gridlines,
                             max: axis.max,
                             colour: c.border,
                           ),
@@ -91,7 +93,7 @@ class VolumeChart extends StatelessWidget {
                       // Bars are drawn against the axis rather than the peak,
                       // or the tallest bar touches the top of the plot and the
                       // gridline it should sit under is invisible behind it.
-                      scaleTo: axis.max.toDouble(),
+                      scaleTo: axis.max,
                       onSelected: onSelected,
                     ),
                   ],
@@ -107,13 +109,13 @@ class VolumeChart extends StatelessWidget {
                 child: Stack(
                   key: ValueKey(axis.max),
                   children: [
-                    for (final tick in axis.ticks)
+                    for (var i = 0; i < axis.gridlines.length; i++)
                       Positioned(
                         right: 0,
                         // Centred on its own rule. `label` is 13/16, so half a
                         // line is 8.
-                        top: height - height * (tick / axis.max) - 8,
-                        child: Text('$tick', style: context.t.bodySmall),
+                        top: height - height * (axis.gridlines[i] / axis.max) - 8,
+                        child: Text(axis.labels[i], style: context.t.bodySmall),
                       ),
                   ],
                 ),
@@ -154,47 +156,11 @@ class VolumeChart extends StatelessWidget {
 /// sized for the narrower number, where it was clipped rather than reported.
 /// The maximum is measured too, though it is never printed, so the gutter is
 /// never narrower than it was.
-double _yAxisWidth(BuildContext context, _Axis axis) => axisGutter(
+double _yAxisWidth(BuildContext context, ValueAxis axis) => axisGutter(
       context,
-      ['${axis.max}', for (final tick in axis.ticks) '$tick'],
+      ['${axis.max.round()}', ...axis.labels],
       gap: 0,
     );
-
-/// A y axis: a round maximum at or above the peak, and the rules to draw inside
-/// it.
-class _Axis {
-  const _Axis({required this.max, required this.ticks});
-
-  final int max;
-
-  /// Interior gridlines only — never 0, never [max]. See the class doc on
-  /// [VolumeChart] for why the edges are dropped.
-  final List<int> ticks;
-
-  /// Snapped to a step that reads as a number of sets rather than as whatever
-  /// the tallest week happened to be: 5s up to fifty, 10s beyond.
-  ///
-  /// Anchored at zero, unlike the trend chart, and for the opposite reason —
-  /// zero sets *is* in the data. A week you skipped has to sit on the baseline.
-  factory _Axis.of(double rawPeak) {
-    // Rounded up before it is snapped: a peak of 6.4 sets a week has to fit
-    // under the axis, not sit on its top gridline.
-    final peak = rawPeak.ceil();
-    if (peak <= 0) return const _Axis(max: 1, ticks: []);
-    final step = peak <= 10
-        ? 2
-        : peak <= 50
-            ? 5
-            : 10;
-    final max = ((peak + step - 1) ~/ step) * step;
-    return _Axis(
-      max: max,
-      ticks: [
-        for (var t = step; t < max; t += step) t,
-      ],
-    );
-  }
-}
 
 class _Gridlines extends CustomPainter {
   const _Gridlines({
@@ -203,8 +169,8 @@ class _Gridlines extends CustomPainter {
     required this.colour,
   });
 
-  final List<int> ticks;
-  final int max;
+  final List<double> ticks;
+  final double max;
   final Color colour;
 
   @override

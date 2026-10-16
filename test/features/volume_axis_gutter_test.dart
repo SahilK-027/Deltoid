@@ -32,7 +32,7 @@ void main() {
 
   testWidgets('every value label fits the gutter it is printed in',
       (tester) async {
-    // A peak of 105 sets a week: an axis of 110, labelled 10 to 100.
+    // A peak of 105 sets a week: an axis of 150, labelled 50 and 100.
     final series = VolumeSeries(
       label: 'Chest',
       weeks: [
@@ -68,7 +68,7 @@ void main() {
       for (final w in tester.widgetList<Text>(values)) int.parse(w.data!),
     ];
     expect(printed, contains(100), reason: 'the band has to print 100');
-    expect(printed, isNot(contains(110)), reason: 'the maximum is not printed');
+    expect(printed, isNot(contains(150)), reason: 'the maximum is not printed');
 
     double widthOf(String label, TextStyle? style) => (TextPainter(
           text: TextSpan(text: label, style: style),
@@ -79,7 +79,7 @@ void main() {
     final style = tester.widget<Text>(values.first).style;
     // Without this the band proves nothing: it is the case where the maximum
     // is narrower than a label under it.
-    expect(widthOf('100', style), greaterThan(widthOf('110', style)));
+    expect(widthOf('100', style), greaterThan(widthOf('150', style)));
 
     for (final element in values.evaluate()) {
       final label = find.byWidget(element.widget);

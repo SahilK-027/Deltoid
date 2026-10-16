@@ -61,6 +61,15 @@ double? metricValue(
 String metricFormat(double v, WeightUnit unit, MeasureMode measure) =>
     measure.isHold ? '${v.round()}s' : formatWeight(v, unit);
 
+/// The precision the value axis prints a measure at, so no gridline is
+/// labelled with a rounding of itself: a whole second for a hold, and half a
+/// kilogram for a load.
+///
+/// The least band the axis shows goes with it at each call: ten seconds, or 5%
+/// of the load, so one session or a flat run of them sits in a band rather
+/// than on a single gridline.
+double metricStep(MeasureMode measure) => measure.isHold ? 1 : 0.5;
+
 /// The same measure named mid-sentence, where it never starts the line.
 String metricNoun(ExerciseMetric metric, MeasureMode measure) =>
     measure.isHold
@@ -181,6 +190,9 @@ class ExerciseTrend extends ConsumerWidget {
             earliest: earliest,
             scale: blankScale(measure),
             formatValue: (v) => metricFormat(v, unit, measure),
+            minStep: metricStep(measure),
+            minSpan: measure.isHold ? 10 : 0,
+            minSpanFraction: measure.isHold ? 0 : 0.05,
           )
         else
           _Chart(
@@ -304,6 +316,9 @@ class _Chart extends ConsumerWidget {
         earliest: earliest,
         scale: scale,
         formatValue: (v) => metricFormat(v, unit, measure),
+        minStep: metricStep(measure),
+        minSpan: measure.isHold ? 10 : 0,
+        minSpanFraction: measure.isHold ? 0 : 0.05,
         // Silent when the range is simply empty — an empty graph says that
         // better than a sentence does. It speaks only when the emptiness is
         // something you could not have read off the plot: days that are there
@@ -368,6 +383,9 @@ class _Chart extends ConsumerWidget {
           ),
       ],
       formatValue: (v) => metricFormat(v, unit, measure),
+      minStep: metricStep(measure),
+      minSpan: measure.isHold ? 10 : 0,
+      minSpanFraction: measure.isHold ? 0 : 0.05,
       tooltip: (v) => measure.isHold
           ? '${metricFormat(v, unit, measure)} held'
           : '${formatWeight(v, unit)} ${unit.label} '

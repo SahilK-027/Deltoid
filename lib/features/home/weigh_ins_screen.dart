@@ -440,6 +440,11 @@ class _TrendCard extends ConsumerWidget {
                 unit.fromKg(latest.weightKg) + 5,
               ),
               formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
+              // Printed to 0.1, so no step is finer; and a band of 2 kg at
+              // least, so a year flat to within 0.1 kg is drawn level rather
+              // than as a climb.
+              minStep: bodyweightIncrement,
+              minSpan: unit.fromKg(2),
               message: marks.isEmpty
                   ? 'Nothing logged in this range.'
                   : 'Only one ${by.noun} has a weigh-in. A second one is '
@@ -460,6 +465,11 @@ class _TrendCard extends ConsumerWidget {
                 ),
               ],
               formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
+              // Printed to 0.1, so no step is finer; and a band of 2 kg at
+              // least, so a year flat to within 0.1 kg is drawn level rather
+              // than as a climb.
+              minStep: bodyweightIncrement,
+              minSpan: unit.fromKg(2),
               tooltip: (v) => '${formatBodyweight(unit.toKg(v), unit)} '
                   '${unit.label}',
             ),

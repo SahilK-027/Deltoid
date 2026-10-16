@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../domain/chart_buckets.dart';
 import '../../domain/cycle_progress.dart';
 import '../../domain/enums.dart';
+import '../../domain/value_axis.dart';
 import '../ids.dart';
 import '../theme/tokens.dart';
 import 'phase_sparkline.dart';
@@ -485,6 +486,9 @@ class TrendChart extends StatefulWidget {
     this.tooltip,
     this.yRange,
     this.height = 220,
+    this.minStep = 0,
+    this.minSpan = 0,
+    this.minSpanFraction = 0,
   });
 
   /// The range the chart is *of*, rather than the range its data happens to
@@ -519,6 +523,16 @@ class TrendChart extends StatefulWidget {
   /// spots are all of them. So the screen works out what is visible and says so
   /// here, and the axis animates between the two rather than jumping.
   final (double, double)? yRange;
+
+  /// The precision [formatValue] prints at, so no gridline is labelled with a
+  /// rounding of itself — see [ValueAxis.trend].
+  final double minStep;
+
+  /// The least height the value band shows, absolute and as a share of the
+  /// value, so a single point or a flat line is drawn in a band rather than
+  /// on one gridline — see [ValueAxis.trend].
+  final double minSpan;
+  final double minSpanFraction;
 
   @override
   State<TrendChart> createState() => _TrendChartState();
@@ -622,9 +636,6 @@ class _TrendChartState extends State<TrendChart>
     final all = [for (final s in series) ...s.spots];
 
     final xs = [for (final s in all) s.x];
-    final ys = [for (final s in all) s.y];
-    final lowest = widget.yRange?.$1 ?? ys.reduce(min);
-    final highest = widget.yRange?.$2 ?? ys.reduce(max);
 
     // The axis describes what is on screen rather than the window. After a
     // pinch the two differ, and labels that continue to describe the window
@@ -647,17 +658,30 @@ class _TrendChartState extends State<TrendChart>
       maxX += 7;
     }
 
-    // Bounds snapped to a round step, so every gridline lands on a number a
-    // person would say. Left to itself the axis labels `1126.5` at the
-    // extremes, which wraps onto two lines and collides with the gridline
-    // above. The band is the data plus air — never anchored at zero, which
-    // draws a year of bodyweight as a flat line an inch off the bottom.
-    final step = _niceStep((highest - lowest) / 4);
-    var maxY = ((highest + step * 0.5) / step).ceilToDouble() * step;
-    var minY = ((lowest - step * 0.5) / step).floorToDouble() * step;
-    // Nothing this app charts is negative, so the air under the lowest point
-    // stops at zero rather than drawing an axis into numbers that cannot exist.
-    if (lowest >= 0 && minY < 0) minY = 0;
+    // The band, its gridlines and their labels, from the one function every
+    // chart's value axis comes from. A band the caller supplies is drawn as
+    // given, and the spots then set nothing; otherwise one wild point is
+    // taken off the scale rather than allowed to flatten the rest.
+    final range = widget.yRange;
+    final yAxis = ValueAxis.trend(
+      range == null
+          ? [
+              for (final s in series) [for (final p in s.spots) p.y],
+            ]
+          : [
+              [range.$1, range.$2],
+            ],
+      format: formatValue,
+      minStep: widget.minStep,
+      minSpan: widget.minSpan,
+      minSpanFraction: widget.minSpanFraction,
+    );
+    var minY = yAxis.min;
+    var maxY = yAxis.max;
+    // The value a touched spot really has, which an off-scale one does not
+    // show by its position.
+    double realValue(int bar, int index, double drawn) =>
+        yAxis.offScaleAt(bar, index)?.value ?? drawn;
 
     // The bounds at this instant, part way between the previous range and the
     // selected one. `fl_chart` interpolates its own data changes but cannot
@@ -710,13 +734,7 @@ class _TrendChartState extends State<TrendChart>
               // against the baseline, so anchoring it on the last day is what
               // puts a label on today and counts the rest back from it.
               baselineX: axis?.baseline ?? minX,
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: step,
-                getDrawingHorizontalLine: (_) =>
-                    FlLine(color: c.border, strokeWidth: 1, dashArray: gridlineDash),
-              ),
+              gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(),
@@ -725,23 +743,7 @@ class _TrendChartState extends State<TrendChart>
                 // eye starts a row, and spending it on an axis pushes the plot
                 // off centre on a phone.
                 rightTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: step,
-                    reservedSize: axisGutter(
-                      context,
-                      _yTicks(minY, maxY, step).map(formatValue),
-                    ),
-                    getTitlesWidget: (value, meta) => _edgeSafe(
-                      value,
-                      meta,
-                      Text(
-                        formatValue(value),
-                        style: context.t.bodySmall,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
+                  sideTitles: _valueTitles(context, yAxis),
                 ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -777,7 +779,7 @@ class _TrendChartState extends State<TrendChart>
                         getTooltipItems: (spots) => [
                           for (final s in spots)
                             LineTooltipItem(
-                              tooltip(s.y),
+                              tooltip(realValue(s.barIndex, s.spotIndex, s.y)),
                               context.t.labelMedium!
                                   .copyWith(color: c.textPrimary),
                             ),
@@ -785,20 +787,42 @@ class _TrendChartState extends State<TrendChart>
                       ),
                     ),
               lineBarsData: [
-                for (final s in series)
+                for (var i = 0; i < series.length; i++)
                   LineChartBarData(
-                    spots: s.spots,
+                    // An off-scale point is drawn on the edge it left by, so
+                    // the line runs to the edge and back.
+                    spots: [
+                      for (var j = 0; j < series[i].spots.length; j++)
+                        series[i].spots[j].copyWith(
+                          y: yAxis.place(i, j, series[i].spots[j].y),
+                        ),
+                    ],
                     isCurved: false,
-                    color: s.color,
+                    color: series[i].color,
                     barWidth: 2,
                     dotData: FlDotData(
-                      show: !dense,
-                      getDotPainter: (_, _, _, _) => FlDotCirclePainter(
-                        radius: 3,
-                        color: c.bg,
-                        strokeWidth: 2,
-                        strokeColor: s.color,
-                      ),
+                      // The caret stays when the markers go: it is the one
+                      // mark that says the line does not end where it seems to.
+                      checkToShowDot: (spot, _) =>
+                          !dense ||
+                          yAxis.offScale.any(
+                            (o) =>
+                                o.series == i &&
+                                series[i].spots[o.index].x == spot.x,
+                          ),
+                      getDotPainter: (_, _, _, index) =>
+                          switch (yAxis.offScaleAt(i, index)?.edge) {
+                        final edge? => OffScaleCaret(
+                            color: series[i].color,
+                            pointsUp: edge == OffScaleEdge.top,
+                          ),
+                        null => FlDotCirclePainter(
+                            radius: 3,
+                            color: c.bg,
+                            strokeWidth: 2,
+                            strokeColor: series[i].color,
+                          ),
+                      },
                     ),
                   ),
               ],
@@ -864,6 +888,9 @@ class EmptyTrendChart extends StatelessWidget {
     this.scale,
     this.formatValue,
     this.height = 220,
+    this.minStep = 0,
+    this.minSpan = 0,
+    this.minSpanFraction = 0,
   });
 
   final TrendWindow window;
@@ -896,19 +923,34 @@ class EmptyTrendChart extends StatelessWidget {
 
   final double height;
 
+  /// As [TrendChart.minStep], [TrendChart.minSpan] and
+  /// [TrendChart.minSpanFraction], so the empty chart draws the band the
+  /// populated one would.
+  final double minStep;
+  final double minSpan;
+  final double minSpanFraction;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final axis = TimeAxis.of(window, earliest: earliest);
 
-    // The same treatment [TrendChart] gives a real band: data plus air, snapped
-    // to a round step. With no data at all it is a bare 0–1, unlabelled, which
-    // draws four gridlines and claims nothing.
+    // The same band [TrendChart] draws for the same values, from the same
+    // function, so moving from a trained range to an empty one keeps the
+    // gridlines where they were. With no data at all it is a bare 0–1,
+    // unlabelled, which draws its gridlines and claims nothing.
     final (lowest, highest) = scale ?? (0.0, 1.0);
-    final step = _niceStep((highest - lowest) / 4);
-    final maxY = ((highest + step * 0.5) / step).ceilToDouble() * step;
-    var minY = ((lowest - step * 0.5) / step).floorToDouble() * step;
-    if (lowest >= 0 && minY < 0) minY = 0;
+    final format = formatValue;
+    final labelled = scale != null && format != null;
+    final yAxis = ValueAxis.trend(
+      [
+        [lowest, highest],
+      ],
+      format: format ?? (v) => '$v',
+      minStep: minStep,
+      minSpan: minSpan,
+      minSpanFraction: minSpanFraction,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -924,46 +966,18 @@ class EmptyTrendChart extends StatelessWidget {
             LineChartData(
               minX: axis.minX,
               maxX: axis.maxX,
-              minY: minY,
-              maxY: maxY,
+              minY: yAxis.min,
+              maxY: yAxis.max,
               baselineX: axis.baseline,
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: step,
-                getDrawingHorizontalLine: (_) =>
-                    FlLine(color: c.border, strokeWidth: 1, dashArray: gridlineDash),
-              ),
+              gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(),
                 leftTitles: const AxisTitles(),
                 rightTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: step,
-                    // Held open even when there is nothing to write in it, so
-                    // the plot does not widen the moment data lands.
-                    reservedSize: axisGutter(context, [
-                      if (formatValue case final f?)
-                        ..._yTicks(minY, maxY, step).map(f),
-                    ]),
-                    getTitlesWidget: (value, meta) {
-                      final format = formatValue;
-                      if (scale == null || format == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return _edgeSafe(
-                        value,
-                        meta,
-                        Text(
-                          format(value),
-                          style: context.t.bodySmall,
-                          maxLines: 1,
-                        ),
-                      );
-                    },
-                  ),
+                  // Held open even when there is nothing to write in it, so
+                  // the plot does not widen the moment data lands.
+                  sideTitles: _valueTitles(context, yAxis, printed: labelled),
                 ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -1020,7 +1034,7 @@ class EmptyTrendChart extends StatelessWidget {
 /// bounds that both contain a `1`, then prints `200` and `205`, which do not,
 /// into a box a quarter of an em too small. A side title is clipped rather than
 /// reported as overflowing, so the axis quietly reads `20` and nothing raises a
-/// word about it. See [_yTicks].
+/// word about it. See [_valueTitles].
 ///
 /// Public because the bar chart measures its gutter the same way. [gap] is the
 /// room a chart puts between the plot and its labels: `fl_chart`'s side title
@@ -1051,29 +1065,86 @@ double axisGutter(
   return widest + gap + 2;
 }
 
-/// Every value the y axis will label, so the gutter can be measured against
-/// what is actually printed in it.
+/// The gridlines of [axis], and no others, dashed in [colour].
 ///
-/// `fl_chart` walks the ticks from the lower bound in steps of `interval`, and
-/// [_edgeSafe] then drops the two sitting on the bounds; the labels that survive
-/// are the interior ones — precisely the set a gutter measured on the bounds
-/// does not account for. The bounds are included anyway: they cost one
-/// measurement each, and a gutter a glyph too wide is invisible where one a
-/// glyph too narrow is the defect this exists to prevent.
+/// `fl_chart` walks every multiple of the step between the bounds; the axis
+/// decides which of them are gridlines. It never draws one on either bound, so
+/// a chart whose bounds are gridlines, as the cycle axis's are, adds them as
+/// extra lines.
+FlGridData _gridOf(ValueAxis axis, Color colour) => FlGridData(
+  show: true,
+  drawVerticalLine: false,
+  horizontalInterval: axis.step,
+  checkToShowHorizontalLine: axis.isGridline,
+  getDrawingHorizontalLine: (_) =>
+      FlLine(color: colour, strokeWidth: 1, dashArray: gridlineDash),
+);
+
+/// The value labels down the right of a plot: the label of each gridline of
+/// [axis], in a gutter measured over exactly those labels.
 ///
-/// A step that cannot divide the band — zero, negative, or so fine the axis
-/// would carry hundreds of ticks — falls back to the bounds rather than
-/// looping. Nothing in the app produces one, and an axis is not the place to
-/// discover otherwise.
-List<double> _yTicks(double minY, double maxY, double step) {
-  if (!step.isFinite || step <= 0 || maxY < minY) return [minY, maxY];
-  final count = (maxY - minY) / step;
-  if (!count.isFinite || count > 64) return [minY, maxY];
-  return [
-    for (var i = 0; i <= count.ceil(); i++)
-      if (minY + step * i <= maxY) minY + step * i,
-    maxY,
-  ];
+/// [printed] false holds the gutter open with nothing in it, which is what an
+/// empty chart with no history to scale against draws.
+SideTitles _valueTitles(
+  BuildContext context,
+  ValueAxis axis, {
+  bool printed = true,
+}) => SideTitles(
+  showTitles: true,
+  interval: axis.step,
+  reservedSize: axisGutter(context, printed ? axis.labels : const []),
+  getTitlesWidget: (value, meta) {
+    final label = printed ? axis.labelAt(value) : null;
+    if (label == null) return const SizedBox.shrink();
+    // Wrapped for the gap between the gutter and the plot. A bare widget
+    // is drawn flush against the axis.
+    return SideTitleWidget(
+      meta: meta,
+      space: Space.xs,
+      child: Text(label, style: context.t.bodySmall, maxLines: 1),
+    );
+  },
+);
+
+/// The mark of a point off the scale: a caret on the edge it left by, in its
+/// series' colour, pointing the way the value went (THEME → Charts).
+///
+/// Its tip is on the edge and its base inside the plot, so it reads as the
+/// line leaving rather than as a marker sitting on the gridline.
+class OffScaleCaret extends FlDotPainter {
+  const OffScaleCaret({required this.color, required this.pointsUp});
+
+  final Color color;
+  final bool pointsUp;
+
+  static const _width = 10.0;
+  static const _height = 6.0;
+
+  @override
+  void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
+    final tip = offsetInCanvas;
+    final base = tip.dy + (pointsUp ? _height : -_height);
+    canvas.drawPath(
+      Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(tip.dx - _width / 2, base)
+        ..lineTo(tip.dx + _width / 2, base)
+        ..close(),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  Size getSize(FlSpot spot) => const Size(_width, _height * 2);
+
+  @override
+  Color get mainColor => color;
+
+  @override
+  FlDotPainter lerp(FlDotPainter a, FlDotPainter b, double t) => b;
+
+  @override
+  List<Object?> get props => [color, pointsUp];
 }
 
 /// A tick at the very edge has half a line of room and ends up printed over
@@ -1098,18 +1169,6 @@ String axisDateFormat(double spanDays) {
   if (spanDays <= 400) return 'MMM';
   if (spanDays <= 365 * 8) return "MMM ''yy";
   return 'yyyy';
-}
-
-/// The nearest round number at or above [raw], from the 1 / 2.5 / 5 / 10
-/// family, so gridlines land on numbers a person would say.
-double _niceStep(double raw) {
-  if (raw <= 0) return 1;
-  final magnitude = pow(10, (log(raw) / ln10).floor()).toDouble();
-  for (final multiple in const [1, 2, 2.5, 5, 10]) {
-    final step = magnitude * multiple;
-    if (step >= raw) return step;
-  }
-  return magnitude * 10;
 }
 
 /// The same idea on the time axis, in units a calendar has: a week, a
@@ -1223,21 +1282,31 @@ class CycleAxisChart extends StatelessWidget {
             points[i],
     };
 
-    final values = [for (final p in drawn.values) p.value!];
+    // In the order the axis draws them, which the off-scale rule reads to
+    // know a cycle's neighbours.
+    final order = drawn.keys.toList()..sort();
 
     // Data plus air, and **not** anchored at zero. Zero is where a regime
     // started, so a window that opens at cycle 13 is a band from +6 to +11 and
     // anchoring it would draw four cycles of work as a flat line at the top of
     // the chart. Zero appears when it is in the data, which is what cycle 1 is.
-    //
-    // A band with nothing in it runs 0 to 2%, which is what a chart of a
-    // programme that has not been trained yet honestly is: the axis it will
-    // have, with no line on it.
-    final lowest = values.isEmpty ? 0.0 : values.reduce(min);
-    final highest = max(values.isEmpty ? 0.0 : values.reduce(max), lowest + 1);
-    final step = _cycleStep(lowest, highest);
-    final minY = (lowest / step).floorToDouble() * step;
-    final maxY = minY + step * 2;
+    // A band with nothing in it runs 0 to 2%: the axis a programme not yet
+    // trained will have, with no line on it. See [ValueAxis.cycle].
+    final yAxis = ValueAxis.cycle(
+      [for (final i in order) drawn[i]!.value!],
+      format: formatValue,
+    );
+    final minY = yAxis.min;
+    final maxY = yAxis.max;
+    // Where a cycle is drawn: on the edge, for the one wild cycle taken off
+    // the scale, and at its value otherwise. The readout names the real one.
+    final placed = <int, double>{
+      for (var k = 0; k < order.length; k++)
+        order[k]: yAxis.place(0, k, drawn[order[k]]!.value!),
+    };
+    final offEdge = <int, OffScaleEdge>{
+      for (final o in yAxis.offScale) order[o.index]: o.edge,
+    };
 
     // Half a position of air at each end, so the first and last markers are not
     // cut in half by the edge of the plot.
@@ -1254,7 +1323,7 @@ class CycleAxisChart extends StatelessWidget {
 
     final gutter = small
         ? 0.0
-        : axisGutter(context, _yTicks(minY, maxY, step).map(formatValue));
+        : axisGutter(context, yAxis.labels);
     // The widest number the axis could print, at the size it will print it.
     final labelWidth = small
         ? 0.0
@@ -1285,18 +1354,9 @@ class CycleAxisChart extends StatelessWidget {
           maxX: maxX,
           minY: minY,
           maxY: maxY,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: step,
-            // `border` over a 20% tint reads as a scratch, and one gridline
-            // changing colour from slot to slot reads as two.
-            getDrawingHorizontalLine: (_) => FlLine(
-              color: tints.isEmpty ? c.border : c.textTertiary,
-              strokeWidth: 1,
-              dashArray: gridlineDash,
-            ),
-          ),
+          // `border` over a 20% tint reads as a scratch, and one gridline
+          // changing colour from slot to slot reads as two.
+          gridData: _gridOf(yAxis, tints.isEmpty ? c.border : c.textTertiary),
           borderData: FlBorderData(show: false),
           // A deload is a band rather than a point on the floor. The weights
           // are lighter on purpose, so a point at the bottom of the chart would
@@ -1322,6 +1382,22 @@ class CycleAxisChart extends StatelessWidget {
             ],
           ),
           extraLinesData: ExtraLinesData(
+            // Behind the line, as the gridlines are.
+            extraLinesOnTop: false,
+            // The two gridlines on the bounds, which `fl_chart` never draws:
+            // three or four gridlines, all of them labelled, and a label with
+            // no line under it reads as a scale the reader has to infer.
+            // The sparkline has no scale to state, so it adds none.
+            horizontalLines: [
+              if (!small)
+                for (final y in [minY, maxY])
+                  HorizontalLine(
+                    y: y,
+                    color: tints.isEmpty ? c.border : c.textTertiary,
+                    strokeWidth: 1,
+                    dashArray: gridlineDash,
+                  ),
+            ],
             verticalLines: [
               if (isBlocks)
                 for (var i = 0; i < n; i++)
@@ -1343,30 +1419,11 @@ class CycleAxisChart extends StatelessWidget {
             leftTitles: const AxisTitles(),
             rightTitles: small
                 ? const AxisTitles()
-                : AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: step,
-                      reservedSize: gutter,
-                      // Every tick printed, the two on the bounds included.
-                      // The time axis suppresses its edges because its labels
-                      // are dates wide enough to collide; three short
-                      // percentages down a gutter do not, and a band whose top
-                      // and bottom are unlabelled is a scale the reader has to
-                      // infer.
-                      // Wrapped for the gap between the gutter and the plot.
-                      // A bare widget is drawn flush against the axis.
-                      getTitlesWidget: (value, meta) => SideTitleWidget(
-                        meta: meta,
-                        space: Space.xs,
-                        child: Text(
-                          formatValue(value),
-                          style: context.t.bodySmall,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ),
+                // Every gridline labelled, the two on the bounds included. The
+                // time axis suppresses its edges because its labels are dates
+                // wide enough to collide; three short percentages down a gutter
+                // do not.
+                : AxisTitles(sideTitles: _valueTitles(context, yAxis)),
             bottomTitles: small
                 ? const AxisTitles()
                 : AxisTitles(
@@ -1483,11 +1540,8 @@ class CycleAxisChart extends StatelessWidget {
             for (var k = 1; k < closed.length; k++)
               _segment(
                 c,
-                from: FlSpot(
-                  closed[k - 1].toDouble(),
-                  drawn[closed[k - 1]]!.value!,
-                ),
-                to: FlSpot(closed[k].toDouble(), drawn[closed[k]]!.value!),
+                from: FlSpot(closed[k - 1].toDouble(), placed[closed[k - 1]]!),
+                to: FlSpot(closed[k].toDouble(), placed[closed[k]]!),
                 // A gap is a break in the line only when the chart was drawing
                 // every cycle. Under blocks every segment spans a block, so
                 // softening them all dashes the whole chart and says "broken"
@@ -1502,11 +1556,8 @@ class CycleAxisChart extends StatelessWidget {
             if (openIndex != null && closed.isNotEmpty)
               _segment(
                 c,
-                from: FlSpot(closed.last.toDouble(), drawn[closed.last]!.value!),
-                to: FlSpot(
-                  openIndex.toDouble(),
-                  drawn[openIndex]!.value!,
-                ),
+                from: FlSpot(closed.last.toDouble(), placed[closed.last]!),
+                to: FlSpot(openIndex.toDouble(), placed[openIndex]!),
                 soft: true,
                 open: true,
               ),
@@ -1516,15 +1567,24 @@ class CycleAxisChart extends StatelessWidget {
             // belongs to one list rather than to each segment's two ends.
             LineChartBarData(
               spots: [
-                for (final i in drawn.keys.toList()..sort())
-                  FlSpot(i.toDouble(), drawn[i]!.value!),
+                for (final i in order) FlSpot(i.toDouble(), placed[i]!),
               ],
               isCurved: false,
               color: Colors.transparent,
               barWidth: 0,
               dotData: FlDotData(
-                show: !small,
+                // The sparkline draws no markers, but keeps the caret: it is
+                // what says the shape does not end where it seems to.
+                checkToShowDot: (spot, _) =>
+                    !small || offEdge.containsKey(spot.x.round()),
                 getDotPainter: (spot, _, _, _) {
+                  final edge = offEdge[spot.x.round()];
+                  if (edge != null) {
+                    return OffScaleCaret(
+                      color: c.progress,
+                      pointsUp: edge == OffScaleEdge.top,
+                    );
+                  }
                   final cycle = drawn[spot.x.round()]!;
                   final isSelected = cycle.cycleId == selected;
                   return FlDotCirclePainter(
@@ -1624,22 +1684,6 @@ double _measure(BuildContext context, String text) {
     textScaler: MediaQuery.textScalerOf(context),
   )..layout();
   return painter.width;
-}
-
-/// The step the cycle axis climbs in, so the band is the data plus air and
-/// every gridline lands on a number a person would say.
-///
-/// A ladder of its own rather than [_niceStep]'s: this axis is always a
-/// percentage change and its band is always two steps tall, so the step has to
-/// be the smallest that covers the data from a rounded floor — 2.5% is not a
-/// figure anybody reads a training block in.
-double _cycleStep(double lowest, double highest) {
-  for (final step in const [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 25.0, 50.0]) {
-    if ((lowest / step).floorToDouble() * step + 2 * step >= highest) {
-      return step;
-    }
-  }
-  return 100;
 }
 
 /// A cycle point as a percentage, in the app's own voice: `+9.8%`, `0%`,
