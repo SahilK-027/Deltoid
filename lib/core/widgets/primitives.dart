@@ -910,11 +910,17 @@ class SecondaryButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.icon,
+    this.fill,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// [DeltoidColors.surfaceHighest] for a button set into an [InsetPanel],
+  /// where the usual `surfaceHigh` would be the panel's own grey and leave
+  /// the button with no edge. Null for every other ground.
+  final Color? fill;
 
   @override
   Widget build(BuildContext context) {
@@ -928,7 +934,7 @@ class SecondaryButton extends StatelessWidget {
       child: Container(
         height: Sizes.control,
         decoration: BoxDecoration(
-          color: c.surfaceHigh,
+          color: fill ?? c.surfaceHigh,
           borderRadius: BorderRadius.circular(Radii.control),
         ),
         child: Row(

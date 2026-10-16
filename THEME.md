@@ -749,17 +749,27 @@ A phase that has been cleared shows this state too.
 **The card asks what comes next, and nothing else does.** Two conditions put
 one inset panel at the foot of the card, under the figures. It holds a
 sentence in `body` and two grey buttons side by side, and it leaves as soon as
-either is tapped.
+either answers it. The buttons are `surfaceHighest`, one step above the panel,
+because a `surfaceHigh` button on a `surfaceHigh` panel has no edge.
 
 - **The planned length has passed**: `12 weeks are up. Start the next phase,
   or keep this one going.` `Change phase` opens the sheet; `Keep going` makes
   the phase open-ended, so the question is answered once.
 - **The weigh-ins have run against the phase for about three weeks** — losing
   on a bulk, gaining on a cut, or drifting either way on maintenance:
-  `Your weight has fallen for three weeks during this bulk.` Then the same two
-  buttons. `Keep going` records the day it was tapped, and the question is not
-  asked again until three more weeks of weigh-ins run against the phase. The
-  thresholds belong to `lib/domain/` and are tested there.
+  `Your weight has fallen for three weeks during this bulk.`, `Your weight
+  has risen for three weeks during this cut.` or `Your weight has risen for
+  three weeks during maintenance.` Then the same two buttons. `Keep going`
+  records the day it was tapped, and the question is not asked again until
+  three more weeks of weigh-ins run against the phase. The thresholds belong
+  to `lib/domain/` and are tested there.
+
+When both conditions hold there is still one panel, and the planned length
+speaks. Its `Keep going` answers both, because the person has said the phase
+holds, and the weigh-in question straight after would ask the same thing
+twice. `Change phase` answers the question only when the sheet saves: a sheet
+closed by its ✕ leaves the panel where it was. Both answers are kept on the
+phase's own row, so a second phone does not ask what the first was told.
 
 Neither is ever a notification, a badge on the Home tab, a toast or a prompt
 on opening the app ([RULES § 6](RULES.md#6-scope)). A person who never opens

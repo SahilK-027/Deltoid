@@ -46,6 +46,7 @@ class PhaseSection extends ConsumerWidget {
             data: data,
             todayKey: todayKey,
             unit: ref.watch(weightUnitProvider).valueOrNull ?? WeightUnit.kg,
+            onChange: open,
           ),
       ],
     );
@@ -86,12 +87,14 @@ class _PhaseCard extends StatelessWidget {
     required this.data,
     required this.todayKey,
     required this.unit,
+    required this.onChange,
   });
 
   final PhaseSpan current;
   final PhaseCardData data;
   final int todayKey;
   final WeightUnit unit;
+  final VoidCallback onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +111,8 @@ class _PhaseCard extends StatelessWidget {
     final change = phaseBodyweightChange(current, log, todayKey: todayKey);
     final sparkline =
         phaseSparkline(current, data.spans, log, todayKey: todayKey);
+    final pastPlan = plannedLengthPassed(current, todayKey: todayKey);
+    final against = weighInsAgainstPhase(current, log, todayKey: todayKey);
 
     return AppCard(
       child: Column(
@@ -196,6 +201,103 @@ class _PhaseCard extends StatelessWidget {
                       ? null
                       : formatBodyweightChange(change!.perWeek!, unit),
                   unit: unit.label,
+                ),
+              ),
+            ],
+          ),
+          if (pastPlan || against != null) ...[
+            const SizedBox(height: Space.lg),
+            _NextPhasePrompt(
+              current: current,
+              pastPlan: pastPlan,
+              against: against,
+              todayKey: todayKey,
+              onChange: onChange,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The card asking what comes next, and the one place anything does
+/// (THEME → Phase card, RULES § 6): no notification, badge or toast.
+///
+/// One panel even when both questions stand. The planned length speaks
+/// first, and `Keep going` then answers both, because the person has said
+/// the phase holds; the weigh-in question straight after would ask the same
+/// thing twice.
+///
+/// `Keep going` is remembered on the phase row rather than in a device
+/// preference: the schema already carries it, it syncs, so a second phone
+/// does not ask what the first was told, and it goes with the phase it
+/// answered. Past the plan it makes the phase open-ended, so that question is
+/// asked once. Against the weigh-ins it records the day, and
+/// [weighInsAgainstPhase] reads only the readings from that day on, so the
+/// question returns only once three more weeks of weigh-ins have run against
+/// the phase.
+class _NextPhasePrompt extends ConsumerWidget {
+  const _NextPhasePrompt({
+    required this.current,
+    required this.pastPlan,
+    required this.against,
+    required this.todayKey,
+    required this.onChange,
+  });
+
+  final PhaseSpan current;
+  final bool pastPlan;
+  final WeightDirection? against;
+  final int todayKey;
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final against = this.against;
+    final during = switch (current.kind) {
+      PhaseKind.bulk => 'this bulk',
+      PhaseKind.cut => 'this cut',
+      PhaseKind.maintenance => 'maintenance',
+    };
+    final moved = against == WeightDirection.rising ? 'risen' : 'fallen';
+    final sentence = pastPlan
+        ? '${current.phase.plannedWeeks} weeks are up. Start the next phase, '
+            'or keep this one going.'
+        : 'Your weight has $moved for three weeks during $during.';
+
+    Future<void> keep() async {
+      final repo = ref.read(phaseRepositoryProvider);
+      final id = current.phase.id;
+      if (pastPlan) await repo.keepGoingPastPlan(id);
+      if (against != null) {
+        await repo.keepGoingAgainstWeighIns(id, on: dateFromDayKey(todayKey));
+      }
+    }
+
+    return InsetPanel(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(sentence, style: context.t.bodyMedium),
+          const SizedBox(height: Space.md),
+          Row(
+            children: [
+              Expanded(
+                child: SecondaryButton(
+                  label: 'Change phase',
+                  onPressed: onChange,
+                  fill: c.surfaceHighest,
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: SecondaryButton(
+                  label: 'Keep going',
+                  onPressed: keep,
+                  fill: c.surfaceHighest,
                 ),
               ),
             ],

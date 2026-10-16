@@ -138,6 +138,159 @@ void main() {
     });
   });
 
+  group('what comes next', () {
+    const pastPlan =
+        '12 weeks are up. Start the next phase, or keep this one going.';
+    const risenOnCut = 'Your weight has risen for three weeks during this cut.';
+
+    Future<void> tapPanel(WidgetTester tester, String label) async {
+      await tester.ensureVisible(find.text(label));
+      await tester.tap(find.text(label));
+      await settle(tester);
+    }
+
+    /// Four weigh-ins over the last three weeks, each [step] kg on the last.
+    Future<void> weighIns(double from, double step) async {
+      const daysAgo = [20, 13, 7, 0];
+      for (var i = 0; i < daysAgo.length; i++) {
+        await training.logBodyweight(
+          daysBefore(today, daysAgo[i]),
+          from + step * i,
+        );
+      }
+    }
+
+    phaseTest('says nothing while the phase is on plan and on track',
+        (tester) async {
+      await phases.startPhase(
+        PhaseKind.cut,
+        from: daysBefore(today, 30),
+        plannedWeeks: 12,
+      );
+      await weighIns(82, -0.5);
+      await pumpHome(tester);
+
+      expect(find.text('Week 5 of 12'), findsOneWidget);
+      expect(find.text('Keep going'), findsNothing);
+      expect(find.text('Change phase'), findsNothing);
+    });
+
+    phaseTest('asks once the planned length has passed, and Keep going '
+        'leaves the phase open-ended', (tester) async {
+      final id = await phases.startPhase(
+        PhaseKind.bulk,
+        from: daysBefore(today, 90),
+        plannedWeeks: 12,
+      );
+      await pumpHome(tester);
+
+      expect(find.text(pastPlan), findsOneWidget);
+      expect(find.text('Week 13 of 12'), findsOneWidget);
+
+      await tapPanel(tester, 'Keep going');
+
+      final row = (await tester.runAsync(live))!.single;
+      expect(row.id, id);
+      expect(row.plannedWeeks, isNull);
+      expect(row.keptDayKey, isNull, reason: 'the weigh-ins were not asked');
+      expect(find.text(pastPlan), findsNothing);
+      expect(find.text('Week 13'), findsOneWidget);
+    });
+
+    phaseTest('asks when the weigh-ins run against the phase, and Keep going '
+        'records the day', (tester) async {
+      final id = await phases.startPhase(
+        PhaseKind.cut,
+        from: daysBefore(today, 30),
+      );
+      await weighIns(80, 0.5);
+      await pumpHome(tester);
+
+      expect(find.text(risenOnCut), findsOneWidget);
+
+      await tapPanel(tester, 'Keep going');
+
+      final row = (await tester.runAsync(live))!.single;
+      expect(row.id, id);
+      expect(row.keptDayKey, todayKey);
+      expect(row.plannedWeeks, isNull);
+      expect(find.text(risenOnCut), findsNothing);
+      expect(find.text('Keep going'), findsNothing);
+    });
+
+    phaseTest('names the direction on a bulk and on maintenance',
+        (tester) async {
+      await phases.startPhase(
+        PhaseKind.maintenance,
+        from: daysBefore(today, 30),
+      );
+      await weighIns(80, -0.5);
+      await pumpHome(tester);
+
+      expect(
+        find.text('Your weight has fallen for three weeks during maintenance.'),
+        findsOneWidget,
+      );
+
+      await tester.runAsync(
+        () => phases.startPhase(PhaseKind.bulk, from: daysBefore(today, 25)),
+      );
+      await settle(tester);
+
+      expect(
+        find.text('Your weight has fallen for three weeks during this bulk.'),
+        findsOneWidget,
+      );
+    });
+
+    phaseTest('holds one question when both stand, and Keep going answers '
+        'both', (tester) async {
+      await phases.startPhase(
+        PhaseKind.cut,
+        from: daysBefore(today, 90),
+        plannedWeeks: 12,
+      );
+      await weighIns(80, 0.5);
+      await pumpHome(tester);
+
+      expect(find.text(pastPlan), findsOneWidget);
+      expect(find.text(risenOnCut), findsNothing);
+      expect(find.text('Keep going'), findsOneWidget);
+
+      await tapPanel(tester, 'Keep going');
+
+      final row = (await tester.runAsync(live))!.single;
+      expect(row.plannedWeeks, isNull);
+      expect(row.keptDayKey, todayKey);
+      expect(find.text(pastPlan), findsNothing);
+      expect(find.text(risenOnCut), findsNothing);
+    });
+
+    phaseTest('Change phase opens the sheet, and a new phase answers it',
+        (tester) async {
+      await phases.startPhase(
+        PhaseKind.cut,
+        from: daysBefore(today, 30),
+      );
+      await weighIns(80, 0.5);
+      await pumpHome(tester);
+
+      await tapPanel(tester, 'Change phase');
+
+      expect(find.text('Clear phase'), findsOneWidget);
+      expect(find.text('Planned length'), findsOneWidget);
+
+      await tester.tap(find.text('Maintenance').last);
+      await settle(tester);
+      await tester.tap(find.text('Save'));
+      await settle(tester);
+
+      final rows = (await tester.runAsync(live))!;
+      expect(rows.last.kind, PhaseKind.maintenance);
+      expect(find.text(risenOnCut), findsNothing);
+    });
+  });
+
   group('the sheet', () {
     Future<void> openSheet(WidgetTester tester, String via) async {
       await tester.ensureVisible(find.text(via));
