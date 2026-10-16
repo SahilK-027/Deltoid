@@ -86,19 +86,13 @@ Today's Settings without its Bodyweight section, plus:
 
 ## 1.19.0: Charts
 
-Work through [`chart-audit.md`](chart-audit.md) in the order it recommends:
-
-1. One shared function for the y range of every chart.
-2. One shared, measured ladder of date labels.
-3. Lines break at empty buckets, and regime jumps are dashed on the cycle chart.
-4. Density decided by pixels rather than counts: markers, tiles and labels.
-5. Deload treatment on long cycle charts and sparklines.
-6. Bodyweight trend parity with the exercise trend.
-7. Text-scale fixes for the bar list and the year heatmap.
-8. An outlier policy, written into THEME first.
-
-Spacing to settle on the way: three line-chart heights, four legend implementations,
-a range control that sits below the chart only on bodyweight, and uneven card padding.
+Every chart is made to look as good with twenty years of data as with a week, working
+through the 33 findings in [`chart-audit.md`](chart-audit.md). THEME's chart rules were
+settled first (`d71cf89`): an outlier is shown as a caret rather than allowed to stretch
+the axis, line charts are 220 tall as a screen's main chart and 150 in a card, one
+legend sits under every plot, chart cards share one spacing rule, and the range control
+sits above every chart. The steps, each mapped to the audit's findings, are under
+"1.19.0, charts" in **Order of work** below.
 
 ---
 
