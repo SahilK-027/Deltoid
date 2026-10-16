@@ -51,9 +51,11 @@ button:focus-visible, input:focus-visible { outline:2px solid var(--accent); out
 .actions { display:flex; gap:8px; }
 .circ { width:40px; height:40px; border-radius:50%; background:var(--high); display:grid; place-items:center; flex:none; }
 .circ .ms { font-size:18px; }
-.appbar { height:56px; display:grid; grid-template-columns:56px 1fr 56px; align-items:center; background:var(--bg); position:sticky; top:0; z-index:2; }
+.appbar { height:56px; display:grid; grid-template-columns:104px 1fr 104px; align-items:center; background:var(--bg); position:sticky; top:0; z-index:2; }
 .appbar h1 { font-size:16px; font-weight:600; text-align:center; }
-.appbar button { width:56px; height:56px; display:grid; place-items:center; }
+.appbar > button { width:56px; height:56px; display:grid; place-items:center; }
+.appbar .bar-actions { display:flex; justify-content:flex-end; gap:8px; padding-right:12px; }
+.appbar .bar-actions .circ .ms { font-size:20px; }
 
 .block { background:var(--surface); padding:16px 16px 20px; }
 .sec { padding:0 16px; margin-top:28px; }
@@ -522,12 +524,12 @@ function mapScreen(kind){
   const colourFor = isW ? k => weighColour(weighed,k) : k => trainColour(trained,k);
   const sw = (c,l) => `<span><i style="background:${c}"></i>${l}</span>`;
   const legend = isW ? sw('var(--heat-empty)','No weigh-in')+sw('var(--lavender)','Weighed') : sw('var(--heat-empty)','Rest')+sw('var(--blue)','Trained')+sw('var(--orange)','Deload');
-  return `<header class="appbar"><button data-back aria-label="Back"><span class="ms">arrow_back</span></button><h1>${isW?'Weigh-ins':'Consistency'}</h1><span></span></header>
+  return `<header class="appbar"><button data-back aria-label="Back"><span class="ms">arrow_back</span></button><h1>${isW?'Weigh-ins':'Consistency'}</h1>${isW ? `<div class="bar-actions"><button class="circ" aria-label="Log or correct a past weigh-in" data-toast="Opens the day picker: a weighed day opens its weigh-in to correct, any other day logs one."><span class="ms">edit_calendar</span></button><button class="circ" id="log-weight" aria-label="Log weight"><span class="ms">add</span></button></div>` : '<span></span>'}</header>
     ${isW ? bodyweightTrend() : ''}
     <div style="padding:${isW?28:16}px 16px 0"><p class="t16">${total} ${noun}s since March 2025</p><div class="legend" style="margin-top:12px">${legend}</div></div>
     ${[2026,2025].map(y=>`<section class="sec"><div class="sh"><h2>${y}</h2><span class="body">${count(y)} ${noun}${count(y)===1?'':'s'}</span></div>
       <div class="card" style="padding:12px 12px 8px">${yearMap(y, colourFor, kind)}</div></section>`).join('')}
-    ${isW?`<div style="position:sticky;bottom:16px;display:flex;justify-content:flex-end;padding:16px 16px 0"><button class="fab" id="log-weight"><span class="ms" style="font-size:20px">add</span>Log weight</button></div>`:''}`;
+`;
 }
 function pickDay(rect){
   const svg = rect.closest('svg'), k = +rect.dataset.day, ring = svg.querySelector('.ring'), cap = svg.querySelector('.cap'), months = svg.querySelector('.months');

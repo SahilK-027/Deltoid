@@ -350,7 +350,9 @@ numbers in brackets are its finding numbers.
    empty range (16), dropped or truncated units (21), the bar list count column at
    three digits (6), year-heatmap labels below 11 sp (22), the readout wrapping (26),
    and the exercise trend's `Change` figure mixing sessions and painting a drop red
-   (20).
+   (20). Also on the Weigh-ins screen: replace the floating `Log weight` button,
+   which covers the current months of the year map, with a round `+` in the app bar
+   beside the calendar button, matching the `+` on the Home tile (see the prototype).
 8. Spacing across chart cards: the spacing table at the end of the audit (heights,
    legends, gaps, padding, the range control's position) plus the remaining polish
    findings (27 to 33).
