@@ -1,11 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/trend_chart.dart';
 import '../../../domain/chart_buckets.dart';
+import '../../../domain/date_axis.dart';
 import '../../../domain/value_axis.dart';
 import '../../../domain/volume_history.dart';
 import 'volume_history_bars.dart';
@@ -47,10 +46,10 @@ class VolumeChart extends StatelessWidget {
     final c = context.c;
     final gutter =
         _yAxisWidth(context, ValueAxis.bars(series.peakPerWeek(by)));
-    // Coarsened against the weeks in hand — see [autoGranularityFor]. A window
+    // Coarsened against the weeks in hand — see [foldForWeeks]. A window
     // and its data disagree for a frame when the range changes, and that frame
     // must not ask for two and a half thousand bars in a phone's width.
-    final safe = autoGranularityFor(series.weeks.length, by);
+    final safe = foldForWeeks(series.weeks.length, by);
     final bars = series.bars(safe);
     final axis = ValueAxis.bars(series.peakPerWeek(safe));
 
@@ -200,21 +199,14 @@ class _Gridlines extends CustomPainter {
       old.max != max || old.colour != colour || old.ticks.length != ticks.length;
 }
 
-/// The date strip under the baseline: the same seven labels, in the same words,
-/// that a line chart prints (THEME → Charts).
+/// The date strip under the baseline: the same ladder of labels, in the same
+/// words, that a line chart prints (THEME → Charts), from [DateAxis.bars].
 ///
-/// Not built out of *runs* — one `Expanded` per calendar period, flexed by how
-/// many bars it covers, with every *n*th one printed. That fails three visible
-/// ways. The count is whatever the calendar happens to produce, so a month
-/// shows two labels and six months seven. Each label is clipped to its own
-/// run's box, so `2024` under a narrow year comes out as `2`. And a run's box
-/// is not centred on anything, so the words drift away from the bars they
-/// name.
-///
-/// Positions are chosen the way the line chart chooses ticks — evenly across the
-/// plot, at most seven — and each label is **centred on its bar** rather than
-/// packed into a slot, with the outermost two pulled flush to the edges so a
-/// wide word cannot hang off either end.
+/// The last label is today, the rest are counted back from it in whole bars,
+/// and each is centred on the bar its day falls in, so every gap is the same.
+/// No label is pulled in from its bar; the newest may run on under the value
+/// gutter. Which labels fit is measured at the size they print, system font scale
+/// included.
 class _Months extends StatelessWidget {
   const _Months({
     super.key,
@@ -234,66 +226,17 @@ class _Months extends StatelessWidget {
   Widget build(BuildContext context) {
     if (bars.isEmpty) return const SizedBox.shrink();
 
-    // Named by how much time is on screen, not by how it is folded — the same
-    // rule and the same function the line charts use. A fortnight of monthly
-    // bars is still a fortnight.
-    final span = daysBetween(bars.first.start, bars.last.end).toDouble();
-    final format = DateFormat(axisDateFormat(span));
+    // The last day the bars stand for: today, in the week that holds it. A
+    // calendar year in the past ends on its 31 December, though its last week
+    // runs into January.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final last = bars.last;
+    var through = last.end.isAfter(today) ? today : last.end;
+    final yearEnd = DateTime(last.start.year, 12, 31);
+    if (through.isAfter(yearEnd)) through = yearEnd;
 
-    // At most seven, and never more than there are bars: four bars get four
-    // labels rather than seven crowded onto four positions.
-    final n = bars.length;
-    final count = n < axisLabelCount ? n : axisLabelCount;
-
-    // **The line chart's geometry, exactly.** Its axis pads half a step either
-    // side and then ticks every step, which puts label *k* at `(k + ½) / count`
-    // of the width — evenly spaced, all of them interior, no end treated
-    // differently from the middle.
-    //
-    // Spreading indices from the first bar to the last, or anchoring the outer
-    // two flush to the edges, bends the spacing: rounding to whole bars makes
-    // the gaps differ by a slot, and anchored ends make the two outer gaps
-    // unlike the five inner ones. Either reads as *nearly* even, which is worse
-    // than even or obviously not.
-    final indices = [
-      for (var k = 0; k < count; k++)
-        math.max(0, math.min(n - 1, (((k + 0.5) * n / count) - 0.5).round())),
-    ];
-
-    List<({int index, double at, String label})> pickedWith(DateFormat f) {
-      final out = <({int index, double at, String label})>[];
-      for (var k = 0; k < indices.length; k++) {
-        final label = f.format(bars[indices[k]].start);
-        out.add((
-          index: indices[k],
-          // The fraction of the plot this label sits at — see [indices].
-          at: (k + 0.5) / count,
-          label: label,
-        ));
-      }
-      return out;
-    }
-
-    // **A collision is a format that is too coarse, not a label too many.**
-    //
-    // Dropping the repeat was the obvious fix and the wrong one: the positions
-    // are fixed at `(k + ½) / count`, so removing one leaves a double-width gap
-    // where it was. Thirteen weeks over three months collided four times and
-    // came out as three labels spaced 42, 126 — which is exactly the uneven
-    // strip this was supposed to cure.
-    //
-    // So the words get more specific instead. Which way depends on what the
-    // picks disagree about: inside one year `Mar` becomes `9 Mar`, and across a
-    // boundary — a year of weekly bars reaching back from August covers
-    // *thirteen* months, so `Aug` lands at both ends — it becomes `Aug '25`.
-    var picks = pickedWith(format);
-    if (_collides(picks)) {
-      final spansYears =
-          bars.first.start.year != bars.last.start.year;
-      picks = pickedWith(DateFormat(spansYears ? "MMM ''yy" : 'd MMM'));
-      if (_collides(picks)) picks = pickedWith(DateFormat("d MMM ''yy"));
-    }
-
+    final measure = dateLabelMeasure(context);
     return Padding(
       padding: EdgeInsets.only(right: gutter),
       child: SizedBox(
@@ -301,38 +244,35 @@ class _Months extends StatelessWidget {
         height: 16,
         child: LayoutBuilder(
           builder: (context, box) {
+            final width = box.maxWidth;
+            final axis = DateAxis.bars(
+              from: bars.first.start,
+              to: through,
+              by: by,
+              count: bars.length,
+              width: width,
+              measure: measure,
+              // Where the step does not divide the bars, the newest label is
+              // centred on today's bar and may run on under the value gutter,
+              // which is empty at this height, and the card's padding beyond.
+              rightRoom: gutter + Space.lg - Space.xs,
+            );
             return Stack(
               clipBehavior: Clip.none,
               children: [
-                for (var k = 0; k < picks.length; k++)
-                  _label(context, picks[k], box.maxWidth),
+                for (final label in axis.labels)
+                  Positioned(
+                    left: label.at * width - measure(label.text) / 2,
+                    child: Text(
+                      label.text,
+                      style: context.t.bodySmall,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  ),
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-
-  static bool _collides(List<({int index, double at, String label})> picks) =>
-      picks.map((p) => p.label).toSet().length != picks.length;
-
-  Widget _label(
-    BuildContext context,
-    ({int index, double at, String label}) pick,
-    double width,
-  ) {
-    // Centred on its position without measuring the word: place the box at the
-    // point, then shift it left by half of whatever width it turns out to be.
-    return Positioned(
-      left: pick.at * width,
-      child: FractionalTranslation(
-        translation: const Offset(-0.5, 0),
-        child: Text(
-          pick.label,
-          style: context.t.bodySmall,
-          maxLines: 1,
-          softWrap: false,
         ),
       ),
     );

@@ -136,10 +136,21 @@ Granularity autoGranularityFor(int marks, Granularity of, {int ceiling = 60}) {
 /// granularity is therefore not selected; the finest one remaining below the
 /// ceiling is. This is what causes a week to open at daily granularity and
 /// fifty years to open at yearly, without either being special-cased.
+///
+/// **About sixty is a tenth either way.** The marks counted are the buckets the
+/// fold draws, a partial one at each end included, and they may run to a tenth
+/// over the [ceiling]. Held to sixty exactly, five years came to 60.02 months
+/// and folded into six yearly bars, the first of them a partial October, where
+/// sixty-one monthly bars draw the same five years legibly.
 Granularity autoGranularity(int spanDays, {int ceiling = 60}) {
-  if (spanDays <= ceiling) return Granularity.daily;
-  if (spanDays / 7 <= ceiling) return Granularity.weekly;
-  if (spanDays / 30.44 <= ceiling) return Granularity.monthly;
+  final most = ceiling * 1.1;
+  for (final g in const [
+    Granularity.daily,
+    Granularity.weekly,
+    Granularity.monthly,
+  ]) {
+    if (_marksIn(spanDays, g) <= most) return g;
+  }
   return Granularity.yearly;
 }
 

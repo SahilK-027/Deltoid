@@ -89,6 +89,17 @@ class VolumeBar {
   bool get isEmpty => totalSets == 0;
 }
 
+/// The fold a chart draws [weeks] weekly marks at: [chosen], coarsened until
+/// the weeks fit (see [autoGranularityFor]) and never refined below it.
+///
+/// The weeks are counted as weeks whatever was chosen. Counted as months, as
+/// the charts used to, five years of weeks read as twenty-one years of months
+/// and folded into six yearly bars.
+Granularity foldForWeeks(int weeks, Granularity chosen) {
+  final fits = autoGranularityFor(weeks, Granularity.weekly);
+  return fits.index > chosen.index ? fits : chosen;
+}
+
 /// Folds weeks into the bars a chart draws at [by].
 ///
 /// [Granularity.weekly] is the identity: one bar per week, which is what this

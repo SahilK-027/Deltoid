@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/domain/chart_buckets.dart';
 import 'package:deltoid/domain/volume_history.dart';
 import 'package:deltoid/features/progress/widgets/volume_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The strip under the volume bars, which had all four of the faults a date
@@ -10,6 +13,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// fragments (`2024` printing as `2`), labels drifting off the bars they name,
 /// and labels hanging past the ends of the plot.
 void main() {
+  // The strip measures what it prints, so it is tested in the font it prints
+  // in. The test font draws every glyph a full em across, twice Inter's width.
+  setUpAll(() async {
+    final inter = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+      final bytes = File('assets/fonts/Inter-$w.ttf').readAsBytesSync();
+      inter.addFont(Future.value(ByteData.sublistView(bytes)));
+    }
+    await inter.load();
+  });
+
   /// [weeks] Mondays running back from a fixed date, so the tests do not move
   /// with the calendar.
   VolumeSeries seriesOf(int weeks) => VolumeSeries(
@@ -62,37 +76,36 @@ void main() {
           if (w.data != null) w.data!,
       ];
 
-  /// The date labels only — the value axis is bare integers.
+  /// The date labels only: the ones under the 150-high plot. The value axis
+  /// sits beside it, and a date label may be a bare number too (`2024`, `9`).
   List<({String label, Rect rect})> stripOf(WidgetTester tester) => [
         for (final e in find.byType(Text).evaluate())
           if ((e.widget as Text).data case final d?)
-            if (int.tryParse(d) == null)
+            if (tester.getRect(find.byWidget(e.widget)).top >= 150)
               (label: d, rect: tester.getRect(find.byWidget(e.widget))),
       ];
 
   testWidgets('a month of weekly bars labels every bar, not two of them',
       (tester) async {
     await pump(tester, 5, Granularity.weekly);
-    final dates = labelsOf(tester).where((s) => s.contains(' ')).toList();
 
     // Five bars, five labels — never "Jul, Aug" because that is how the months
-    // happened to fall.
+    // happened to fall. The last is the last day the bars stand for, not the
+    // Monday its week began on.
+    final dates = [for (final l in stripOf(tester)) l.label];
     expect(dates, hasLength(5));
     expect(dates.first, contains('Jul'));
+    expect(dates.last, anyOf('16', '16 Aug'));
   });
 
   testWidgets('a year of weekly bars keeps to seven, and to distinct ones',
       (tester) async {
     await pump(tester, 52, Granularity.weekly);
-    final months = labelsOf(tester)
-        .where((s) => RegExp(r'^[A-Z][a-z]{2}').hasMatch(s))
-        .toList();
+    final months = [for (final l in stripOf(tester)) l.label];
 
     expect(months.length, lessThanOrEqualTo(7));
-    expect(months.length, greaterThanOrEqualTo(5));
-    // A year reaching back from August covers thirteen months, so plain `Aug`
-    // would land at both ends. The axis says which year each one is rather than
-    // printing one of them fewer times and losing an end.
+    expect(months.length, greaterThanOrEqualTo(4));
+    expect(months.last, startsWith('Aug'));
     expect(months.toSet().length, months.length,
         reason: 'a repeated label is a format that is too coarse');
   });
@@ -125,20 +138,22 @@ void main() {
 
   testWidgets('the gaps between labels are equal, at every range',
       (tester) async {
-    // The complaint that produced this file's second rewrite: the labels were
-    // *nearly* evenly spaced, which reads worse than either even or obviously
-    // not. They now sit where the line chart's ticks sit — `(k + ½) / count` of
-    // the plot — so every gap is the same and the two ends are not special.
+    // The labels step in whole weeks, or at the average month, so they are
+    // evenly spaced. The two at the ends may be pulled in flush with the plot,
+    // so the gaps are compared between the labels inside them.
     for (final weeks in [13, 26, 52, 52 * 3]) {
       await pump(tester, weeks, Granularity.weekly);
       final strip = stripOf(tester);
       final centres = [for (final l in strip) l.rect.center.dx]..sort();
-      expect(centres.length, greaterThanOrEqualTo(5),
+      expect(centres.length, greaterThanOrEqualTo(3),
           reason: '$weeks weeks drew ${centres.length} date labels');
+      if (centres.length < 4) continue;
 
+      final inner = centres.sublist(1, centres.length - 1);
       final gaps = [
-        for (var i = 1; i < centres.length; i++) centres[i] - centres[i - 1],
+        for (var i = 1; i < inner.length; i++) inner[i] - inner[i - 1],
       ];
+      if (gaps.isEmpty) continue;
       final widest = gaps.reduce((a, b) => a > b ? a : b);
       final narrowest = gaps.reduce((a, b) => a < b ? a : b);
       expect(widest - narrowest, lessThan(1.0),

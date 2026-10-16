@@ -2,10 +2,10 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../domain/chart_buckets.dart';
 import '../../domain/cycle_progress.dart';
+import '../../domain/date_axis.dart';
 import '../../domain/enums.dart';
 import '../../domain/value_axis.dart';
 import '../ids.dart';
@@ -125,84 +125,11 @@ class TrendWindow {
   int get hashCode => Object.hash(range, year, isAll);
 }
 
-// ─── The time axis ──────────────────────────────────────────────────────────
+// ─── Gridlines ─────────────────────────────────────────────────────────────
 
 /// A gridline's dash: four points drawn, four left out. One pattern for every
 /// chart, line or bar, since THEME has them share their gridlines.
 const gridlineDash = <int>[4, 4];
-
-/// How many date labels a chart draws, whatever it is showing.
-///
-/// Seven, always. It is enough to read a year by its months and few enough that
-/// a phone can print them without collision, and holding it constant is what
-/// makes changing range read as a zoom rather than as a different chart: the
-/// labels stay where they are and only their words change.
-///
-/// Public because the bar charts print the same seven, so both kinds of chart
-/// are read at the same rhythm.
-const axisLabelCount = 7;
-
-/// The x axis of a window: where it starts, where it ends, and where the labels
-/// go.
-///
-/// Anchored on the right. Every rolling range ends today, so the last label is
-/// today and the remainder are counted back from it. Laying labels out from the
-/// left edge instead causes `1W` to print whichever day the data happens to
-/// begin on, and never to print today.
-class TimeAxis {
-  const TimeAxis({
-    required this.minX,
-    required this.maxX,
-    required this.interval,
-    required this.baseline,
-    required this.format,
-  });
-
-  /// Built for [window], padded outward by half a step so the first and last
-  /// labels are strictly inside the plot and have room to print. Without the
-  /// padding they sit on the edges, where a label has half a line of space and
-  /// prints over its neighbour.
-  /// [zoom] is the pinch scale: `1` denotes the whole window and `4` a quarter
-  /// of it on screen. The label sequence is derived from the visible span, so
-  /// zooming into a decade converts years into months rather than emptying the
-  /// axis. The label count remains seven and only the resolution changes.
-  factory TimeAxis.of(
-    TrendWindow window, {
-    DateTime? earliest,
-    double zoom = 1,
-  }) {
-    final (start, end) = window.xBoundsSince(earliest);
-    final from = _x(start);
-    final to = _x(end);
-    final span = (to - from).abs();
-    final visible = zoom > 1 ? span / zoom : span;
-    final step = visible <= 0 ? 1.0 : visible / (axisLabelCount - 1);
-    return TimeAxis(
-      minX: from - step / 2,
-      maxX: to + step / 2,
-      interval: step,
-      // The ladder hangs off the last day rather than the first — see the class
-      // doc. `fl_chart` phases its ticks against `baselineX`, so this is the
-      // one number that decides whether today gets a label.
-      baseline: to,
-      format: axisDateFormat(visible),
-    );
-  }
-
-  final double minX;
-  final double maxX;
-  final double interval;
-  final double baseline;
-
-  /// An `intl` pattern, chosen by how much time is on screen.
-  final String format;
-
-  String label(double value) => DateFormat(format).format(
-        DateTime.fromMillisecondsSinceEpoch((value * 86400000).round()),
-      );
-
-  static double _x(DateTime d) => d.millisecondsSinceEpoch / 86400000;
-}
 
 /// The one control every chart in the app is driven by: how much time, which
 /// year, and how finely it is averaged.
@@ -637,27 +564,6 @@ class _TrendChartState extends State<TrendChart>
 
     final xs = [for (final s in all) s.x];
 
-    // The axis describes what is on screen rather than the window. After a
-    // pinch the two differ, and labels that continue to describe the window
-    // describe a chart that is no longer displayed. Seven labels are drawn at
-    // any zoom level, which is what allows zooming in to report position rather
-    // than removing the dates.
-    final axis = window == null
-        ? null
-        : TimeAxis.of(window, earliest: widget.earliest, zoom: _scale);
-
-    // One session is a chart with one dot on it, and a dot is worth drawing —
-    // it establishes the current position, on the axis the next point is read
-    // against. Its
-    // span is zero days, though, and an axis from a day to itself has no width
-    // to divide, so a fortnight of air is put either side of it.
-    var minX = axis?.minX ?? xs.reduce(min);
-    var maxX = axis?.maxX ?? xs.reduce(max);
-    if (maxX - minX < 1) {
-      minX -= 7;
-      maxX += 7;
-    }
-
     // The band, its gridlines and their labels, from the one function every
     // chart's value axis comes from. A band the caller supplies is drawn as
     // given, and the spots then set nothing; otherwise one wild point is
@@ -676,37 +582,64 @@ class _TrendChartState extends State<TrendChart>
       minSpan: widget.minSpan,
       minSpanFraction: widget.minSpanFraction,
     );
-    var minY = yAxis.min;
-    var maxY = yAxis.max;
+    final valueTitles = _valueTitles(context, yAxis);
+    final dense = all.length > 40;
     // The value a touched spot really has, which an off-scale one does not
     // show by its position.
     double realValue(int bar, int index, double drawn) =>
         yAxis.offScaleAt(bar, index)?.value ?? drawn;
 
-    // The bounds at this instant, part way between the previous range and the
-    // selected one. `fl_chart` interpolates its own data changes but cannot
-    // interpolate between two spot lists of different lengths, which is what a
-    // change of resolution produces, so the transition is driven here.
-    final t = Motion.emphasized.transform(_zoomTo.value);
-    final was = _from;
-    if (was != null && t < 1) {
-      minX = _lerp(was.minX, minX, t);
-      maxX = _lerp(was.maxX, maxX, t);
-      minY = _lerp(was.minY, minY, t);
-      maxY = _lerp(was.maxY, maxY, t);
+    // The window's days, or with no window the days the data covers. One
+    // session is a chart with one dot on it, and a dot is worth drawing: it
+    // establishes the current position, on the axis the next point is read
+    // against. An axis from a day to itself has no width to divide, though,
+    // so a fortnight of air is put either side of it.
+    var (from, to) = window?.xBoundsSince(widget.earliest) ??
+        (_dayAt(xs.reduce(min)), _dayAt(xs.reduce(max)));
+    if (daysBetween(from, to) < 1) {
+      from = daysBefore(from, 7);
+      to = daysBefore(to, -7);
     }
-    _drawn = (minX: minX, maxX: maxX, minY: minY, maxY: maxY);
-
-    final spanDays = maxX - minX;
-    final xInterval = axis?.interval ?? _niceDayStep(spanDays / 4);
-    final dense = all.length > 40;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           height: height,
-          child: LineChart(
+          child: LayoutBuilder(builder: (context, box) {
+          // The axis describes what is on screen rather than the window. After
+          // a pinch the two differ, and labels that continue to describe the
+          // window describe a chart that is no longer displayed, so the labels
+          // are measured against the time on screen and zooming in reports
+          // position rather than removing the dates.
+          final axis = DateAxis.line(
+            from: from,
+            to: to,
+            width: box.maxWidth - valueTitles.reservedSize,
+            measure: dateLabelMeasure(context),
+            zoom: _scale,
+          );
+          var minX = axis.minX;
+          var maxX = axis.maxX;
+          var minY = yAxis.min;
+          var maxY = yAxis.max;
+
+          // The bounds at this instant, part way between the previous range
+          // and the selected one. `fl_chart` interpolates its own data changes
+          // but cannot interpolate between two spot lists of different
+          // lengths, which is what a change of resolution produces, so the
+          // transition is driven here.
+          final t = Motion.emphasized.transform(_zoomTo.value);
+          final was = _from;
+          if (was != null && t < 1) {
+            minX = _lerp(was.minX, minX, t);
+            maxX = _lerp(was.maxX, maxX, t);
+            minY = _lerp(was.minY, minY, t);
+            maxY = _lerp(was.maxY, maxY, t);
+          }
+          _drawn = (minX: minX, maxX: maxX, minY: minY, maxY: maxY);
+
+          return LineChart(
             // Changing the range or averaging rescales the chart rather than
             // reloading it. The box retains its size and `fl_chart`
             // interpolates its contents: the axis bounds rescale and the line
@@ -731,9 +664,9 @@ class _TrendChartState extends State<TrendChart>
               minY: minY,
               maxY: maxY,
               // The tick ladder hangs off this. `fl_chart` phases its labels
-              // against the baseline, so anchoring it on the last day is what
-              // puts a label on today and counts the rest back from it.
-              baselineX: axis?.baseline ?? minX,
+              // against the baseline, so anchoring it on the newest label is
+              // what puts a label on today and counts the rest back from it.
+              baselineX: axis.baselineX,
               gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
@@ -742,34 +675,8 @@ class _TrendChartState extends State<TrendChart>
                 // Right-hand Y labels (THEME → Components): the left gutter is where the
                 // eye starts a row, and spending it on an axis pushes the plot
                 // off centre on a phone.
-                rightTitles: AxisTitles(
-                  sideTitles: _valueTitles(context, yAxis),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 30,
-                    interval: xInterval,
-                    // The padded edges are half a step outside the window and
-                    // are not dates anybody asked about.
-                    minIncluded: false,
-                    maxIncluded: false,
-                    getTitlesWidget: (value, meta) => _edgeSafe(
-                      value,
-                      meta,
-                      Text(
-                        axis?.label(value) ??
-                            DateFormat(axisDateFormat(spanDays)).format(
-                              DateTime.fromMillisecondsSinceEpoch(
-                                (value * 86400000).round(),
-                              ),
-                            ),
-                        style: context.t.bodySmall,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                ),
+                rightTitles: AxisTitles(sideTitles: valueTitles),
+                bottomTitles: AxisTitles(sideTitles: _dateTitles(context, axis)),
               ),
               lineTouchData: tooltip == null
                   ? const LineTouchData(enabled: false)
@@ -827,7 +734,8 @@ class _TrendChartState extends State<TrendChart>
                   ),
               ],
             ),
-          ),
+          );
+          }),
         ),
         // Markers only while they mark something. Past about forty points the
         // circles touch and the shape being examined is obscured by the points
@@ -933,7 +841,7 @@ class EmptyTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final axis = TimeAxis.of(window, earliest: earliest);
+    final (from, to) = window.xBoundsSince(earliest);
 
     // The same band [TrendChart] draws for the same values, from the same
     // function, so moving from a trained range to an empty one keeps the
@@ -957,7 +865,15 @@ class EmptyTrendChart extends StatelessWidget {
       children: [
         SizedBox(
           height: height,
-          child: LineChart(
+          child: LayoutBuilder(builder: (context, box) {
+          final valueTitles = _valueTitles(context, yAxis, printed: labelled);
+          final axis = DateAxis.line(
+            from: from,
+            to: to,
+            width: box.maxWidth - valueTitles.reservedSize,
+            measure: dateLabelMeasure(context),
+          );
+          return LineChart(
             // The empty chart rescales with the same motion as a populated
             // one, so ranging across an untrained period is a single continuous
             // transition rather than a chart, a discontinuity, and a chart.
@@ -968,40 +884,22 @@ class EmptyTrendChart extends StatelessWidget {
               maxX: axis.maxX,
               minY: yAxis.min,
               maxY: yAxis.max,
-              baselineX: axis.baseline,
+              baselineX: axis.baselineX,
               gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(),
                 leftTitles: const AxisTitles(),
-                rightTitles: AxisTitles(
-                  // Held open even when there is nothing to write in it, so
-                  // the plot does not widen the moment data lands.
-                  sideTitles: _valueTitles(context, yAxis, printed: labelled),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 30,
-                    interval: axis.interval,
-                    minIncluded: false,
-                    maxIncluded: false,
-                    getTitlesWidget: (value, meta) => _edgeSafe(
-                      value,
-                      meta,
-                      Text(
-                        axis.label(value),
-                        style: context.t.bodySmall,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                ),
+                // Held open even when there is nothing to write in it, so the
+                // plot does not widen the moment data lands.
+                rightTitles: AxisTitles(sideTitles: valueTitles),
+                bottomTitles: AxisTitles(sideTitles: _dateTitles(context, axis)),
               ),
               lineTouchData: const LineTouchData(enabled: false),
               lineBarsData: const [],
             ),
-          ),
+          );
+          }),
         ),
         if (message != null) ...[
           const SizedBox(height: Space.sm),
@@ -1147,41 +1045,59 @@ class OffScaleCaret extends FlDotPainter {
   List<Object?> get props => [color, pointsUp];
 }
 
-/// A tick at the very edge has half a line of room and ends up printed over
-/// its neighbour — `Dec 19Jul 26`, `330 Jul`. Both axes drop theirs.
-Widget _edgeSafe(double value, TitleMeta meta, Widget child) {
-  if (value <= meta.min || value >= meta.max) return const SizedBox.shrink();
-  return SideTitleWidget(meta: meta, space: Space.xs, child: child);
+/// The date labels under a line chart, from [axis].
+///
+/// Each label is centred on its day; [DateAxis] pads the plot so the outer
+/// two fit. The padded edges themselves are not dates anybody asked about and
+/// carry no label.
+SideTitles _dateTitles(BuildContext context, DateAxis axis) => SideTitles(
+  showTitles: true,
+  reservedSize: 30,
+  interval: axis.interval,
+  minIncluded: false,
+  maxIncluded: false,
+  getTitlesWidget: (value, meta) {
+    final label = axis.labelAt(value);
+    if (label == null) return const SizedBox.shrink();
+    return SideTitleWidget(
+      meta: meta,
+      space: Space.xs,
+      child: Text(label, style: context.t.bodySmall, maxLines: 1),
+    );
+  },
+);
+
+/// The width of a date label as a chart prints it: `label` size, at the system
+/// font scale, so [DateAxis] measures what is drawn.
+///
+/// Public because the bar chart measures its date strip the same way.
+/// Memoised for one build, since the ladder asks after the same few words for
+/// every step it tries.
+double Function(String) dateLabelMeasure(BuildContext context) {
+  final style = context.t.bodySmall;
+  final scaler = MediaQuery.textScalerOf(context);
+  final direction = Directionality.of(context);
+  final seen = <String, double>{};
+  return (label) => seen.putIfAbsent(label, () {
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: style),
+          textDirection: direction,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        final width = painter.width;
+        painter.dispose();
+        return width;
+      });
 }
 
-/// Label resolution follows the span, or four ticks a day apart all render as
-/// the same month and overlap into mush.
-///
-/// A week is labelled by its days, as `Fri Sat Sun … Thu`, because at that
-/// range the day of the week is the relevant distinction.
-///
-/// Public because the bar charts read their labels by the same rule. Two kinds
-/// of chart may draw different marks; they may not name the same fortnight two
-/// different ways (THEME → Charts).
-String axisDateFormat(double spanDays) {
-  if (spanDays <= 8) return 'EEE';
-  if (spanDays <= 45) return 'd MMM';
-  if (spanDays <= 400) return 'MMM';
-  if (spanDays <= 365 * 8) return "MMM ''yy";
-  return 'yyyy';
+/// The day an x value plotted by [DateAxis.xOf] falls on.
+DateTime _dayAt(double x) {
+  final t = DateTime.fromMillisecondsSinceEpoch((x * 86400000).round());
+  return DateTime(t.year, t.month, t.day);
 }
 
-/// The same idea on the time axis, in units a calendar has: a week, a
-/// fortnight, a month, a quarter, a year. Ticks every 97 days label three
-/// different months and read as noise.
 double _lerp(double a, double b, double t) => a + (b - a) * t;
-
-double _niceDayStep(double raw) {
-  for (final step in const [7.0, 14.0, 30.0, 61.0, 91.0, 182.0, 365.0]) {
-    if (step >= raw) return step;
-  }
-  return (raw / 365).ceilToDouble() * 365;
-}
 
 // ─── The cycle axis ─────────────────────────────────────────────────────────
 

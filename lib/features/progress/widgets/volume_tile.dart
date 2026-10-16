@@ -70,7 +70,7 @@ class _VolumeTileState extends State<VolumeTile> {
           WeeklyBars(
             bars: series.bars(
               // Against the weeks in hand, not the window's opinion of them.
-              autoGranularityFor(series.weeks.length, widget.by),
+              foldForWeeks(series.weeks.length, widget.by),
             ),
             hue: widget.hue,
             height: widget.chartHeight,

@@ -869,7 +869,8 @@ ones it cannot are below, under
 **No chart ever plots raw rows.** Fifty years of daily entries is eighteen
 thousand marks across a phone — a texture, not a chart. Every chart folds into
 buckets (daily, weekly, monthly, yearly) and draws one mark each, keeping the
-count under about sixty at _any_ range. `Auto` picks the **finest** level under
+count under about sixty at _any_ range, where about is a tenth over: five
+years is sixty-one months and draws monthly, not as six yearly bars. `Auto` picks the **finest** level under
 that ceiling rather than the coarsest that fits, which is what makes a week open
 on days and fifty years open on years without either being a special case. The
 chip always names the level in force: a silently smoothed chart lies about its
@@ -898,16 +899,26 @@ resolution.
   ends on the day you are standing in. Laid out from the left instead, `1W`
   printed whichever day the data happened to start on and never printed today
   at all. The plot is padded half a step either side so the first and last
-  labels sit inside it with room to print.
+  labels sit inside it with room to print, and **the first label stands as far
+  from the left edge as the last does from the right**: a chart whose labels
+  start a step in and end flush reads as off centre. A month or year the window
+  opens part way through keeps its label, so six months back from 16 October
+  print `Apr` for the fortnight of April they hold.
 - **Whether seven fit is a measurement, as it is on the cycle axis.** The widest
   label is measured at the size it will be drawn, system font scale included.
-  When seven do not fit, the format steps down first (`d MMM` to the day with
-  the month printed where it changes, `MMM ''yy` to `yyyy`), and only then does
-  the count drop to four, still ending on today. A fixed count of seven, which
+  When seven do not fit, the count drops, to four where four fit, still ending
+  on today. **Every label on an axis is worded the same way, and in full**:
+  dates read `18 Sep 25 Sep 2 Oct`, months inside a year `Dec Feb Apr`, and
+  months across more than a year carry their year on every label,
+  `Apr '25 Oct '25 Apr '26`. When the words do not fit there are fewer of them;
+  they are never shortened. A short form beside a long one (`18 Sep 25 2 Oct`)
+  read as a mistake. A fixed count of seven, which
   this rule used to state, collided at `1M` at a 1.3 font and on every `All`
-  range of one to eight years. Past about two years the ticks fall on 1 January,
-  every 1, 2, 5 or 10 years counted back from this year, so a decade does not
-  print `2006 2010 2013`.
+  range of one to eight years. Past about two years the ticks fall in the middle
+  of each year, under the year's point, every 1, 2, 5 or 10 years counted back
+  from this year, so a decade does not print `2006 2010 2013`. Before July the
+  middle of this year has not happened, so the ticks fall on today's date in
+  each year instead.
 - **The labels are named by how much time is on screen**: a week by its weekdays
   (`Fri Sat Sun … Thu`), a season by dates, a year by months, a decade by years.
   Four ticks a day apart all render as the same month and read as mush.
@@ -979,6 +990,13 @@ resolution.
 - **A bucket is a bar, not a point on a line.** A line between two weeks claims
   the value between them means something, and weekly counts have no between —
   eleven that week, nine the next.
+- **A bar chart's date labels run flush from one end of the plot to the
+  other**, evenly spaced, wherever the step allows: a step that divides the
+  bars evenly puts a label on the first bar and on today's, so thirteen weeks
+  read `24 Jul 14 Aug 4 Sep 25 Sep 16 Oct` with the first starting at the left
+  end of the plot and the last ending at the right. Each label sits within a
+  bar or two of its own, and the two margins are the same. Labels that started
+  three bars in and ended flush read as a chart pushed to one side.
 - **A bar's gap is a share of its slot, never a constant.** At thirteen bars a
   fixed 2pt gap is a quarter of each column and reads as separation; at
   fifty-two it is three quarters, and the chart becomes a grey band with
