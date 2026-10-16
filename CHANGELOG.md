@@ -15,6 +15,38 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-10-16
+
+Minor release recording bulk, cut and maintenance phases and showing them on Home and on Cycle progress.
+
+### Added
+
+- **Home:** A Phase card between Habits and Past sessions records whether you are in a bulk, a cut or maintenance. It shows the phase, the day it started and the week it is in, such as `Week 7 of 12`.
+  - A bodyweight graph covers the phase and the weeks before it, tinted by the phase each stretch ran in.
+  - Three figures sit beneath it: bodyweight, the change since the phase started, and the change each week. A figure the weigh-ins cannot support shows a dash.
+  - With no phase set, the card explains what a phase is for and offers `Set a phase`.
+- **Phases:** `Change` on the Phase card opens the phase sheet, where you choose the phase, the day it started, and a planned length of 8, 12 or 16 weeks or none.
+  - Choosing a different phase starts a new one, and choosing the same phase corrects the current one.
+  - `Clear phase` ends the phase yesterday, so Home shows no phase at once. A phase started today is removed instead.
+- **Phases:** The Phase card asks what comes next once the planned length has passed, with `12 weeks are up. Start the next phase, or keep this one going.`
+- **Phases:** The Phase card also asks when your weigh-ins have run against the phase for about three weeks, such as `Your weight has risen for three weeks during this cut.`
+  - Each question offers `Change phase`, which opens the phase sheet, and `Keep going`. When both apply, the card asks once, about the planned length, and `Keep going` answers both.
+  - `Keep going` past the planned length makes the phase open-ended. Against the weigh-ins, the question returns only after three more weeks of weigh-ins run against the phase.
+  - These questions appear only on the Phase card, never as a notification.
+- **Progress:** On the cycle progress chart, each cycle is tinted by the phase most of its sessions ran in: bulk lavender, cut cyan and maintenance grey. A cycle trained with no phase has no tint.
+  - Deloads are drawn as before, and a tint never extends beneath a deload band.
+  - Under `All`, each block between two deloads takes the phase most of its sessions ran in.
+  - Tapping a cycle names its phase in the readout, such as `Cycle 6 · 3 Sep to 9 Sep 2026 · Cut · +6.4%`.
+  - The legend adds a swatch for each phase shown on the chart.
+  - This applies to the Cycle progress card and to a regime's progress screen.
+- **Sync:** Phases are backed up and synced like weigh-ins, and the backup sheet lists unsent phase changes on a line of their own.
+
+### Upgrade notes
+
+- **Schema change.** Adds the `phases` table. The local schema migrates from version 6 to 7 on first launch.
+- If you sync to your own server, apply `supabase/migrations/20261016120000_phases.sql` with `supabase db push` before installing this build on a synced phone. Until the server has the new table, sync fails and changes wait on the phone.
+- A backup written by this build is refused by earlier builds, which say that it was written by a newer version.
+
 ## [1.17.0] - 2026-10-16
 
 Minor release replacing the four tabs with five and giving bodyweight a place on Home.
@@ -545,7 +577,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...v1.17.0
 [1.16.1]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...v1.16.1
 [1.16.0]: https://github.com/SahilK-027/Deltoid/compare/v1.15.3...v1.16.0

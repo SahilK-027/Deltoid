@@ -1,6 +1,6 @@
 # Deltoid roadmap: 1.17.0 to 1.20.0
 
-The plan agreed on 15 October 2026. Release 1.17.0 is built; nothing after it is yet.
+The plan agreed on 15 October 2026. Releases 1.17.0 and 1.18.0 are built; nothing after them is yet.
 
 - **Prototype:** [`prototype.html`](prototype.html) opens in any browser. It draws every
   screen in the app's own tokens, greys out everything that stays exactly as it is

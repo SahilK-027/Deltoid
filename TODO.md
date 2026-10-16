@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,352 tests and sixteen pgTAP tests, analyzer clean.**
+**1,403 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -87,9 +87,11 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 
 ### Phases
 
-- [x] The data: a syncable `phases` table, kind, start day, planned length, end day and the day a prompt was answered. Schema 6 → 7, server rung and its RLS case included; pushed, pulled, backed up and restored, two invariants, and the two-device fuzz starts, edits and clears phases. The RLS case has not yet run against a real Postgres.
+- [x] The data: a syncable `phases` table, kind, start day, planned length, end day and the day a prompt was answered. Schema 6 → 7, server rung and its RLS case included; pushed, pulled, backed up and restored, two invariants, and the two-device fuzz starts, edits and clears phases. Its RLS case passes against the local Postgres.
 - [x] What is read off it, in `domain/phases.dart`: the phase on a day, the phase most of a cycle ran in, the change and weekly rate during a phase, and the two staleness checks.
-- [x] The Phase card on Home and the phase sheet: set, change, correct or clear a phase, its start day from the day picker and an optional planned length, with a bodyweight sparkline tinted by phase and three figures. The staleness prompts and the cycle chart tints are still to come.
+- [x] The Phase card on Home and the phase sheet: set, change, correct or clear a phase, its start day from the day picker and an optional planned length, with a bodyweight sparkline tinted by phase and three figures.
+- [x] The staleness prompts, on the Phase card and nowhere else: the planned length passed, and about three weeks of weigh-ins against the phase. `Keep going` is stored on the phase's own row, so the answer syncs with it.
+- [x] The cycle chart tints each cycle, or each block under `All`, by the phase most of its sessions ran in, stops every tint at a deload band's edge, names the phase in the readout and adds it to the legend.
 
 ### Sync
 

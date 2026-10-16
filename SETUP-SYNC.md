@@ -60,7 +60,7 @@ The project ref is the subdomain from your project URL — the `abcdefgh` part.
 `supabase link` will ask for your database password, which you set when you
 created the project.
 
-Verify it worked in the dashboard under **Table Editor**: you should see nine
+Verify it worked in the dashboard under **Table Editor**: you should see ten
 tables, including `workouts`, `set_logs`, and `exercises`.
 
 ## 3. Create a release keystore
