@@ -1195,6 +1195,7 @@ class CycleAxisChart extends StatelessWidget {
 
   /// Whether the chart is drawing one point per block, which turns the deload
   /// bands into hairlines: forty bands at four pixels each is an orange chart.
+  /// See [deloadMark].
   final bool isBlocks;
 
   /// The cycle the readout above the chart is describing, by cycle id.
@@ -1204,8 +1205,8 @@ class CycleAxisChart extends StatelessWidget {
   /// small variant on a regime card wants.
   final ValueChanged<CyclePoint>? onSelected;
 
-  /// The sparkline variant: no labels, no gutter, no touch. THEME → Charts
-  /// gives sparklines no axes at all.
+  /// The sparkline variant: no labels, no gutter, no gridlines, no deloads,
+  /// no touch. THEME → Charts gives sparklines no axes at all.
   final bool small;
 
   final double? height;
@@ -1289,6 +1290,7 @@ class CycleAxisChart extends StatelessWidget {
     // The sparkline carries no tints: it has no legend to name them, and a
     // hue is read beside the label that says which meaning it carries.
     final tints = small ? const <_Tint>[] : _tints(points, isBlocks: isBlocks);
+    final deloads = deloadMark(small: small, isBlocks: isBlocks);
 
     final gutter = small
         ? 0.0
@@ -1325,7 +1327,11 @@ class CycleAxisChart extends StatelessWidget {
           maxY: maxY,
           // `border` over a 20% tint reads as a scratch, and one gridline
           // changing colour from slot to slot reads as two.
-          gridData: _gridOf(yAxis, tints.isEmpty ? c.border : c.textTertiary),
+          // The sparkline drops the gridlines with the axis they belong to:
+          // a dashed line across a shape with no scale is furniture.
+          gridData: small
+              ? const FlGridData(show: false)
+              : _gridOf(yAxis, tints.isEmpty ? c.border : c.textTertiary),
           borderData: FlBorderData(show: false),
           // A deload is a band rather than a point on the floor. The weights
           // are lighter on purpose, so a point at the bottom of the chart would
@@ -1340,7 +1346,7 @@ class CycleAxisChart extends StatelessWidget {
                   x2: t.to,
                   color: c.phaseTint(t.kind),
                 ),
-              if (!isBlocks)
+              if (deloads == DeloadMark.band)
                 for (var i = 0; i < n; i++)
                   if (points[i].isDeload)
                     VerticalRangeAnnotation(
@@ -1368,13 +1374,15 @@ class CycleAxisChart extends StatelessWidget {
                   ),
             ],
             verticalLines: [
-              if (isBlocks)
+              // At 20% and one pixel: thirty-five hairlines at 45% and 1.5
+              // were a striped orange fill across a 140-cycle chart.
+              if (deloads == DeloadMark.hairline)
                 for (var i = 0; i < n; i++)
                   if (points[i].isDeload)
                     VerticalLine(
                       x: i.toDouble(),
-                      color: c.deload.withValues(alpha: 0.45),
-                      strokeWidth: 1.5,
+                      color: c.deload.withValues(alpha: 0.20),
+                      strokeWidth: 1,
                     ),
             ],
           ),
@@ -1439,10 +1447,15 @@ class CycleAxisChart extends StatelessWidget {
                             '$number',
                             style: context.t.bodySmall?.copyWith(
                               // An orange number under an orange band, so the
-                              // axis says which cycle the light week was.
+                              // axis says which cycle the light week was —
+                              // only where every cycle is numbered, or a
+                              // ladder of 2 turns half the axis orange.
                               color: cycle != null &&
                                       cycle.isDeload &&
-                                      !isBlocks
+                                      deloadNumberColoured(
+                                        labelEvery: every,
+                                        isBlocks: isBlocks,
+                                      )
                                   ? c.deload
                                   : isSelected
                                       ? c.textPrimary

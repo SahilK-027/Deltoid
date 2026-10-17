@@ -104,6 +104,13 @@ void main() {
     final data = dataOf(tester);
     expect(data.rangeAnnotations.verticalRangeAnnotations, isEmpty);
     expect(data.extraLinesData.verticalLines.length, 6);
+    // Faint and one pixel, so 35 of them on a 140-cycle chart are not a
+    // striped orange fill.
+    final dark = DeltoidColors.dark;
+    for (final line in data.extraLinesData.verticalLines) {
+      expect(line.color, dark.deload.withValues(alpha: 0.20));
+      expect(line.strokeWidth, 1);
+    }
     // And the line between blocks is solid: under blocks a gap is what every
     // segment has, so dashing them says "broken" about the normal case.
     final segments = data.lineBarsData.where((b) => b.barWidth > 0);
@@ -490,6 +497,87 @@ void main() {
       );
 
       expect(bands(tester), isEmpty);
+    });
+  });
+
+  group('the sparkline drops the furniture', () {
+    testWidgets('no gridlines, no deload band, no hairline', (tester) async {
+      await tester.pumpWidget(
+        harness([
+          point(1, value: 0),
+          point(2, value: 5),
+          point(3, value: 8),
+          point(4, isDeload: true),
+        ], small: true),
+      );
+
+      final data = dataOf(tester);
+      expect(data.gridData.show, isFalse);
+      expect(data.rangeAnnotations.verticalRangeAnnotations, isEmpty);
+      expect(data.extraLinesData.horizontalLines, isEmpty);
+      expect(data.extraLinesData.verticalLines, isEmpty);
+    });
+
+    testWidgets('nor under blocks', (tester) async {
+      final points = [
+        for (var i = 1; i <= 30; i++)
+          point(i, value: i % 5 == 0 ? null : i.toDouble(), isDeload: i % 5 == 0),
+      ];
+      await tester.pumpWidget(
+        harness(
+          points,
+          plotted: {for (var i = 4; i <= 30; i += 5) 'c$i'},
+          isBlocks: true,
+          small: true,
+        ),
+      );
+
+      final data = dataOf(tester);
+      expect(data.gridData.show, isFalse);
+      expect(data.extraLinesData.verticalLines, isEmpty);
+    });
+  });
+
+  group('the orange numbers', () {
+    Color? colourOf(WidgetTester tester, String text) =>
+        tester.widget<Text>(find.text(text)).style?.color;
+
+    testWidgets('every cycle numbered: a deload number is orange',
+        (tester) async {
+      await tester.pumpWidget(
+        harness([
+          point(1, value: 0),
+          point(2, value: 1),
+          point(3, value: 2),
+          point(4, isDeload: true),
+        ]),
+      );
+      final dark = DeltoidColors.dark;
+      expect(colourOf(tester, '4'), dark.deload);
+      expect(colourOf(tester, '3'), isNot(dark.deload));
+    });
+
+    testWidgets('a thinned ladder prints every number in one colour',
+        (tester) async {
+      // Sixty cycles at 400 wide cannot number every one, and the ladder of
+      // 2 or more lands on deloads at 4, 8, 12…
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        harness([
+          for (var i = 1; i <= 60; i++)
+            point(i, value: i % 4 == 0 ? null : i.toDouble(), isDeload: i % 4 == 0),
+        ]),
+      );
+      final dark = DeltoidColors.dark;
+      final printed = tester.widgetList<Text>(find.descendant(
+        of: find.byType(LineChart),
+        matching: find.byType(Text),
+      ));
+      expect(printed, isNotEmpty);
+      expect(printed.length, lessThan(60));
+      expect(printed.any((t) => t.style?.color == dark.deload), isFalse);
     });
   });
 }

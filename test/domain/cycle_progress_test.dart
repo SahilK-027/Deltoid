@@ -824,4 +824,31 @@ void main() {
       expect(cycleSegmentJumps(cycle(3), cycle(5), isBlocks: true), isFalse);
     });
   });
+
+  group('deloadMark and deloadNumberColoured — a deload, quiet at any length',
+      () {
+    test('a full chart draws a band, and under blocks a hairline', () {
+      expect(deloadMark(small: false, isBlocks: false), DeloadMark.band);
+      expect(deloadMark(small: false, isBlocks: true), DeloadMark.hairline);
+    });
+
+    test('a sparkline draws no deload at all, blocks or not', () {
+      expect(deloadMark(small: true, isBlocks: false), DeloadMark.none);
+      expect(deloadMark(small: true, isBlocks: true), DeloadMark.none);
+    });
+
+    test('a deload number is orange only when every cycle is numbered', () {
+      expect(deloadNumberColoured(labelEvery: 1, isBlocks: false), isTrue);
+      for (final every in [2, 5, 10]) {
+        expect(
+          deloadNumberColoured(labelEvery: every, isBlocks: false),
+          isFalse,
+        );
+      }
+    });
+
+    test('under blocks no number is orange, since there is no band', () {
+      expect(deloadNumberColoured(labelEvery: 1, isBlocks: true), isFalse);
+    });
+  });
 }

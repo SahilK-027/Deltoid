@@ -632,6 +632,39 @@ bool cycleSegmentJumps(
 }) =>
     !isBlocks && (to.index - from.index).abs() > 1;
 
+/// How a deload is marked on the cycle axis.
+enum DeloadMark {
+  /// Not at all: the sparkline on an All time card, which is read as a shape.
+  none,
+
+  /// A band at 80% of the deload's slot, behind the line.
+  band,
+
+  /// A faint full-height hairline, under blocks.
+  hairline,
+}
+
+/// How the cycle axis marks a deload ([THEME → The cycle axis](THEME.md#the-cycle-axis)).
+///
+/// A sparkline marks none. It has no legend to name the orange and is read as
+/// a shape among its siblings, and at four cycles a deload band was a solid
+/// square a quarter of the drawing wide. Under blocks the deloads are
+/// hairlines, because forty bands at four pixels each is an orange chart.
+DeloadMark deloadMark({required bool small, required bool isBlocks}) => small
+    ? DeloadMark.none
+    : (isBlocks ? DeloadMark.hairline : DeloadMark.band);
+
+/// Whether a deload's number under the cycle axis is printed orange.
+///
+/// Only where every cycle is numbered. A deload commonly falls every fourth
+/// cycle, so a ladder of 2 lands on each one, and on `Last 24` half the
+/// numbers on the axis were orange: a scale in two colours, read as two
+/// scales. Where every cycle is numbered the orange number is one among many
+/// and names the band above it; on a thinned axis the band already says which
+/// cycle was light. Under blocks there is no band for a number to match.
+bool deloadNumberColoured({required int labelEvery, required bool isBlocks}) =>
+    !isBlocks && labelEvery == 1;
+
 /// The phase each of [points] is tinted by, position for position.
 ///
 /// A cycle takes the phase most of its sessions ran in. Under [isBlocks] a

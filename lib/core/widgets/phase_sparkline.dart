@@ -79,6 +79,10 @@ class _PhaseSparklinePainter extends CustomPainter {
   static const _inset = 6.0;
   static const _dot = 4.0;
 
+  /// A lone week's dot: the line's own width doubled, so it reads as a
+  /// reading rather than a speck.
+  static const _lone = 2.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
@@ -101,9 +105,10 @@ class _PhaseSparklinePainter extends CustomPainter {
     canvas.restore();
 
     final weeks = data.weeks;
-    if (weeks.isEmpty) return;
+    final weighed = weeks.nonNulls.toList();
+    if (weighed.isEmpty) return;
 
-    final values = [for (final w in weeks) w.weightKg];
+    final values = [for (final w in weighed) w.weightKg];
     final lo = values.reduce(math.min);
     final hi = values.reduce(math.max);
     // Half a kilogram either side at least, so a flat month is drawn as a
@@ -119,24 +124,39 @@ class _PhaseSparklinePainter extends CustomPainter {
           _inset + (top - w.weightKg) / span * plotHeight,
         );
 
-    final points = [for (final w in weeks) at(w)];
-    if (points.length > 1) {
-      final path = Path()..moveTo(points.first.dx, points.first.dy);
-      for (final p in points.skip(1)) {
+    // One run of weighed weeks per stretch, broken where two or more weeks
+    // in a row had no weigh-in.
+    final runs = <List<Offset>>[[]];
+    for (final w in weeks) {
+      if (w == null) {
+        runs.add([]);
+      } else {
+        runs.last.add(at(w));
+      }
+    }
+    final stroke = Paint()
+      ..color = line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    for (final run in runs) {
+      if (run.length == 1) {
+        // A week with a break either side is a line of no length, and
+        // without a dot of its own it is not drawn at all.
+        canvas.drawCircle(run.single, _lone, Paint()..color = line);
+        continue;
+      }
+      if (run.isEmpty) continue;
+      final path = Path()..moveTo(run.first.dx, run.first.dy);
+      for (final p in run.skip(1)) {
         path.lineTo(p.dx, p.dy);
       }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = line
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..strokeJoin = StrokeJoin.round
-          ..strokeCap = StrokeCap.round,
-      );
+      canvas.drawPath(path, stroke);
     }
-    canvas.drawCircle(points.last, _dot + 2, Paint()..color = ring);
-    canvas.drawCircle(points.last, _dot, Paint()..color = line);
+    final last = runs.lastWhere((r) => r.isNotEmpty).last;
+    canvas.drawCircle(last, _dot + 2, Paint()..color = ring);
+    canvas.drawCircle(last, _dot, Paint()..color = line);
   }
 
   @override

@@ -149,7 +149,9 @@ const phaseSparklineMinimumDays = 84;
 /// Positions are in days from [fromKey], so the painter maps one number to
 /// one pixel column and never reads a calendar. [weeks] are means of each
 /// week's weigh-ins in kilograms, oldest first, placed at the middle of the
-/// days the week shares with the window; a week with no weigh-in is absent.
+/// days the week shares with the window. A single week with no weigh-in is
+/// absent and the line crosses it; a null is a break, where two or more weeks
+/// in a row had none, as every line chart folds them ([lineBuckets]).
 /// [bands] are the stretches each phase covers, `toDay` exclusive.
 class PhaseSparklineData {
   const PhaseSparklineData({
@@ -161,7 +163,7 @@ class PhaseSparklineData {
 
   final int fromKey;
   final int toKey;
-  final List<({double day, double weightKg})> weeks;
+  final List<({double day, double weightKg})?> weeks;
   final List<({PhaseKind kind, int fromDay, int toDay})> bands;
 
   /// Days the window covers, both ends included.
@@ -192,14 +194,18 @@ PhaseSparklineData phaseSparkline(
   final fromKey = math.min(current.startKey, floor);
   final from = dateFromDayKey(fromKey);
 
+  // Broken where the full charts break: a straight line across a month with
+  // no weigh-in draws a trend nobody measured.
   final weeks = [
-    for (final bucket in bucketize(
+    for (final bucket in lineBuckets(bucketize(
       rows: [for (final e in log) (dayKey: e.dayKey, value: e.weightKg)],
       by: Granularity.weekly,
       from: from,
       to: today,
-    ))
-      if (bucket.value != null)
+    )))
+      if (bucket == null)
+        null
+      else
         (
           // The middle of the days the week shares with the window: the
           // first week may start before it, and the last runs past today.

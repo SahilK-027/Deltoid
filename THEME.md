@@ -732,7 +732,8 @@ bottom:
   filled dot. Behind it each stretch is tinted by the phase it ran in, `bulk`
   and `cut` at 20% and `maintenance` at 16%, with no tint where no phase was
   set. A legend under it names only the phases the sparkline shows. It has no
-  axis, as no sparkline does.
+  axis, as no sparkline does, and it breaks where two or more weeks in a row
+  had no weigh-in, as every sparkline does (see [Charts](#charts)).
 - **A hairline**, then **three figures** in equal columns, each a `label` over
   a dense `ValueUnit`: `Bodyweight`, the latest weigh-in; `Since start`, the
   change from the bodyweight on the phase's first day; and `Each week`, that
@@ -954,7 +955,16 @@ resolution.
   every chart. **No vertical gridlines, no chart border.**
 - Y labels **right** at `label` size; X labels below the baseline.
 - A series is a 2px line with open circle markers, filled `bg`, stroked in the
-  series colour. Sparklines drop the axes entirely.
+  series colour. **Sparklines drop the axes entirely**, and everything that
+  belongs to an axis with them: no gridlines, no labels, no deload bands or
+  hairlines, no tint without a legend to name it. A sparkline is read as a
+  shape among its siblings, and a dashed gridline across a shape with no scale,
+  or a deload band that at four cycles is a solid square, is furniture. **A
+  sparkline breaks where its full chart would**: two or more empty buckets in a
+  row are a gap in the line, a single one is crossed, and a reading with a
+  break either side is a dot of twice the line's width, since a line of no
+  length is otherwise not drawn. A shape that runs straight across a month
+  nobody weighed in draws a trend nobody measured.
 - **Markers only while they mark something.** When neighbouring points are
   closer than about 10 px the circles touch and the line is lost inside them;
   drop them and offer zoom. The distance is measured in pixels for each series
@@ -1130,9 +1140,15 @@ state.
 - **A deload is a band, never a point.** The weights are lighter on purpose, so a
   point at the floor of the chart would report a planned week as a collapse. The
   band is `deload` at 14%, and its cycle number under the axis is orange to
-  match. Past 24 cycles, where `All` draws one point per block, the bands become
-  hairlines at 20% — forty bands at four points each is an orange chart, and so,
-  it turned out, were thirty-five hairlines at the 45% this rule used to state.
+  match **where every cycle is numbered**. On a thinned axis the ladder of 2
+  lands on every fourth-cycle deload, and half the numbers were orange: a scale
+  in two colours reads as two scales, and the band already says which cycle was
+  light. Past 24 cycles, where `All` draws one point per block, the bands become
+  hairlines, one pixel at 20%, and no number is orange — forty bands at four
+  points each is an orange chart, and so, it turned out, were thirty-five
+  hairlines at the 45% and 1.5 px this rule used to state. A hairline rather
+  than a tick under the axis, because the axis carries numbers and a second
+  kind of mark among them is read as one.
   The sparkline on an All time card draws no deloads at all, since it is read as
   a shape.
 - **A cycle is tinted by the phase most of its sessions ran in.** Its slot is
@@ -1147,7 +1163,8 @@ state.
   sparkline form on an All time card carries no tint, because it has no
   legend to name one.
 - **A deload is drawn exactly as it is with no phases at all**: the band at
-  80% of its slot, no point, the orange number, the line dashed across it.
+  80% of its slot, no point, the orange number where every cycle is numbered,
+  the line dashed across it.
   **No tint is ever drawn under it.** The tints of the cycles either side run
   to the deload band's edges and stop there, so a light week never reads as
   part of a cut, and orange is never mixed with another hue into a colour

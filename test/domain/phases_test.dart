@@ -615,14 +615,51 @@ void main() {
       ]);
     });
 
-    test('a week with no weigh-in is left out rather than drawn at zero', () {
+    test('a week with no weigh-in is never drawn at zero', () {
       final data = phaseSparkline(
         cut,
         spans,
         [w(20260803, 80), w(today, 78)],
         todayKey: today,
       );
+      expect(data.weeks.nonNulls.map((e) => e.weightKg), [80.0, 78.0]);
+    });
+
+    test('a single week with no weigh-in is crossed', () {
+      // Weighed the weeks of 28 Sep and 12 Oct; the week of 5 Oct had none.
+      final data = phaseSparkline(
+        cut,
+        spans,
+        [w(20260929, 80), w(20261013, 79)],
+        todayKey: today,
+      );
       expect(data.weeks, hasLength(2));
+      expect(data.weeks.every((e) => e != null), isTrue);
+    });
+
+    test('two or more weeks in a row with no weigh-in break the line', () {
+      final data = phaseSparkline(
+        cut,
+        spans,
+        [w(20260803, 80), w(20260922, 79), w(20261013, 78)],
+        todayKey: today,
+      );
+      expect(data.weeks, hasLength(5));
+      expect(data.weeks[1], isNull);
+      expect(data.weeks[3], isNull);
+      expect(data.weeks.last?.weightKg, 78.0);
+    });
+
+    test('empty weeks at either end are trimmed, not breaks', () {
+      final data = phaseSparkline(
+        cut,
+        spans,
+        [w(20260901, 80), w(20260908, 79)],
+        todayKey: today,
+      );
+      expect(data.weeks, hasLength(2));
+      expect(data.weeks.first, isNotNull);
+      expect(data.weeks.last, isNotNull);
     });
   });
 }
