@@ -1,4 +1,4 @@
-# Deltoid roadmap: 1.17.0 to 1.20.0
+# Deltoid roadmap: 1.17.0 to 1.19.0
 
 The plan agreed on 15 October 2026. Releases 1.17.0 and 1.18.0 are built; nothing after them is yet.
 
@@ -46,8 +46,7 @@ Unchanged, including the exercise catalog under Movements on Regimes.
 
 ### Progress
 
-Cycle progress and Weekly volume move here from Workouts, unchanged. The AI card
-joins them in 1.20.0.
+Cycle progress and Weekly volume move here from Workouts, unchanged.
 
 ### More
 
@@ -96,142 +95,13 @@ sits above every chart. The steps, each mapped to the audit's findings, are unde
 
 ---
 
-## 1.20.0: AI analysis
+## Dropped: 1.20.0 AI analysis
 
-### The card
-
-An `AI analysis` section at the top of Progress. The card has a 2px multicolour
-border that turns slowly (pink, lavender, cyan, green and yellow, never the reserved
-progress blue or deload orange) and holds, top to bottom:
-
-- Mr Delta beside a speech bubble. At rest it reads `I am Mr Delta. Ask me anything
-  about your training.`; while working, `Looking through your log…` then `Working it
-  out…`; once an answer lands, the span of data it rests on, such as `Based on six
-  cycles of bench press and your current cut.`
-- A question field.
-- Suggested questions as full-width rows.
-- While an answer is being worked out: the question as its heading; under `Reading`,
-  the figures being gathered appear one by one as tags; once Mr Delta starts writing,
-  the label becomes `Worked out from` and three pulsing placeholder lines stand in
-  for the answer. The question field and the suggestions are locked meanwhile.
-- While an answer is open: the question as its heading with a close button, the
-  answer revealed paragraph by paragraph, and a `Worked out from` row naming the
-  figures it used. The remaining questions sit under `Ask something else`.
-- The line `Needs a connection. Deltoid works out the figures on this phone and sends
-  only those.`
-
-### Mr Delta
-
-A pixel-art mascot drawn from the owner's design: an open delta on top, a solid
-lavender body carrying the face (dark eyes with a glint, a white mouth with a pink
-tongue, pink cheeks), raised arms, two legs and a shadow. Every motion moves in whole
-pixels with stepped timing, and every motion stops under reduced motion.
-
-| Mood | When | What he does |
-|---|---|---|
-| Rest | Waiting | Bobs and blinks |
-| Workout | At rest, every 8 to 12 seconds, for 5 seconds | Presses a barbell overhead, with a sweat drop |
-| Searching | While the figures are gathered | Sweeps a magnifying glass across his face |
-| Thinking | While the answer is written | Looks up while three dots appear |
-| Happy | For 3 seconds after the answer lands | Arms up, a hop, sparkles |
-| Asleep | With no connection | Eyes closed, breathing, Zs rising |
-
-In the app the searching and thinking moods follow the real request rather than
-fixed timers.
-
-### With no connection
-
-- Mr Delta sleeps and the card is muted. The bubble reads `I need a connection to
-  answer.` There is no way to save a question for later; it is asked again once the
-  connection is back.
-- The question field is disabled: `Available when you are back online`.
-- **Answers already received stay readable**, listed under `Your recent answers`
-  and marked `Answered earlier, saved on this phone`.
-- A note states that cycle progress, weekly volume and everything logged keep working,
-  and that only Mr Delta needs the internet.
-
-### Under the hood
-
-- The API key lives in a Supabase server function and never in the app.
-- The app computes the figures and sends only those with the question. The model asks
-  the app for exact figures rather than doing arithmetic on raw logs.
-- Model: Claude Opus 5.5 (`claude-opus-5-5`) at `medium` effort. At four or five
-  questions a month the cost is a few cents.
-  A setting to choose Sonnet 5.5 instead was considered and left out of 1.20: the
-  difference is cents a month and it would add a question and a second set of evals.
-  If it is added later, it is one More row (`More thorough` / `Faster`), and the
-  server function accepts only an allowlist of `claude-opus-5-5` and
-  `claude-sonnet-5-5`, with the app sending a choice rather than a model ID.
-- The server function is the only place that names a provider, so changing provider
-  later is a one-file change.
-
-### Architecture: the same cost and speed at any amount of history
-
-**The raw log never leaves the phone.** A question never carries sets or workouts.
-It carries a few hundred folded figures, so twenty years of training costs the same
-to ask about as two months.
-
-1. **Facts layer, on the phone, in Dart.** A new set of pure functions in
-   `lib/domain/` (tested without a database, like everything there) answers fixed
-   questions about the log: one lift's best set by cycle, a muscle's weekly sets,
-   bodyweight by week, the phases and their dates, the regimes and their spells.
-   They reuse the queries and the bucketing the charts already use
-   (`chart_buckets.dart`), so every figure Mr Delta quotes is the figure the chart
-   draws, and every result is capped at about sixty points, the same rule the charts
-   follow. One implementation of the maths, in one language.
-2. **The brief.** With each question the app sends a short standing summary: units,
-   the active regime and its cycle, the current phase, the last 12 weeks of volume and
-   bodyweight, and each lift's best set per year. About 3,000 tokens, whatever the
-   length of the history.
-3. **Two passes, not an open loop.** The first call gives the model the question, the
-   brief and a catalogue of the facts it can request, and it replies with a structured
-   list of the facts it needs (at most five). The app computes those on the phone and
-   sends them back in a second call, which writes the answer. Two round trips at most,
-   a bounded wait, and the `Worked out from` tags are exactly the facts requested.
-4. **Server function.** A Supabase Edge Function holds the API key, accepts only a
-   signed-in user's token, limits each account to a handful of questions a day, and
-   relays the two calls. It never reads the synced tables, so it never needs its own
-   copy of the training maths.
-5. **Saved answers.** Each answer is stored on the phone in a new drift table with the
-   question, the text, the facts it used and the date it was asked, as a snapshot in
-   the way a set log is. That is what keeps past answers readable offline. Whether the
-   table syncs is decided when it is built.
-6. **Checking the numbers.** The prompt requires every number in the answer to come
-   from the supplied facts. The app then checks that each number in the reply appears
-   in those facts and, if one does not, shows the answer with a line saying a figure
-   could not be checked rather than presenting it as fact.
-7. **What is never sent.** Notes, exercise names the user typed beyond the ones the
-   question needs, account details and device identifiers stay on the phone.
-8. **Failure states Mr Delta must have.** Offline (asleep), timed out after 30
-   seconds, the daily limit reached, the model declining the question, and a server
-   error. Each gets a plain sentence in the bubble and leaves the card usable.
-9. **Tests.** Domain tests for every fact function, a fixed brief built from a seeded
-   database and compared against a stored copy, and an evaluation of about ten real
-   questions with known answers, run before each model change.
-
-At four or five questions a month, prompt caching, batching and cost tuning are not
-worth building; the design keeps each question small instead.
-
-### After 1.20: Mr Delta elsewhere (ideas, not agreed)
-
-- **One home, many doors.** The card on Progress stays the only place Mr Delta
-  answers. Other screens get an `Ask Mr Delta` link that opens the card with a question
-  already filled in: a lift's history (`Why has this lift stalled?`), a past workout
-  (`How did this session compare?`), the Phase card (`How is this phase going?`).
-- **Never on the log screen.** Nothing may stand between the thumb and a set.
-- **Drafting a regime.** Describe what you want (days a week, time per session,
-  equipment, anything to avoid) and Mr Delta drafts a regime from exercises already in
-  the catalog. The draft opens in the ordinary regime editor, nothing is saved until
-  you save it, and every slot can be changed like any other. A structured output keeps
-  the draft to real catalog exercises and valid set counts, and the app validates it
-  before showing it.
-- **This conflicts with two written rules.** THEME says creation never offers to
-  "build you a plan" because "the user is the planner", and RULES § 6 lists AI coaching
-  as deliberately absent. Drafting a regime only fits if those are rewritten to say the
-  user still decides and Mr Delta only proposes a starting point.
-- **A smaller step that conflicts with nothing:** Mr Delta reviewing a regime you
-  built, for example pointing out that back gets 18 sets a week and chest 10, and
-  leaving every change to you.
+AI analysis with Mr Delta was designed in full and then dropped on 17 October 2026.
+Deltoid has one user, and a question to a model about a log its owner reads every day
+does not justify an Edge Function, a key to hold, and a rule exception for a mascot. The
+roadmap ends at 1.19.0. The design is kept in this file's history at `cb51122`, should
+it ever return.
 
 ---
 
@@ -248,15 +118,13 @@ entry only when no name survives.
 These decisions contradict the rules as written, so the rules change first and the
 code follows.
 
-- **RULES § 6:** allow streak and habit counts, the Progress tab, and AI analysis,
-  which § 6 currently rules out by name as AI coaching. Record each reason.
+- **RULES § 6:** allow streak and habit counts and the Progress tab. Record each
+  reason. AI coaching stays out of scope.
 - **THEME:** the five-tab navigation and the Home composition; the colour rule that
   every hue except the deload orange and the progress blue may be reused, which puts
-  lavender on bulk, the Arms bar, the weigh-in habit and Mr Delta, and cyan on cut and
-  the Back bar; and one exception for the AI card covering its gradient border, the
-  mascot and its animation.
-- **CLAUDE.md rule 11:** an exception for Mr Delta's voice, and a note that `programs`
-  in the About text is deliberate.
+  lavender on bulk, the Arms bar and the weigh-in habit, and cyan on cut and the Back
+  bar.
+- **CLAUDE.md rule 11:** a note that `programs` in the About text is deliberate.
 
 ## Order of work
 
@@ -360,8 +228,7 @@ numbers in brackets are its finding numbers.
    data size and confirm each finding is fixed or deliberately kept, then the version
    bump, the changelog and a final emulator pass.
 
-**Then** 1.20.0 AI analysis, broken down the same way when it starts. The deleted-regime
-legend fix can land in any patch release.
+1.19.0 ends the roadmap. The deleted-regime legend fix can land in any patch release.
 
 ## Versioning
 
