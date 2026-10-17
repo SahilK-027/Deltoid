@@ -3,8 +3,8 @@
 The plan agreed on 15 October 2026. Releases 1.17.0, 1.18.0 and 1.19.0 are built, and the roadmap is complete.
 
 - **Prototype:** [`prototype.html`](prototype.html) opens in any browser. It draws every
-  screen in the app's own tokens, greys out everything that stays exactly as it is
-  today, and has a switch to simulate having no connection. A hosted copy is at
+  screen in the app's own tokens and greys out everything that stays exactly as it
+  is today. A hosted copy is at
   <https://claude.ai/artifact/NkQuNBQ9RV6WxfCXd8mwqH>.
 - **Chart audit:** [`chart-audit.md`](chart-audit.md) ranks 33 chart problems found by
   rendering every chart from one entry to twenty years of data. Its screenshots
@@ -109,7 +109,7 @@ it ever return.
 
 Keep each deleted regime's name from its tombstone row, so the legend and run list
 read `Push pull legs (deleted)` in grey. Fall back to a single `Deleted programme`
-entry only when no name survives.
+entry only when no name survives. Built in 1.19.1.
 
 ---
 

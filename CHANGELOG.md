@@ -15,6 +15,16 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.19.1] - 2026-10-17
+
+Patch release naming deleted programmes on the All time timeline.
+
+### Fixed
+
+- **Progress:** The All time timeline names each deleted programme, such as `Push pull legs (deleted)`, in its legend and in the year's list of regimes. It used to call every one `Deleted programme`, so two deleted programmes in one year looked identical and the legend named the same thing twice.
+  - Deleted programmes stay grey, since the six colours belong to the programmes you still have, and the names tell them apart.
+  - A long name in the year's list is shortened before `(deleted)` is, so the row always says the programme is gone.
+
 ## [1.19.0] - 2026-10-17
 
 Minor release redrawing every chart so that it reads as clearly with twenty years of data as with one week.
@@ -621,7 +631,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...HEAD
+[1.19.1]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...v1.17.0
