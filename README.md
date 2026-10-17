@@ -39,7 +39,7 @@ Three other properties follow from the same intent:
   </tr>
   <tr>
     <td width="33.33%">
-      <img src="design/posters/04-workouts.png" alt="Today: know what you are training" width="100%">
+      <img src="design/posters/04-home.png" alt="Home: know what you are training" width="100%">
     </td>
     <td width="33.33%">
       <img src="design/posters/05-volume.png" alt="Volume: every set, counted by muscle" width="100%">

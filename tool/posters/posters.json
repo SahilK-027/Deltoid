@@ -24,11 +24,11 @@
     "accent": "#a78bfa"
   },
   {
-    "out": "04-workouts.png",
-    "kicker": "Today",
+    "out": "04-home.png",
+    "kicker": "Home",
     "title": "Know what|you are training",
-    "note": "The next session, the cycle you are in, and how far the deload still is — before you put the phone down.",
-    "shot": "shots/workouts.png",
+    "note": "The next session, the cycle you are in, how far the deload still is, and the habits you are keeping — before you put the phone down.",
+    "shot": "shots/home.png",
     "accent": "#ff7a4d"
   },
   {
