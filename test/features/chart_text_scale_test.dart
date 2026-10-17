@@ -35,7 +35,7 @@ Future<void> _loadInter() async {
 /// The chart cards at the largest system font the app allows, 1.3 (see
 /// `app.dart`), on a phone 390 wide: nothing overflows, no unit or name is
 /// cut short, and no label touches what sits over it. The chart audit's
-/// findings 6, 21, 22 and 26.
+/// findings 6, 21, 22 and 26, and the figures under a chart.
 void main() {
   setUpAll(_loadInter);
 
@@ -118,6 +118,39 @@ void main() {
           tester.getRect(find.text(n).first).right,
       };
       expect(right, hasLength(1));
+    });
+  });
+
+  group('a row of figures', () {
+    Widget row() => const StatRow(children: [
+          StatTile(value: '228', unit: 'kg', label: 'Best est. 1RM'),
+          StatTile(value: '+181.7%', label: 'Change in Push 2'),
+          StatTile(value: 'Peak', label: 'Best is the latest'),
+        ]);
+
+    testWidgets('sets a long figure smaller rather than cutting it', (
+      tester,
+    ) async {
+      await pump(tester, row());
+
+      // It was `+181.…` at 1.3, a third of a phone wide.
+      expect(tester.takeException(), isNull);
+      expect(whole(tester, find.text('+181.7%')), isTrue);
+      final figure = tester.getRect(find.text('+181.7%'));
+      final tile = tester.getRect(find.byType(StatTile).at(1));
+      expect(figure.left, greaterThanOrEqualTo(tile.left));
+      expect(figure.right, lessThanOrEqualTo(tile.right + 0.5));
+    });
+
+    testWidgets('leaves a figure that fits at its own size', (tester) async {
+      await pump(tester, row(), scale: 1.0);
+
+      for (final text in ['228', '+181.7%', 'Peak']) {
+        final shown = tester.getRect(find.text(text));
+        final natural =
+            tester.renderObject<RenderParagraph>(find.text(text)).size;
+        expect(shown.width, moreOrLessEquals(natural.width), reason: text);
+      }
     });
   });
 

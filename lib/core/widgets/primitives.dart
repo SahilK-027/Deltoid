@@ -1632,6 +1632,7 @@ class ValueUnit extends StatelessWidget {
     this.unit,
     this.dense = false,
     this.emphasis,
+    this.shrinkToFit = false,
   });
 
   final String value;
@@ -1645,9 +1646,33 @@ class ValueUnit extends StatelessWidget {
   /// Paints the value. Only for a semantic reading — a record, a deload.
   final Color? emphasis;
 
+  /// Sets the pair smaller, value and unit together, when it does not fit its
+  /// width, rather than ellipsizing the value. For a figure in a row of
+  /// siblings, where a third of a phone at a 1.3 font cut `+181.7%` to
+  /// `+181.…`: a number missing its end is a different number.
+  final bool shrinkToFit;
+
   @override
   Widget build(BuildContext context) {
     final valueStyle = dense ? context.t.labelLarge : context.t.displaySmall;
+    if (shrinkToFit) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(value, style: valueStyle?.copyWith(color: emphasis)),
+            if (unit != null) ...[
+              const SizedBox(width: Space.xs),
+              Text(unit!, style: context.t.bodyMedium),
+            ],
+          ],
+        ),
+      );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1693,7 +1718,12 @@ class StatTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ValueUnit(value: value, unit: unit, emphasis: emphasis),
+        ValueUnit(
+          value: value,
+          unit: unit,
+          emphasis: emphasis,
+          shrinkToFit: true,
+        ),
         const SizedBox(height: Space.xxs),
         Text(label, style: context.t.bodySmall, maxLines: 2),
       ],

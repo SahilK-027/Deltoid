@@ -655,6 +655,12 @@ it, sharing a baseline. `dense` is the row form (`labelLarge`, trailing an
 `AppRow`); the default is the page form (`displaySmall`, the number a card is
 about). `StatTile` is this plus a label under it.
 
+**A figure in a stat tile is never cut short.** Three tiles share a phone's
+width, and at a 1.3 font a third of it has no room for `+181.7%`, which was
+ellipsized to `+181.…`: a number missing its end is a different number. When the
+figure and its unit do not fit the tile, the pair is set smaller, together, until
+it does. A figure that fits keeps its size.
+
 **Every value carrying a unit is this widget.** It was hand-built in seven
 places, each deciding for itself whether the unit was `bodyMedium` or `bodySmall`
 and whether the pair shared a baseline or a centre line.
