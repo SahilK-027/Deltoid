@@ -726,6 +726,19 @@ void main() {
       expect(formatChangePercent(0.04), '0%');
       expect(formatChangePercent(-0.04), '0%');
     });
+
+    test('prints a change of 100% or more as a whole number', () {
+      expect(formatChangePercent(181.7), '+182%');
+      expect(formatChangePercent(100), '+100%');
+      expect(formatChangePercent(1234.4), '+1234%');
+      expect(formatChangePercent(-100), '−100%');
+    });
+
+    test('keeps a tenth below 100%, judged after rounding', () {
+      expect(formatChangePercent(99.94), '+99.9%');
+      expect(formatChangePercent(99.96), '+100%');
+      expect(formatChangePercent(-99.9), '−99.9%');
+    });
   });
 
   test('roundLoad snaps to the nearest half kilo', () {

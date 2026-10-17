@@ -472,8 +472,17 @@ int stalledSessions(List<double?> chronological1RMs) {
 ///
 /// `+0.0%` claimed a direction for a lift that stood still, and `−0.0%` a loss
 /// that never happened (THEME → Lift row).
+///
+/// From 100% up the figure is whole, `+182%`: a tenth of a per cent says
+/// nothing about a lift that has nearly trebled, and it was the digit that did
+/// not fit a third of a phone at a 1.3 font. The threshold is read after
+/// rounding to a tenth, so 99.96 is `+100%` rather than `+100.0%`.
 String formatChangePercent(double percent) {
   final rounded = double.parse(percent.toStringAsFixed(1));
   if (rounded == 0) return '0%';
-  return '${rounded > 0 ? '+' : '−'}${rounded.abs().toStringAsFixed(1)}%';
+  final sign = rounded > 0 ? '+' : '−';
+  final size = rounded.abs();
+  return size >= 100
+      ? '$sign${size.round()}%'
+      : '$sign${size.toStringAsFixed(1)}%';
 }

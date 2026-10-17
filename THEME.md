@@ -661,6 +661,11 @@ ellipsized to `+181.…`: a number missing its end is a different number. When t
 figure and its unit do not fit the tile, the pair is set smaller, together, until
 it does. A figure that fits keeps its size.
 
+**A change of 100% or more is a whole number**, `+182%` rather than `+181.7%`. A
+tenth of a per cent says nothing about a lift that has nearly trebled, and it
+was the digit that did not fit. Below 100% a change keeps its tenth, a drop is
+in `text`, and a change that rounds to nothing is `0%` with no sign.
+
 **Every value carrying a unit is this widget.** It was hand-built in seven
 places, each deciding for itself whether the unit was `bodyMedium` or `bodySmall`
 and whether the pair shared a baseline or a centre line.

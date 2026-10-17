@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:deltoid/core/ids.dart';
+import 'package:deltoid/core/providers.dart';
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/theme/tokens.dart';
 import 'package:deltoid/core/widgets/primitives.dart';
@@ -10,7 +12,9 @@ import 'package:deltoid/domain/cycle_progress.dart';
 import 'package:deltoid/domain/enums.dart';
 import 'package:deltoid/domain/metrics.dart';
 import 'package:deltoid/domain/muscle_volume.dart';
+import 'package:deltoid/domain/units.dart';
 import 'package:deltoid/domain/volume_history.dart';
+import 'package:deltoid/features/history/exercise_trend.dart';
 import 'package:deltoid/features/home/widgets/year_heatmap.dart';
 import 'package:deltoid/features/progress/widgets/strength_card.dart';
 import 'package:deltoid/features/progress/widgets/volume_bars.dart';
@@ -18,6 +22,7 @@ import 'package:deltoid/features/progress/widgets/volume_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Inter, as `y_axis_gutter_test.dart` loads it: the test font draws every
@@ -152,6 +157,48 @@ void main() {
         expect(shown.width, moreOrLessEquals(natural.width), reason: text);
       }
     });
+  });
+
+  testWidgets('an exercise trend prints a change past 100% whole', (
+    tester,
+  ) async {
+    // Twenty years of one session, 80 kg to 225 kg: +181.25%, which a third of
+    // a phone cut to `+181.…` at 1.3 when it was printed to a tenth.
+    final today = DateTime.now();
+    final points = [
+      for (var w = 1043; w >= 0; w--)
+        ProgressPoint(
+          dayKey: dayKeyOf(today.subtract(Duration(days: w * 7))),
+          sessionId: 'Push 1',
+          sessionName: 'Push 1',
+          isDeload: false,
+          topSetLoad: 0,
+          topSetReps: 5,
+          best1RM: 80 + 145 * (1043 - w) / 1043,
+          volume: 400,
+        ),
+    ];
+    await pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          exerciseProgressProvider('bench')
+              .overrideWith((ref) => Stream.value(points)),
+          weightUnitProvider.overrideWith((ref) => Stream.value(WeightUnit.kg)),
+          chartRangeProvider.overrideWith((ref) => const TrendWindow.all()),
+        ],
+        child: const ExerciseTrend(exerciseId: 'bench'),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    final change = find.text('+181%');
+    expect(change, findsOneWidget);
+    final figure = tester.getRect(change);
+    final tile = tester.getRect(
+      find.ancestor(of: change, matching: find.byType(StatTile)),
+    );
+    expect(figure.right, lessThanOrEqualTo(tile.right + 0.5));
   });
 
   testWidgets('a volume tile prints its whole unit', (tester) async {
