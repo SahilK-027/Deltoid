@@ -679,6 +679,12 @@ the tiles already agree on.
 chart is scaled against and how many periods it covers — and names the period
 under your finger while scrubbing.
 
+**A unit that does not fit beside its figure wraps under it.** A weekly-volume
+tile in half a phone at a 1.3 font has no room for `11.4 sets/wk` on one line,
+and cut it to `sets/...`: a unit missing its end is a figure with no unit
+(rule 5). The pair shares a baseline while it fits and stacks when it does
+not, and is never truncated.
+
 ### Habit tile
 
 Two to a row under the `Habits` heading on Home, Weigh-ins on the left and
@@ -1107,6 +1113,28 @@ resolution.
   emptiness is something you could not read off the plot — unscoreable days, a
   range that is all deloads. A range you did not train in needs no caption; the
   empty graph is the sentence.
+- **A change under a chart is read along one line.** The exercise trend's
+  `Change` is the change across the range of the session trained last, first
+  performance to last, because prefill is per session
+  ([RULES § 1](RULES.md#1-the-one-rule)): the first Push 1 against the last
+  Push 2 reported the gap between two days of the programme as lost strength.
+  It reads `Change in Push 2` while the chart draws more than one session, and
+  `Change` while it draws one. Green for gaining only, `text` for a drop, and
+  `0%` with no sign for a change that rounds to nothing, as on the
+  [Lift row](#lift-row). A session that equals the best is at the best, so a
+  flat year reads `Peak` rather than `98 sessions since best`.
+- **Bodyweight is drawn as an exercise is.** One weigh-in is a chart with one
+  dot, a range with no weigh-in is the empty chart with no caption, its value
+  axis is scaled to the whole log rather than to the latest weight with 5
+  either side, and the change over the range carries its unit:
+  `−3.2 kg over the range`.
+- **A year map's month strip never shrinks its type.** The labels are `micro`
+  at the system font scale, centred on each month's columns. Where twelve
+  names collide, every other month is named (`Jan Mar May`), and where those
+  collide too, every month by its initial, as the timeline strip prints them.
+  It used to scale the type down to fit twelve names, to about 7 sp, under the
+  11 sp floor of [Type](#4-type) and deaf to the system font. The strip's row
+  grows with the font, 18 at 1.0.
 - **A chart that has not loaded yet claims nothing.** It draws its frame and
   waits: "nothing logged" is a statement about the log, and a frame that has not
   read the log may not make it. A header that collapses while it reads shoves
@@ -1352,6 +1380,14 @@ reads.
 - **One hue per row**, from the six in order, so a row's identity is its colour
   rather than its position.
 - Name in `body`, figure in `valueSm` with its unit in `micro` beside it.
+- **Both columns are measured, at the system font scale.** The names column is
+  as wide as the longest name any row could print: every region with its
+  caret, and every muscle an opened region lists, which sits a step in.
+  Measured over every region rather than this week's rows, so the bars do not
+  move sideways when the week changes, and never more than two fifths of the
+  row. The counts column is as wide as the widest count in the list with its
+  unit, so every bar ends at the same x. Fixed at 84 and 64, they ellipsized
+  `Shoulders` and overflowed at `140 sets` at a 1.3 font.
 - **A row that opens carries a small caret that flips** — chevrons down the left
   of every row are a column of furniture over a column of data. A row with
   nothing to open offers no caret; a control that does nothing is worse than no
@@ -1876,10 +1912,15 @@ on Home rather than here, because Home is where things are entered.
   and its count, in the card and the year-map design Consistency uses. A day
   with a weigh-in is `weighIn` and a day without is `heatEmpty`.
 
-`Log weight` floats at the bottom right as the compact primary, because it adds
-one more entry to what the screen lists, and it opens the weigh-in sheet the
-tile's `+` opens. This screen is where bodyweight lives once Settings no longer
-holds it ([RULES § 6](RULES.md#6-scope)).
+**Today's weight is logged from the app bar.** A round `+`, labelled
+`Log weight`, sits beside the calendar and after it, 8 apart: the
+[circular icon button](#buttons) at 40, the `+` Home's Weigh-ins tile carries,
+and it opens the same weigh-in sheet. It floated at the bottom right as
+`Log weight`, the compact primary, and sat over the current months of the
+newest year map, which are the part of it read most. It is absent while the
+empty state is up, whose own button is the same action. This screen is where
+bodyweight lives once Settings no longer holds it
+([RULES § 6](RULES.md#6-scope)).
 
 **A past weigh-in is corrected through the calendar in the app bar.** A circular
 icon button, `edit_calendar_outlined`, labelled `Correct a weigh-in`, opens the

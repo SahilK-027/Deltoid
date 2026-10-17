@@ -1389,10 +1389,20 @@ class CycleAxisChart extends StatelessWidget {
           titlesData: FlTitlesData(
             // Not a title: the room the topmost value label needs, which sits
             // on the upper bound and would otherwise be drawn half outside the
-            // chart's own box.
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false, reservedSize: small ? 0 : 10),
-            ),
+            // chart's own box. Measured, because the label grows with the
+            // system font. Titles that are shown and draw nothing, because
+            // `fl_chart` reserves no room for titles that are hidden: the 10
+            // this used to ask for was never given, and at a 1.3 font the top
+            // value sat against the readout over the chart.
+            topTitles: small
+                ? const AxisTitles()
+                : AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: _topReserve(context),
+                      getTitlesWidget: (_, _) => const SizedBox.shrink(),
+                    ),
+                  ),
             leftTitles: const AxisTitles(),
             rightTitles: small
                 ? const AxisTitles()
@@ -1659,6 +1669,21 @@ typedef _Tint = ({PhaseKind kind, double from, double to});
 /// into every second one on an ordinary phone, which is half an axis thrown
 /// away to buy space nobody needed.
 const _labelGap = 6.0;
+
+/// The room over the cycle axis's top gridline: half its label's line, drawn
+/// at the size and scale it is printed at, and 2 more. At 1.0 that is the 10
+/// this used to fix, and the gap to whatever sits over the chart stays the
+/// same at every font scale.
+double _topReserve(BuildContext context) {
+  final painter = TextPainter(
+    text: TextSpan(text: '0', style: context.t.bodySmall),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final half = painter.height / 2;
+  painter.dispose();
+  return half + 2;
+}
 
 /// One string, at the size and scale it will be drawn at.
 double _measure(BuildContext context, String text) {

@@ -741,3 +741,42 @@ bool _fits(
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
 double _min(double a, double b) => a < b ? a : b;
+
+/// How a year map's month strip is worded: every month by its short name,
+/// every other month by it, or every month by its initial.
+enum MonthLabels { full, alternate, initials }
+
+/// The fullest wording of a year map's month strip that does not collide.
+///
+/// [centres] is where each month's label is centred along the strip, January
+/// first, and [full] and [initials] are the widths of each month's short name
+/// and initial at the size they will be drawn, system font scale included. Two
+/// labels collide when the room between their centres is less than half of
+/// each plus [gap].
+///
+/// **The type never shrinks.** The strip used to scale its labels down until
+/// all twelve fitted, which drew them at about 7 sp on a phone and ignored the
+/// system font. Labels stay at their size (THEME → Type, 11 sp at least) and
+/// there are fewer words instead: every other month while those fit, which
+/// keeps the months readable as names, then every month by its initial, as the
+/// timeline strip on All time prints them. A strip too narrow even for
+/// initials still prints initials; there is nothing smaller left to print.
+MonthLabels monthLabelsFor({
+  required List<double> centres,
+  required List<double> full,
+  required List<double> initials,
+  double gap = 4,
+}) {
+  assert(centres.length == full.length && full.length == initials.length);
+  bool fits(List<double> widths, int step) {
+    for (var i = step; i < centres.length; i += step) {
+      final room = centres[i] - centres[i - step];
+      if (room < (widths[i] + widths[i - step]) / 2 + gap) return false;
+    }
+    return true;
+  }
+
+  if (fits(full, 1)) return MonthLabels.full;
+  if (fits(full, 2)) return MonthLabels.alternate;
+  return MonthLabels.initials;
+}

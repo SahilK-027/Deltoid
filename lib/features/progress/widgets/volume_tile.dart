@@ -96,45 +96,20 @@ class _VolumeTileState extends State<VolumeTile> {
           const SizedBox(height: Space.md),
           Row(
             children: [
-              // The figure and its unit take what they need and give way
-              // together; the chevron keeps the card's right edge. Two of these
-              // sit side by side in half a phone's width, so both texts are
-              // `Flexible` — the same reason `StatTile` is — and the row still
-              // holds when the system font is turned up.
+              // The figure and its unit share a baseline while both fit, and
+              // the unit wraps under the figure when they do not. Two of these
+              // sit side by side in half a phone's width, and at a 1.3 font
+              // `sets/wk` was cut to `sets/...`: a unit with its end missing
+              // is a figure with no unit (THEME rule 5).
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        // One decimal, deliberately unlike the sessions-per-week
-                        // figure on Workouts, which floors. That one counts whole
-                        // sessions you either did or did not do; this is a rate
-                        // over a span, where `11` and `11.4` are different
-                        // training.
-                        //
-                        // `valueSm`, not `value`: six of these are read as a
-                        // grid rather than one at a time, and at 22 the figure
-                        // outshouted the muscle it belongs to. THEME keeps
-                        // `value` for the number a card is *about* — here the
-                        // card is about the muscle and the chart across it.
-                        series.averagePerWeek.toStringAsFixed(1),
-                        style: context.t.labelLarge,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: Space.xs),
-                    Flexible(
-                      child: Text(
-                        'sets/wk',
-                        style: context.t.bodyMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                child: _Figure(
+                  // One decimal, deliberately unlike the sessions-per-week
+                  // figure on Workouts, which floors. That one counts whole
+                  // sessions you either did or did not do; this is a rate
+                  // over a span, where `11` and `11.4` are different
+                  // training.
+                  value: series.averagePerWeek.toStringAsFixed(1),
+                  unit: 'sets/wk',
                 ),
               ),
               if (widget.onTap != null)
@@ -144,6 +119,57 @@ class _VolumeTileState extends State<VolumeTile> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The tile's figure and its unit: on one baseline while the pair fits the
+/// width, and the unit on its own line under the figure when it does not.
+///
+/// `valueSm`, not `value`: six of these are read as a grid rather than one at
+/// a time, and at 22 the figure outshouted the muscle it belongs to. THEME
+/// keeps `value` for the number a card is *about* — here the card is about
+/// the muscle and the chart across it.
+class _Figure extends StatelessWidget {
+  const _Figure({required this.value, required this.unit});
+
+  final String value;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final figure = Text(value, style: context.t.labelLarge, maxLines: 1);
+    final label = Text(unit, style: context.t.bodyMedium, maxLines: 1);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final scaler = MediaQuery.textScalerOf(context);
+        double width(String text, TextStyle? style) {
+          final painter = TextPainter(
+            text: TextSpan(text: text, style: style),
+            textDirection: Directionality.of(context),
+            textScaler: scaler,
+            maxLines: 1,
+          )..layout();
+          final w = painter.width;
+          painter.dispose();
+          return w;
+        }
+
+        final needed = width(value, context.t.labelLarge) +
+            Space.xs +
+            width(unit, context.t.bodyMedium);
+        if (!box.hasBoundedWidth || needed <= box.maxWidth) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [figure, const SizedBox(width: Space.xs), label],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [figure, label],
+        );
+      },
     );
   }
 }

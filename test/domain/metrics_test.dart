@@ -646,6 +646,86 @@ void main() {
       expect(stalledSessions([100]), 0);
       expect(stalledSessions([]), 0);
     });
+
+    test('counts a session that equals the best as the best', () {
+      // A year of identical sessions printed `98 sessions since best`.
+      expect(stalledSessions([100, 100, 100, 100]), 0);
+      expect(stalledSessions([100, 120, 110, 120]), 0);
+      expect(stalledSessions([100, 120, 120, 110, 115]), 2);
+    });
+  });
+
+  group('latestSessionChange', () {
+    test('compares the latest session with itself, never with the other', () {
+      // Push 1 is heavier than Push 2. First Push 1 against last Push 2 was a
+      // drop of 20%; Push 2 itself went from 80 to 82, which is +2.5%.
+      final change = latestSessionChange([
+        (session: 'Push 1', value: 100),
+        (session: 'Push 2', value: 80),
+        (session: 'Push 1', value: 102),
+        (session: 'Push 2', value: 82),
+      ]);
+      expect(change?.session, 'Push 2');
+      expect(change?.percent, closeTo(2.5, 1e-9));
+    });
+
+    test('reads the session the last entry belongs to', () {
+      final change = latestSessionChange([
+        (session: 'Push 2', value: 80),
+        (session: 'Push 1', value: 100),
+        (session: 'Push 2', value: 84),
+        (session: 'Push 1', value: 95),
+      ]);
+      expect(change?.session, 'Push 1');
+      expect(change?.percent, closeTo(-5, 1e-9));
+    });
+
+    test('skips entries it cannot score', () {
+      final change = latestSessionChange([
+        (session: 'Push 1', value: null),
+        (session: 'Push 1', value: 100),
+        (session: 'Push 1', value: 110),
+        (session: 'Push 2', value: null),
+      ]);
+      expect(change?.session, 'Push 1');
+      expect(change?.percent, closeTo(10, 1e-9));
+    });
+
+    test('is null with one performance of that session, or none', () {
+      expect(
+        latestSessionChange([
+          (session: 'Push 1', value: 100),
+          (session: 'Push 1', value: 104),
+          (session: 'Push 2', value: 80),
+        ]),
+        isNull,
+      );
+      expect(latestSessionChange([]), isNull);
+      expect(latestSessionChange([(session: 'Push 1', value: null)]), isNull);
+    });
+
+    test('is null on a base of zero', () {
+      expect(
+        latestSessionChange([
+          (session: 'Plank', value: 0),
+          (session: 'Plank', value: 30),
+        ]),
+        isNull,
+      );
+    });
+  });
+
+  group('formatChangePercent', () {
+    test('signs a gain and a loss, with a true minus', () {
+      expect(formatChangePercent(3.44), '+3.4%');
+      expect(formatChangePercent(-2.2), '−2.2%');
+    });
+
+    test('prints a change that rounds to nothing as 0%, with no sign', () {
+      expect(formatChangePercent(0), '0%');
+      expect(formatChangePercent(0.04), '0%');
+      expect(formatChangePercent(-0.04), '0%');
+    });
   });
 
   test('roundLoad snaps to the nearest half kilo', () {

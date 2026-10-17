@@ -16,7 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The Weigh-ins screen, behind the habit tile on Home: the trend, the count,
-/// a year map per year, the correction calendar and `Log weight`.
+/// a year map per year, the correction calendar and the `+` beside it.
 ///
 /// Harness rules are `more_screen_test.dart`'s: never `pumpAndSettle` while a
 /// watched query may still be answering, and the container outlives the tree
@@ -70,9 +70,71 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Weigh-ins'), findsOneWidget);
     expect(find.text('No weights logged'), findsOneWidget);
-    // The empty state's button is the floating one's action, so the floating
-    // one is hidden rather than offered twice.
+    // The empty state's button is the `+`'s action, so the `+` is hidden
+    // rather than offered twice.
     expect(find.text('Log weight'), findsOneWidget);
+    expect(find.byTooltip('Log weight'), findsNothing);
+  });
+
+  testWidgets('logs a weight from the app bar, not from a floating button', (
+    tester,
+  ) async {
+    // The floating `Log weight` sat over the current months of the year map.
+    await log(today, 76.5);
+    await pump(tester, const WeighInsScreen());
+
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byTooltip('Log weight'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Log weight'), findsNothing);
+    // Beside the calendar, after it, as the prototype draws them.
+    final calendar = tester.getCenter(find.byTooltip('Correct a weigh-in'));
+    final add = tester.getCenter(find.byTooltip('Log weight'));
+    expect(add.dx, greaterThan(calendar.dx));
+    expect(add.dy, calendar.dy);
+  });
+
+  group('the trend', () {
+    testWidgets('draws one weigh-in as a chart with one dot', (tester) async {
+      await log(today, 76.5);
+      await pump(tester, const WeighInsScreen());
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TrendChart), findsOneWidget);
+      expect(find.byType(EmptyTrendChart), findsNothing);
+      expect(find.textContaining('A second one is needed'), findsNothing);
+    });
+
+    testWidgets('draws an empty range uncaptioned, on the scale of the log', (
+      tester,
+    ) async {
+      await log(today.subtract(const Duration(days: 200)), 80);
+      await log(today.subtract(const Duration(days: 190)), 84);
+      container.read(bodyweightWindowProvider.notifier).state =
+          const TrendWindow.rolling(ChartRange.month);
+      await pump(tester, const WeighInsScreen());
+
+      final empty = tester.widget<EmptyTrendChart>(find.byType(EmptyTrendChart));
+      // The empty graph is the sentence (THEME → Charts).
+      expect(empty.message, isNull);
+      expect(find.textContaining('Nothing logged'), findsNothing);
+      // The whole log, not the latest weight with 5 either side.
+      expect(empty.scale, (80.0, 84.0));
+    });
+
+    testWidgets('states the change over the range with its unit', (
+      tester,
+    ) async {
+      await log(today.subtract(const Duration(days: 30)), 80);
+      await log(today, 76.8);
+      await pump(tester, const WeighInsScreen());
+
+      expect(find.text('−3.2 kg over the range'), findsOneWidget);
+    });
   });
 
   testWidgets('the trend, the count and its legend, then a map per year', (
@@ -117,7 +179,7 @@ void main() {
     await pump(tester, const WeighInsScreen());
     expect(find.text('1 weigh-in since June ${now.year - 1}'), findsOneWidget);
 
-    await tester.tap(find.text('Log weight'));
+    await tester.tap(find.byTooltip('Log weight'));
     await settle(tester);
     expect(find.text('Log bodyweight'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '77.4');
@@ -129,13 +191,13 @@ void main() {
     expect(container.read(weighInDaysProvider).value, contains(dayKeyOf(today)));
   });
 
-  testWidgets('Log weight over a weight already logged today corrects it', (
+  testWidgets('the + over a weight already logged today corrects it', (
     tester,
   ) async {
     await log(today, 76.5);
     await pump(tester, const WeighInsScreen());
 
-    await tester.tap(find.text('Log weight'));
+    await tester.tap(find.byTooltip('Log weight'));
     await settle(tester);
 
     // A blank field here would replace today's weight without showing it.

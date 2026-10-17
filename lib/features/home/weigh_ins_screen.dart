@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -101,20 +103,22 @@ class WeighInsScreen extends ConsumerWidget {
             tooltip: 'Correct a weigh-in',
             onTap: () => correctWeighInPrompt(context, ref),
           ),
+          // Today's weight, the `+` the Weigh-ins tile on Home carries. In the
+          // app bar rather than floating: a floating `Log weight` sat over the
+          // current months of the year map, which is the part of it read most.
+          // Absent while the empty state is up, whose own button is the same
+          // action (THEME rule 6).
+          if (latest != null) ...[
+            const SizedBox(width: Space.sm),
+            CircleIconButton(
+              icon: Icons.add_rounded,
+              tooltip: 'Log weight',
+              onTap: () => logTodaysWeight(context, ref),
+            ),
+          ],
           const SizedBox(width: Space.gutter),
         ],
       ),
-      // One more entry in what the screen lists, so it floats as the compact
-      // primary rather than spanning the foot (THEME → Buttons). Hidden while
-      // the empty state is up, whose own button is the same action.
-      floatingActionButton: latest == null
-          ? null
-          : PrimaryButton(
-              compact: true,
-              label: 'Log weight',
-              icon: Icons.add_rounded,
-              onPressed: () => logTodaysWeight(context, ref),
-            ),
       body: switch ((summary, days)) {
         // Local disk: a spinner here would show for two frames.
         (null, _) || (_, null) => const SizedBox.shrink(),
@@ -170,15 +174,15 @@ class _WeighIns extends ConsumerWidget {
     // `.builder` for the reason Consistency uses it: a year map per year,
     // and only the ones on screen are painted.
     return ListView.builder(
-      // Room under the last year for the floating button to clear it. The
-      // page runs under the system navigation bar and the button sits above
-      // it, so the bar's height is added: without it the last year stopped
-      // under the button on a phone with three-button navigation.
+      // The foot Consistency leaves under its last year. The page runs under
+      // the system navigation bar, so the bar's height is added: without it
+      // the last year stops under the bar on a phone with three-button
+      // navigation.
       padding: EdgeInsets.fromLTRB(
         Space.gutter,
         Space.lg,
         Space.gutter,
-        Space.huge * 2 + MediaQuery.paddingOf(context).bottom,
+        Space.huge + MediaQuery.paddingOf(context).bottom,
       ),
       itemCount: years.length + 2,
       itemBuilder: (context, i) {
@@ -253,8 +257,8 @@ class _WeighIns extends ConsumerWidget {
 
 /// Today's weight: logs it, or opens it for correcting if it is already there.
 ///
-/// What the `+` on the Weigh-ins tile and `Log weight` on this screen both
-/// open. A second weigh-in on the same day replaces the first, so offering an
+/// What the `+` on the Weigh-ins tile and the `+` in this screen's app bar
+/// both open. A second weigh-in on the same day replaces the first, so offering an
 /// empty field over a weight already logged today would overwrite it without
 /// showing what it replaced.
 Future<void> logTodaysWeight(BuildContext context, WidgetRef ref) async {
@@ -370,10 +374,19 @@ class _TrendCard extends ConsumerWidget {
     // The change over the range is the *log's* first and last reading, not the
     // first and last bucket: averaging is how the line is drawn, and this line
     // is a fact about two weigh-ins.
-    final change = points.length < 2
+    final delta = points.length < 2
         ? null
         : formatBodyweightDelta(
             points.last.weightKg, points.first.weightKg, unit);
+    // With its unit, as every value is (THEME rule 5): `−3.2 kg`, not `−3.2`.
+    final change = delta == null ? null : '$delta ${unit.label}';
+
+    // The band of the whole log, in display units: what an empty range is
+    // drawn against, so a month with no weigh-in reads as an empty stretch of
+    // the same chart rather than one scaled around the latest weight
+    // (THEME → Charts).
+    final logged = all.isEmpty ? [latest.weightKg] : all.map((p) => p.weightKg);
+    final scale = (logged.reduce(min), logged.reduce(max));
 
     // `All` starts where the log does. Every other window knows its own left
     // edge, and for `All` the query returned everything, so the first row is it.
@@ -423,33 +436,28 @@ class _TrendCard extends ConsumerWidget {
             style: context.t.bodyMedium,
           ),
           const SizedBox(height: Space.lg),
-          if (readings < 2)
+          if (readings == 0)
             // The chart, empty, rather than a box where the chart was: the
             // range chips under it stay a zoom rather than a thing that
-            // resizes the card (THEME → Charts).
+            // resizes the card. No caption: a range with no weigh-in in it is
+            // an empty graph, and that is already the sentence (THEME →
+            // Charts).
             EmptyTrendChart(
               height: 190,
               window: window,
               earliest: earliest,
-              // Scaled around the last weigh-in, in the same display units the
-              // real chart plots in. An axis with no numbers on it reads as a
-              // chart that failed to draw (THEME → Charts).
-              scale: (
-                unit.fromKg(latest.weightKg) - 5,
-                unit.fromKg(latest.weightKg) + 5,
-              ),
+              scale: (unit.fromKg(scale.$1), unit.fromKg(scale.$2)),
               formatValue: (v) => formatBodyweight(unit.toKg(v), unit),
               // Printed to 0.1, so no step is finer; and a band of 2 kg at
               // least, so a year flat to within 0.1 kg is drawn level rather
               // than as a climb.
               minStep: bodyweightIncrement,
               minSpan: unit.fromKg(2),
-              message: readings == 0
-                  ? 'Nothing logged in this range.'
-                  : 'Only one ${by.noun} has a weigh-in. A second one is '
-                      'needed before a trend can be drawn.',
             )
           else
+            // One weigh-in is a chart with one dot on it, as one session is on
+            // an exercise's chart: where you are, for the next to be read
+            // against.
             TrendChart(
               height: 190,
               window: window,

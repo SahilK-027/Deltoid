@@ -399,4 +399,57 @@ void main() {
       expect(autoGranularity(66), Granularity.weekly);
     });
   });
+
+  group('monthLabelsFor', () {
+    // Twelve months 26 apart, the strip of a year map on a phone.
+    final centres = [for (var i = 0; i < 12; i++) 13.0 + i * 26];
+
+    test('names every month where the names fit', () {
+      expect(
+        monthLabelsFor(
+          centres: centres,
+          full: List.filled(12, 20),
+          initials: List.filled(12, 7),
+        ),
+        MonthLabels.full,
+      );
+    });
+
+    test('names every other month where twelve names collide', () {
+      // At a 1.3 font a name is 27 wide: 27 + 4 does not fit in 26, and
+      // does in 52.
+      expect(
+        monthLabelsFor(
+          centres: centres,
+          full: List.filled(12, 27),
+          initials: List.filled(12, 9),
+        ),
+        MonthLabels.alternate,
+      );
+    });
+
+    test('falls back to initials where every other name collides', () {
+      expect(
+        monthLabelsFor(
+          centres: centres,
+          full: List.filled(12, 50),
+          initials: List.filled(12, 9),
+        ),
+        MonthLabels.initials,
+      );
+    });
+
+    test('a single pair that collides is enough to thin the strip', () {
+      // February is the narrowest month, and its neighbours decide.
+      final tight = [...centres]..[2] = centres[1] + 22;
+      expect(
+        monthLabelsFor(
+          centres: tight,
+          full: List.filled(12, 20),
+          initials: List.filled(12, 7),
+        ),
+        MonthLabels.alternate,
+      );
+    });
+  });
 }

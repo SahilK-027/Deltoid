@@ -411,11 +411,16 @@ double bodyweightOnOrdered(
   return a.weightKg + (b.weightKg - a.weightKg) * t;
 }
 
-/// How many consecutive recent performances failed to beat the best e1RM that
+/// How many consecutive recent performances failed to reach the best e1RM that
 /// came before them.
 ///
 /// This is the actual answer to "am I progressing" — cheap to compute, and
 /// surfaced as a quiet badge rather than a dashboard.
+///
+/// **Equalling the best is being at it.** A performance that ties the best is
+/// counted as the best, so the latest of a flat run is where the count starts.
+/// Counting from the first of the tied values printed `98 sessions since best`
+/// under a year of identical sessions, every one of which was the best.
 int stalledSessions(List<double?> chronological1RMs) {
   final values = chronological1RMs.whereType<double>().toList();
   if (values.length < 2) return 0;
@@ -423,10 +428,52 @@ int stalledSessions(List<double?> chronological1RMs) {
   var best = values.first;
   var bestIndex = 0;
   for (var i = 1; i < values.length; i++) {
-    if (values[i] > best) {
+    if (values[i] >= best) {
       best = values[i];
       bestIndex = i;
     }
   }
   return values.length - 1 - bestIndex;
+}
+
+/// The change in per cent across one session's own performances, for the
+/// session trained most recently: its first scored value in [chronological]
+/// against its last.
+///
+/// **Per session, because prefill is per session** (RULES § 1). Push 1 and
+/// Push 2 are two progressions of the same movement, often at two different
+/// weights, so comparing the first performance in a range with the last one
+/// compared Push 1 with Push 2 and reported the gap between two programmes as
+/// a loss of strength.
+///
+/// The session is the one the last entry belongs to, which is the line the
+/// reader has just added a point to. Entries whose value is null cannot be
+/// scored and are skipped, as the chart skips them. Null when that session has
+/// fewer than two scored entries, or a first value that is not positive: a
+/// percentage needs two points and a base, and `0%` from one point reads as
+/// "no progress" when the truth is "not enough data yet".
+({String session, double percent})? latestSessionChange(
+  List<({String session, double? value})> chronological,
+) {
+  final scored = chronological.where((e) => e.value != null).toList();
+  if (scored.isEmpty) return null;
+  final session = scored.last.session;
+  final own = [for (final e in scored) if (e.session == session) e.value!];
+  if (own.length < 2 || own.first <= 0) return null;
+  return (
+    session: session,
+    percent: (own.last - own.first) / own.first * 100,
+  );
+}
+
+/// A change in per cent as the app prints it: `+3.4%`, `−2.2%`, and `0%` for a
+/// change that rounds to nothing, with no sign and no decimal. The minus is a
+/// true minus rather than a hyphen.
+///
+/// `+0.0%` claimed a direction for a lift that stood still, and `−0.0%` a loss
+/// that never happened (THEME → Lift row).
+String formatChangePercent(double percent) {
+  final rounded = double.parse(percent.toStringAsFixed(1));
+  if (rounded == 0) return '0%';
+  return '${rounded > 0 ? '+' : '−'}${rounded.abs().toStringAsFixed(1)}%';
 }

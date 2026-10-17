@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../domain/date_axis.dart';
 import '../heatmap_data.dart';
 import 'heatmap.dart' show heatColourIn;
 
@@ -124,15 +127,18 @@ class _YearHeatmapState extends State<YearHeatmap> {
   /// left cost a tenth of the width to answer a question nobody opens this
   /// screen with, and the space goes into the cells instead.
   ///
-  /// Tall enough for one line of `labelSmall` and no taller — this row *is* the
-  /// bottom of the block, so every spare pixel in it shows up as a card that
-  /// sits lower under the grid than it does over it.
-  static const _monthRow = 18.0;
+  /// Tall enough for one line of `labelSmall` at the system font scale and no
+  /// taller — this row *is* the bottom of the block, so every spare pixel in it
+  /// shows up as a card that sits lower under the grid than it does over it.
+  /// At 1.0 it is 18, one 14-point line and the gap over it.
+  static double _monthRow(TextScaler scaler) => scaler.scale(14) + 4;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final now = DateTime.now();
+    final scaler = MediaQuery.textScalerOf(context);
+    final monthRow = _monthRow(scaler);
 
     // UTC throughout: `add(Duration(days: 1))` across a DST boundary lands on
     // 23:00 the day before, which doubles a column twice a year.
@@ -173,7 +179,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
           child: Semantics(
             label: caption.isEmpty ? '${widget.year}' : caption,
             child: CustomPaint(
-              size: Size(gridWidth, gridHeight + _monthRow),
+              size: Size(gridWidth, gridHeight + monthRow),
               painter: _YearPainter(
                 year: widget.year,
                 days: widget.days,
@@ -181,7 +187,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
                 weeks: weeks,
                 cell: cell,
                 gap: gap,
-                monthRow: _monthRow,
+                monthRow: monthRow,
                 todayKey: dayKeyOf(now),
                 picked: _picked,
                 // The readout replaces 366 tooltips, and it takes over the month
@@ -196,6 +202,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
                   ring: c.textPrimary,
                 ),
                 labelStyle: context.t.labelSmall!,
+                textScaler: scaler,
               ),
             ),
           ),
@@ -280,6 +287,7 @@ class _YearPainter extends CustomPainter {
     required this.caption,
     required this.colours,
     required this.labelStyle,
+    required this.textScaler,
   });
 
   final int year;
@@ -297,6 +305,9 @@ class _YearPainter extends CustomPainter {
 
   final _Palette colours;
   final TextStyle labelStyle;
+
+  /// The system font scale, which a `TextPainter` does not read for itself.
+  final TextScaler textScaler;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -359,9 +370,11 @@ class _YearPainter extends CustomPainter {
   /// four or five columns wide, so anchoring to its first week pushes every
   /// label left of the block it names and makes December fall off the end.
   ///
-  /// All twelve, always. The type shrinks to fit, down to a floor, rather than
-  /// dropping labels when two would touch — that is how a year ends up labelled
-  /// Jan, Apr, Jul, Oct, and a missing month is worse than a small one.
+  /// At the size of every other `labelSmall`, system font scale included, and
+  /// never smaller. Where twelve names do not fit, every other month is named,
+  /// and where those do not fit either, every month by its initial (see
+  /// [monthLabelsFor]). The strip used to shrink its type to about 7 sp to keep
+  /// twelve names, under the 11 sp floor and deaf to the system font.
   void _months(Canvas canvas, Size size, Map<int, _Span> spans) {
     if (spans.isEmpty) return;
     final top = 7 * cell + 6 * gap + gap;
@@ -375,6 +388,7 @@ class _YearPainter extends CustomPainter {
           style: labelStyle.copyWith(color: colours.ring),
         ),
         textDirection: TextDirection.ltr,
+        textScaler: textScaler,
         maxLines: 1,
       )
         ..layout(maxWidth: size.width)
@@ -382,35 +396,44 @@ class _YearPainter extends CustomPainter {
       return;
     }
 
-    // The narrowest month decides the size for all of them, so the strip stays
-    // one typeface at one size rather than a ragged mix.
-    final slot = spans.values
-        .map((s) => s.width)
-        .reduce((a, b) => a < b ? a : b);
+    final style = labelStyle.copyWith(color: colours.label);
+    final names = _measure(style, _monthName);
+    final initials = _measure(style, (m) => _monthName(m).substring(0, 1));
 
-    var style = labelStyle.copyWith(color: colours.label);
-    var painters = _measure(style);
-    final widest =
-        painters.values.map((p) => p.width).reduce((a, b) => a > b ? a : b);
-    if (widest > slot - 2) {
-      final scale = ((slot - 2) / widest).clamp(0.62, 1.0);
-      style = style.copyWith(fontSize: (style.fontSize ?? 11) * scale);
-      painters = _measure(style);
-    }
+    final months = spans.keys.toList()..sort();
+    double centre(int month) =>
+        spans[month]!.left + spans[month]!.width / 2;
+    final form = monthLabelsFor(
+      centres: [for (final m in months) centre(m)],
+      full: [for (final m in months) names[m]!.width],
+      initials: [for (final m in months) initials[m]!.width],
+    );
 
-    for (final entry in spans.entries) {
-      final painter = painters[entry.key];
-      if (painter == null) continue;
-      final centre = entry.value.left + entry.value.width / 2;
-      painter.paint(canvas, Offset(centre - painter.width / 2, top));
+    for (var i = 0; i < months.length; i++) {
+      if (form == MonthLabels.alternate && i.isOdd) continue;
+      final month = months[i];
+      final painter =
+          form == MonthLabels.initials ? initials[month]! : names[month]!;
+      // Held inside the strip: at a large font January's name is wider than
+      // twice the room to the left of its centre.
+      final left = max(
+        0.0,
+        min(centre(month) - painter.width / 2, size.width - painter.width),
+      );
+      painter.paint(canvas, Offset(left, top));
     }
   }
 
-  Map<int, TextPainter> _measure(TextStyle style) => {
+  Map<int, TextPainter> _measure(
+    TextStyle style,
+    String Function(int month) text,
+  ) =>
+      {
         for (var month = 1; month <= 12; month++)
           month: TextPainter(
-            text: TextSpan(text: _monthName(month), style: style),
+            text: TextSpan(text: text(month), style: style),
             textDirection: TextDirection.ltr,
+            textScaler: textScaler,
           )..layout(),
       };
 
@@ -437,5 +460,6 @@ class _YearPainter extends CustomPainter {
       old.colours.days != colours.days ||
       old.colours.label != colours.label ||
       old.colours.ring != colours.ring ||
-      old.labelStyle != labelStyle;
+      old.labelStyle != labelStyle ||
+      old.textScaler != textScaler;
 }

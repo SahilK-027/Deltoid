@@ -436,15 +436,16 @@ class _Summary extends ConsumerWidget {
         .whereType<double>()
         .fold<double?>(null, (a, b) => a == null || b > a ? b : a);
 
-    // A percentage change needs two points. With one, "+0.0%" reads as
-    // "no progress" when the truth is "not enough data yet".
-    final first =
-        real.length >= 2 ? metricValue(real.first, metric, measure) : null;
-    final last =
-        real.length >= 2 ? metricValue(real.last, metric, measure) : null;
-    final delta = (first != null && last != null && first > 0)
-        ? (last - first) / first * 100
-        : null;
+    // The change along one session's own line, the session trained last:
+    // Push 1 and Push 2 are two progressions (RULES § 1), and the first
+    // performance in the range against the last compared one with the other.
+    // A percentage needs two points, so one is a dash rather than `0%`.
+    final change = latestSessionChange([
+      for (final p in real)
+        (session: p.sessionName, value: metricValue(p, metric, measure)),
+    ]);
+    final sessions = {for (final p in real) p.sessionName};
+    final changed = change == null ? null : formatChangePercent(change.percent);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,12 +460,19 @@ class _Summary extends ConsumerWidget {
         Expanded(
           child: StatTile(
             // The range is already named by the selected chip above.
-            value: delta == null
-                ? '—'
-                : '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)}%',
-            label: 'Change',
-            emphasis:
-                delta == null ? null : (delta >= 0 ? c.positive : c.negative),
+            value: changed ?? '—',
+            // Named when the chart draws more than one session, so the figure
+            // says whose line it is read off.
+            label: change == null || sessions.length < 2
+                ? 'Change'
+                : 'Change in ${change.session}',
+            // Green for gaining only, the colour the app uses for beating last
+            // time. A drop is `text`: going backwards is information rather
+            // than a fault, and red is the colour of deleting something
+            // (THEME → Lift row).
+            emphasis: changed != null && changed.startsWith('+')
+                ? c.positive
+                : null,
           ),
         ),
         Expanded(

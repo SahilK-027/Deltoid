@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -35,8 +37,29 @@ class _VolumeBarsState extends State<VolumeBars> {
     // app has no business inventing a number of sets you are failing to hit
     // (RULES § Scope). One set in a week is therefore a full bar, which is
     // correct — it is the most you did.
-    final max = widget.volume.maxSets;
+    final most = widget.volume.maxSets;
+    final count = _countWidth(context, rows);
 
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Never more than two fifths of the row, so a font turned all the way
+        // up still leaves the bars a chart to draw. Past that a name
+        // ellipsizes, which is the lesser loss.
+        final name = box.hasBoundedWidth
+            ? min(_nameWidth(context), box.maxWidth * 0.4)
+            : _nameWidth(context);
+        return _list(context, rows, most, name, count);
+      },
+    );
+  }
+
+  Widget _list(
+    BuildContext context,
+    List<MuscleVolume> rows,
+    int max,
+    double nameWidth,
+    double countWidth,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,6 +67,8 @@ class _VolumeBarsState extends State<VolumeBars> {
           _RegionRow(
             row: row,
             max: max,
+            nameWidth: nameWidth,
+            countWidth: countWidth,
             hue: context.c.forRegion(row.region),
             open: _open.contains(row.region),
             onTap: !row.region.isCompound
@@ -65,6 +90,8 @@ class _VolumeBarsState extends State<VolumeBars> {
                 : _Parts(
                     row: row,
                     max: max,
+                    nameWidth: nameWidth,
+                    countWidth: countWidth,
                     hue: context.c.forRegion(row.region),
                   ),
           ),
@@ -76,15 +103,68 @@ class _VolumeBarsState extends State<VolumeBars> {
 
 /// The width the names column takes, so every bar starts at the same x.
 ///
-/// Fixed rather than intrinsic: an intrinsic column re-measures as the longest
-/// name changes, and `Shoulders` week to `Arms` week would move every bar on
-/// the card sideways.
-const _nameWidth = 84.0;
+/// The longest name any row could print, measured at the size it is drawn,
+/// system font scale included: every region with its caret where it has one,
+/// and every muscle a region opens onto, which sits a step in. Measured over
+/// every region rather than over the rows in this week, because a column sized
+/// to this week's names moves every bar sideways when the week changes. It
+/// was a fixed 84, which ellipsized `Shoulders` and `Hamstrings` at a 1.3 font.
+double _nameWidth(BuildContext context) {
+  var widest = 0.0;
+  for (final region in MuscleRegion.values) {
+    final caret = region.isCompound ? Space.xxs + _caret : 0.0;
+    widest = max(
+      widest,
+      _textWidth(context, region.label, context.t.bodyMedium) + caret,
+    );
+    if (!region.isCompound) continue;
+    for (final muscle in region.parts) {
+      widest = max(
+        widest,
+        _textWidth(context, muscle.label, context.t.bodySmall) + Space.sm,
+      );
+    }
+  }
+  return widest.ceilToDouble();
+}
+
+/// The width the counts column takes: the widest count in this list with its
+/// unit, measured once at the size it is drawn, so every bar ends at the same
+/// x and a three-digit count at a 1.3 font fits. It was a fixed 64, which
+/// overflowed at `140 sets`.
+double _countWidth(BuildContext context, List<MuscleVolume> rows) {
+  final unit = _textWidth(context, 'sets', context.t.labelSmall);
+  var widest = 0.0;
+  for (final row in rows) {
+    for (final sets in [row.sets, for (final p in row.parts) p.sets]) {
+      widest = max(widest, _textWidth(context, '$sets', context.t.labelLarge));
+    }
+  }
+  return (widest + Space.xxs + unit).ceilToDouble();
+}
+
+/// One line of text, as wide as it is drawn on this phone.
+double _textWidth(BuildContext context, String text, TextStyle? style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final width = painter.width;
+  painter.dispose();
+  return width;
+}
+
+/// The caret on a row that opens.
+const _caret = 16.0;
 
 class _RegionRow extends StatelessWidget {
   const _RegionRow({
     required this.row,
     required this.max,
+    required this.nameWidth,
+    required this.countWidth,
     required this.hue,
     required this.open,
     this.onTap,
@@ -92,6 +172,8 @@ class _RegionRow extends StatelessWidget {
 
   final MuscleVolume row;
   final int max;
+  final double nameWidth;
+  final double countWidth;
   final Color hue;
   final bool open;
   final VoidCallback? onTap;
@@ -110,7 +192,7 @@ class _RegionRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: _nameWidth,
+            width: nameWidth,
             child: Row(
               children: [
                 Flexible(
@@ -134,7 +216,7 @@ class _RegionRow extends StatelessWidget {
                     curve: Motion.curve,
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      size: 16,
+                      size: _caret,
                       color: c.textTertiary,
                     ),
                   ),
@@ -145,7 +227,7 @@ class _RegionRow extends StatelessWidget {
           const SizedBox(width: Space.sm),
           Expanded(child: _Bar(sets: row.sets, max: max, hue: hue)),
           const SizedBox(width: Space.sm),
-          _Count(sets: row.sets),
+          _Count(sets: row.sets, width: countWidth),
         ],
       ),
     );
@@ -161,10 +243,18 @@ class _RegionRow extends StatelessWidget {
 /// child has to look like a child, or `Legs` and `Quads` in the same type on
 /// the same ground read as two regions.
 class _Parts extends StatelessWidget {
-  const _Parts({required this.row, required this.max, required this.hue});
+  const _Parts({
+    required this.row,
+    required this.max,
+    required this.nameWidth,
+    required this.countWidth,
+    required this.hue,
+  });
 
   final MuscleVolume row;
   final int max;
+  final double nameWidth;
+  final double countWidth;
   final Color hue;
 
   @override
@@ -184,7 +274,7 @@ class _Parts extends StatelessWidget {
               child: Row(
                 children: [
                   SizedBox(
-                    width: _nameWidth - Space.sm,
+                    width: nameWidth - Space.sm,
                     child: Text(
                       part.muscle.label,
                       style: context.t.bodySmall,
@@ -209,7 +299,7 @@ class _Parts extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: Space.sm),
-                  _Count(sets: part.sets, small: true),
+                  _Count(sets: part.sets, width: countWidth, small: true),
                 ],
               ),
             ),
@@ -274,19 +364,18 @@ class _Bar extends StatelessWidget {
 /// `12` in `valueSm` with `sets` in `micro` beside it. A muscle trained zero
 /// times prints `0 sets` rather than nothing at all.
 class _Count extends StatelessWidget {
-  const _Count({required this.sets, this.small = false});
+  const _Count({required this.sets, required this.width, this.small = false});
 
   final int sets;
   final bool small;
 
+  /// The column's width, the same on every row: see [_countWidth].
+  final double width;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      // Wide enough for three digits and the word — a hundred sets a week is
-      // not a real training week, but a number that overflows its box is a
-      // striped bar across the card. Fixed, so every bar ends at the same x
-      // whatever the counts are.
-      width: 64,
+      width: width,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.baseline,
