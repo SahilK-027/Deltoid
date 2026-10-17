@@ -164,7 +164,7 @@ class _PhaseCard extends StatelessWidget {
             semanticLabel: 'Bodyweight by week, with the '
                 '${current.kind.label.toLowerCase()} since $since',
           ),
-          const SizedBox(height: Space.sm),
+          const SizedBox(height: Space.md),
           PhaseLegend(kinds: sparkline.kinds),
           const SizedBox(height: Space.lg),
           const Divider(),
@@ -183,7 +183,7 @@ class _PhaseCard extends StatelessWidget {
                   unit: unit.label,
                 ),
               ),
-              const SizedBox(width: Space.sm),
+              const SizedBox(width: Space.md),
               Expanded(
                 child: _Figure(
                   label: 'Since start',
@@ -193,7 +193,7 @@ class _PhaseCard extends StatelessWidget {
                   unit: unit.label,
                 ),
               ),
-              const SizedBox(width: Space.sm),
+              const SizedBox(width: Space.md),
               Expanded(
                 child: _Figure(
                   label: 'Each week',

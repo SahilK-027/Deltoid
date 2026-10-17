@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../domain/enums.dart';
 import '../../domain/phases.dart';
 import '../theme/tokens.dart';
+import 'chart_legend.dart';
 
 /// The phase colours, by kind (THEME → Semantic assignments).
 extension PhaseHue on DeltoidColors {
@@ -166,37 +167,17 @@ class _PhaseSparklinePainter extends CustomPainter {
 
 /// The swatches under a phase tint: a 10 square in each phase's hue, named
 /// in the text colour around it, never in the hue (THEME → Semantic
-/// assignments: cyan on a white card is 1.7:1).
+/// assignments: cyan on a white card is 1.7:1). The one [ChartLegend], keyed
+/// by phase.
 class PhaseLegend extends StatelessWidget {
   const PhaseLegend({super.key, required this.kinds});
 
   final List<PhaseKind> kinds;
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final style = context.t.labelSmall?.copyWith(color: c.textSecondary);
-    return Wrap(
-      spacing: Space.md,
-      runSpacing: Space.xs,
-      children: [
-        for (final kind in kinds)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: c.phase(kind),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: Space.xs),
-              Text(kind.label, style: style),
-            ],
-          ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ChartLegend(
+        entries: [
+          for (final kind in kinds) LegendEntry(kind.label, context.c.phase(kind)),
+        ],
+      );
 }

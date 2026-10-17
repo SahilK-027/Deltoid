@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/chart_legend.dart';
 import '../../../core/widgets/phase_sparkline.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/trend_chart.dart';
@@ -129,7 +130,10 @@ class _StrengthCardState extends State<StrengthCard> {
               ],
             ],
           ),
-          const SizedBox(height: Space.md),
+          // The spacing every chart card shares (THEME → Charts): 16 to the
+          // range control, 12 to the readout, 16 to the plot, 12 under it to
+          // the legend and 16 to the row that follows.
+          const SizedBox(height: Space.lg),
           SegmentedPill<CycleRange>(
             segments: [
               for (final r in CycleRange.values)
@@ -150,7 +154,7 @@ class _StrengthCardState extends State<StrengthCard> {
             point: selected,
             isBaseline: selected.cycleId == baseline?.cycleId,
           ),
-          const SizedBox(height: Space.sm),
+          const SizedBox(height: Space.lg),
           CycleAxisChart(
             points: window.points,
             plotted: window.plotted,
@@ -159,10 +163,10 @@ class _StrengthCardState extends State<StrengthCard> {
             selected: selected.cycleId,
             onSelected: (p) => setState(() => _selected = p.cycleId),
           ),
-          const SizedBox(height: Space.sm),
+          const SizedBox(height: Space.md),
           _Legend(window: window),
           if (widget.onOpen != null) ...[
-            const SizedBox(height: Space.md),
+            const SizedBox(height: Space.lg),
             const Divider(),
             const SizedBox(height: Space.md),
             Pressable(
@@ -251,30 +255,27 @@ class _StrengthCardState extends State<StrengthCard> {
             selected: progress.latest?.cycleId,
             minSlots: _quietSlots,
           ),
-          const SizedBox(height: Space.md),
+          const SizedBox(height: Space.lg),
           const Divider(),
           const SizedBox(height: Space.md),
-          Row(
+          StatRow(
+            trailing: recorded && widget.onOpen != null
+                ? Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: context.c.textSecondary,
+                  )
+                : null,
             children: [
-              Expanded(
-                child: StatTile(
-                  value: '——',
-                  unit: '%',
-                  label: 'Stronger overall',
-                ),
+              const StatTile(
+                value: '——',
+                unit: '%',
+                label: 'Stronger overall',
               ),
-              Expanded(
-                child: StatTile(
-                  value: planned == null ? counted : '$counted of $planned',
-                  label: recorded ? 'Lifts recorded' : 'Lifts improved',
-                ),
+              StatTile(
+                value: planned == null ? counted : '$counted of $planned',
+                label: recorded ? 'Lifts recorded' : 'Lifts improved',
               ),
-              if (recorded && widget.onOpen != null)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: context.c.textSecondary,
-                ),
             ],
           ),
         ],
@@ -390,9 +391,9 @@ String? cycleSpan(CyclePoint point) {
 
 /// What the marks mean, under the chart.
 ///
-/// Two legends would be one too many: the x axis is named on the left, and the
-/// only marks that need explaining are the ones that are not a plain cycle —
-/// the deload band and the cycle still being trained.
+/// The x axis is named by the title, and the only marks that need explaining
+/// are the ones that are not a plain cycle — the deload band, the cycle still
+/// being trained, and the phase tints.
 class _Legend extends StatelessWidget {
   const _Legend({required this.window});
 
@@ -401,7 +402,6 @@ class _Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final style = context.t.labelSmall?.copyWith(color: c.textSecondary);
     final hasDeload = window.points.any((p) => p.isDeload);
     final open = window.points.where((p) => p.isOpen && p.isScored).firstOrNull;
     // The phases the window shows, in the order they appear, each once. A
@@ -412,73 +412,21 @@ class _Legend extends StatelessWidget {
       if (kind != null && !phases.contains(kind)) phases.add(kind);
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Cycle', style: style),
-        const SizedBox(width: Space.md),
-        // Wrapping onto a second line rather than running off the card: a
-        // deload, the open cycle and three phases are more than one line of a
-        // phone holds.
-        Expanded(
-          child: Wrap(
-            alignment: WrapAlignment.end,
-            spacing: Space.md,
-            runSpacing: Space.xs,
-            children: [
-              if (hasDeload)
-                _swatch(c.deload.withValues(alpha: 0.5), 'Deload', style),
-              if (open != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Dashed, because the line it stands for is: a solid rule
-                    // in the legend names a mark the chart never draws.
-                    SizedBox(
-                      width: 14,
-                      height: 2,
-                      child: Row(
-                        children: [
-                          for (var i = 0; i < 3; i++) ...[
-                            if (i > 0) const SizedBox(width: 2),
-                            Expanded(
-                              child: DecoratedBox(
-                                decoration:
-                                    BoxDecoration(color: c.textTertiary),
-                                child: const SizedBox(height: 2),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: Space.xs),
-                    Text('Cycle ${open.index} so far', style: style),
-                  ],
-                ),
-              for (final kind in phases)
-                _swatch(c.phase(kind), kind.label, style),
-            ],
+    return ChartLegend(
+      title: 'Cycle',
+      entries: [
+        if (hasDeload)
+          LegendEntry('Deload', c.deload.withValues(alpha: 0.5)),
+        // Dashed, because the line it stands for is: a solid rule in the
+        // legend names a mark the chart never draws.
+        if (open != null)
+          LegendEntry(
+            'Cycle ${open.index} so far',
+            c.textTertiary,
+            mark: LegendMark.dashedLine,
           ),
-        ),
+        for (final kind in phases) LegendEntry(kind.label, c.phase(kind)),
       ],
     );
   }
-
-  /// A 10 square in [color] and its name.
-  Widget _swatch(Color color, String label, TextStyle? style) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: Space.xs),
-          Text(label, style: style),
-        ],
-      );
 }

@@ -137,6 +137,9 @@ void main() {
     // The card on this screen has no name of its own: the app bar carries it.
     expect(find.text('Cycle progress'), findsNothing);
     // Everything went up ten per cent, so there is one group and it is that one.
+    // Under the card, which is spaced as every chart card is and runs past
+    // the foot of an 800 by 600 test screen.
+    await scrollTo(tester, find.text('Stronger'));
     expect(find.text('Stronger'), findsOneWidget);
     expect(find.text('No change'), findsNothing);
     expect(find.text('Weaker'), findsNothing);
@@ -160,6 +163,7 @@ void main() {
 
     await pump(tester, regime.id);
 
+    await scrollTo(tester, find.text('No change'));
     expect(find.text('No change'), findsOneWidget);
     expect(find.text('Stronger'), findsNothing);
     // One set, printed once rather than as a range to itself.

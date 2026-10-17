@@ -347,3 +347,23 @@ VolumeHistory computeVolumeHistory({
     },
   );
 }
+
+/// A span of [weeks] weeks as a caption names it: `13 weeks`, `18 months`,
+/// `5 years`.
+///
+/// Weeks while the span is about a year or less, because a week is the unit
+/// the training is written in and a year's range still reads as a count of
+/// them. Past that a count of weeks is a number nobody holds in their head:
+/// `Last 261 weeks` asked the reader to divide by fifty-two. Months up to two
+/// years, where a whole number of years would round eighteen months to two,
+/// and whole years after.
+String spanOfWeeks(int weeks) {
+  if (weeks <= spanWeeksMax) return '$weeks ${weeks == 1 ? 'week' : 'weeks'}';
+  final months = (weeks * 7 / 30.436875).round();
+  if (months < 24) return '$months months';
+  return '${(weeks * 7 / 365.2425).round()} years';
+}
+
+/// The longest span [spanOfWeeks] still counts in weeks: a year's range, with
+/// the weeks a window part way through one adds at each end.
+const spanWeeksMax = 56;

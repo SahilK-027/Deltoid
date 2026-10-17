@@ -39,9 +39,11 @@ void main() {
     // so on a 390pt phone the year chip starts off the right edge. That is the
     // strip working as designed (a clipped chip is the scroll affordance), and
     // it means this test has to scroll to it exactly as a thumb would.
-    await tester.ensureVisible(find.text('2026'));
+    // The chip reads `Year` while a rolling range is in force: it names a
+    // year only once one is applied.
+    await tester.ensureVisible(find.text('Year'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('2026'));
+    await tester.tap(find.text('Year'));
     await tester.pumpAndSettle();
   }
 

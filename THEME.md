@@ -873,6 +873,9 @@ page, and over the plot. Bodyweight put it under the plot, where it is read
 after the chart it has already changed, and a control that moves between
 screens is two controls. A row that drives several cards at once, as the region
 volume screen's does, sits above the first of them, outside every card.
+The year chip reads `Year` until a year is applied, and the year once one
+is: printing the newest year while a rolling range was in force read as
+that year being on the chart, and on a stale log as last year's.
 **The one chart this does not govern is the cycle
 axis**, whose x axis is a regime's cycle numbers and has no dates to range over;
 it carries `Last 12 · Last 24 · All` instead, and the rules it keeps and the
@@ -987,7 +990,19 @@ resolution.
   the same room. A sparkline is sized by the card or tile that holds it and is
   neither. The empty chart and the frame of a chart still loading take the
   height of the chart they stand in for; a placeholder of 260 in front of a
-  chart of 190 moved the page when the chart arrived.
+  chart of 190 moved the page when the chart arrived. Bodyweight was that
+  190, and is 220 with the exercise trend. In code the two are
+  `chartHeightFull` and `chartHeightCard`, and the trend chart takes no
+  height of its own.
+- **One strip under every plot for its x labels**: `Space.sm` from the
+  baseline, then one line of `label` measured at the system font scale, 24
+  at 1.0. The line charts reserved a fixed 30 and the bar chart a fixed 16
+  set 8 below, which its labels overflowed at a 1.3 font.
+- **One gutter for every value axis**, line or bar, measured by
+  `axisGutter` over the labels the axis actually draws: the labels sit
+  `Space.xs` from the plot, left-aligned, with 2 of air after the widest.
+  The bar chart measured one fold's axis and drew another's, and laid its
+  gap out beside the gutter instead of inside it.
 - **One legend, `ChartLegend`, under the plot.** It keys every chart that needs
   a key: the trend chart's series, the Strength card's marks, the All time
   groups, the year maps and the Phase card's tints. An entry is a swatch, 4, and
@@ -996,26 +1011,41 @@ resolution.
   rule, dashed where the line it names is dashed; an area (a band, a tint, a
   heat cell) by a 10 square at radius 2. Entries start at the left, 12 apart,
   and wrap 4 apart; a legend may lead with a title in the same style, as the
-  Strength card's `Cycle` does, and the timeline strip's `Regimes` and `Weeks`
-  are two of them (see [Timeline strip](#timeline-strip)). It names only what
-  the chart draws now, and a chart of one series has none, since the screen
-  already names it. **It never grows past two rows**: the last entry that fits
-  reads `and 3 more`, so the header does not change height when a range brings a
+  Strength card's `Cycle` does, 12 before the first entry, and the timeline
+  strip's `Regimes` and `Weeks` are two of them, 8 apart (see
+  [Timeline strip](#timeline-strip)). It names only what the chart draws now,
+  and a chart of one series has none, since the screen already names it.
+  **It never grows past two rows**: the last entry that fits reads
+  `and 3 more`, so the header does not change height when a range brings a
   ninth session into view. Five legends, in circles at 8 and squares at 10,
   `bodySmall` and `labelSmall`, 12 and 16 apart, are what this replaces.
+- **Lines drawn on top of each other are one entry.** Push 1 and Push 2 held
+  at 100 kg for a year draw one line, the later over the earlier, and a key
+  naming both named a line nobody could see. A line hidden under one drawn
+  after it, to within a pixel everywhere it is drawn, is keyed with it once,
+  in the colour on top: `Push 2 and Push 1`. Where the earlier line shows
+  anywhere, across a break in the other or past its end, both are keyed,
+  because both can be seen. The alternatives were worse: offsetting one line
+  by a pixel draws a gap in the data that is not there, and dashing it draws
+  a jump.
 - **Every chart card is padded 16 and spaced the same way inside.** Top to
   bottom: the figure and its caption, 16, the range control, 12, the readout
   where there is one, 16, then the plot. Under the plot: 8 to a hint or caption,
   12 to the legend, and 16 to whatever follows (a row of figures, a hairline,
-  the row that opens the detail). The plot reserves half its top label's
-  measured height inside its own box, so the top value never touches what sits
-  over it. Figures in a row under a chart are 12 apart. On the page with no card
-  around it, as the exercise trend is, the page gutter stands in for the padding
-  and every gap is the same. **The dense-row 12 of
-  [§ 5](#5-space-radius-elevation) is for rows of a list, not for a chart
-  card**: the weekly-volume bar list takes 16, and a year map takes 16 with 12
-  at the foot, because its month strip carries 4 of its own slack under the
-  labels.
+  the row that opens the detail), then 12 under a hairline. The plot reserves
+  half its top label's measured height and 2 more inside its own box, 10 at
+  1.0, so the top value never touches what sits over it; the trend chart, the
+  empty chart and the cycle axis all do, through `topLabelReserve`. Figures in
+  a row under a chart are 12 apart, in a `StatRow`: written as a bare row per
+  card they met edge to edge, and at a 1.3 font `Best est. 1RM` ran into
+  `Change`. On the page with no card around it, as the exercise trend is, the
+  page gutter stands in for the padding and every gap is the same. **The
+  dense-row 12 of [§ 5](#5-space-radius-elevation) is for rows of a list, not
+  for a chart card**, and two cards keep 16 to their ink by giving way to
+  slack their contents carry: the weekly-volume bar list is 16 at the sides
+  and 8 above and below, where every row carries 8 of its own, and a year map
+  takes 16 with 12 at the foot, because its month strip carries 4 of its own
+  slack under the labels.
 - **A bucket is a bar, not a point on a line.** A line between two weeks claims
   the value between them means something, and weekly counts have no between —
   eleven that week, nine the next.
@@ -1075,7 +1105,11 @@ resolution.
 - **A gridline is `border` on `surface` only.** Over a lighter fill —
   `heatEmpty`, `surfaceHighest` — `border` is _darker_ than what it crosses and
   reads as a scratch. Use `textTertiary` there, or drop the line: a figure under
-  the chart usually says it better.
+  the chart usually says it better. The region volume chart keeps its lines,
+  because its labels have nothing else to be read against: they are drawn in
+  `textTertiary` over the full-height tracks and under the bars. Drawn behind
+  the tracks they showed only in the hairline gaps between bars, and `5 10 15`
+  floated down the gutter with no line under any of them.
 - **A chart read by touch names the value in its caption, not a tooltip.** On a
   card half a phone wide a tooltip covers the chart it describes, and the
   caption is already the line saying what the chart is of.
@@ -1112,7 +1146,14 @@ resolution.
 - **A chart explains itself under the plot, never across it**, and only when the
   emptiness is something you could not read off the plot — unscoreable days, a
   range that is all deloads. A range you did not train in needs no caption; the
-  empty graph is the sentence.
+  empty graph is the sentence. Every such line sits in one place: 8 under the
+  plot, in `label` `textTertiary`, 2 apart where there are two, and before the
+  legend. The zoom hint, `Showing 7 of 9 sessions.` and an empty range's reason
+  were three styles in three places, one of them under the legend.
+- **A span past about a year is named in months, then years.** A caption reads
+  `Last 13 weeks` while the span is a year's range or less, `Last 18 months` up
+  to two years, and `Last 5 years` after: `Last 261 weeks` asked the reader to
+  divide by fifty-two.
 - **A change under a chart is read along one line.** The exercise trend's
   `Change` is the change across the range of the session trained last, first
   performance to last, because prefill is per session
@@ -1208,7 +1249,10 @@ state.
   swatch, for the reason `Deload` appears only where a deload does.
 - **The open cycle is drawn as unfinished**: a dashed segment to a marker stroked
   in `textTertiary`. Its point is real and partial, and a solid one would claim a
-  finished cycle two sessions in.
+  finished cycle two sessions in. Selected, it is filled in the same grey, as
+  every selected marker is filled in its own stroke; filled `progress`, it lost
+  the one mark that said it was unfinished on the card where it is selected by
+  default.
 - **A jump in the line is dashed at 60%** — across a deload, or across a spell
   on another regime. A solid line between two points claims the training
   between them. **Under blocks it is solid**: there every segment spans a block,
@@ -1957,6 +2001,7 @@ appear only while an account is signed in:
 | Type roles, input theme, control themes                         | `lib/core/theme/theme.dart`                      |
 | Components — cards, rows, chips, sheets, dialogs, radios, pills | `lib/core/widgets/primitives.dart`               |
 | The one chart                                                   | `lib/core/widgets/trend_chart.dart`              |
+| The one legend, `ChartLegend`                                   | `lib/core/widgets/chart_legend.dart`             |
 | The day picker                                                  | `lib/core/widgets/calendar.dart`                 |
 | The re-order sheet                                              | `lib/core/widgets/reorder_sheet.dart`            |
 | The cycle order card, position marks and the line between them  | `lib/core/widgets/cycle_order.dart`              |

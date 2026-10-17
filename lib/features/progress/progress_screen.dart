@@ -124,7 +124,14 @@ class _VolumeCard extends StatelessWidget {
           onAction: openHistory,
         ),
         AppCard(
-          padding: const EdgeInsets.all(Space.md),
+          // 16 at the sides, as every chart card is padded (THEME → Charts),
+          // and 8 above and below, where each row carries 8 of its own, so
+          // the ink stands 16 from every edge. At 12 all round the names stood
+          // 4 in from the cards above and below them.
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.lg,
+            vertical: Space.sm,
+          ),
           onTap: volume.isEmpty ? null : openHistory,
           // Just the bars. A sentence under them would restate what every row
           // already prints — a total, a count of trained regions, and the

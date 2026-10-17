@@ -181,10 +181,8 @@ class _Figure extends StatelessWidget {
 /// tile is scaled to its own maximum, which is a fact about the drawing rather
 /// than about your training. The scale is stated where it can be read properly,
 /// on the axis of the full-size chart a tile opens onto.
-String weekSpanLabel(VolumeSeries series) {
-  final weeks = series.weeks.length;
-  return 'Last $weeks ${weeks == 1 ? 'week' : 'weeks'}';
-}
+String weekSpanLabel(VolumeSeries series) =>
+    'Last ${spanOfWeeks(series.weeks.length)}';
 
 /// One bar, named by what it covers and what it came to.
 ///

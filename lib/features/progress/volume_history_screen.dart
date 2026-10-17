@@ -154,11 +154,11 @@ class _Grid extends StatelessWidget {
 
   /// The line under the range control.
   ///
-  /// Weeks first, because it is what every average on the screen is divided by
-  /// and a rate whose denominator is unstated is a number you cannot check.
+  /// The span first, because it is what every average on the screen is divided
+  /// by and a rate whose denominator is unstated is a number you cannot check.
+  /// Named in years past about one, as [spanOfWeeks] names it.
   static String _summary(VolumeHistory history) {
-    final weeks = history.weekCount;
-    final span = '$weeks ${weeks == 1 ? 'week' : 'weeks'}';
+    final span = spanOfWeeks(history.weekCount);
     if (history.isEmpty) return '$span · nothing logged';
     return '$span · ${history.averagePerWeek.toStringAsFixed(1)} '
         'hard sets per week';

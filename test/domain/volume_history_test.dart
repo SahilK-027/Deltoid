@@ -355,4 +355,27 @@ void main() {
       expect(foldWeeks(thirteenWeeks, Granularity.yearly), hasLength(1));
     });
   });
+
+  group('spanOfWeeks', () {
+    test('counts weeks up to about a year', () {
+      expect(spanOfWeeks(1), '1 week');
+      expect(spanOfWeeks(13), '13 weeks');
+      expect(spanOfWeeks(53), '53 weeks');
+      expect(spanOfWeeks(spanWeeksMax), '$spanWeeksMax weeks');
+    });
+
+    test('names months up to two years and years after', () {
+      expect(spanOfWeeks(spanWeeksMax + 1), '13 months');
+      expect(spanOfWeeks(78), '18 months');
+      expect(spanOfWeeks(104), '2 years');
+      expect(spanOfWeeks(261), '5 years');
+      expect(spanOfWeeks(1044), '20 years');
+    });
+
+    test('never prints a count of weeks past about a year', () {
+      for (var weeks = spanWeeksMax + 1; weeks < 3000; weeks++) {
+        expect(spanOfWeeks(weeks), isNot(contains('week')), reason: '$weeks');
+      }
+    });
+  });
 }

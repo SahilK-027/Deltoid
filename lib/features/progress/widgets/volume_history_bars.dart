@@ -27,6 +27,7 @@ class WeeklyBars extends StatefulWidget {
     required this.hue,
     required this.height,
     this.scaleTo,
+    this.grid,
     this.onSelected,
   });
 
@@ -43,6 +44,14 @@ class WeeklyBars extends StatefulWidget {
   /// the clearest reading of "this was the most". A chart with a y axis passes
   /// its rounded maximum instead, or the tallest bar covers the top gridline.
   final double? scaleTo;
+
+  /// Drawn over the tracks and under the bars: a chart's gridlines.
+  ///
+  /// Every bar has a full-height `heatEmpty` track, so gridlines painted
+  /// behind the bars were hidden everywhere but the hairline gaps between
+  /// them, and the labels beside the plot had nothing to be read against. On
+  /// top of the bars they would read as breaks in them.
+  final Widget? grid;
 
   /// Fired with the week under the finger, and with null when it is lifted
   /// clear. The caller prints the readout, because on a card this narrow a
@@ -138,6 +147,20 @@ class _WeeklyBarsState extends State<WeeklyBars>
     widget.onSelected?.call(null);
   }
 
+  _BarsPainter _painter(DeltoidColors c, {required bool front}) => _BarsPainter(
+        weeks: widget.bars,
+        max: _max,
+        fromWeeks: _fromWeeks,
+        fromMax: _fromMax,
+        zoom: CurvedAnimation(parent: _zoom, curve: Motion.emphasized),
+        hue: widget.hue,
+        // The same grey as a rest day on the heatmap: a week you skipped
+        // and a day you skipped are one absence.
+        track: c.heatEmpty,
+        touched: _touched,
+        front: front,
+      );
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -160,19 +183,13 @@ class _WeeklyBarsState extends State<WeeklyBars>
       child: SizedBox(
         height: widget.height,
         width: double.infinity,
+        // Two passes of one painter, the tracks behind the grid and the bars
+        // in front of it, so a gridline crosses an empty track and never a
+        // bar.
         child: CustomPaint(
-          painter: _BarsPainter(
-            weeks: widget.bars,
-            max: _max,
-            fromWeeks: _fromWeeks,
-            fromMax: _fromMax,
-            zoom: CurvedAnimation(parent: _zoom, curve: Motion.emphasized),
-            hue: widget.hue,
-            // The same grey as a rest day on the heatmap: a week you skipped
-            // and a day you skipped are one absence.
-            track: c.heatEmpty,
-            touched: _touched,
-          ),
+          painter: _painter(c, front: false),
+          foregroundPainter: _painter(c, front: true),
+          child: widget.grid == null ? null : SizedBox.expand(child: widget.grid),
         ),
       ),
     );
@@ -189,6 +206,7 @@ class _BarsPainter extends CustomPainter {
     required this.hue,
     required this.track,
     required this.touched,
+    required this.front,
   }) : super(repaint: zoom);
 
   final List<VolumeBar> weeks;
@@ -203,6 +221,9 @@ class _BarsPainter extends CustomPainter {
   final Color hue;
   final Color track;
   final int? touched;
+
+  /// The bars when true, the tracks behind them when false.
+  final bool front;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -255,18 +276,21 @@ class _BarsPainter extends CustomPainter {
       final fade = fromWeeks > 0 && t < 1 && i < entering ? t : 1.0;
       final rect = Rect.fromLTWH(left, 0, ink, size.height);
 
-      canvas.drawRRect(
-        RRect.fromRectAndCorners(
-          rect,
-          topLeft: radius,
-          topRight: radius,
-          bottomLeft: radius,
-          bottomRight: radius,
-        ),
-        fade >= 1
-            ? trackPaint
-            : (Paint()..color = track.withValues(alpha: fade)),
-      );
+      if (!front) {
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            rect,
+            topLeft: radius,
+            topRight: radius,
+            bottomLeft: radius,
+            bottomRight: radius,
+          ),
+          fade >= 1
+              ? trackPaint
+              : (Paint()..color = track.withValues(alpha: fade)),
+        );
+        continue;
+      }
 
       final sets = weeks[i].setsPerWeek;
       if (sets <= 0 || scale <= 0) continue;
@@ -309,5 +333,6 @@ class _BarsPainter extends CustomPainter {
       old.max != max ||
       old.hue != hue ||
       old.track != track ||
+      old.front != front ||
       !identical(old.weeks, weeks);
 }

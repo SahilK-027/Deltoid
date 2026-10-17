@@ -109,12 +109,12 @@ class _Years extends StatelessWidget {
                 ),
               ),
               AppCard(
-                // Shy of even at the bottom: the month strip is 18dp tall for
-                // a 14dp line, so it carries ~4dp of its own slack under the
-                // labels. Padding the full 12 there put the grid visibly high
-                // in the card.
+                // The 16 of every chart card, shy of even at the bottom: the
+                // month strip is 18dp tall for a 14dp line, so it carries ~4dp
+                // of its own slack under the labels. Padding the full 16
+                // there put the grid visibly high in the card.
                 padding: const EdgeInsets.fromLTRB(
-                    Space.md, Space.md, Space.md, Space.sm),
+                    Space.lg, Space.lg, Space.lg, Space.md),
                 child: YearHeatmap(
                   year: year,
                   days: TrainingYearDays(days),

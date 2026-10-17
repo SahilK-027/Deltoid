@@ -65,7 +65,7 @@ void main() {
     expect(series, hasLength(7));
     expect(series.first.name, 'Session 8', reason: 'newest is the blue line');
     expect(series.last.name, 'Session 2');
-    expect(find.text('Showing 7 of 9 sessions'), findsOneWidget);
+    expect(find.text('Showing 7 of 9 sessions.'), findsOneWidget);
   });
 
   testWidgets('every drawn line has its own colour, blue first',

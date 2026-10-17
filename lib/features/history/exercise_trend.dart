@@ -391,20 +391,13 @@ class _Chart extends ConsumerWidget {
           ? '${metricFormat(v, unit, measure)} held'
           : '${formatWeight(v, unit)} ${unit.label} '
               '${metricNoun(metric, measure)}',
+      // Under the plot with the zoom hint and before the legend, where every
+      // chart says what it leaves out.
+      caption: picked.total <= names.length
+          ? null
+          : 'Showing ${names.length} of ${picked.total} sessions.',
     );
-    if (picked.total <= names.length) return chart;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        chart,
-        const SizedBox(height: Space.sm),
-        Text(
-          'Showing ${names.length} of ${picked.total} sessions',
-          style: context.t.bodySmall,
-        ),
-      ],
-    );
+    return chart;
   }
 }
 
@@ -447,56 +440,48 @@ class _Summary extends ConsumerWidget {
     final sessions = {for (final p in real) p.sessionName};
     final changed = change == null ? null : formatChangePercent(change.percent);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return StatRow(
       children: [
-        Expanded(
-          child: StatTile(
-            value: best == null ? '—' : metricFormat(best, unit, measure),
-            unit: best == null || measure.isHold ? null : unit.label,
-            label: metricBestLabel(metric, measure),
-          ),
+        StatTile(
+          value: best == null ? '—' : metricFormat(best, unit, measure),
+          unit: best == null || measure.isHold ? null : unit.label,
+          label: metricBestLabel(metric, measure),
         ),
-        Expanded(
-          child: StatTile(
-            // The range is already named by the selected chip above.
-            value: changed ?? '—',
-            // Named when the chart draws more than one session, so the figure
-            // says whose line it is read off.
-            label: change == null || sessions.length < 2
-                ? 'Change'
-                : 'Change in ${change.session}',
-            // Green for gaining only, the colour the app uses for beating last
-            // time. A drop is `text`: going backwards is information rather
-            // than a fault, and red is the colour of deleting something
-            // (THEME → Lift row).
-            emphasis: changed != null && changed.startsWith('+')
-                ? c.positive
-                : null,
-          ),
+        StatTile(
+          // The range is already named by the selected chip above.
+          value: changed ?? '—',
+          // Named when the chart draws more than one session, so the figure
+          // says whose line it is read off.
+          label: change == null || sessions.length < 2
+              ? 'Change'
+              : 'Change in ${change.session}',
+          // Green for gaining only, the colour the app uses for beating last
+          // time. A drop is `text`: going backwards is information rather
+          // than a fault, and red is the colour of deleting something
+          // (THEME → Lift row).
+          emphasis:
+              changed != null && changed.startsWith('+') ? c.positive : null,
         ),
-        Expanded(
-          // "Peak" is a claim about a best that exists. With nothing scored —
-          // still loading, or never trained — the honest answer is the dash the
-          // other two tiles are already showing, not a word that reads as good
-          // news.
-          child: StatTile(
-            value: best == null
-                ? '—'
-                : stalled == 0
-                    ? 'Peak'
-                    : '$stalled',
-            label: best == null
-                ? 'Sessions since best'
-                : stalled == 0
-                    ? 'Best is the latest'
-                    : 'Session${stalled == 1 ? '' : 's'} since best',
-            // Grey, never the delete red. A run of sessions off your best is a
-            // fact about the log, not a fault: you deloaded, you were ill, you
-            // were working a different rep range. Red made an ordinary count
-            // read as an alarm.
-            emphasis: stalled >= 3 ? c.textSecondary : null,
-          ),
+        // "Peak" is a claim about a best that exists. With nothing scored —
+        // still loading, or never trained — the honest answer is the dash the
+        // other two tiles are already showing, not a word that reads as good
+        // news.
+        StatTile(
+          value: best == null
+              ? '—'
+              : stalled == 0
+                  ? 'Peak'
+                  : '$stalled',
+          label: best == null
+              ? 'Sessions since best'
+              : stalled == 0
+                  ? 'Best is the latest'
+                  : 'Session${stalled == 1 ? '' : 's'} since best',
+          // Grey, never the delete red. A run of sessions off your best is a
+          // fact about the log, not a fault: you deloaded, you were ill, you
+          // were working a different rep range. Red made an ordinary count
+          // read as an alarm.
+          emphasis: stalled >= 3 ? c.textSecondary : null,
         ),
       ],
     );

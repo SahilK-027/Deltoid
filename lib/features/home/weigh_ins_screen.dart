@@ -244,7 +244,7 @@ class _WeighIns extends ConsumerWidget {
                 // The padding Consistency's year cards use, for the reason
                 // given there: the month strip carries its own slack.
                 padding: const EdgeInsets.fromLTRB(
-                    Space.md, Space.md, Space.md, Space.sm),
+                    Space.lg, Space.lg, Space.lg, Space.md),
                 child: YearHeatmap(year: year, days: maps),
               ),
             ],
@@ -358,12 +358,14 @@ class _TrendCard extends ConsumerWidget {
     // Oldest first, which is the direction a chart reads — and the query
     // returns the window rather than the log, though on `All` those are the
     // same thing.
-    final all = ref.watch(bodyweightRangeProvider).valueOrNull;
-    if (all == null) {
-      return const AppCard(
-        child: SizedBox(height: 260, child: Center(child: SizedBox.shrink())),
-      );
-    }
+    final read = ref.watch(bodyweightRangeProvider).valueOrNull;
+    // Not read yet. The card draws in full with nothing in the chart and no
+    // figures on its axis, so it is already the height it will be: a frame of
+    // 260 in front of a card of another height moved the page when the
+    // weigh-ins arrived, and a frame that has not read the log claims nothing
+    // about it (THEME → Charts).
+    final loading = read == null;
+    final all = read ?? const <({int dayKey, double weightKg})>[];
 
     // The window is cut here rather than in the query so that changing range
     // keeps the same chart on screen and zooms it.
@@ -374,7 +376,7 @@ class _TrendCard extends ConsumerWidget {
     // The change over the range is the *log's* first and last reading, not the
     // first and last bucket: averaging is how the line is drawn, and this line
     // is a fact about two weigh-ins.
-    final delta = points.length < 2
+    final delta = loading || points.length < 2
         ? null
         : formatBodyweightDelta(
             points.last.weightKg, points.first.weightKg, unit);
@@ -435,15 +437,28 @@ class _TrendCard extends ConsumerWidget {
             DateFormat('EEE d MMM yyyy').format(dateFromDayKey(latest.dayKey)),
             style: context.t.bodyMedium,
           ),
+          // Above the chart it drives, as on every chart (THEME → Charts): under
+          // the plot it was read after the chart it had already changed.
           const SizedBox(height: Space.lg),
-          if (readings == 0)
+          TrendRangeBar(
+            window: window,
+            years: years,
+            onChanged: onWindow,
+            earliest: earliest,
+            granularity: by,
+            granularityIsAuto: granularity == null,
+            onGranularity: onGranularity,
+          ),
+          const SizedBox(height: Space.lg),
+          if (loading)
+            EmptyTrendChart(window: window, earliest: earliest)
+          else if (readings == 0)
             // The chart, empty, rather than a box where the chart was: the
             // range chips under it stay a zoom rather than a thing that
             // resizes the card. No caption: a range with no weigh-in in it is
             // an empty graph, and that is already the sentence (THEME →
             // Charts).
             EmptyTrendChart(
-              height: 190,
               window: window,
               earliest: earliest,
               scale: (unit.fromKg(scale.$1), unit.fromKg(scale.$2)),
@@ -459,7 +474,6 @@ class _TrendCard extends ConsumerWidget {
             // an exercise's chart: where you are, for the next to be read
             // against.
             TrendChart(
-              height: 190,
               window: window,
               earliest: earliest,
               series: [
@@ -483,16 +497,6 @@ class _TrendCard extends ConsumerWidget {
               tooltip: (v) => '${formatBodyweight(unit.toKg(v), unit)} '
                   '${unit.label}',
             ),
-          const SizedBox(height: Space.lg),
-          TrendRangeBar(
-            window: window,
-            years: years,
-            onChanged: onWindow,
-            earliest: earliest,
-            granularity: by,
-            granularityIsAuto: granularity == null,
-            onGranularity: onGranularity,
-          ),
         ],
       ),
     );

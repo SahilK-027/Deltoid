@@ -1701,6 +1701,42 @@ class StatTile extends StatelessWidget {
   }
 }
 
+/// [StatTile]s side by side, sharing the width equally, `Space.md` apart.
+///
+/// A row of figures under a chart is one component, not a `Row` written per
+/// card. Written per card, the tiles met edge to edge, and at a 1.3 font in a
+/// card their labels ran into each other: `Best est. 1RMChange`.
+///
+/// Start-aligned and nothing else, for the reason THEME gives the stat tile:
+/// every tile is the same shape, so the row needs no measuring. [trailing],
+/// a chevron where the row opens something, sits after the last tile.
+class StatRow extends StatelessWidget {
+  const StatRow({super.key, required this.children, this.trailing});
+
+  final List<Widget> children;
+  final Widget? trailing;
+
+  /// The gap between two figures in a row (THEME → Charts).
+  static const gap = Space.md;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (i, child) in children.indexed) ...[
+          if (i > 0) const SizedBox(width: gap),
+          Expanded(child: child),
+        ],
+        // Beside the figures rather than their labels, which is the line the
+        // row is read by.
+        if (trailing case final t?)
+          Padding(padding: const EdgeInsets.only(top: Space.xs), child: t),
+      ],
+    );
+  }
+}
+
 /// Small status pill. Tinted, never filled, unless it is the one live state on
 /// the screen.
 class Pill extends StatelessWidget {

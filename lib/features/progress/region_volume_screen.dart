@@ -200,28 +200,21 @@ class _Figures extends StatelessWidget {
     final weeks = series.weeks.length;
 
     return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: StatRow(
         children: [
-          Expanded(
-            child: StatTile(
-              value: '${series.totalSets}',
-              label: 'Hard sets',
-            ),
+          StatTile(
+            value: '${series.totalSets}',
+            label: 'Hard sets',
           ),
-          Expanded(
-            child: StatTile(
-              value: '${series.peakSets}',
-              label: 'Best week',
-            ),
+          StatTile(
+            value: '${series.peakSets}',
+            label: 'Best week',
           ),
-          Expanded(
-            child: StatTile(
-              value: '${series.weeksTrained}',
-              // The denominator is printed rather than implied: `9` alone
-              // reads as a score, and `9 of 13 weeks` is a fact.
-              label: 'Of $weeks weeks trained',
-            ),
+          StatTile(
+            value: '${series.weeksTrained}',
+            // The denominator is printed rather than implied: `9` alone
+            // reads as a score, and `9 of 13 weeks` is a fact.
+            label: 'Of $weeks weeks trained',
           ),
         ],
       ),

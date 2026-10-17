@@ -235,6 +235,7 @@ lib/
     theme/                  tokens.dart and theme.dart — the design language in code
     widgets/                primitives.dart (cards, rows, chips, sheets),
                             trend_chart.dart (the single chart widget),
+                            chart_legend.dart (the single chart legend),
                             calendar.dart (the single day picker),
                             reorder_sheet.dart, ticking.dart (all per-second rebuilds),
                             cycle_order.dart (the order of a cycle, drawn)

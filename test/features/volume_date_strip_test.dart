@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:deltoid/core/theme/theme.dart';
+import 'package:deltoid/core/widgets/trend_chart.dart';
 import 'package:deltoid/domain/chart_buckets.dart';
 import 'package:deltoid/domain/volume_history.dart';
 import 'package:deltoid/features/progress/widgets/volume_chart.dart';
@@ -76,12 +77,14 @@ void main() {
           if (w.data != null) w.data!,
       ];
 
-  /// The date labels only: the ones under the 150-high plot. The value axis
-  /// sits beside it, and a date label may be a bare number too (`2024`, `9`).
+  /// The date labels only: the ones under the plot, which is the card height
+  /// less its strip, `Space.sm` and a 16 line at 1.0. The value axis sits
+  /// beside it, and a date label may be a bare number too (`2024`, `9`).
   List<({String label, Rect rect})> stripOf(WidgetTester tester) => [
         for (final e in find.byType(Text).evaluate())
           if ((e.widget as Text).data case final d?)
-            if (tester.getRect(find.byWidget(e.widget)).top >= 150)
+            if (tester.getRect(find.byWidget(e.widget)).top >=
+                chartHeightCard - 24)
               (label: d, rect: tester.getRect(find.byWidget(e.widget))),
       ];
 

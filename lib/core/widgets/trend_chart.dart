@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 
 import '../../domain/chart_buckets.dart';
 import '../../domain/chart_density.dart';
+import '../../domain/chart_legend.dart';
 import '../../domain/cycle_progress.dart';
 import '../../domain/date_axis.dart';
 import '../../domain/enums.dart';
 import '../../domain/value_axis.dart';
 import '../ids.dart';
 import '../theme/tokens.dart';
+import 'chart_legend.dart';
 import 'phase_sparkline.dart';
 import 'primitives.dart';
 
@@ -125,6 +127,19 @@ class TrendWindow {
   @override
   int get hashCode => Object.hash(range, year, isAll);
 }
+
+// ─── Heights ────────────────────────────────────────────────────────────────
+
+/// The two heights a line chart is drawn at (THEME → Charts), each the plot
+/// and its labels together, so two charts of one height take the same room.
+///
+/// A chart that is the subject of its screen: the exercise trend, and the
+/// bodyweight trend on Weigh-ins.
+const chartHeightFull = 220.0;
+
+/// A chart in a card among other cards: the Strength card's cycle axis, and
+/// the region volume chart, a bar chart held to the same height.
+const chartHeightCard = 150.0;
 
 // ─── Gridlines ─────────────────────────────────────────────────────────────
 
@@ -269,7 +284,10 @@ class TrendRangeBar extends StatelessWidget {
               children: [
                 if (years.isNotEmpty) ...[
                   AppChip(
-                    label: '${window.year ?? years.first}',
+                    // `Year` until a year is applied. Printing the newest year
+                    // while a rolling range is in force read as that year being
+                    // the one on the chart, and on a stale log as last year's.
+                    label: window.year == null ? 'Year' : '${window.year}',
                     icon: Icons.calendar_today_rounded,
                     selected: window.year != null,
                     caret: true,
@@ -417,7 +435,7 @@ class TrendChart extends StatefulWidget {
     this.earliest,
     this.tooltip,
     this.yRange,
-    this.height = 220,
+    this.caption,
     this.minStep = 0,
     this.minSpan = 0,
     this.minSpanFraction = 0,
@@ -444,7 +462,10 @@ class TrendChart extends StatefulWidget {
   /// The whole tooltip line, unit and all. Null disables touch entirely.
   final String Function(double value)? tooltip;
 
-  final double height;
+  /// A line under the plot about what it leaves out, such as `Showing 7 of 9
+  /// sessions.` It sits where the zoom hint does, before the legend, so a
+  /// chart explains itself in one place (THEME → Charts).
+  final String? caption;
 
   /// The band the value axis covers, when the caller knows better than the
   /// spots do.
@@ -561,7 +582,6 @@ class _TrendChartState extends State<TrendChart>
     // The line being drawn: the one held from before the range changed while it
     // is still travelling, the real one once it has arrived.
     final series = _held ?? widget.series;
-    final height = widget.height;
     final formatValue = widget.formatValue;
     final tooltip = widget.tooltip;
     final window = widget.window;
@@ -601,6 +621,7 @@ class _TrendChartState extends State<TrendChart>
       minSpanFraction: widget.minSpanFraction,
     );
     final valueTitles = _valueTitles(context, yAxis);
+    final topTitles = _topTitles(context);
     OffScale? offScaleAt(int bar, int index) => switch (readingAt[bar][index]) {
           final k? => yAxis.offScaleAt(bar, k),
           null => null,
@@ -655,7 +676,7 @@ class _TrendChartState extends State<TrendChart>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: height,
+          height: chartHeightFull,
           child: Builder(builder: (context) {
           // The axis describes what is on screen rather than the window. After
           // a pinch the two differ, and labels that continue to describe the
@@ -720,7 +741,7 @@ class _TrendChartState extends State<TrendChart>
               gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(),
+                topTitles: topTitles,
                 leftTitles: const AxisTitles(),
                 // Right-hand Y labels (THEME → Components): the left gutter is where the
                 // eye starts a row, and spending it on an axis pushes the plot
@@ -793,34 +814,21 @@ class _TrendChartState extends State<TrendChart>
         // closer than [markerSpacing] the circles touch and the shape being
         // examined is obscured by the points composing it, so the markers are
         // dropped and the gesture is labelled instead.
-        if (dense) ...[
-          const SizedBox(height: Space.sm),
-          Text(
-            'Pinch to zoom and drag to pan.',
-            style: context.t.bodySmall?.copyWith(color: c.textTertiary),
-          ),
-        ],
+        _Notes([
+          if (dense) 'Pinch to zoom and drag to pan.',
+          ?widget.caption,
+        ]),
         if (series.length > 1) ...[
           const SizedBox(height: Space.md),
-          Wrap(
-            spacing: Space.lg,
-            runSpacing: Space.sm,
-            children: [
-              for (final s in series)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration:
-                          BoxDecoration(color: s.color, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: Space.sm),
-                    Text(s.name, style: context.t.bodySmall),
-                  ],
-                ),
-            ],
+          ChartLegend(
+            entries: _seriesLegend(
+              series,
+              // One pixel of the plot, in the units of its value axis.
+              tolerance: (yAxis.max - yAxis.min) /
+                  (chartHeightFull -
+                      xLabelStrip(context) -
+                      topLabelReserve(context)),
+            ),
           ),
         ],
       ],
@@ -848,7 +856,6 @@ class EmptyTrendChart extends StatelessWidget {
     this.message,
     this.scale,
     this.formatValue,
-    this.height = 220,
     this.minStep = 0,
     this.minSpan = 0,
     this.minSpanFraction = 0,
@@ -881,8 +888,6 @@ class EmptyTrendChart extends StatelessWidget {
 
   /// A y value as it should be read, exactly as [TrendChart.formatValue].
   final String Function(double value)? formatValue;
-
-  final double height;
 
   /// As [TrendChart.minStep], [TrendChart.minSpan] and
   /// [TrendChart.minSpanFraction], so the empty chart draws the band the
@@ -917,7 +922,7 @@ class EmptyTrendChart extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: height,
+          height: chartHeightFull,
           child: LayoutBuilder(builder: (context, box) {
           final valueTitles = _valueTitles(context, yAxis, printed: labelled);
           final axis = DateAxis.line(
@@ -941,7 +946,7 @@ class EmptyTrendChart extends StatelessWidget {
               gridData: _gridOf(yAxis, c.border),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(),
+                topTitles: _topTitles(context),
                 leftTitles: const AxisTitles(),
                 // Held open even when there is nothing to write in it, so the
                 // plot does not widen the moment data lands.
@@ -954,13 +959,7 @@ class EmptyTrendChart extends StatelessWidget {
           );
           }),
         ),
-        if (message != null) ...[
-          const SizedBox(height: Space.sm),
-          Text(
-            message!,
-            style: context.t.bodySmall?.copyWith(color: c.textTertiary),
-          ),
-        ],
+        _Notes([?message]),
       ],
     );
   }
@@ -987,15 +986,10 @@ class EmptyTrendChart extends StatelessWidget {
 /// reported as overflowing, so the axis quietly reads `20` and nothing raises a
 /// word about it. See [_valueTitles].
 ///
-/// Public because the bar chart measures its gutter the same way. [gap] is the
-/// room a chart puts between the plot and its labels: `fl_chart`'s side title
-/// spends `Space.xs` of the reserved size on it, and the bar chart lays the
-/// same gap out beside the gutter rather than inside it, so passes none.
-double axisGutter(
-  BuildContext context,
-  Iterable<String> labels, {
-  double gap = Space.xs,
-}) {
+/// Public because the bar chart measures its gutter the same way, and lays its
+/// labels out in the same box: the gap between the plot and its labels is
+/// `Space.xs` of the reserved size on every chart, line or bar.
+double axisGutter(BuildContext context, Iterable<String> labels) {
   final style = context.t.bodySmall;
   // Measured at the size the label will actually be drawn at. Without the
   // scaler this reserves room for 1.0 and the label renders at whatever the
@@ -1013,8 +1007,105 @@ double axisGutter(
   }
   // The label, the gap before it, and a point of air so a rounded glyph does
   // not touch the card's padding.
-  return widest + gap + 2;
+  return widest + Space.xs + 2;
 }
+
+/// The strip under a plot that its x labels print in: one line of `label` at
+/// the size it is drawn, system font scale included, and `Space.sm` between
+/// it and the baseline.
+///
+/// One measurement for every chart. The line charts reserved a fixed 30 and
+/// the bar chart a fixed 16 placed 8 below, which at a 1.3 font its labels
+/// overflowed.
+double xLabelStrip(BuildContext context) =>
+    Space.sm + labelLineHeight(context);
+
+/// The room over a plot's top gridline: half its value label's line, drawn at
+/// the size and scale it is printed at, and 2 more, so the top value never
+/// touches what sits over the chart. At 1.0 that is 10.
+double topLabelReserve(BuildContext context) => labelLineHeight(context) / 2 + 2;
+
+/// One line of `label` at the size it is drawn, system font scale included.
+///
+/// Public because the bar chart centres its value labels on their gridlines
+/// by it.
+double labelLineHeight(BuildContext context) {
+  final painter = TextPainter(
+    text: TextSpan(text: '0', style: context.t.bodySmall),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final height = painter.height;
+  painter.dispose();
+  return height;
+}
+
+/// Titles over the plot that draw nothing and reserve [topLabelReserve].
+///
+/// Shown, because `fl_chart` reserves no room for titles that are hidden: the
+/// 10 the cycle axis used to ask for that way was never given, and at a 1.3
+/// font its top value sat against the readout over the chart.
+AxisTitles _topTitles(BuildContext context) => AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: topLabelReserve(context),
+        getTitlesWidget: (_, _) => const SizedBox.shrink(),
+      ),
+    );
+
+/// The lines under a plot that explain it: the zoom hint, a caption about
+/// what is left out, or why an empty range is empty. `Space.sm` under the plot
+/// and 2 apart, in `label` `textTertiary`, so every chart says these things in
+/// one place and one voice.
+class _Notes extends StatelessWidget {
+  const _Notes(this.lines);
+
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    if (lines.isEmpty) return const SizedBox.shrink();
+    final style = context.t.bodySmall?.copyWith(color: context.c.textTertiary);
+    return Padding(
+      padding: const EdgeInsets.only(top: Space.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (i, line) in lines.indexed) ...[
+            if (i > 0) const SizedBox(height: Space.xxs),
+            Text(line, style: style),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The key to a trend chart's lines, one entry per line on screen.
+///
+/// Two series drawn on top of each other are one line, the later one over the
+/// earlier, so they are keyed once in the colour on top under both names:
+/// `Push 1 and Push 2`. Keying both named a line nobody could see.
+/// [tolerance] is a pixel in the value axis's units, the nearest two lines can
+/// be and still be seen as two.
+List<LegendEntry> _seriesLegend(
+  List<TrendSeries> series, {
+  required double tolerance,
+}) =>
+    [
+      for (final group in identicalSeries(
+        [
+          for (final s in series)
+            [for (final p in s.spots) (p.x, p.isNull() ? null : p.y)],
+        ],
+        tolerance: tolerance,
+      ))
+        LegendEntry(
+          joinNames([for (final i in group) series[i].name]),
+          series[group.last].color,
+          mark: LegendMark.line,
+        ),
+    ];
 
 /// The gridlines of [axis], and no others, dashed in [colour].
 ///
@@ -1105,7 +1196,7 @@ class OffScaleCaret extends FlDotPainter {
 /// carry no label.
 SideTitles _dateTitles(BuildContext context, DateAxis axis) => SideTitles(
   showTitles: true,
-  reservedSize: 30,
+  reservedSize: xLabelStrip(context),
   interval: axis.interval,
   minIncluded: false,
   maxIncluded: false,
@@ -1114,7 +1205,7 @@ SideTitles _dateTitles(BuildContext context, DateAxis axis) => SideTitles(
     if (label == null) return const SizedBox.shrink();
     return SideTitleWidget(
       meta: meta,
-      space: Space.xs,
+      space: Space.sm,
       child: Text(label, style: context.t.bodySmall, maxLines: 1),
     );
   },
@@ -1316,7 +1407,7 @@ class CycleAxisChart extends StatelessWidget {
         );
 
         return SizedBox(
-      height: height ?? (small ? 64 : 150),
+      height: height ?? (small ? 64 : chartHeightCard),
       child: LineChart(
         duration: Motion.base,
         curve: Motion.emphasized,
@@ -1389,20 +1480,8 @@ class CycleAxisChart extends StatelessWidget {
           titlesData: FlTitlesData(
             // Not a title: the room the topmost value label needs, which sits
             // on the upper bound and would otherwise be drawn half outside the
-            // chart's own box. Measured, because the label grows with the
-            // system font. Titles that are shown and draw nothing, because
-            // `fl_chart` reserves no room for titles that are hidden: the 10
-            // this used to ask for was never given, and at a 1.3 font the top
-            // value sat against the readout over the chart.
-            topTitles: small
-                ? const AxisTitles()
-                : AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: _topReserve(context),
-                      getTitlesWidget: (_, _) => const SizedBox.shrink(),
-                    ),
-                  ),
+            // chart's own box. See [topLabelReserve].
+            topTitles: small ? const AxisTitles() : _topTitles(context),
             leftTitles: const AxisTitles(),
             rightTitles: small
                 ? const AxisTitles()
@@ -1416,7 +1495,7 @@ class CycleAxisChart extends StatelessWidget {
                 : AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 30,
+                      reservedSize: xLabelStrip(context),
                       interval: 1,
                       getTitlesWidget: (value, meta) {
                         final i = value.round();
@@ -1499,12 +1578,19 @@ class CycleAxisChart extends StatelessWidget {
                       TouchedSpotIndicatorData(
                         FlLine(color: c.border, strokeWidth: 1),
                         FlDotData(
-                          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
-                            radius: 4.5,
-                            color: c.progress,
-                            strokeWidth: 2,
-                            strokeColor: c.progress,
-                          ),
+                          // Under the finger as it will be once lifted: an
+                          // open cycle keeps its grey.
+                          getDotPainter: (spot, _, _, _) {
+                            final ink = drawn[spot.x.round()]?.isOpen ?? false
+                                ? c.textTertiary
+                                : c.progress;
+                            return FlDotCirclePainter(
+                              radius: 4.5,
+                              color: ink,
+                              strokeWidth: 2,
+                              strokeColor: ink,
+                            );
+                          },
                         ),
                       ),
                   ],
@@ -1581,11 +1667,15 @@ class CycleAxisChart extends StatelessWidget {
                   }
                   final cycle = drawn[spot.x.round()]!;
                   final isSelected = cycle.cycleId == selected;
+                  // Selected is filled and open is grey, and an open cycle
+                  // that is selected is both: filled in its own grey. Filled
+                  // `progress`, it lost the one mark saying it is unfinished.
+                  final ink = cycle.isOpen ? c.textTertiary : c.progress;
                   return FlDotCirclePainter(
                     radius: isSelected ? 4.5 : 3.5,
-                    color: isSelected ? c.progress : c.bg,
+                    color: isSelected ? ink : c.bg,
                     strokeWidth: 2,
-                    strokeColor: cycle.isOpen ? c.textTertiary : c.progress,
+                    strokeColor: ink,
                   );
                 },
               ),
@@ -1669,21 +1759,6 @@ typedef _Tint = ({PhaseKind kind, double from, double to});
 /// into every second one on an ordinary phone, which is half an axis thrown
 /// away to buy space nobody needed.
 const _labelGap = 6.0;
-
-/// The room over the cycle axis's top gridline: half its label's line, drawn
-/// at the size and scale it is printed at, and 2 more. At 1.0 that is the 10
-/// this used to fix, and the gap to whatever sits over the chart stays the
-/// same at every font scale.
-double _topReserve(BuildContext context) {
-  final painter = TextPainter(
-    text: TextSpan(text: '0', style: context.t.bodySmall),
-    textDirection: Directionality.of(context),
-    textScaler: MediaQuery.textScalerOf(context),
-  )..layout();
-  final half = painter.height / 2;
-  painter.dispose();
-  return half + 2;
-}
 
 /// One string, at the size and scale it will be drawn at.
 double _measure(BuildContext context, String text) {

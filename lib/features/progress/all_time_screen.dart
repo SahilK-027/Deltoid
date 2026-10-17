@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/chart_legend.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/trend_chart.dart';
 import '../../data/repositories/training_repository.dart';
@@ -137,36 +138,36 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
           const _MonthRow(),
           const SizedBox(height: Space.xs),
           _WeekStrip(weeks: weeks ?? const [], regimes: byId),
-          const SizedBox(height: Space.lg),
+          const SizedBox(height: Space.md),
           // Two legends, not one. A regime's colour, a deload and a week off
           // are three different kinds of fact, and a single row of swatches
           // invites the reader to take the orange one for a seventh programme.
-          _LegendGroup(
+          ChartLegend(
             title: 'Regimes',
-            children: [
+            entries: [
               for (final id in used)
-                _LegendSwatch(
-                  colour: byId[id] == null
+                LegendEntry(
+                  byId[id]?.name ?? 'Deleted programme',
+                  byId[id] == null
                       ? c.textTertiary
                       : c.identityAt(byId[id]!.identityIndex),
-                  label: byId[id]?.name ?? 'Deleted programme',
                 ),
             ],
           ),
           if (trained.any((w) => w.isDeload) ||
               (weeks ?? const []).any((w) => w.isOff)) ...[
-            const SizedBox(height: Space.md),
-            _LegendGroup(
+            const SizedBox(height: Space.sm),
+            ChartLegend(
               title: 'Weeks',
-              children: [
+              entries: [
                 if (trained.any((w) => w.isDeload))
-                  _LegendSwatch(colour: c.deload, label: 'Deload'),
+                  LegendEntry('Deload', c.deload),
                 if ((weeks ?? const []).any((w) => w.isOff))
-                  _LegendSwatch(colour: c.heatEmpty, label: 'Week off'),
+                  LegendEntry('Week off', c.heatEmpty),
               ],
             ),
           ],
-          const SizedBox(height: Space.md),
+          const SizedBox(height: Space.lg),
           const Divider(),
           _RunsFold(
             year: year,
@@ -307,56 +308,6 @@ class _WeekStrip extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-/// A titled group of swatches.
-class _LegendGroup extends StatelessWidget {
-  const _LegendGroup({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: context.t.labelSmall?.copyWith(color: context.c.textTertiary),
-        ),
-        const SizedBox(height: Space.sm),
-        Wrap(spacing: Space.lg, runSpacing: Space.sm, children: children),
-      ],
-    );
-  }
-}
-
-class _LegendSwatch extends StatelessWidget {
-  const _LegendSwatch({required this.colour, required this.label});
-
-  final Color colour;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: colour,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: Space.xs),
-        Text(label, style: context.t.labelSmall),
-      ],
     );
   }
 }
@@ -569,7 +520,7 @@ class _RegimeCard extends ConsumerWidget {
             style: context.t.bodyMedium,
           ),
           if (window != null && progress!.progress.latest != null) ...[
-            const SizedBox(height: Space.md),
+            const SizedBox(height: Space.lg),
             CycleAxisChart(
               points: window.points,
               plotted: window.plotted,
@@ -578,28 +529,24 @@ class _RegimeCard extends ConsumerWidget {
               small: true,
             ),
           ],
-          const SizedBox(height: Space.md),
+          const SizedBox(height: Space.lg),
           const Divider(),
           const SizedBox(height: Space.md),
-          Row(
+          StatRow(
             children: [
-              Expanded(
-                child: StatTile(
-                  value: progress?.progress.percent == null
-                      ? '——'
-                      : formatCycleValue(progress!.progress.percent!),
-                  unit: '%',
-                  label: 'Stronger overall',
-                ),
+              StatTile(
+                value: progress?.progress.percent == null
+                    ? '——'
+                    : formatCycleValue(progress!.progress.percent!),
+                unit: '%',
+                label: 'Stronger overall',
               ),
-              Expanded(
-                child: StatTile(
-                  value: progress == null || progress.progress.liftsCompared == 0
-                      ? '—'
-                      : '${progress.progress.liftsImproved} of '
-                          '${progress.progress.liftsCompared}',
-                  label: 'Lifts improved',
-                ),
+              StatTile(
+                value: progress == null || progress.progress.liftsCompared == 0
+                    ? '—'
+                    : '${progress.progress.liftsImproved} of '
+                        '${progress.progress.liftsCompared}',
+                label: 'Lifts improved',
               ),
             ],
           ),

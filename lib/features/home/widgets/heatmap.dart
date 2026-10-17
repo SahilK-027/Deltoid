@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/chart_legend.dart';
 import '../heatmap_data.dart';
 import '../home_providers.dart';
 
@@ -234,44 +235,17 @@ class HeatmapLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    Widget swatch(Color color, {Color? border}) => Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-            border: border == null ? null : Border.all(color: border),
-          ),
-        );
-
-    if (_weighIns) {
-      return Row(
-        children: [
-          swatch(c.heatEmpty),
-          const SizedBox(width: Space.xs),
-          Text('No weigh-in', style: context.t.labelSmall),
-          const SizedBox(width: Space.lg),
-          swatch(c.weighIn),
-          const SizedBox(width: Space.xs),
-          Text('Weighed', style: context.t.labelSmall),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        swatch(c.heatEmpty),
-        const SizedBox(width: Space.xs),
-        Text('Rest', style: context.t.labelSmall),
-        const SizedBox(width: Space.lg),
-        swatch(c.progress),
-        const SizedBox(width: Space.xs),
-        Text('Trained', style: context.t.labelSmall),
-        const SizedBox(width: Space.lg),
-        swatch(c.deload),
-        const SizedBox(width: Space.xs),
-        Text('Deload', style: context.t.labelSmall),
-      ],
+    return ChartLegend(
+      entries: _weighIns
+          ? [
+              LegendEntry('No weigh-in', c.heatEmpty),
+              LegendEntry('Weighed', c.weighIn),
+            ]
+          : [
+              LegendEntry('Rest', c.heatEmpty),
+              LegendEntry('Trained', c.progress),
+              LegendEntry('Deload', c.deload),
+            ],
     );
   }
 }
