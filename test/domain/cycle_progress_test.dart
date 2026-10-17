@@ -703,6 +703,70 @@ void main() {
     });
   });
 
+  group('timeline keys', () {
+    const live = {'ul': (name: 'Upper lower', identityIndex: 2)};
+    const deleted = {'ppl': 'Push pull legs', 'fb': 'Full body', 'old': '  '};
+
+    test('a live regime is named and wears its own colour', () {
+      final key = timelineKeyOf('ul', live: live, deleted: deleted);
+      expect(key.label, 'Upper lower');
+      expect(key.identityIndex, 2);
+      expect(key.isDeleted, isFalse);
+    });
+
+    test('a deleted regime keeps the name its tombstone holds, in grey', () {
+      final key = timelineKeyOf('ppl', live: live, deleted: deleted);
+      expect(key.label, 'Push pull legs (deleted)');
+      expect(key.name, 'Push pull legs');
+      expect(key.suffix, ' (deleted)');
+      expect(key.isDeleted, isTrue);
+    });
+
+    test('only a regime with no name to read is a deleted programme', () {
+      expect(
+        timelineKeyOf('gone', live: live, deleted: deleted).label,
+        deletedProgrammeLabel,
+      );
+      expect(
+        timelineKeyOf('old', live: live, deleted: deleted).label,
+        deletedProgrammeLabel,
+      );
+    });
+
+    test('two deleted regimes are told apart by name', () {
+      final keys = timelineLegendKeys(
+        ['ppl', 'ul', 'fb'],
+        live: live,
+        deleted: deleted,
+      );
+      expect(
+        keys.map((k) => k.label),
+        ['Push pull legs (deleted)', 'Upper lower', 'Full body (deleted)'],
+      );
+    });
+
+    test('regimes whose names are lost share one legend entry', () {
+      final keys = timelineLegendKeys(
+        ['gone', 'ul', 'old', 'lost'],
+        live: live,
+        deleted: deleted,
+      );
+      expect(
+        keys.map((k) => k.label),
+        [deletedProgrammeLabel, 'Upper lower'],
+      );
+    });
+
+    test('two deleted regimes of one name are keyed once', () {
+      final keys = timelineLegendKeys(
+        ['a', 'b'],
+        live: const {},
+        deleted: const {'a': 'Push pull legs', 'b': 'Push pull legs'},
+      );
+      expect(keys.map((k) => k.label), ['Push pull legs (deleted)']);
+    });
+  });
+
   group('the years a stepper offers', () {
     test('run from the first ISO year to the last', () {
       expect(

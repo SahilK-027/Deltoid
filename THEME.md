@@ -1409,7 +1409,13 @@ from thirty queries to answer a question about one of them.
   it, so the strip still holds them, and `surfaceHighest` is deliberately the
   same tone as `heatEmpty` — drawn in it, a week trained on a programme since
   deleted was indistinguishable from a week nothing was trained in. They take
-  `textTertiary`, and the legend names them.
+  `textTertiary`.
+- **A deleted programme is named, not counted.** The identity hues are a closed
+  set of six held by live regimes, so every deleted one shares the grey and its
+  name has to tell it apart. The legend and the run list read the name its
+  tombstone kept, as `Push pull legs (deleted)`, keyed once per name. Only a
+  programme with no name to read falls back to `Deleted programme`, and however
+  many there are, the legend keys them once.
 - **Two legends, never one.** A regime's colour and a week's state are different
   kinds of fact, and one row of swatches invites the reader to take the orange
   one for a seventh programme. `Regimes` lists only those trained in the year on

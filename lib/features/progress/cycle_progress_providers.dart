@@ -59,6 +59,13 @@ final liveRegimesProvider =
   return ref.watch(trainingRepositoryProvider).watchLiveRegimes();
 });
 
+/// The names deleted regimes held, by id, so the timeline can still name the
+/// weeks their workouts fill.
+final deletedRegimeNamesProvider =
+    StreamProvider.autoDispose<Map<String, String>>((ref) {
+  return ref.watch(trainingRepositoryProvider).watchDeletedRegimeNames();
+});
+
 /// The ISO years the timeline's stepper can move between.
 final trainedYearsProvider = StreamProvider.autoDispose<List<int>>((ref) {
   final overview = ref.watch(historyOverviewProvider).valueOrNull;

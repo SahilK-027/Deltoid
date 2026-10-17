@@ -182,10 +182,11 @@ void main() {
 
     await pump(tester);
 
-    // Named, because the strip still holds its weeks: the workouts survive the
-    // programme. And drawn in a grey that is not the empty grey — the two say
-    // different things.
-    expect(find.text('Deleted programme'), findsWidgets);
+    // Named by the name its tombstone kept, because the strip still holds its
+    // weeks: the workouts survive the programme. And drawn in a grey that is
+    // not the empty grey — the two say different things.
+    expect(find.text('${regime.name} (deleted)'), findsWidgets);
+    expect(find.text('Deleted programme'), findsNothing);
     final colours = tester
         .widgetList<DecoratedBox>(find.byType(DecoratedBox))
         .map((d) => d.decoration)

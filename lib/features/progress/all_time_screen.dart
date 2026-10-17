@@ -23,10 +23,11 @@ class AllTimeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final regimes = ref.watch(liveRegimesProvider).valueOrNull;
     final years = ref.watch(trainedYearsProvider).valueOrNull;
+    final deleted = ref.watch(deletedRegimeNamesProvider).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Regimes')),
-      body: regimes == null || years == null
+      body: regimes == null || years == null || deleted == null
           ? const SizedBox.shrink()
           : ListView(
               padding: const EdgeInsets.fromLTRB(
@@ -38,7 +39,11 @@ class AllTimeScreen extends ConsumerWidget {
               children: [
                 if (years.isNotEmpty) ...[
                   const SectionHeader('Timeline'),
-                  _TimelineCard(years: years, regimes: regimes),
+                  _TimelineCard(
+                    years: years,
+                    regimes: regimes,
+                    deleted: deleted,
+                  ),
                   const SizedBox(height: Space.section),
                 ],
                 const SectionHeader('Strength by regime'),
@@ -63,10 +68,17 @@ class AllTimeScreen extends ConsumerWidget {
 /// strips a reader has to find their way down, drawn from thirty queries, to
 /// answer a question about one of them.
 class _TimelineCard extends ConsumerStatefulWidget {
-  const _TimelineCard({required this.years, required this.regimes});
+  const _TimelineCard({
+    required this.years,
+    required this.regimes,
+    required this.deleted,
+  });
 
   final List<int> years;
   final List<RegimeMark> regimes;
+
+  /// The names deleted regimes held, by id.
+  final Map<String, String> deleted;
 
   @override
   ConsumerState<_TimelineCard> createState() => _TimelineCardState();
@@ -91,6 +103,12 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
     final index = widget.years.indexOf(year);
     final weeks = ref.watch(timelineYearProvider(year)).valueOrNull;
     final byId = {for (final r in widget.regimes) r.id: r};
+    final live = {
+      for (final r in widget.regimes)
+        r.id: (name: r.name, identityIndex: r.identityIndex),
+    };
+    TimelineKey keyOf(String id) =>
+        timelineKeyOf(id, live: live, deleted: widget.deleted);
 
     final trained = weeks == null
         ? const <TimelineWeek>[]
@@ -145,13 +163,12 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
           ChartLegend(
             title: 'Regimes',
             entries: [
-              for (final id in used)
-                LegendEntry(
-                  byId[id]?.name ?? 'Deleted programme',
-                  byId[id] == null
-                      ? c.textTertiary
-                      : c.identityAt(byId[id]!.identityIndex),
-                ),
+              for (final key in timelineLegendKeys(
+                used,
+                live: live,
+                deleted: widget.deleted,
+              ))
+                LegendEntry(key.label, _keyColour(c, key)),
             ],
           ),
           if (trained.any((w) => w.isDeload) ||
@@ -174,12 +191,19 @@ class _TimelineCardState extends ConsumerState<_TimelineCard> {
             open: _runsOpen,
             onToggle: () => setState(() => _runsOpen = !_runsOpen),
             runs: timelineRuns(weeks ?? const []),
-            regimes: byId,
+            keyOf: keyOf,
           ),
         ],
       ),
     );
   }
+}
+
+/// A regime's swatch: its identity hue, or for one since deleted the one grey
+/// that is not the empty grey of a week off.
+Color _keyColour(DeltoidColors c, TimelineKey key) {
+  final index = key.identityIndex;
+  return index == null ? c.textTertiary : c.identityAt(index);
 }
 
 /// One arrow of the year stepper. Disabled rather than absent at each end, so
@@ -319,14 +343,14 @@ class _RunsFold extends StatelessWidget {
     required this.open,
     required this.onToggle,
     required this.runs,
-    required this.regimes,
+    required this.keyOf,
   });
 
   final int year;
   final bool open;
   final VoidCallback onToggle;
   final List<TimelineRun> runs;
-  final Map<String, RegimeMark> regimes;
+  final TimelineKey Function(String regimeId) keyOf;
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +394,7 @@ class _RunsFold extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final run in runs) ...[
-                      _RunRow(run: run, regime: regimes[run.regimeId]),
+                      _RunRow(run: run, regime: keyOf(run.regimeId)),
                       const SizedBox(height: Space.md),
                     ],
                   ],
@@ -385,7 +409,7 @@ class _RunRow extends StatelessWidget {
   const _RunRow({required this.run, required this.regime});
 
   final TimelineRun run;
-  final RegimeMark? regime;
+  final TimelineKey regime;
 
   @override
   Widget build(BuildContext context) {
@@ -410,9 +434,7 @@ class _RunRow extends StatelessWidget {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: regime == null
-                  ? c.textTertiary
-                  : c.identityAt(regime!.identityIndex),
+              color: _keyColour(c, regime),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -424,13 +446,26 @@ class _RunRow extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  // The name shortens and the suffix does not: `(deleted)` is
+                  // the one word telling the row apart from a live programme.
                   Expanded(
-                    child: Text(
-                      regime?.name ?? 'Deleted programme',
-                      style: context.t.bodyMedium
-                          ?.copyWith(color: c.textPrimary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            regime.name,
+                            style: context.t.bodyMedium
+                                ?.copyWith(color: c.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          regime.suffix,
+                          style: context.t.bodyMedium
+                              ?.copyWith(color: c.textPrimary),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: Space.sm),

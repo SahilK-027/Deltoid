@@ -910,6 +910,74 @@ List<TimelineRun> timelineRuns(List<TimelineWeek> weeks) {
   return runs;
 }
 
+/// The name the timeline prints for a regime whose own name cannot be read.
+const deletedProgrammeLabel = 'Deleted programme';
+
+/// A regime as the timeline keys it: the words its legend entry and run rows
+/// print, and the identity colour it wears.
+class TimelineKey {
+  const TimelineKey(this.name, {this.identityIndex, this.suffix = ''});
+
+  /// The regime's own name, or [deletedProgrammeLabel] where none survives.
+  final String name;
+
+  /// ` (deleted)` after the name of a deleted regime, kept apart so a row that
+  /// has to shorten a long name can shorten the name and keep the suffix.
+  final String suffix;
+
+  String get label => '$name$suffix';
+
+  /// The identity slot of a live regime. Null for one since deleted, which is
+  /// drawn in grey: the six identity hues are a closed set held by live
+  /// regimes, so the name, not the colour, tells two deleted ones apart.
+  final int? identityIndex;
+
+  bool get isDeleted => identityIndex == null;
+}
+
+/// What the timeline calls [regimeId].
+///
+/// A live regime by its name, in its own colour. A deleted one by the name its
+/// tombstone kept, as `Push pull legs (deleted)`. Only a regime with no name to
+/// read — no row at all, or a blank one — falls back to
+/// [deletedProgrammeLabel].
+TimelineKey timelineKeyOf(
+  String regimeId, {
+  required Map<String, ({String name, int identityIndex})> live,
+  required Map<String, String> deleted,
+}) {
+  final mark = live[regimeId];
+  if (mark != null) {
+    return TimelineKey(mark.name, identityIndex: mark.identityIndex);
+  }
+  final name = deleted[regimeId]?.trim() ?? '';
+  return name.isEmpty
+      ? const TimelineKey(deletedProgrammeLabel)
+      : TimelineKey(name, suffix: ' (deleted)');
+}
+
+/// The `Regimes` legend for the year whose strip trains [used], in the order
+/// they first appear.
+///
+/// One entry per live regime. A deleted one is keyed once per name rather than
+/// once per id: every deleted regime is the same grey, so two entries reading
+/// alike would name one swatch twice. Those whose names are lost therefore
+/// share a single [deletedProgrammeLabel] entry.
+List<TimelineKey> timelineLegendKeys(
+  Iterable<String> used, {
+  required Map<String, ({String name, int identityIndex})> live,
+  required Map<String, String> deleted,
+}) {
+  final keys = <TimelineKey>[];
+  final deletedLabels = <String>{};
+  for (final id in used) {
+    final key = timelineKeyOf(id, live: live, deleted: deleted);
+    if (key.isDeleted && !deletedLabels.add(key.label)) continue;
+    keys.add(key);
+  }
+  return keys;
+}
+
 /// The ISO years a log spanning [firstDayKey] to [lastDayKey] covers, earliest
 /// first.
 ///

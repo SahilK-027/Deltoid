@@ -2736,6 +2736,23 @@ class TrainingRepository {
   Stream<List<RegimeMark>> watchLiveRegimes() =>
       db.watchQuery([db.regimes], liveRegimes);
 
+  /// The name each deleted regime held when it was deleted, by id.
+  ///
+  /// A delete is a tombstone, never a hard delete, and `name` is not nullable,
+  /// so the row keeps it locally and through sync. The timeline reads it to
+  /// name a deleted programme's weeks rather than calling every one of them
+  /// `Deleted programme`.
+  Future<Map<String, String>> deletedRegimeNames() async {
+    final rows = await (db.select(db.regimes)
+          ..where((t) => t.deletedAt.isNotNull()))
+        .get();
+    return {for (final r in rows) r.id: r.name};
+  }
+
+  /// [deletedRegimeNames], re-read when a programme is deleted.
+  Stream<Map<String, String>> watchDeletedRegimeNames() =>
+      db.watchQuery([db.regimes], deletedRegimeNames);
+
   /// Every lift the programme holds: each exercise in each session, with the
   /// names a screen prints, in programme order.
   ///
