@@ -87,6 +87,12 @@ Inverts, never tinted. `bg #F4F4F4` · `surface #FFFFFF` · `surfaceHigh #EDEDED
 · `surfaceHighest #E0E0E0` · `border #E4E4E4` · text `#111111 / #5F5F5F /
 #8C8C8C` · `accent #111111` with white labels.
 
+`heatEmpty` is lighter than `surfaceHighest` here, at `#E8E8E8`. At `#E0E0E0` the
+tracks behind a year of volume bars read as a grey block on a white card, and
+the bars as cut out of it. Lighter still and a rest day stops being visible as
+a cell: `#E8E8E8` is the lightest grey that keeps 1.2:1 against `surface`, which
+`test/core/light_theme_test.dart` holds it to.
+
 ### The hues
 
 **Eight, plus one red.** `pink #FF7F9F` · `cyan #77D4E3` · `yellow #FFD15E` ·
@@ -147,7 +153,7 @@ shout where the others may not: a destructive action.
 | `bulk`        | lavender                                              | A bulk, as a tint on the Phase card and the cycle chart  |
 | `cut`         | cyan                                                  | A cut, as a tint on the Phase card and the cycle chart   |
 | `maintenance` | `textSecondary`                                       | Maintenance, as a tint on the same two charts            |
-| `heatEmpty`   | `surfaceHighest`                                      | A day not trained, and an untrained muscle               |
+| `heatEmpty`   | `surfaceHighest` in dark, `#E8E8E8` in light          | A day not trained, and an untrained muscle               |
 
 **The identity order alternates warm and cool.** The muscle regions draw in this
 order as a stack of bars, one per row, and two warm hues on adjacent rows read
@@ -1009,6 +1015,18 @@ resolution.
   fifty-two it is three quarters, and the chart becomes a grey band with
   hairlines on it. Below ~4pt of slot the bars meet, and the corner radius goes
   with the gap — a 2pt radius on a 2pt bar is a lozenge.
+- **A chart too narrow for its bars folds them coarser.** The fold is chosen by
+  width, not by span: the finest level whose slot is at least ~4pt. A year of
+  weeks is fifty-two bars across the full-width chart and a texture across a
+  tile in half a phone, so the tile draws thirteen months while the chart it
+  opens onto keeps the weeks. The level chosen on the range row is the finest a
+  tile draws, never one it is refined below, and a tile's readout names the
+  bar it actually draws: a month, not a week.
+- **A bar is never wider than 24pt.** One week across a whole plot is a slab
+  that reads as a filled panel. The slots still span the plot, however few
+  there are, and past the cap the bar stands in the middle of its slot: five
+  weeks are spread evenly across the width rather than packed against one edge
+  of it, and every date label stays under its own bar.
 - **A week that was trained never draws as a week that was not.** A bar rounded
   to zero pixels is the chart contradicting the data; clamp it to a point of ink.
 - **Bars and lines share everything except the mark** — the range row, the

@@ -12,6 +12,7 @@ library;
 
 import '../core/ids.dart';
 import 'chart_buckets.dart';
+import 'chart_density.dart';
 import 'enums.dart';
 import 'muscle_volume.dart';
 
@@ -98,6 +99,28 @@ class VolumeBar {
 Granularity foldForWeeks(int weeks, Granularity chosen) {
   final fits = autoGranularityFor(weeks, Granularity.weekly);
   return fits.index > chosen.index ? fits : chosen;
+}
+
+/// The fold a chart [width] logical pixels wide draws [weeks] at: the finest
+/// one from [foldForWeeks] onward whose bars each have at least [barMinSlot]
+/// of slot, and yearly when none does.
+///
+/// Folded by width rather than by span, because the same year is fifty-two
+/// legible bars across a full-width chart and a texture across half a phone.
+/// A tile at a year therefore draws months while the chart it opens onto
+/// keeps weeks.
+Granularity foldForWidth(
+  List<VolumeWeek> weeks,
+  Granularity chosen,
+  double width,
+) {
+  final from = foldForWeeks(weeks.length, chosen);
+  for (final g in const [Granularity.weekly, Granularity.monthly]) {
+    if (g.index < from.index) continue;
+    final bars = foldWeeks(weeks, g).length;
+    if (bars == 0 || width / bars >= barMinSlot) return g;
+  }
+  return Granularity.yearly;
 }
 
 /// Folds weeks into the bars a chart draws at [by].

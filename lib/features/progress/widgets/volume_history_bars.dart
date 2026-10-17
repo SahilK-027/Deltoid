@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../domain/chart_density.dart';
 import '../../../domain/volume_history.dart';
 
 /// One bar per week, scrubbable, and it zooms when the range changes.
@@ -216,8 +217,12 @@ class _BarsPainter extends CustomPainter {
     // arrive on the left. Scaling about the centre instead would slide this
     // week sideways, which is the one bar the eye is holding on to.
     final slot = fromWeeks <= 0 || t >= 1
-        ? size.width / count
-        : _lerp(size.width / fromWeeks, size.width / count, t);
+        ? barSlot(size.width, count)
+        : _lerp(
+            barSlot(size.width, fromWeeks),
+            barSlot(size.width, count),
+            t,
+          );
 
     final scale = fromWeeks <= 0 || t >= 1
         ? max
@@ -227,18 +232,14 @@ class _BarsPainter extends CustomPainter {
     // they travel in.
     canvas.clipRect(Offset.zero & size);
 
-    final gap = slot >= 8
-        ? 2.0
-        : slot >= 4
-            ? 1.0
-            : 0.0;
-    // **Never `clamp(1.0, slot)`.** A slot narrower than a point makes the lower
-    // bound exceed the upper one, and `clamp` throws rather than picking a
-    // side — which is a painter that crashes the frame, mid-scroll, with no way
-    // back. A bar is a point of ink or the whole slot, whichever is smaller.
-    final barWidth = math.max(slot - gap, math.min(slot, 1.0));
+    // The gap is a share of the slot, and the ink is never clamped to a bound
+    // computed here, which throws inside `paint`: see [barWidth]. Past
+    // [barMaxWidth] the bar stands in the middle of its slot, so a week or two
+    // is spread across the plot rather than drawn as a slab across it.
+    final ink = barWidth(slot);
+    final inset = (slot - ink) / 2;
     // A 2pt radius on a 2pt bar is a lozenge, not a bar (THEME → Bar list).
-    final radius = barWidth >= 5 ? const Radius.circular(Radii.bar) : Radius.zero;
+    final radius = ink >= 5 ? const Radius.circular(Radii.bar) : Radius.zero;
 
     // Zooming out reveals weeks that were not on screen before. They fade in
     // rather than sliding in from nowhere fully drawn.
@@ -248,11 +249,11 @@ class _BarsPainter extends CustomPainter {
     for (var i = 0; i < count; i++) {
       // Counted back from the right edge, so the last bar is always the last
       // bar whatever the slot width is doing.
-      final left = size.width - (count - i) * slot;
-      if (left + barWidth < 0) continue;
+      final left = size.width - (count - i) * slot + inset;
+      if (left + ink < 0) continue;
 
       final fade = fromWeeks > 0 && t < 1 && i < entering ? t : 1.0;
-      final rect = Rect.fromLTWH(left, 0, barWidth, size.height);
+      final rect = Rect.fromLTWH(left, 0, ink, size.height);
 
       canvas.drawRRect(
         RRect.fromRectAndCorners(
@@ -290,7 +291,7 @@ class _BarsPainter extends CustomPainter {
 
       canvas.drawRRect(
         RRect.fromRectAndCorners(
-          Rect.fromLTWH(left, size.height - filled, barWidth, filled),
+          Rect.fromLTWH(left, size.height - filled, ink, filled),
           topLeft: radius,
           topRight: radius,
         ),

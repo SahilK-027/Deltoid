@@ -119,23 +119,25 @@ void main() {
 
     testWidgets('keeps the marker on a lone reading when the rest are dropped',
         (tester) async {
-      // Past forty points the markers go. A reading with a break either side
-      // is a line of no length, so without its marker it is not drawn at all.
+      // Neighbours closer than about ten pixels lose their markers: three
+      // hundred weeks across this plot are under three apart. A reading with a
+      // break either side is a line of no length, so without its marker it is
+      // not drawn at all.
       final values = <double?>[
-        for (var i = 0; i < 30; i++) 100 + i.toDouble(),
+        for (var i = 0; i < 150; i++) 100 + i.toDouble(),
         null,
         140,
         null,
-        for (var i = 0; i < 30; i++) 150 + i.toDouble(),
+        for (var i = 0; i < 150; i++) 150 + i.toDouble(),
       ];
       await tester.pumpWidget(_trend(values));
       await tester.pumpAndSettle();
 
       final line = _data(tester).lineBarsData.single;
       final show = line.dotData.checkToShowDot;
-      expect(show(line.spots[31], line), isTrue);
+      expect(show(line.spots[151], line), isTrue);
       expect(show(line.spots[10], line), isFalse);
-      expect(show(line.spots[40], line), isFalse);
+      expect(show(line.spots[200], line), isFalse);
     });
   });
 

@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/chart_buckets.dart';
+import '../../domain/chart_density.dart';
 import '../../domain/cycle_progress.dart';
 import '../../domain/date_axis.dart';
 import '../../domain/enums.dart';
@@ -600,7 +601,6 @@ class _TrendChartState extends State<TrendChart>
       minSpanFraction: widget.minSpanFraction,
     );
     final valueTitles = _valueTitles(context, yAxis);
-    final dense = all.length > 40;
     OffScale? offScaleAt(int bar, int index) => switch (readingAt[bar][index]) {
           final k? => yAxis.offScaleAt(bar, k),
           null => null,
@@ -634,12 +634,29 @@ class _TrendChartState extends State<TrendChart>
       to = daysBefore(to, -7);
     }
 
+    return LayoutBuilder(builder: (context, box) {
+    final plotWidth = box.maxWidth - valueTitles.reservedSize;
+    // Markers only while they mark something, decided for each series on its
+    // own by the pixels between its closest neighbours (THEME → Charts). The
+    // window's days span the plot at rest, and a pinch spreads them by its
+    // scale, so zooming in brings the markers back.
+    final xSpan = DateAxis.xOf(to) - DateAxis.xOf(from);
+    final perX = xSpan > 0 ? plotWidth / xSpan : double.infinity;
+    final marked = [
+      for (final r in readings)
+        markersFit([for (final p in r) p.x], perX * _scale),
+    ];
+    // The gesture is offered while the markers are dropped at rest, so the
+    // line under the chart does not come and go with the pinch.
+    final dense =
+        readings.any((r) => !markersFit([for (final p in r) p.x], perX));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           height: height,
-          child: LayoutBuilder(builder: (context, box) {
+          child: Builder(builder: (context) {
           // The axis describes what is on screen rather than the window. After
           // a pinch the two differ, and labels that continue to describe the
           // window describe a chart that is no longer displayed, so the labels
@@ -648,7 +665,7 @@ class _TrendChartState extends State<TrendChart>
           final axis = DateAxis.line(
             from: from,
             to: to,
-            width: box.maxWidth - valueTitles.reservedSize,
+            width: plotWidth,
             measure: dateLabelMeasure(context),
             zoom: _scale,
           );
@@ -745,7 +762,7 @@ class _TrendChartState extends State<TrendChart>
                       // The caret stays when the markers go: it is the one
                       // mark that says the line does not end where it seems to.
                       checkToShowDot: (spot, _) =>
-                          !dense ||
+                          marked[i] ||
                           lone[i].contains(spot.x) ||
                           yAxis.offScale.any(
                             (o) =>
@@ -772,10 +789,10 @@ class _TrendChartState extends State<TrendChart>
           );
           }),
         ),
-        // Markers only while they mark something. Past about forty points the
-        // circles touch and the shape being examined is obscured by the points
-        // composing it, so the markers are dropped and the gesture is labelled
-        // instead.
+        // Markers only while they mark something. Where neighbours stand
+        // closer than [markerSpacing] the circles touch and the shape being
+        // examined is obscured by the points composing it, so the markers are
+        // dropped and the gesture is labelled instead.
         if (dense) ...[
           const SizedBox(height: Space.sm),
           Text(
@@ -808,6 +825,7 @@ class _TrendChartState extends State<TrendChart>
         ],
       ],
     );
+    });
   }
 
 }

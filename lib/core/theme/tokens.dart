@@ -111,8 +111,9 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
 
   /// An untrained day, and the unfilled portion of a volume bar's track.
   ///
-  /// Deliberately the same grey as [surfaceHighest], retained under its own
-  /// name because it serves a distinct purpose. The heatmap grid and the muscle
+  /// The same grey as [surfaceHighest] in dark, and a step lighter in light,
+  /// where that grey behind a tile of bars reads as a block rather than as a
+  /// track. Retained under its own name because it serves a distinct purpose. The heatmap grid and the muscle
   /// bars are positioned one above the other on the landing screen and are read
   /// together, so an untrained day and an untrained muscle must represent the
   /// same absence. Two greys eight points apart would indicate otherwise.
@@ -236,7 +237,11 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     positive: green,
     negative: red,
     identity: [pink, cyan, yellow, lavender, sand, green],
-    heatEmpty: Color(0xFFE0E0E0),
+    // Lighter than `surfaceHighest`: at #E0E0E0 the track behind a tile of
+    // bars is a grey block on white. #E8E8E8 is as light as it goes while a
+    // rest day is still a cell against `surface` (1.2:1, held by
+    // `light_theme_test.dart`).
+    heatEmpty: Color(0xFFE8E8E8),
     progress: blue,
     shadow: Color(0x1A000000),
   );

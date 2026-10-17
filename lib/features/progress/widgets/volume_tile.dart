@@ -27,7 +27,9 @@ class VolumeTile extends StatefulWidget {
   final VolumeSeries series;
 
   /// How finely the weeks are folded, so six tiles read at one granularity
-  /// rather than each at its own.
+  /// rather than each at its own. The finest a tile draws: one too narrow for
+  /// its bars folds them coarser (see [foldForWidth]), and tiles of one width
+  /// still agree.
   final Granularity by;
   final Color hue;
   final VoidCallback? onTap;
@@ -38,7 +40,8 @@ class VolumeTile extends StatefulWidget {
 }
 
 class _VolumeTileState extends State<VolumeTile> {
-  VolumeBar? _week;
+  /// The bar under the finger, and the fold it was drawn at, which names it.
+  ({VolumeBar bar, Granularity by})? _week;
 
   @override
   Widget build(BuildContext context) {
@@ -61,20 +64,32 @@ class _VolumeTileState extends State<VolumeTile> {
           Text(
             week == null
                 ? weekSpanLabel(series)
-                : weekReadout(week, widget.by),
+                : weekReadout(week.bar, week.by),
             style: context.t.bodyMedium,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: Space.lg),
-          WeeklyBars(
-            bars: series.bars(
-              // Against the weeks in hand, not the window's opinion of them.
-              foldForWeeks(series.weeks.length, widget.by),
-            ),
-            hue: widget.hue,
+          // A fixed height around the `LayoutBuilder`, so a parent asking for
+          // the tile's intrinsic height is answered without asking it.
+          SizedBox(
             height: widget.chartHeight,
-            onSelected: (w) => setState(() => _week = w),
+            child: LayoutBuilder(
+              builder: (context, box) {
+                // Against the weeks in hand, not the window's opinion of them,
+                // and against the tile's width: a year of weeks in half a
+                // phone is a texture, so the tile draws months instead.
+                final by = foldForWidth(series.weeks, widget.by, box.maxWidth);
+                return WeeklyBars(
+                  bars: series.bars(by),
+                  hue: widget.hue,
+                  height: widget.chartHeight,
+                  onSelected: (w) => setState(
+                    () => _week = w == null ? null : (bar: w, by: by),
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: Space.lg),
           const Divider(),
