@@ -131,7 +131,8 @@ double _nameWidth(BuildContext context) {
 /// The width the counts column takes: the widest count in this list with its
 /// unit, measured once at the size it is drawn, so every bar ends at the same
 /// x and a three-digit count at a 1.3 font fits. It was a fixed 64, which
-/// overflowed at `140 sets`.
+/// overflowed at `140 sets`. The unit is measured as `sets`, the wider of the
+/// two it prints, so a list whose only count is `1 set` still lines up.
 double _countWidth(BuildContext context, List<MuscleVolume> rows) {
   final unit = _textWidth(context, 'sets', context.t.labelSmall);
   var widest = 0.0;
@@ -362,7 +363,8 @@ class _Bar extends StatelessWidget {
 }
 
 /// `12` in `valueSm` with `sets` in `micro` beside it. A muscle trained zero
-/// times prints `0 sets` rather than nothing at all.
+/// times prints `0 sets` rather than nothing at all, and one trained once
+/// prints `1 set`.
 class _Count extends StatelessWidget {
   const _Count({required this.sets, required this.width, this.small = false});
 
@@ -394,7 +396,7 @@ class _Count extends StatelessWidget {
                 : context.t.labelLarge,
           ),
           const SizedBox(width: Space.xxs),
-          Text('sets', style: context.t.labelSmall),
+          Text(sets == 1 ? 'set' : 'sets', style: context.t.labelSmall),
         ],
       ),
     );

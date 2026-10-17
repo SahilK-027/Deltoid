@@ -187,6 +187,7 @@ String weekSpanLabel(VolumeSeries series) =>
 /// One bar, named by what it covers and what it came to.
 ///
 /// `15–21 Jun · 11 sets` for a week, `June 2026 · 14.2 sets a week` for a month.
+/// A count or a rate of exactly one takes the singular: `1 set`, `1 set a week`.
 /// A folded bar states its **rate**, because that is its height, and never its
 /// total, which would be a number the bar is not drawn to.
 String weekReadout(VolumeBar bar, Granularity by) {
@@ -205,5 +206,5 @@ String weekReadout(VolumeBar bar, Granularity by) {
   final rate = bar.setsPerWeek == bar.setsPerWeek.roundToDouble()
       ? bar.setsPerWeek.toStringAsFixed(0)
       : bar.setsPerWeek.toStringAsFixed(1);
-  return '$period · $rate sets a week';
+  return '$period · $rate ${rate == '1' ? 'set' : 'sets'} a week';
 }
