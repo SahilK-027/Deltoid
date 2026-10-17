@@ -15,8 +15,8 @@
 ///   misreport the month whereas "62 sets in March" does not. Which of the two
 ///   applies to a series is given by [BucketFold] and must be supplied by the
 ///   caller.
-/// - An empty bucket is not necessarily zero. A month with no weigh-in has no
-///   weight, and the line breaks. A month with no training has zero sets, and
+/// - An empty bucket is not necessarily zero. Months with no weigh-in have no
+///   weight, and the line breaks (see [lineBuckets]). A month with no training has zero sets, and
 ///   the bar rests on the baseline. The same absence carries two different
 ///   meanings, so [bucketize] reports empty buckets and leaves the
 ///   interpretation to the caller.
@@ -280,6 +280,37 @@ List<Bucket> bucketize({
         count: counts[i],
       ),
   ];
+}
+
+/// The buckets a line is drawn through, with a null wherever the line breaks.
+///
+/// This is a line chart's reading of the emptiness [bucketize] reports. Two or
+/// more empty buckets in a row between readings are an absence: there is no
+/// value to draw, and a straight line across them would claim weigh-ins or
+/// sessions that never happened, so the run becomes one null and the line
+/// stops there and starts again. A single empty bucket is not. A movement
+/// trained every eight or nine days leaves every other week empty, and
+/// breaking at each of them cut a year of steady training into pieces, so a
+/// lone empty bucket is dropped and the line drawn straight across it: that is
+/// the rhythm of the training, not a gap in it. Empty buckets before the first
+/// reading and after the last are dropped too: the axis still runs the whole
+/// window, and there is simply no line at either end to break.
+///
+/// A bar chart does not ask this question. A week with no training is zero
+/// sets and draws on the baseline, so it reads the buckets as they are.
+List<Bucket?> lineBuckets(List<Bucket> buckets) {
+  final out = <Bucket?>[];
+  var empty = 0;
+  for (final b in buckets) {
+    if (b.isEmpty) {
+      empty++;
+      continue;
+    }
+    if (empty > 1 && out.isNotEmpty) out.add(null);
+    empty = 0;
+    out.add(b);
+  }
+  return out;
 }
 
 /// Which series a multi-line chart draws when there are more than it has

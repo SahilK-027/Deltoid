@@ -795,4 +795,33 @@ void main() {
       expect(p.lifts.last.lift, bench);
     });
   });
+
+  group('which segments of the cycle line jump', () {
+    CyclePoint cycle(int index) => CyclePoint(
+          cycleId: 'c$index',
+          index: index,
+          isDeload: false,
+          isOpen: false,
+          value: 1,
+          lifts: const [],
+        );
+
+    test('consecutive cycles are joined solid', () {
+      expect(cycleSegmentJumps(cycle(2), cycle(3), isBlocks: false), isFalse);
+    });
+
+    test('a deload between two cycles is a jump', () {
+      expect(cycleSegmentJumps(cycle(3), cycle(5), isBlocks: false), isTrue);
+    });
+
+    test('a spell on another regime is a jump, though the two cycles sit side '
+        'by side on the axis', () {
+      expect(cycleSegmentJumps(cycle(3), cycle(9), isBlocks: false), isTrue);
+    });
+
+    test('under blocks nothing jumps, since every segment spans a block', () {
+      expect(cycleSegmentJumps(cycle(3), cycle(9), isBlocks: true), isFalse);
+      expect(cycleSegmentJumps(cycle(3), cycle(5), isBlocks: true), isFalse);
+    });
+  });
 }

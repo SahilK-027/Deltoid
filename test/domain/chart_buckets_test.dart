@@ -286,4 +286,77 @@ void main() {
       expect(got.total, 0);
     });
   });
+
+  group('lineBuckets', () {
+    List<Bucket> monthsOf(List<({int dayKey, double value})> rows) => bucketize(
+          rows: rows,
+          by: Granularity.monthly,
+          from: DateTime(2026, 1, 1),
+          to: DateTime(2026, 6, 30),
+        );
+
+    test('two months with nothing in them break the line rather than being '
+        'crossed', () {
+      final line = lineBuckets(monthsOf([
+        at(2026, 1, 10, 80),
+        at(2026, 2, 10, 81),
+        at(2026, 5, 10, 79),
+      ]));
+      expect(
+        [for (final b in line) b?.start.month],
+        [1, 2, null, 5],
+        reason: 'March and April are one break, not two',
+      );
+    });
+
+    test('empty months at either end are dropped, not drawn as breaks', () {
+      final line = lineBuckets(monthsOf([
+        at(2026, 3, 10, 80),
+        at(2026, 4, 10, 81),
+      ]));
+      expect([for (final b in line) b?.start.month], [3, 4]);
+    });
+
+    test('a single empty month is the rhythm, and the line crosses it', () {
+      final line = lineBuckets(monthsOf([
+        at(2026, 1, 10, 80),
+        at(2026, 3, 10, 81),
+        at(2026, 5, 10, 82),
+      ]));
+      expect([for (final b in line) b?.start.month], [1, 3, 5]);
+    });
+
+    test('a lone month between two breaks is kept on its own', () {
+      final line = lineBuckets(monthsOf([
+        at(2026, 1, 10, 80),
+        at(2026, 4, 10, 81),
+      ]));
+      expect([for (final b in line) b?.start.month], [1, null, 4]);
+      final lone = lineBuckets(bucketize(
+        rows: [at(2026, 1, 10, 80), at(2026, 4, 10, 81), at(2026, 7, 10, 82)],
+        by: Granularity.monthly,
+        from: DateTime(2026, 1, 1),
+        to: DateTime(2026, 7, 31),
+      ));
+      expect([for (final b in lone) b?.start.month], [1, null, 4, null, 7]);
+    });
+
+    test('nothing logged is nothing to draw', () {
+      expect(lineBuckets(monthsOf(const [])), isEmpty);
+    });
+
+    test('a summed bucket that is empty is still a zero to a bar chart', () {
+      // The fold keeps the empty month in place with a count of zero; only a
+      // line reads that as a break.
+      final months = bucketize(
+        rows: [at(2026, 1, 10, 12), at(2026, 3, 10, 9)],
+        by: Granularity.monthly,
+        from: DateTime(2026, 1, 1),
+        to: DateTime(2026, 3, 31),
+        fold: BucketFold.sum,
+      );
+      expect(months.length, 3);
+      expect(months[1].isEmpty, isTrue);
+    });
+  });
 }

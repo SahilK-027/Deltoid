@@ -380,6 +380,10 @@ class TrendSeries {
   final Color color;
 
   /// x is [trendX] of a day key, y is the value in display units.
+  ///
+  /// A [FlSpot.nullSpot] breaks the line there. The chart does not decide
+  /// where: whether an empty bucket is a gap or a zero is a fact about the
+  /// data, so the caller says so, usually through [lineBuckets].
   final List<FlSpot> spots;
 }
 
@@ -560,7 +564,20 @@ class _TrendChartState extends State<TrendChart>
     final formatValue = widget.formatValue;
     final tooltip = widget.tooltip;
     final window = widget.window;
-    final all = [for (final s in series) ...s.spots];
+    // The readings, without the breaks between them. The value axis and its
+    // off-scale rule count readings, so an off-scale index is a position in
+    // these lists, and [readingAt] turns a spot's index into one.
+    final readings = [
+      for (final s in series) [for (final p in s.spots) if (p.isNotNull()) p],
+    ];
+    final readingAt = [
+      for (final s in series)
+        () {
+          var k = 0;
+          return [for (final p in s.spots) p.isNotNull() ? k++ : null];
+        }(),
+    ];
+    final all = [for (final r in readings) ...r];
 
     final xs = [for (final s in all) s.x];
 
@@ -572,7 +589,7 @@ class _TrendChartState extends State<TrendChart>
     final yAxis = ValueAxis.trend(
       range == null
           ? [
-              for (final s in series) [for (final p in s.spots) p.y],
+              for (final r in readings) [for (final p in r) p.y],
             ]
           : [
               [range.$1, range.$2],
@@ -584,10 +601,26 @@ class _TrendChartState extends State<TrendChart>
     );
     final valueTitles = _valueTitles(context, yAxis);
     final dense = all.length > 40;
+    OffScale? offScaleAt(int bar, int index) => switch (readingAt[bar][index]) {
+          final k? => yAxis.offScaleAt(bar, k),
+          null => null,
+        };
+    // A reading with a break either side is a line of no length, and is drawn
+    // only by its marker, so it keeps the marker when the rest are dropped.
+    final lone = [
+      for (final s in series)
+        {
+          for (var j = 0; j < s.spots.length; j++)
+            if (s.spots[j].isNotNull() &&
+                (j == 0 || s.spots[j - 1].isNull()) &&
+                (j == s.spots.length - 1 || s.spots[j + 1].isNull()))
+              s.spots[j].x,
+        },
+    ];
     // The value a touched spot really has, which an off-scale one does not
     // show by its position.
     double realValue(int bar, int index, double drawn) =>
-        yAxis.offScaleAt(bar, index)?.value ?? drawn;
+        offScaleAt(bar, index)?.value ?? drawn;
 
     // The window's days, or with no window the days the data covers. One
     // session is a chart with one dot on it, and a dot is worth drawing: it
@@ -699,10 +732,11 @@ class _TrendChartState extends State<TrendChart>
                     // An off-scale point is drawn on the edge it left by, so
                     // the line runs to the edge and back.
                     spots: [
-                      for (var j = 0; j < series[i].spots.length; j++)
-                        series[i].spots[j].copyWith(
-                          y: yAxis.place(i, j, series[i].spots[j].y),
-                        ),
+                      for (final (j, p) in series[i].spots.indexed)
+                        switch (readingAt[i][j]) {
+                          final k? => p.copyWith(y: yAxis.place(i, k, p.y)),
+                          null => FlSpot.nullSpot,
+                        },
                     ],
                     isCurved: false,
                     color: series[i].color,
@@ -712,13 +746,14 @@ class _TrendChartState extends State<TrendChart>
                       // mark that says the line does not end where it seems to.
                       checkToShowDot: (spot, _) =>
                           !dense ||
+                          lone[i].contains(spot.x) ||
                           yAxis.offScale.any(
                             (o) =>
                                 o.series == i &&
-                                series[i].spots[o.index].x == spot.x,
+                                readings[i][o.index].x == spot.x,
                           ),
                       getDotPainter: (_, _, _, index) =>
-                          switch (yAxis.offScaleAt(i, index)?.edge) {
+                          switch (offScaleAt(i, index)?.edge) {
                         final edge? => OffScaleCaret(
                             color: series[i].color,
                             pointsUp: edge == OffScaleEdge.top,
@@ -1458,11 +1493,13 @@ class CycleAxisChart extends StatelessWidget {
                 c,
                 from: FlSpot(closed[k - 1].toDouble(), placed[closed[k - 1]]!),
                 to: FlSpot(closed[k].toDouble(), placed[closed[k]]!),
-                // A gap is a break in the line only when the chart was drawing
-                // every cycle. Under blocks every segment spans a block, so
-                // softening them all dashes the whole chart and says "broken"
-                // about the one thing that is normal here.
-                soft: !isBlocks && closed[k] - closed[k - 1] > 1,
+                // Read off the cycle numbers rather than the positions: a
+                // resumed regime's 3 and 9 sit side by side on the axis.
+                soft: cycleSegmentJumps(
+                  points[closed[k - 1]],
+                  points[closed[k]],
+                  isBlocks: isBlocks,
+                ),
               ),
             // The open cycle, dashed away from the last closed one: its point
             // is real but partial, and drawing it solid would claim a finished

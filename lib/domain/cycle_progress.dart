@@ -611,6 +611,27 @@ CycleWindow cycleWindow(CycleProgress progress, CycleRange range) {
 /// The number of cycles above which All draws one point per block.
 const blockThreshold = 24;
 
+/// Whether the line from cycle [from] to cycle [to] jumps, and is therefore
+/// dashed at 60% rather than drawn solid.
+///
+/// A solid line between two points claims the training between them, so a
+/// segment jumps whenever a cycle lies between its ends that it does not draw:
+/// a deload, which holds its place and scores nothing, or a spell on another
+/// regime, which leaves no place at all. The second is why this reads the cycle
+/// numbers and not the positions on the axis. Cycles are evenly spaced, so 3
+/// and 9 of a resumed regime sit side by side, and a rule written in positions
+/// drew six cycles of another programme as a solid line.
+///
+/// Under [isBlocks] no segment jumps: every one spans a block, and dashing
+/// them all says "broken" about the one thing that is normal there
+/// ([THEME → The cycle axis](THEME.md#the-cycle-axis)).
+bool cycleSegmentJumps(
+  CyclePoint from,
+  CyclePoint to, {
+  required bool isBlocks,
+}) =>
+    !isBlocks && (to.index - from.index).abs() > 1;
+
 /// The phase each of [points] is tinted by, position for position.
 ///
 /// A cycle takes the phase most of its sessions ran in. Under [isBlocks] a

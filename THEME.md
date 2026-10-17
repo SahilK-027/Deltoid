@@ -884,10 +884,15 @@ resolution.
   the axis would rescale by four every time you changed the averaging; holding
   the unit still is what makes the control a smoothing control rather than a
   different chart.
-- **An empty bucket is not a zero, except when it is.** A month with no weigh-in
-  breaks the line — there is no weight to draw. A month with no training is zero
-  sets and the bar sits on the baseline. Same absence, two truths, and the fold
-  reports emptiness so each chart can say which its own data means.
+- **An empty bucket is not a zero, except when it is.** Two months in a row
+  with no weigh-in break the line — there is no weight to draw. A month with no
+  training is zero sets and the bar sits on the baseline. Same absence, two
+  truths, and the fold reports emptiness so each chart can say which its own
+  data means.
+- **A single empty bucket is the rhythm, not a gap.** A movement trained every
+  eight or nine days leaves every other week empty, and a line broken at each
+  of them is a year of steady training cut into pieces. So a line breaks only
+  at two or more empty buckets in a row, and is drawn straight across one.
 - **A bucket is drawn at its middle, not its first day.** A month plotted on the
   1st is half a month early, and a yearly mark on New Year's Day reads as the
   wrong year.
@@ -949,7 +954,9 @@ resolution.
   drop them and offer zoom. The distance is measured in pixels for each series
   on its own. A count of points across every series, which this rule used to
   imply with "past ~40 points", clumped 26 markers into a quarter of a chart and
-  dropped them from two series that had room for them.
+  dropped them from two series that had room for them. A reading with a break
+  either side keeps its marker however close the rest are: it is a line of no
+  length, and without its marker it is not drawn at all.
 - **Two heights for a line chart.** A chart that is the subject of its screen is
   **220**: the exercise trend and the bodyweight trend on Weigh-ins. A chart in
   a card among other cards is **150**: the Strength card's cycle axis, and the

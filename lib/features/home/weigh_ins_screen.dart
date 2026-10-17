@@ -385,19 +385,18 @@ class _TrendCard extends ConsumerWidget {
 
     // Plotted in display units, which is what the axis and the tooltip read in.
     // The mean of a week of weigh-ins is a weigh-in; the sum of them is not a
-    // weight anybody has ever been.
-    final marks = [
-      for (final b in bucketize(
-        rows: [
-          for (final e in points)
-            (dayKey: e.dayKey, value: unit.fromKg(e.weightKg)),
-        ],
-        by: by,
-        from: from,
-        to: to,
-      ))
-        if (b.value != null) b,
-    ];
+    // weight anybody has ever been. Two months in a row with no weigh-in have
+    // no weight to draw, so the line breaks there rather than crossing them.
+    final marks = lineBuckets(bucketize(
+      rows: [
+        for (final e in points)
+          (dayKey: e.dayKey, value: unit.fromKg(e.weightKg)),
+      ],
+      by: by,
+      from: from,
+      to: to,
+    ));
+    final readings = marks.nonNulls.length;
 
     return AppCard(
       child: Column(
@@ -424,7 +423,7 @@ class _TrendCard extends ConsumerWidget {
             style: context.t.bodyMedium,
           ),
           const SizedBox(height: Space.lg),
-          if (marks.length < 2)
+          if (readings < 2)
             // The chart, empty, rather than a box where the chart was: the
             // range chips under it stay a zoom rather than a thing that
             // resizes the card (THEME → Charts).
@@ -445,7 +444,7 @@ class _TrendCard extends ConsumerWidget {
               // than as a climb.
               minStep: bodyweightIncrement,
               minSpan: unit.fromKg(2),
-              message: marks.isEmpty
+              message: readings == 0
                   ? 'Nothing logged in this range.'
                   : 'Only one ${by.noun} has a weigh-in. A second one is '
                       'needed before a trend can be drawn.',
@@ -460,7 +459,10 @@ class _TrendCard extends ConsumerWidget {
                   name: 'Bodyweight',
                   color: context.c.progress,
                   spots: [
-                    for (final b in marks) FlSpot(bucketX(b), b.value!),
+                    for (final b in marks)
+                      b == null
+                          ? FlSpot.nullSpot
+                          : FlSpot(bucketX(b), b.value!),
                   ],
                 ),
               ],
