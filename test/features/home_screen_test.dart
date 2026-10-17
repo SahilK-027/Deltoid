@@ -143,6 +143,33 @@ void main() {
     expect(clock(), isNot(first));
   });
 
+  testWidgets('the in-progress tile counts one set as one set',
+      (tester) async {
+    final regimeId = await createRegimeFromTemplate(db, ppl);
+    final sessions = await (db.select(db.sessions)
+          ..where((t) => t.regimeId.equals(regimeId))
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+    final id = await TrainingRepository(db).startWorkout(
+      regimeId: regimeId,
+      sessionId: sessions.first.id,
+    );
+    // Every set but one is deleted, so the workout's total is exactly one.
+    await db.customStatement(
+      'UPDATE set_logs SET deleted_at = ? WHERE workout_exercise_id IN '
+      '(SELECT id FROM workout_exercises WHERE workout_id = ?) AND id <> '
+      '(SELECT s.id FROM set_logs s JOIN workout_exercises e '
+      'ON e.id = s.workout_exercise_id WHERE e.workout_id = ? LIMIT 1)',
+      [nowMs(), id, id],
+    );
+
+    await pumpWorkouts(tester);
+    await frames(tester);
+
+    expect(find.text('0 of 1 set'), findsOneWidget);
+    expect(find.text('0 of 1 sets'), findsNothing);
+  });
+
   testWidgets('the habit grids clear the fold on a six-session split',
       (tester) async {
     // A cycle drawn twice — a row of labelled bars in the hero card and then

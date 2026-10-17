@@ -5,6 +5,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../domain/rest.dart';
+import '../domain/set_format.dart';
 
 /// Lock-screen presentation of an open workout.
 ///
@@ -333,7 +334,7 @@ class WorkoutNotifications {
         // The header's small grey line, next to the app name: where the
         // session stands, which is the one number that is true whether or not
         // a rest is running.
-        subText: total > 0 ? '$done of $total sets' : null,
+        subText: total > 0 ? setsOfTotal(done, total) : null,
         // The progress bar represents the rest and nothing else.
         //
         // A notification's progress bar holds whatever value was last posted

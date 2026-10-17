@@ -235,6 +235,21 @@ void main() {
     });
   });
 
+  group('setsOfTotal', () {
+    test('the unit agrees with the total', () {
+      expect(setsOfTotal(0, 1), '0 of 1 set');
+      expect(setsOfTotal(1, 1), '1 of 1 set');
+      expect(setsOfTotal(1, 2), '1 of 2 sets');
+      expect(setsOfTotal(3, 12), '3 of 12 sets');
+      expect(setsOfTotal(0, 0), '0 of 0 sets');
+    });
+
+    test('a kind qualifies the unit without changing its number', () {
+      expect(setsOfTotal(1, 1, kind: 'working'), '1 of 1 working set');
+      expect(setsOfTotal(2, 3, kind: 'working'), '2 of 3 working sets');
+    });
+  });
+
   group('heaviestLogged', () {
     test('picks the heaviest, not the last', () {
       final sets = [

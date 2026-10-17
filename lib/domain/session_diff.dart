@@ -15,6 +15,8 @@
 /// Pure: no database, no drift types. Tested in `test/domain`.
 library;
 
+import 'set_format.dart';
+
 enum SessionChangeKind {
   /// Trained today, not in the template.
   added,
@@ -186,7 +188,7 @@ List<SessionChange> diffSetCounts({
             SessionChange(
               kind: SessionChangeKind.setCount,
               exerciseIds: [t.exerciseId],
-              label: 'Did ${l.workingDone} of ${t.targetSets} working sets '
+              label: 'Did ${setsOfTotal(l.workingDone, t.targetSets, kind: 'working')} '
                   'of ${t.name}',
               setCount: l.workingDone,
             ),

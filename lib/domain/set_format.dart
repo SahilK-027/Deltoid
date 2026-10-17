@@ -216,6 +216,14 @@ String setTitle(SetType type, String label, int? leg) {
   return leg == null ? head : '$head · leg $leg';
 }
 
+/// How far through its sets a workout stands: `3 of 12 sets`, or
+/// `1 of 1 set` when there is only one. The unit agrees with the total, which
+/// is the number it counts. [kind] qualifies it, as in `2 of 3 working sets`.
+String setsOfTotal(int done, int total, {String? kind}) {
+  final unit = total == 1 ? 'set' : 'sets';
+  return '$done of $total ${kind == null ? unit : '$kind $unit'}';
+}
+
 /// The bodyweight a lift is scored against, as the first line of the log's
 /// pill: `73.2 kg`.
 String bodyweightBasisLabel(BodyweightBasis basis, WeightUnit unit) =>

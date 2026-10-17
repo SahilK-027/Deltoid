@@ -119,6 +119,17 @@ void main() {
       expect(changes.single.label, 'Did 1 of 3 working sets of deadlift');
     });
 
+    test('the label counts against the programmed total', () {
+      // A count is offered only for 1 <= done < programmed, so the smallest
+      // total a label can name is two, and the unit is plural there.
+      final changes = diffSetCounts(
+        template: [target('row', 2), target('curl', 1)],
+        logged: [tally('row', 1), tally('curl', 0)],
+        isDeload: false,
+      );
+      expect(changes.single.label, 'Did 1 of 2 working sets of row');
+    });
+
     test('more working sets than programmed are not offered', () {
       // They carry forward already: the next workout mirrors last time's
       // shape, and the template's count is only a floor.

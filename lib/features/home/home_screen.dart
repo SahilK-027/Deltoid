@@ -14,6 +14,7 @@ import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
 import '../../domain/habits.dart';
 import '../../domain/cycle_engine.dart';
+import '../../domain/set_format.dart';
 import '../history/workout_detail_screen.dart';
 import '../log/log_screen.dart';
 import '../log/widgets/exercise_sheets.dart';
@@ -1053,7 +1054,7 @@ class _ResumeHero extends ConsumerWidget {
               ),
             ),
             if (total > 0)
-              Text('$done of $total sets', style: context.t.labelSmall),
+              Text(setsOfTotal(done, total), style: context.t.labelSmall),
           ],
         ),
         const SizedBox(height: Space.lg),

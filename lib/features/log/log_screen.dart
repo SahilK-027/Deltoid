@@ -35,6 +35,7 @@ import 'widgets/rest_timer.dart';
 import 'widgets/set_row.dart';
 import '../../core/widgets/toast.dart';
 import '../../domain/session_name.dart';
+import '../../domain/set_format.dart';
 import '../account/backup_mark.dart';
 
 /// Which value the keypad is currently editing.
@@ -372,7 +373,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
           // The movement and the set. Whether a clock joins it is decided where
           // it is known whether anything will keep that clock moving.
           body: exercise == null
-              ? '$done of $total sets'
+              ? setsOfTotal(done, total)
               : counted > 0
               ? '$exercise ($position/$counted)'
               : exercise,
@@ -2381,7 +2382,7 @@ Future<_FinishChoice?> _confirmEarlyFinish(
       final c = sheet.c;
       return AppSheet(
         title: 'Finish with sets left?',
-        subtitle: '$done of $total sets logged',
+        subtitle: '${setsOfTotal(done, total)} logged',
         footer: Column(
           children: [
             PrimaryButton(
