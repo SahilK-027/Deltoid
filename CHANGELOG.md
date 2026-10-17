@@ -15,6 +15,50 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-10-17
+
+Minor release redrawing every chart so that it reads as clearly with twenty years of data as with one week.
+
+### Changed
+
+- **Charts:** Every chart chooses its value axis the same way. The band fits the data with half a step of room on each side, every gridline sits on a round number, and every label states the value of its own gridline.
+  - One reading, or a history that never changes, draws three gridlines with the value between them rather than a single line.
+  - A reading far outside the rest, such as a mistyped 260 kg among 100 kg sessions, is drawn as a caret at the edge of the chart rather than flattening every other session against the floor.
+  - The weekly volume chart prints three or four values on its axis, and its gridlines are drawn over the empty tracks so the values can be read against them.
+- **Charts:** Every chart that runs over time takes its date labels from one ladder. The last label is today, labels no longer collide at a larger system font, 3M no longer repeats a month, and long ranges label whole years at even steps, such as `2006 2011 2016 2021 2026`.
+  - Bar charts use the same ladder, so the last bar is labelled with today's date rather than the Monday its week began.
+  - Five years of volume is drawn as sixty monthly bars rather than six yearly ones.
+- **Charts:** A trend line breaks where two or more weeks or months in a row have nothing logged, rather than drawing straight across the gap. A single empty week is crossed, since one week off is part of training.
+  - On the cycle chart, the line from one cycle to the next is dashed when another regime was trained in between.
+  - The bodyweight graph on the Phase card breaks in the same places.
+- **Charts:** A line shows its markers only while there is room between them, and pinching to zoom brings them back.
+  - Volume bars have a maximum width, so a single week of training is no longer drawn as one slab across the whole chart.
+  - The volume tiles on Progress fold to months at one year, so their bars stay apart.
+- **Charts:** Chart cards share one spacing, and every chart has one legend under its plot. A legend never takes more than two rows and names the rest, such as `and 2 more`.
+  - Two lines drawn on top of each other are named together once, such as `Push 2 and Push 1`.
+  - The chip that chooses a year reads `Year` until a year is chosen. It used to name a year that was not applied.
+  - Volume spans read `Last 18 months` or `Last 5 years` once a span passes about a year, rather than counting hundreds of weeks.
+  - A selected cycle that is still open stays grey.
+- **Progress:** On long cycle charts, deloads are drawn as faint lines rather than turning the chart orange, and a deload's cycle number is orange only where every cycle is numbered.
+- **Progress:** The graphs on All time draw only the line, with no gridlines or deload bands.
+- **Bodyweight:** The trend on the Weigh-ins screen behaves as an exercise trend does. One weigh-in draws one dot, a range with nothing in it shows an empty chart with no message, and the change carries its unit, such as `−3.2 kg over the range`.
+  - The range control sits above the chart, as it does on every other chart, and the chart is the same height as an exercise trend.
+- **Bodyweight:** `Log weight` is a round `+` in the Weigh-ins app bar beside the calendar button, matching the `+` on the Home tile. The floating button it replaces covered the current months of the year map.
+- **History:** On an exercise trend, `Change` follows the progression of the session trained last and names it when the chart draws more than one session, such as `Change in Push 2`. It used to compare the first session in the range with the last, whichever sessions they were.
+  - A gain is green and a drop is in the ordinary text colour rather than red. No change reads `0%`.
+  - A change of 100% or more is printed as a whole number, such as `+182%`.
+  - A session that equals your best counts as the best in `Sessions since best`.
+- **Appearance:** In the light theme, empty cells and tracks are a lighter grey.
+
+### Fixed
+
+- **Progress:** On the cycle chart, a gain past +200% no longer draws the line out of the chart and over the readout, and the graphs on All time stay inside their cards.
+- **Charts:** At the largest system font, chart text is no longer cut short. Three-digit set counts and long muscle names fit the weekly volume list, a volume tile prints `sets/wk` in full, and a figure under a chart that does not fit its place is set smaller rather than cut.
+  - The cycle readout no longer touches the value under it.
+- **Progress:** A count of one reads `1 set` in the weekly volume list, and `1 set a week` in a volume chart's readout for a month or a year. Both used to read `1 sets`.
+- **Log:** A session with a single set reads `1 of 1 set` rather than `1 of 1 sets` on the in-progress tile on Home, in the session notification, and in the sheet that offers to finish with sets left. The session summary does the same, such as `Did 1 of 1 working set`.
+- **Charts:** The month labels on a year map are never smaller than the app's smallest text and grow with the system font. When all twelve do not fit, every other month is printed.
+
 ## [1.18.0] - 2026-10-16
 
 Minor release recording bulk, cut and maintenance phases and showing them on Home and on Cycle progress.
@@ -577,7 +621,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...HEAD
+[1.19.0]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/SahilK-027/Deltoid/compare/v1.16.1...v1.17.0
 [1.16.1]: https://github.com/SahilK-027/Deltoid/compare/v1.16.0...v1.16.1

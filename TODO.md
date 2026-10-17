@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,403 tests and sixteen pgTAP tests, analyzer clean.**
+**1,585 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -92,6 +92,16 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The Phase card on Home and the phase sheet: set, change, correct or clear a phase, its start day from the day picker and an optional planned length, with a bodyweight sparkline tinted by phase and three figures.
 - [x] The staleness prompts, on the Phase card and nowhere else: the planned length passed, and about three weeks of weigh-ins against the phase. `Keep going` is stored on the phase's own row, so the answer syncs with it.
 - [x] The cycle chart tints each cycle, or each block under `All`, by the phase most of its sessions ran in, stops every tint at a deload band's edge, names the phase in the readout and adds it to the legend.
+
+### Charts
+
+- [x] One value axis for every chart in `domain/value_axis.dart`: half a step of air each side, a round step, every gridline labelled, and an off-scale caret for an outlier.
+- [x] One ladder of date labels in `domain/date_axis.dart`, measured at the system font and anchored on today, shared by line and bar charts.
+- [x] Lines break at two or more empty buckets and cross a single one; a resumed regime's jump is dashed.
+- [x] Density decided in pixels in `domain/chart_density.dart`: markers by their spacing, bar ink capped at 24 px, volume tiles folded by width.
+- [x] Deloads quiet on long cycle charts, sparklines bare, and the Phase card's sparkline breaking where its full chart would.
+- [x] The bodyweight trend at parity with the exercise trend, chart text whole at a 1.3 font, `Change` read along one session, and `Log weight` as a `+` in the Weigh-ins app bar.
+- [x] One spacing for chart cards, two line-chart heights, one `ChartLegend`, and a stat tile figure set smaller rather than cut.
 
 ### Sync
 

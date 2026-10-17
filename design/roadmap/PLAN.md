@@ -1,6 +1,6 @@
 # Deltoid roadmap: 1.17.0 to 1.19.0
 
-The plan agreed on 15 October 2026. Releases 1.17.0 and 1.18.0 are built; nothing after them is yet.
+The plan agreed on 15 October 2026. Releases 1.17.0, 1.18.0 and 1.19.0 are built, and the roadmap is complete.
 
 - **Prototype:** [`prototype.html`](prototype.html) opens in any browser. It draws every
   screen in the app's own tokens, greys out everything that stays exactly as it is
@@ -228,7 +228,12 @@ numbers in brackets are its finding numbers.
    data size and confirm each finding is fixed or deliberately kept, then the version
    bump, the changelog and a final emulator pass.
 
-1.19.0 ends the roadmap. The deleted-regime legend fix can land in any patch release.
+1.19.0 was released on 17 October 2026 and ends the roadmap. The re-run of the audit's
+harness found every finding fixed or deliberately kept, and one gap it had not listed,
+a stat tile figure cut short at a 1.3 font. Before the release it was fixed
+(`8953cec`), a change of 100% or more became a whole percentage (`ec9cd72`), the
+unused `ConsistencyHeatmap` was deleted (`0b4ad54`), and `1 sets` became `1 set`
+in weekly volume (`4e8d590`) and in a session's count of its sets (`351884a`). The deleted-regime legend fix can land in any patch release.
 
 ## Versioning
 
