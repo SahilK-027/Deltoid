@@ -131,8 +131,9 @@ class _StrengthCardState extends State<StrengthCard> {
             ],
           ),
           // The spacing every chart card shares (THEME → Charts): 16 to the
-          // range control, 12 to the readout, 16 to the plot, 12 under it to
-          // the legend and 16 to the row that follows.
+          // range control, 12 to the readout and 12 from it to the plot, so the
+          // strip sits evenly between the two, 12 under the plot to the legend
+          // and 16 to the row that follows.
           const SizedBox(height: Space.lg),
           SegmentedPill<CycleRange>(
             segments: [
@@ -154,7 +155,7 @@ class _StrengthCardState extends State<StrengthCard> {
             point: selected,
             isBaseline: selected.cycleId == baseline?.cycleId,
           ),
-          const SizedBox(height: Space.lg),
+          const SizedBox(height: Space.md),
           CycleAxisChart(
             points: window.points,
             plotted: window.plotted,
@@ -315,25 +316,33 @@ class _Readout extends StatelessWidget {
         color: c.surfaceHigh,
         borderRadius: BorderRadius.circular(Radii.cell),
       ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: 'Cycle ${point.index}',
-              style: context.t.bodyMedium?.copyWith(
-                color: c.textPrimary,
-                fontWeight: FontWeight.w600,
+      // One line in `bodySmall`, set smaller rather than wrapped when a large
+      // system font leaves it no room: a strip that grows a second line when
+      // the chart is tapped moves the plot under the finger.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Cycle ${point.index}',
+                style: context.t.bodySmall?.copyWith(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            TextSpan(
-              text: rest,
-              style: point.isDeload
-                  ? context.t.bodyMedium?.copyWith(color: c.deload)
-                  : context.t.bodyMedium,
-            ),
-          ],
+              TextSpan(
+                text: rest,
+                style: point.isDeload
+                    ? context.t.bodySmall?.copyWith(color: c.deload)
+                    : context.t.bodySmall,
+              ),
+            ],
+          ),
+          maxLines: 1,
+          softWrap: false,
         ),
-        maxLines: 2,
       ),
     );
   }
@@ -367,14 +376,18 @@ String cycleReadout(CyclePoint point, {bool isBaseline = false}) {
   return parts.join('  ·  ');
 }
 
-/// The days a cycle covers: `24 Aug to 30 Aug 2026`, `7 Sep 2026 to now`.
+/// The days a cycle covers: `24–30 Aug 2026`, `25 Sep–3 Oct 2026`,
+/// `7 Sep 2026 to now`.
 ///
 /// The year is always printed. A cycle is read months after the fact, and
-/// "24 Aug to 30 Aug" in a log spanning years names four different weeks.
+/// "24–30 Aug" in a log spanning years names four different weeks. A range is
+/// joined by an en dash, and a month the two ends share is printed once, so
+/// the readout fits one line on a phone.
 String? cycleSpan(CyclePoint point) {
   final from = point.startDayKey;
   if (from == null) return null;
   final start = dateFromDayKey(from);
+  final dayOnly = DateFormat('d');
   final day = DateFormat('d MMM');
   final withYear = DateFormat('d MMM yyyy');
 
@@ -383,10 +396,14 @@ String? cycleSpan(CyclePoint point) {
   final to = point.endDayKey;
   if (to == null || to == from) return withYear.format(start);
   final end = dateFromDayKey(to);
-  // Both years on a cycle that crosses one. `29 Dec to 4 Jan 2026` reads as a
+  // Both years on a cycle that crosses one. `29 Dec–4 Jan 2026` reads as a
   // week in December 2026 that ended the previous January.
-  final opening = start.year == end.year ? day : withYear;
-  return '${opening.format(start)} to ${withYear.format(end)}';
+  final opening = start.year != end.year
+      ? withYear
+      : start.month != end.month
+          ? day
+          : dayOnly;
+  return '${opening.format(start)}–${withYear.format(end)}';
 }
 
 /// What the marks mean, under the chart.

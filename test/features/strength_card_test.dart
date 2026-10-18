@@ -169,6 +169,38 @@ void main() {
       );
     });
 
+    testWidgets('the readout keeps to one line at a large system font',
+        (tester) async {
+      // A Pixel-width phone at 1.3: the strip is set smaller rather than
+      // wrapped, so a tap on the chart never moves the plot under the finger.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.625;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(411, 914),
+            textScaler: TextScaler.linear(1.3),
+          ),
+          child: harness(
+            phasedRegime([
+              phased(1, 100, 20260526),
+              phased(2, 110, 20260602),
+              phased(3, 60, 20260609, isDeload: true),
+              phased(4, 120, 20260616),
+            ]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final strip = find.textContaining('Cycle 4', findRichText: true);
+      final text = tester.widget<RichText>(strip.first);
+      expect(text.maxLines, 1);
+      expect(text.softWrap, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a regime trained with no phase has no phase in its legend',
         (tester) async {
       await tester.pumpWidget(harness(trained()));
@@ -288,14 +320,23 @@ void main() {
     test('names the cycle, its dates and its score', () {
       expect(
         cycleReadout(point(9, value: 9.8, from: 20260824, to: 20260830)),
-        'Cycle 9  ·  24 Aug to 30 Aug 2026  ·  +9.8%',
+        'Cycle 9  ·  24–30 Aug 2026  ·  +9.8%',
       );
     });
 
     test('prints both years on a cycle that crosses one', () {
       expect(
         cycleSpan(point(1, value: 0, from: 20251229, to: 20260104)),
-        '29 Dec 2025 to 4 Jan 2026',
+        '29 Dec 2025–4 Jan 2026',
+      );
+    });
+
+    test('a cycle across two months names both', () {
+      expect(
+        cycleReadout(
+          point(2, value: 4.1, from: 20260925, to: 20261003, phase: PhaseKind.cut),
+        ),
+        'Cycle 2  ·  25 Sep–3 Oct 2026  ·  Cut  ·  +4.1%',
       );
     });
 
@@ -314,7 +355,7 @@ void main() {
     test('a deload says so instead of scoring', () {
       expect(
         cycleReadout(point(5, from: 20260622, to: 20260628, isDeload: true)),
-        'Cycle 5  ·  22 Jun to 28 Jun 2026  ·  Deload',
+        'Cycle 5  ·  22–28 Jun 2026  ·  Deload',
       );
     });
 
@@ -324,7 +365,7 @@ void main() {
           point(1, value: 0, from: 20260525, to: 20260531),
           isBaseline: true,
         ),
-        'Cycle 1  ·  25 May to 31 May 2026',
+        'Cycle 1  ·  25–31 May 2026',
       );
     });
 
@@ -333,14 +374,14 @@ void main() {
         cycleReadout(
           point(6, value: 6.4, from: 20260903, to: 20260909, phase: PhaseKind.cut),
         ),
-        'Cycle 6  ·  3 Sep to 9 Sep 2026  ·  Cut  ·  +6.4%',
+        'Cycle 6  ·  3–9 Sep 2026  ·  Cut  ·  +6.4%',
       );
     });
 
     test('a cycle with no phase says nothing extra', () {
       expect(
         cycleReadout(point(6, value: 6.4, from: 20260903, to: 20260909)),
-        'Cycle 6  ·  3 Sep to 9 Sep 2026  ·  +6.4%',
+        'Cycle 6  ·  3–9 Sep 2026  ·  +6.4%',
       );
     });
 
@@ -355,7 +396,7 @@ void main() {
             phase: PhaseKind.cut,
           ),
         ),
-        'Cycle 5  ·  22 Jun to 28 Jun 2026  ·  Deload',
+        'Cycle 5  ·  22–28 Jun 2026  ·  Deload',
       );
     });
 

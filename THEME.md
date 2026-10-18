@@ -861,8 +861,12 @@ its legend, then the row that opens the detail.
   rewording itself is not visibly an answer to the tap. The cycle is named in
   `text` at the head of it; a deload says so in `deload`. A cycle that ran in a
   phase names it after the days, in the strip's own text colour:
-  `Cycle 6 · 3 Sep to 9 Sep 2026 · Cut · +6.4%`. A cycle with no phase leaves
-  the item out rather than printing `No phase`.
+  `Cycle 6 · 3–9 Sep 2026 · Cut · +6.4%`, or `25 Sep–3 Oct 2026` across two
+  months. A cycle with no phase leaves the item out rather than printing
+  `No phase`. **The strip is one line of `bodySmall`**, set smaller rather
+  than wrapped when a large system font leaves it no room, because a strip
+  that grows a line when the chart is tapped moves the plot under the
+  finger.
 - **Three states, one card** — trained, a first cycle with nothing to compare,
   and nothing trained at all. The last two print `——` where the figure goes and
   keep the chart's height as empty space, so the page does not change shape on
@@ -1041,7 +1045,8 @@ resolution.
   a jump.
 - **Every chart card is padded 16 and spaced the same way inside.** Top to
   bottom: the figure and its caption, 16, the range control, 12, the readout
-  where there is one, 16, then the plot. Under the plot: 8 to a hint or caption,
+  where there is one and 12 again, so the strip sits evenly between the
+  control and the chart, otherwise 16, then the plot. Under the plot: 8 to a hint or caption,
   12 to the legend, and 16 to whatever follows (a row of figures, a hairline,
   the row that opens the detail), then 12 under a hairline. The plot reserves
   half its top label's measured height and 2 more inside its own box, 10 at
