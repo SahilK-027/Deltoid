@@ -158,7 +158,7 @@ build instead.
 
 ## Status
 
-The app is feature-complete and in daily use. All 1,591 Dart tests and sixteen
+The app is feature-complete and in daily use. All 1,604 Dart tests and sixteen
 pgTAP tests pass, and the analyzer reports no issues. [TODO.md](TODO.md) is the
 only place where status is recorded, and [CHANGELOG.md](CHANGELOG.md) says what
 each release changed.
@@ -271,7 +271,7 @@ theme, backup, and the account.
 
 ### Testing
 
-The suite contains 1,591 Dart tests, plus sixteen pgTAP tests that run behind
+The suite contains 1,604 Dart tests, plus sixteen pgTAP tests that run behind
 `supabase test db`. Alongside conventional unit and widget tests, three pieces
 are worth describing:
 

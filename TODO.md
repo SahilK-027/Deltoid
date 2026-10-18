@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,591 tests and sixteen pgTAP tests, analyzer clean.**
+**1,604 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -103,6 +103,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The bodyweight trend at parity with the exercise trend, chart text whole at a 1.3 font, `Change` read along one session, and `Log weight` as a `+` in the Weigh-ins app bar.
 - [x] One spacing for chart cards, two line-chart heights, one `ChartLegend`, and a stat tile figure set smaller rather than cut.
 - [x] All time names a deleted regime from its tombstone, in grey, and keys only regimes with no name to read as one `Deleted programme`.
+- [x] A gap in a line bridged by a faint dotted line, a daily line crossing up to six empty days, and the cycle readout on one line.
 
 ### Sync
 

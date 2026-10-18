@@ -15,6 +15,17 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.19.2] - 2026-10-18
+
+Patch release joining a chart's line across a gap and keeping the cycle readout to one line.
+
+### Fixed
+
+- **Charts:** Where nothing was logged for a while, a faint dotted line now joins the readings on either side, so a chart reads as one trend rather than as broken pieces. The solid line still stops at the gap, and the dotted stretch shows that nothing was measured there.
+  - The bodyweight graph on the Phase card is joined the same way.
+  - On a chart averaged by day, gaps of up to six days are drawn as a solid line, since bodyweight is weighed a few times a week. Only a week or more with nothing logged is dotted.
+- **Progress:** The cycle readout under Cycle progress stays on one line, such as `Cycle 2 · 25 Sep–3 Oct 2026 · Cut · +4.1%`, rather than wrapping onto a second. It is set in smaller text, with equal space above and below it.
+
 ## [1.19.1] - 2026-10-17
 
 Patch release naming deleted programmes on the All time timeline.
@@ -631,7 +642,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...HEAD
+[1.19.2]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...v1.19.2
 [1.19.1]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/SahilK-027/Deltoid/compare/v1.17.0...v1.18.0
