@@ -10,8 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Gaps and jumps, the audit's findings 2 and 12: a line breaks at a bucket
-/// with nothing in it, a bar chart keeps its zero, and the cycle line is dashed
-/// across a spell on another regime as it is across a deload.
+/// with nothing in it and a faint dotted line bridges the break, a bar chart
+/// keeps its zero, and the cycle line is dashed across a spell on another
+/// regime as it is across a deload.
 
 Widget _app(Widget child) => MaterialApp(
       theme: buildTheme(Brightness.dark),
@@ -74,12 +75,51 @@ void main() {
       await tester.pumpWidget(_trend([100, 102, null, 110, 112]));
       await tester.pumpAndSettle();
 
-      final line = _data(tester).lineBarsData.single;
+      final line = _data(tester).lineBarsData.first;
       expect(line.spots.length, 5);
       expect(line.spots[2].isNull(), isTrue,
           reason: 'fl_chart breaks the line at a null spot');
       expect([for (final s in line.spots) if (s.isNotNull()) s.y],
           [100, 102, 110, 112]);
+    });
+
+    testWidgets('bridges the break with a faint dotted line', (tester) async {
+      await tester.pumpWidget(_trend([100, 102, null, 110, 112]));
+      await tester.pumpAndSettle();
+
+      final bars = _data(tester).lineBarsData;
+      expect(bars.length, 2, reason: 'the line, then one bridge');
+      final line = bars.first;
+      final bridge = bars.last;
+      expect(line.dashArray, isNull);
+      expect(bridge.dashArray, softLineDash);
+      expect(bridge.color!.a, closeTo(softLineAlpha, 0.01));
+      expect([for (final s in bridge.spots) (s.x, s.y)],
+          [(line.spots[1].x, 102), (line.spots[3].x, 110)]);
+      expect(bridge.dotData.show, isFalse);
+    });
+
+    testWidgets('a bridge names nothing when touched', (tester) async {
+      await tester.pumpWidget(_trend([100, 102, null, 110, 112]));
+      await tester.pumpAndSettle();
+
+      final data = _data(tester);
+      final bridge = data.lineBarsData.last;
+      final items = data.lineTouchData.touchTooltipData.getTooltipItems([
+        LineBarSpot(bridge, 1, bridge.spots.first),
+      ]);
+      expect(items.single, isNull);
+      expect(
+        data.lineTouchData.getTouchedSpotIndicator(bridge, [0]).single,
+        isNull,
+      );
+    });
+
+    testWidgets('a line with no break has no bridge', (tester) async {
+      await tester.pumpWidget(_trend([100, 102, 104, 110]));
+      await tester.pumpAndSettle();
+
+      expect(_data(tester).lineBarsData.length, 1);
     });
 
     testWidgets('scales its axis to the readings, not to the break',
@@ -100,7 +140,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final data = _data(tester);
-      final line = data.lineBarsData.single;
+      final line = data.lineBarsData.first;
       expect(line.spots[4].y, data.maxY,
           reason: 'the wild point is drawn on the top edge');
       expect(
@@ -133,7 +173,7 @@ void main() {
       await tester.pumpWidget(_trend(values));
       await tester.pumpAndSettle();
 
-      final line = _data(tester).lineBarsData.single;
+      final line = _data(tester).lineBarsData.first;
       final show = line.dotData.checkToShowDot;
       expect(show(line.spots[151], line), isTrue);
       expect(show(line.spots[10], line), isFalse);

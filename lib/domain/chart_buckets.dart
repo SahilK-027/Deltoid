@@ -298,7 +298,11 @@ List<Bucket> bucketize({
 ///
 /// A bar chart does not ask this question. A week with no training is zero
 /// sets and draws on the baseline, so it reads the buckets as they are.
-List<Bucket?> lineBuckets(List<Bucket> buckets) {
+///
+/// [crossable] is how many empty buckets in a row are still the rhythm rather
+/// than a gap, one unless the caller says otherwise: [crossableEmpty] gives it
+/// for a granularity.
+List<Bucket?> lineBuckets(List<Bucket> buckets, {int crossable = 1}) {
   final out = <Bucket?>[];
   var empty = 0;
   for (final b in buckets) {
@@ -306,9 +310,47 @@ List<Bucket?> lineBuckets(List<Bucket> buckets) {
       empty++;
       continue;
     }
-    if (empty > 1 && out.isNotEmpty) out.add(null);
+    if (empty > crossable && out.isNotEmpty) out.add(null);
     empty = 0;
     out.add(b);
+  }
+  return out;
+}
+
+/// How many empty buckets in a row a line crosses solid at [by].
+///
+/// A day is too fine a bucket for one empty one to mean anything: bodyweight is
+/// weighed a few times a week, not every morning, and a lift is trained once or
+/// twice a week. So a daily line crosses up to six empty days, anything short of
+/// a week, and breaks only at a week or more with nothing in it. Every coarser
+/// granularity crosses one, as [lineBuckets] explains.
+int crossableEmpty(Granularity by) => by == Granularity.daily ? 6 : 1;
+
+/// The gaps a line chart bridges with a dotted line, as the indices of the
+/// readings either side of each break.
+///
+/// [present] is the line's points in order, true for a reading and false for
+/// the break [lineBuckets] put where two or more buckets in a row were empty.
+/// A break with a reading on both sides is bridged; one at either end of the
+/// list has nothing to reach and is left alone.
+///
+/// The break stays in the data, and the solid line still stops at it: a solid
+/// line across the gap would claim readings that were never taken. The bridge
+/// is drawn faint and dotted so that the eye reads one trend through the
+/// whole window, and reads it as unmeasured where the dots are (THEME →
+/// Charts).
+List<(int, int)> gapBridges(List<bool> present) {
+  final out = <(int, int)>[];
+  int? last;
+  var broken = false;
+  for (var i = 0; i < present.length; i++) {
+    if (!present[i]) {
+      broken = true;
+      continue;
+    }
+    if (broken && last != null) out.add((last, i));
+    broken = false;
+    last = i;
   }
   return out;
 }

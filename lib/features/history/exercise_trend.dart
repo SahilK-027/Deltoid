@@ -366,7 +366,8 @@ class _Chart extends ConsumerWidget {
               // Months you did not train this movement break the line. A zero
               // would draw a crash to the axis and back, and a straight line
               // across them would claim sessions that never happened. One
-              // empty week is the rhythm of the training and is crossed.
+              // empty week, or less than a week of empty days, is the rhythm
+              // of the training and is crossed.
               for (final b in lineBuckets(bucketize(
                 rows: [
                   for (final p in bySession[names[i]]!)
@@ -378,7 +379,7 @@ class _Chart extends ConsumerWidget {
                 by: by,
                 from: from,
                 to: to,
-              )))
+              ), crossable: crossableEmpty(by)))
                 b == null ? FlSpot.nullSpot : FlSpot(bucketX(b), b.value!),
             ],
           ),

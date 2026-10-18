@@ -749,8 +749,9 @@ bottom:
   filled dot. Behind it each stretch is tinted by the phase it ran in, `bulk`
   and `cut` at 20% and `maintenance` at 16%, with no tint where no phase was
   set. A legend under it names only the phases the sparkline shows. It has no
-  axis, as no sparkline does, and it breaks where two or more weeks in a row
-  had no weigh-in, as every sparkline does (see [Charts](#charts)).
+  axis, as no sparkline does, and where two or more weeks in a row had no
+  weigh-in its line stops and a dotted bridge carries it on, as on every
+  chart (see [Charts](#charts)).
 - **A hairline**, then **three figures** in equal columns, each a `label` over
   a dense `ValueUnit`: `Bodyweight`, the latest weigh-in; `Since start`, the
   change from the bodyweight on the phase's first day; and `Each week`, that
@@ -923,7 +924,19 @@ resolution.
 - **A single empty bucket is the rhythm, not a gap.** A movement trained every
   eight or nine days leaves every other week empty, and a line broken at each
   of them is a year of steady training cut into pieces. So a line breaks only
-  at two or more empty buckets in a row, and is drawn straight across one.
+  at two or more empty buckets in a row, and is drawn straight across one. A
+  day is the exception, being too fine a bucket for one empty one to mean
+  anything: bodyweight is weighed a few times a week, so a daily line is drawn
+  straight across up to six empty days and breaks only at a week or more.
+- **A gap is bridged, not left open.** Where the solid line stops, a dotted
+  line in the series' colour at 60%, 2 drawn and 5 left out, joins the
+  reading before the gap to the reading after it. A chart full of broken
+  pieces reads as a broken chart; one trend with stretches marked as
+  unmeasured reads as what happened. The solid line never crosses the gap,
+  since that would claim readings nobody took, and the bridge carries no
+  marker and answers no touch. It is the same dash and the same 60% as the
+  cycle chart's jump across a deload or a resumed regime: one look, one
+  meaning, joined without being measured.
 - **A bucket is drawn at its middle, not its first day.** A month plotted on the
   1st is half a month early, and a yearly mark on New Year's Day reads as the
   wrong year.
@@ -985,10 +998,10 @@ resolution.
   shape among its siblings, and a dashed gridline across a shape with no scale,
   or a deload band that at four cycles is a solid square, is furniture. **A
   sparkline breaks where its full chart would**: two or more empty buckets in a
-  row are a gap in the line, a single one is crossed, and a reading with a
-  break either side is a dot of twice the line's width, since a line of no
-  length is otherwise not drawn. A shape that runs straight across a month
-  nobody weighed in draws a trend nobody measured.
+  row stop the solid line and a dotted bridge carries it on, a single one is
+  crossed, and a reading with a break either side is a dot of twice the line's
+  width. A solid shape across a month nobody weighed in draws a trend nobody
+  measured.
 - **Markers only while they mark something.** When neighbouring points are
   closer than about 10 px the circles touch and the line is lost inside them;
   drop them and offer zoom. The distance is measured in pixels for each series

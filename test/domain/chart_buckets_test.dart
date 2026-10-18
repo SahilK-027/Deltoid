@@ -287,6 +287,64 @@ void main() {
     });
   });
 
+  group('crossableEmpty', () {
+    List<Bucket> daysOf(List<int> weighedDays) => bucketize(
+          rows: [
+            for (final d in weighedDays)
+              (dayKey: dayKeyOf(DateTime(2026, 9, d)), value: 80.0),
+          ],
+          by: Granularity.daily,
+          from: DateTime(2026, 9, 1),
+          to: DateTime(2026, 9, 30),
+        );
+
+    test('a daily line crosses up to six empty days solid', () {
+      final line = lineBuckets(
+        daysOf([1, 3, 10]),
+        crossable: crossableEmpty(Granularity.daily),
+      );
+      expect(line.contains(null), isFalse,
+          reason: 'one empty day and six empty days are both crossed');
+    });
+
+    test('a daily line breaks at a week with nothing in it', () {
+      final line = lineBuckets(
+        daysOf([1, 9]),
+        crossable: crossableEmpty(Granularity.daily),
+      );
+      expect([for (final b in line) b == null], [false, true, false]);
+    });
+
+    test('every coarser line crosses one empty bucket', () {
+      for (final by in Granularity.values) {
+        if (by == Granularity.daily) continue;
+        expect(crossableEmpty(by), 1, reason: by.name);
+      }
+    });
+  });
+
+  group('gapBridges', () {
+    test('joins the readings either side of each break', () {
+      expect(gapBridges([true, true, false, true, false, true]), [(1, 3), (3, 5)]);
+    });
+
+    test('a line with no break has nothing to bridge', () {
+      expect(gapBridges([true, true, true]), isEmpty);
+    });
+
+    test('a break at either end reaches nothing and is left alone', () {
+      expect(gapBridges([false, true, true, false]), isEmpty);
+    });
+
+    test('a run of breaks is one bridge', () {
+      expect(gapBridges([true, false, false, true]), [(0, 3)]);
+    });
+
+    test('a lone reading between two breaks is joined on both sides', () {
+      expect(gapBridges([true, false, true, false, true]), [(0, 2), (2, 4)]);
+    });
+  });
+
   group('lineBuckets', () {
     List<Bucket> monthsOf(List<({int dayKey, double value})> rows) => bucketize(
           rows: rows,

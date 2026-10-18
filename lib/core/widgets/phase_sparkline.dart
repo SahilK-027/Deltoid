@@ -6,6 +6,7 @@ import '../../domain/enums.dart';
 import '../../domain/phases.dart';
 import '../theme/tokens.dart';
 import 'chart_legend.dart';
+import 'trend_chart.dart' show softLineAlpha, softLineDash;
 
 /// The phase colours, by kind (THEME → Semantic assignments).
 extension PhaseHue on DeltoidColors {
@@ -141,6 +142,18 @@ class _PhaseSparklinePainter extends CustomPainter {
       ..strokeWidth = 2
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round;
+    // Each gap bridged by a faint dotted line from the end of one run to the
+    // start of the next, as on the full charts: one trend through the window,
+    // unmeasured where the dots are.
+    final bridge = Paint()
+      ..color = line.withValues(alpha: softLineAlpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.butt;
+    final drawn = runs.where((r) => r.isNotEmpty).toList();
+    for (var i = 1; i < drawn.length; i++) {
+      _dotted(canvas, drawn[i - 1].last, drawn[i].first, bridge);
+    }
     for (final run in runs) {
       if (run.length == 1) {
         // A week with a break either side is a line of no length, and
@@ -158,6 +171,20 @@ class _PhaseSparklinePainter extends CustomPainter {
     final last = runs.lastWhere((r) => r.isNotEmpty).last;
     canvas.drawCircle(last, _dot + 2, Paint()..color = ring);
     canvas.drawCircle(last, _dot, Paint()..color = line);
+  }
+
+  /// A straight line from [a] to [b] in [softLineDash]'s dashes, which a
+  /// canvas does not draw on its own.
+  static void _dotted(Canvas canvas, Offset a, Offset b, Paint paint) {
+    final length = (b - a).distance;
+    if (length == 0) return;
+    final step = (b - a) / length;
+    final on = softLineDash[0].toDouble();
+    final gap = softLineDash[1].toDouble();
+    for (var d = 0.0; d < length; d += on + gap) {
+      final end = math.min(d + on, length);
+      canvas.drawLine(a + step * d, a + step * end, paint);
+    }
   }
 
   @override

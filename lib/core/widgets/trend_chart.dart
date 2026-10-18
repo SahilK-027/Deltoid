@@ -147,6 +147,14 @@ const chartHeightCard = 150.0;
 /// chart, line or bar, since THEME has them share their gridlines.
 const gridlineDash = <int>[4, 4];
 
+/// The dash of a line that joins two readings without measuring what lies
+/// between them: a gap bridged on a trend, and the jump across a deload or a
+/// resumed regime on the cycle chart. One look for one meaning.
+const softLineDash = <int>[2, 5];
+
+/// The opacity of that line, against the solid line's full colour.
+const softLineAlpha = 0.6;
+
 /// The one control every chart in the app is driven by: how much time, which
 /// year, and how finely it is averaged.
 ///
@@ -642,6 +650,15 @@ class _TrendChartState extends State<TrendChart>
     // show by its position.
     double realValue(int bar, int index, double drawn) =>
         offScaleAt(bar, index)?.value ?? drawn;
+    // A series' point where it is drawn: an off-scale one on the edge it
+    // left by, and a break as a break.
+    FlSpot placed(int bar, int index) {
+      final p = series[bar].spots[index];
+      return switch (readingAt[bar][index]) {
+        final k? => p.copyWith(y: yAxis.place(bar, k, p.y)),
+        null => FlSpot.nullSpot,
+      };
+    }
 
     // The window's days, or with no window the days the data covers. One
     // session is a chart with one dot on it, and a dot is worth drawing: it
@@ -754,15 +771,23 @@ class _TrendChartState extends State<TrendChart>
                   : LineTouchData(
                       touchTooltipData: LineTouchTooltipData(
                         getTooltipColor: (_) => c.surfaceHigh,
+                        // A bridge is not a reading, so it names nothing.
                         getTooltipItems: (spots) => [
                           for (final s in spots)
-                            LineTooltipItem(
-                              tooltip(realValue(s.barIndex, s.spotIndex, s.y)),
-                              context.t.labelMedium!
-                                  .copyWith(color: c.textPrimary),
-                            ),
+                            s.barIndex >= series.length
+                                ? null
+                                : LineTooltipItem(
+                                    tooltip(realValue(
+                                        s.barIndex, s.spotIndex, s.y)),
+                                    context.t.labelMedium!
+                                        .copyWith(color: c.textPrimary),
+                                  ),
                         ],
                       ),
+                      getTouchedSpotIndicator: (bar, indices) =>
+                          bar.dashArray != null
+                              ? [for (final _ in indices) null]
+                              : defaultTouchedIndicators(bar, indices),
                     ),
               lineBarsData: [
                 for (var i = 0; i < series.length; i++)
@@ -770,11 +795,8 @@ class _TrendChartState extends State<TrendChart>
                     // An off-scale point is drawn on the edge it left by, so
                     // the line runs to the edge and back.
                     spots: [
-                      for (final (j, p) in series[i].spots.indexed)
-                        switch (readingAt[i][j]) {
-                          final k? => p.copyWith(y: yAxis.place(i, k, p.y)),
-                          null => FlSpot.nullSpot,
-                        },
+                      for (var j = 0; j < series[i].spots.length; j++)
+                        placed(i, j),
                     ],
                     isCurved: false,
                     color: series[i].color,
@@ -805,6 +827,22 @@ class _TrendChartState extends State<TrendChart>
                       },
                     ),
                   ),
+                // A gap is bridged by a faint dotted line in the series'
+                // colour, after the solid lines so that a touch's bar index
+                // still names a series. The solid line stops at the gap, and
+                // the dots carry the trend across it as unmeasured.
+                for (var i = 0; i < series.length; i++)
+                  for (final (a, b) in gapBridges([
+                    for (final p in series[i].spots) p.isNotNull(),
+                  ]))
+                    LineChartBarData(
+                      spots: [placed(i, a), placed(i, b)],
+                      isCurved: false,
+                      color: series[i].color.withValues(alpha: softLineAlpha),
+                      barWidth: 2,
+                      dashArray: softLineDash,
+                      dotData: const FlDotData(show: false),
+                    ),
               ],
             ),
           );
@@ -1735,10 +1773,10 @@ class CycleAxisChart extends StatelessWidget {
       spots: [from, to],
       isCurved: false,
       color: soft
-          ? c.progress.withValues(alpha: open ? 0.7 : 0.6)
+          ? c.progress.withValues(alpha: open ? 0.7 : softLineAlpha)
           : c.progress,
       barWidth: 2,
-      dashArray: soft ? (open ? const [3, 4] : const [2, 5]) : null,
+      dashArray: soft ? (open ? const [3, 4] : softLineDash) : null,
       dotData: const FlDotData(show: false),
     );
   }

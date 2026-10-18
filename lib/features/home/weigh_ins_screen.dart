@@ -400,8 +400,9 @@ class _TrendCard extends ConsumerWidget {
 
     // Plotted in display units, which is what the axis and the tooltip read in.
     // The mean of a week of weigh-ins is a weigh-in; the sum of them is not a
-    // weight anybody has ever been. Two months in a row with no weigh-in have
-    // no weight to draw, so the line breaks there rather than crossing them.
+    // weight anybody has ever been. Two months in a row with no weigh-in, or a
+    // week of days, have no weight to draw, so the solid line stops there and
+    // a dotted one carries the trend across.
     final marks = lineBuckets(bucketize(
       rows: [
         for (final e in points)
@@ -410,7 +411,7 @@ class _TrendCard extends ConsumerWidget {
       by: by,
       from: from,
       to: to,
-    ));
+    ), crossable: crossableEmpty(by));
     final readings = marks.nonNulls.length;
 
     return AppCard(
