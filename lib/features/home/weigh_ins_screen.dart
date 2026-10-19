@@ -78,7 +78,7 @@ final bodyweightRangeProvider = StreamProvider.autoDispose<
 /// Bodyweight screen Settings used to open (THEME → The destinations). The
 /// trend card leads because "where is it going" is what the screen is opened
 /// with. The year maps under it answer the habit's own question, how often a
-/// weight was taken, in the design Consistency answers it for training.
+/// weight was taken, a whole year to a card.
 ///
 /// There is no list of entries. An old weigh-in is reached through the
 /// calendar in the app bar, which finds a day by its date where a list made
@@ -165,16 +165,16 @@ class _WeighIns extends ConsumerWidget {
     for (final key in days) {
       byYear[key ~/ 10000] = (byYear[key ~/ 10000] ?? 0) + 1;
     }
-    // Newest first, as on Consistency: scrolling down goes back in time.
+    // Newest first: scrolling down goes back in time, as History does.
     final years = [for (var y = now.year; y >= first.year; y--) y];
     // The years the trend's picker offers: only those with a weigh-in in them.
     final logged = [for (final y in years) if (byYear.containsKey(y)) y];
     final maps = WeighInYearDays(days);
 
-    // `.builder` for the reason Consistency uses it: a year map per year,
-    // and only the ones on screen are painted.
+    // `.builder`: a year map per year, and only the ones on screen are
+    // painted.
     return ListView.builder(
-      // The foot Consistency leaves under its last year. The page runs under
+      // The foot left under the last year. The page runs under
       // the system navigation bar, so the bar's height is added: without it
       // the last year stops under the bar on a phone with three-button
       // navigation.
@@ -241,8 +241,8 @@ class _WeighIns extends ConsumerWidget {
                 ),
               ),
               AppCard(
-                // The padding Consistency's year cards use, for the reason
-                // given there: the month strip carries its own slack.
+                // Shy of even at the bottom: the month strip carries its own
+                // slack under the labels.
                 padding: const EdgeInsets.fromLTRB(
                     Space.lg, Space.lg, Space.lg, Space.md),
                 child: YearHeatmap(year: year, days: maps),

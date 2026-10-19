@@ -1548,8 +1548,8 @@ class _HabitsSection extends ConsumerWidget {
             Expanded(
               child: HabitTile(
                 title: 'Workouts',
-                // The colours the Consistency map draws in: a trained day in
-                // progress blue, a deload in orange.
+                // The colours the Consistency calendar draws in: a trained
+                // day in progress blue, a deload in orange.
                 fill: (key) => switch (heatmap.days[key]) {
                   null => null,
                   final day => day.isDeload ? c.deload : c.progress,

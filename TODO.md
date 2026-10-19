@@ -45,7 +45,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] History pages by keyset, indexes every exercise trained, opens a workout from its own snapshots.
 - [x] A set on a logged day can be corrected or removed from its own line: load, count, partials and type, never the tick or the time. Cycle progress re-reads on the correction.
 - [x] Trend chart: e1RM or top weight, one line per session slot, deloads excluded, stalls flagged, pinch to zoom, holds in seconds.
-- [x] Consistency heatmap, opened from the Workouts habit tile on Home, with the all-time view behind it.
+- [x] Consistency, opened from the Workouts habit tile on Home: one year at a time from the year sheet, sessions per week as bars read by a tooltip, and the year's days as twelve month calendars.
 - [x] Weekly muscle volume, six regions counted in SQL, arms and legs folding open.
 - [x] Volume history screen: six tiles, one bar per week, averages over every week in the span.
 - [x] A region opens onto a full chart plus the movements that produced its sets.
@@ -81,7 +81,6 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Home: the masthead, Today's session, Habits and Past sessions, in a fixed order. `Log a past session` is a row of its own card, not a masthead icon.
 - [x] Habit tiles for weigh-ins and workouts: 30 days as a grid, `N/7 this week`, a + that opens the weigh-in sheet and a play button that starts the session due.
 - [x] The Weigh-ins screen replaces the Bodyweight screen: the trend card, a year map per year, `Log weight`, and a calendar for correcting a past weigh-in.
-- [x] Consistency and Weigh-ins share one year-map design.
 - [x] Progress holds Cycle progress and Weekly volume, moved from Home unchanged.
 - [x] More: a profile header while signed in, an `Account` row with the email beneath it, and the new About text. Bodyweight is no longer a section of it.
 

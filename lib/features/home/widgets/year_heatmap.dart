@@ -5,16 +5,13 @@ import 'package:flutter/material.dart';
 import '../../../core/ids.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../domain/date_axis.dart';
-import '../heatmap_data.dart';
-import 'heatmap.dart' show heatColourIn;
 
 /// What a year map draws: the colour of a day that has happened, and what a
 /// picked day says about itself.
 ///
-/// The map is one design for every habit the app counts. Training days and
-/// weigh-in days differ only in what fills a cell and in the words under the
-/// grid, so those two answers are all a kind of day supplies, and the grid,
-/// the month strip, the dimmed future and the tap stay in one place.
+/// A kind of day differs only in what fills a cell and in the words under the
+/// grid, so those two answers are all it supplies, and the grid, the month
+/// strip, the dimmed future and the tap stay in one place.
 ///
 /// Equal when the days behind it are the same object, which is what a
 /// provider hands over until something changes. The painter repaints on a
@@ -41,30 +38,6 @@ abstract class YearMapDays {
 
   @override
   int get hashCode => identityHashCode(source);
-}
-
-/// Training days, in the colours the compact grid on Home draws:
-/// [DeltoidColors.progress] for a session and [DeltoidColors.deload] for a
-/// light week.
-class TrainingYearDays extends YearMapDays {
-  const TrainingYearDays(this.days);
-
-  final Map<int, HeatDay> days;
-
-  @override
-  Object get source => days;
-
-  @override
-  Color fill(DeltoidColors c, int dayKey) =>
-      heatColourIn(c, days[dayKey], isFuture: false);
-
-  @override
-  String describe(int dayKey, {required bool isFuture}) {
-    final day = days[dayKey];
-    if (day == null) return 'rest day';
-    final n = day.workouts;
-    return '$n session${n == 1 ? '' : 's'}${day.isDeload ? ' · deload' : ''}';
-  }
 }
 
 /// Days with a weigh-in, in [DeltoidColors.weighIn]. A day either holds one or
@@ -104,8 +77,9 @@ class WeighInYearDays extends YearMapDays {
 /// is not a year at a glance, which is the only reason to open this screen —
 /// so the cells shrink to fit fifty-three weeks and the horizontal scroll goes.
 ///
-/// Consistency draws training days with it and Weigh-ins draws weigh-in days;
-/// [days] decides which.
+/// Weigh-ins draws its days with it. Consistency drew training days with it
+/// until it moved to weekly bars and month calendars, and [days] keeps the
+/// kind of day open for any habit that wants the year at a glance.
 class YearHeatmap extends StatefulWidget {
   const YearHeatmap({super.key, required this.year, required this.days});
 

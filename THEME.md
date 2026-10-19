@@ -724,7 +724,7 @@ row is `CrossAxisAlignment.start` for the reason a row of stat tiles is.
   rather than a row of buttons, with the label every circular icon button is
   required to carry. With no session due there is nothing for play to start,
   and the button is absent rather than disabled.
-- **The rest of the tile opens the full map.** Workouts opens Consistency;
+- **The rest of the tile opens the screen behind it.** Workouts opens Consistency;
   Weigh-ins opens the Weigh-ins screen. A tap on the button never also opens
   the tile.
 
@@ -1141,7 +1141,12 @@ resolution.
   floated down the gutter with no line under any of them.
 - **A chart read by touch names the value in its caption, not a tooltip.** On a
   card half a phone wide a tooltip covers the chart it describes, and the
-  caption is already the line saying what the chart is of.
+  caption is already the line saying what the chart is of. **One exception,
+  Consistency's weekly bars**, whose card heads with the year's two figures
+  rather than a caption: a picked week is named in a tooltip standing over its
+  bar, `surfaceHighest` at the cell radius, so the figures above stay the
+  year's while a week is read. The other bars step back to 35%, as they do on
+  every bar chart.
 - **A sparkline may omit its scale; a chart you navigated to may not.** The
   small version is read as a shape among siblings, so no axis and no figure
   beyond the one under it. The full-size one answers "how much" and states a y
@@ -1980,6 +1985,39 @@ the page. Nothing on it asks a question. Cycle progress has since gained the
 phase tints, under [The cycle axis](#the-cycle-axis), and the phases are set
 on Home rather than here, because Home is where things are entered.
 
+**Consistency** is pushed from the Workouts habit tile, so it wears the app
+bar, titled `Consistency`. It shows one year at a time, and asks how
+consistent each week was, so the week is what it draws. Top to bottom:
+
+- **the year chip**, pinned under the bar as Volume's range row is, selected,
+  with the calendar glyph and a caret. It opens `Which year?`, a capped sheet
+  listing every year from the first session to this one, newest first, each
+  row the year over its session count with a radio. A sheet rather than the
+  year stepper, because a year a decade back is a scroll and a tap, not ten
+  presses of an arrow. The screen opens on this year;
+- `Sessions per week`, its trailing figure the year's sessions, `187
+  sessions`, over a card: a [stat row](#stat-tile) of `Average a week` and
+  `Weeks trained`, `38 of 42`, then a bar a week. A bar is `progress`, or
+  `deload` for a week that held a deload, and a week without a session draws
+  nothing. Both figures leave out the week under way, which on a Monday
+  morning holds nothing yet; with no whole week behind them they print `——`.
+  A press or a drag picks a week, named in a tooltip over its bar
+  ([Charts](#charts)), and the pick stays until the same week is pressed
+  again;
+- `Training calendar`, its trailing figure the year's training days, over a
+  card of twelve month calendars, three to a row, each a `bodySmall` month
+  name over a Monday-first grid of heat cells in the year map's colours. The
+  picked week is ringed day by day, and today is ringed. There are no weekday
+  letters, which three months side by side would print three times, and no
+  count beside a month name, which crowded the grid. A hairline and the
+  heatmap legend, `Rest`, `Trained`, `Deload`, close the card, the one legend
+  for both cards.
+
+**Each count is stated once**: sessions in the first heading, days in the
+second, the two rates in the card. The year map this screen drew put
+fifty-three weeks across a phone at cells of about 5, which read as a
+texture in which no week could be found.
+
 **Weigh-ins** is pushed from its habit tile, so it wears the app bar, titled
 `Weigh-ins`. Top to bottom:
 
@@ -1988,8 +2026,8 @@ on Home rather than here, because Home is where things are entered.
 - a line counting every weigh-in since the first, `48 weigh-ins since March
   2025`, over a legend of `No weigh-in` and `Weighed`;
 - a year map per year, newest first, each under a heading carrying the year
-  and its count, in the card and the year-map design Consistency uses. A day
-  with a weigh-in is `weighIn` and a day without is `heatEmpty`.
+  and its count, each in its own card. A day with a weigh-in is `weighIn` and
+  a day without is `heatEmpty`.
 
 **Today's weight is logged from the app bar.** A round `+`, labelled
 `Log weight`, sits beside the calendar and after it, 8 apart: the
@@ -2044,7 +2082,9 @@ appear only while an account is signed in:
 | Table, keypad, stopwatch pad                                    | `lib/features/log/widgets/`                      |
 | Bar list                                                        | `lib/features/progress/widgets/volume_bars.dart` |
 | Habit tile and its thirty-day grid                              | `lib/features/home/widgets/habit_tile.dart`  |
-| The year map, for training days and weigh-in days               | `lib/features/home/widgets/year_heatmap.dart` |
+| The year map, for weigh-in days                                 | `lib/features/home/widgets/year_heatmap.dart` |
+| Consistency's weekly bars and their tooltip                     | `lib/features/home/widgets/session_bars.dart` |
+| Consistency's month calendars                                   | `lib/features/home/widgets/year_calendar.dart` |
 
 Feature code composes these; it does not restyle them. **A component nothing
 calls is deleted**, not left for later — it is a second answer to a question

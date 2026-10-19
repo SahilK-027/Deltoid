@@ -240,7 +240,7 @@ void main() {
     testWidgets('makes room for its month strip at the system font', (
       tester,
     ) async {
-      const map = YearHeatmap(year: 2025, days: TrainingYearDays({}));
+      const map = YearHeatmap(year: 2025, days: WeighInYearDays({}));
       await pump(tester, map, scale: 1.0);
       final small = sizeAt(tester).height;
       await pump(tester, map);

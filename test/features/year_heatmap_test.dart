@@ -1,34 +1,13 @@
 import 'package:deltoid/core/theme/theme.dart';
 import 'package:deltoid/core/theme/tokens.dart';
-import 'package:deltoid/features/home/heatmap_data.dart';
 import 'package:deltoid/features/home/widgets/year_heatmap.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// One year-map design for every habit: Consistency draws training days with
-/// it and Weigh-ins draws weigh-in days, and only the fill and the words of a
-/// picked day differ.
+/// The year map Weigh-ins draws its days with: the fill of a day, and the
+/// words of a picked one.
 void main() {
   final c = DeltoidColors.dark;
-
-  group('training days', () {
-    final days = TrainingYearDays({
-      20250101: const HeatDay(workouts: 1, isDeload: false),
-      20250102: const HeatDay(workouts: 2, isDeload: true),
-    });
-
-    test('fill in the colours of the Consistency map', () {
-      expect(days.fill(c, 20250101), c.progress);
-      expect(days.fill(c, 20250102), c.deload);
-      expect(days.fill(c, 20250103), c.heatEmpty);
-    });
-
-    test('describe a day as Consistency always has', () {
-      expect(days.describe(20250101, isFuture: false), '1 session');
-      expect(days.describe(20250102, isFuture: false), '2 sessions · deload');
-      expect(days.describe(20250103, isFuture: false), 'rest day');
-    });
-  });
 
   group('weigh-in days', () {
     final days = WeighInYearDays({20250101});
@@ -97,20 +76,6 @@ void main() {
       await pumpYear(tester, WeighInYearDays({20250101}));
       await tapDay(tester, column: 0, row: 3);
       expect(find.bySemanticsLabel('Thu 2 Jan · no weigh-in'), findsOneWidget);
-    });
-
-    testWidgets('reads the session count on a training map', (tester) async {
-      await pumpYear(
-        tester,
-        TrainingYearDays({
-          20250101: const HeatDay(workouts: 1, isDeload: true),
-        }),
-      );
-      await tapDay(tester, column: 0, row: 2);
-      expect(
-        find.bySemanticsLabel('Wed 1 Jan · 1 session · deload'),
-        findsOneWidget,
-      );
     });
 
     testWidgets('a second tap on the same day lets it go', (tester) async {
