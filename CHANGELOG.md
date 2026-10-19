@@ -15,6 +15,18 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-10-19
+
+Minor release redrawing the Consistency screen as one year at a time, by week and by day.
+
+### Changed
+
+- **Consistency:** The screen behind the Workouts habit tile shows one year at a time instead of a small year map for every year. The year chip under the title opens a list of every year you have trained in, newest first, each with its session count.
+  - `Sessions per week` draws a bar for each week of the year, blue for a week you trained and orange for a deload week, under your average sessions a week and the number of weeks you trained.
+  - Pressing or dragging across the bars shows the week's dates and sessions above its bar. Press the same week again to hide it.
+  - `Training calendar` shows the year as twelve month calendars, each week starting on Monday, with the week you picked on the chart and today outlined.
+  - The week in progress is drawn but left out of the average and the weeks trained, so a Monday with nothing logged yet is not counted as a missed week.
+
 ## [1.19.2] - 2026-10-18
 
 Patch release joining a chart's line across a gap and keeping the cycle readout to one line.
@@ -642,7 +654,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...HEAD
+[1.20.0]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...v1.20.0
 [1.19.2]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...v1.19.2
 [1.19.1]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/SahilK-027/Deltoid/compare/v1.18.0...v1.19.0
