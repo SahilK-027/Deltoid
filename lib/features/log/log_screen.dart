@@ -120,8 +120,30 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// makes the next tap a guess.
   final _openSwipe = ValueNotifier<String?>(null);
   Timer? _clock;
-  DateTime? _restStartedAt;
+
+  /// The target for the next rest of the exercise on screen. The rest now
+  /// running keeps its own target, in [_rest]: a page turn mid-rest must not
+  /// send a rest with forty seconds left back up to two minutes.
   int _restTargetSeconds = kDefaultRestSeconds;
+
+  /// Whether the rest held in [restClockProvider] has been taken up by this
+  /// screen. Until then the screen behaves as though no rest is running, so the
+  /// one-second clock cannot ring for a rest that ended while it was closed.
+  bool _restResumed = false;
+  bool _resumeScheduled = false;
+
+  /// The rest now running for this workout, if any.
+  ///
+  /// Held in a provider rather than here, because this screen is disposed
+  /// whenever you back out of it and a rest belongs to the workout, not to the
+  /// screen. See [_resumeRest] for how it is taken up again.
+  RestClock? get _rest {
+    if (!_restResumed) return null;
+    final clock = ref.read(restClockProvider);
+    return clock != null && clock.workoutId == widget.workoutId ? clock : null;
+  }
+
+  DateTime? get _restStartedAt => _rest?.startedAt;
 
   /// **Who owns the end of this rest.**
   ///
@@ -169,13 +191,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// Whether the rest now running is the gap between two exercises rather than
   /// between two sets of one. The ± writes itself down against the exercise on
   /// screen, and that number is not the exercise's — see [_adjustRest].
-  bool _restIsBetweenExercises = false;
-
-  /// The target belonging to the exercise now on screen, held back while a
-  /// rest started under the previous exercise is still running. Applying it at
-  /// once would swap the target under the running clock when the page is turned
-  /// mid-rest, sending a rest with forty seconds left back up to two minutes.
-  int? _pendingRestTarget;
+  bool get _restIsBetweenExercises => _rest?.betweenExercises ?? false;
 
   /// Set once the current rest has reached zero, so the buzz fires on the
   /// crossing and not on every tick after it. Cleared whenever the rest is
@@ -333,8 +349,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
   void _postSessionNotification() {
     final detail = _detail;
     if (detail == null) return;
-    final startedAt = _restStartedAt;
-    final resting = startedAt != null && _showRestBar && !_restAlerted;
+    final rest = _rest;
+    final resting = rest != null && _showRestBar && !_restAlerted;
     final done = _doneSets(detail);
     final total = _totalSets(detail);
     // The movement in front of you, which is the one thing the count could
@@ -353,9 +369,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final (position, counted) = entry == null
         ? (0, 0)
         : setPosition(entry.sets);
-    final left = resting
-        ? _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds
-        : null;
+    final left = resting ? rest.remainingAt(DateTime.now()) : null;
     // Off means the foreground service does not start at all: Android will
     // not run one without a notification, so there is no quieter shape of this
     // to offer. What is lost is the live clock — the end-of-rest alert is a
@@ -383,7 +397,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
             detail.workout.startedAt,
           ),
           restSecondsLeft: left,
-          restTargetSeconds: resting ? _restTargetSeconds : null,
+          restTargetSeconds: resting ? rest.targetSeconds : null,
         )
         .ignore();
   }
@@ -409,14 +423,12 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// Buzzes once when rest reaches zero. Without this the timer only ever
   /// turns green, which you can't see with the phone face down on a bench.
   void _checkRestElapsed() {
-    final startedAt = _restStartedAt;
-    if (startedAt == null) {
+    final rest = _rest;
+    if (rest == null) {
       _restAlerted = false;
       return;
     }
-    final remaining =
-        _restTargetSeconds - DateTime.now().difference(startedAt).inSeconds;
-    if (remaining > 0) {
+    if (rest.runningAt(DateTime.now())) {
       // An extended target puts rest back on the clock, so re-arm the alert.
       _restAlerted = false;
       return;
@@ -456,7 +468,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final startedAt = _restStartedAt;
     if (startedAt == null) return null;
     final seconds = DateTime.now().difference(startedAt).inSeconds;
-    if (seconds <= 0 || seconds > 1800) return null;
+    if (seconds <= 0 || seconds > kMaxRestTakenSeconds) return null;
     return seconds;
   }
 
@@ -490,24 +502,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   void _applyRestTarget(int seconds) {
     if (!mounted) return;
-    // A clock already counting down belongs to the set that started it. The
-    // new target takes over at the next rest, not in the middle of this one.
-    if (_restRunning) {
-      _pendingRestTarget = seconds;
-      return;
-    }
-    setState(() {
-      _pendingRestTarget = null;
-      _restTargetSeconds = seconds;
-    });
-  }
-
-  /// Whether rest is still on the clock. Past zero the bar says "Rest finished"
-  /// and the number is no longer being counted, so a new target may land.
-  bool get _restRunning {
-    final startedAt = _restStartedAt;
-    if (startedAt == null) return false;
-    return DateTime.now().difference(startedAt).inSeconds < _restTargetSeconds;
+    // Taken at once, even mid-rest: a clock already counting down keeps the
+    // target it started with in [_rest], and this one waits for the next rest.
+    setState(() => _restTargetSeconds = seconds);
   }
 
   /// Everything Settings decides about rest. Read rather than watched: this
@@ -535,37 +532,97 @@ class _LogScreenState extends ConsumerState<LogScreen>
   (int, bool)? _restDurationAfter(String setId) {
     final detail = _detail;
     if (detail == null) return null;
+    return switch (restKindAfter(_restSlots(detail), setId)) {
+      RestKind.sameExercise => (_restTargetSeconds, false),
+      RestKind.betweenExercises => (_restPrefs.betweenExercises, true),
+      null => null,
+    };
+  }
 
-    var openHere = false;
-    var openElsewhere = false;
-    for (final entry in detail.entries) {
-      if (entry.workoutExercise.skipReason != SkipReason.none) continue;
-      final holdsIt = entry.sets.any((s) => s.id == setId);
-      for (final set in entry.sets) {
-        if (set.id == setId || set.isDone) continue;
-        if (holdsIt) {
-          openHere = true;
-        } else {
-          openElsewhere = true;
-        }
+  /// The workout as the rest logic sees it: which sets are done, when, and
+  /// which exercises have been skipped.
+  List<RestSlot> _restSlots(WorkoutDetail detail) => [
+    for (final entry in detail.entries)
+      (
+        skipped: entry.workoutExercise.skipReason != SkipReason.none,
+        sets: [
+          for (final set in entry.sets)
+            (id: set.id, done: set.isDone, completedAtMs: set.completedAt),
+        ],
+      ),
+  ];
+
+  /// Takes up the rest this workout was in when the screen last closed.
+  ///
+  /// Two sources, in order. The provider, which holds the rest exactly —
+  /// including a ± made during it — for as long as the process lives, so
+  /// backing out to Home and returning finds the clock where it was. Failing
+  /// that, the sets: a rest starts in the same tap that stamps a set's
+  /// `completedAt`, so a process that was killed, or swiped out of recents,
+  /// comes back to the rest it left, counted from that stamp
+  /// ([lastRestStarted]).
+  ///
+  /// Leaving the screen still cancels the alarm and the lock-screen line, as
+  /// it always has. A rest still running is re-armed here; one that ended
+  /// while the screen was closed is over, and does not ring late.
+  Future<void> _resumeRest(WorkoutDetail detail) async {
+    if (!mounted) return;
+    final held = ref.read(restClockProvider);
+    var clock = held != null && held.workoutId == widget.workoutId
+        ? held
+        : null;
+    if (clock == null) {
+      final last = lastRestStarted(_restSlots(detail), DateTime.now());
+      if (last == null) {
+        _restResumed = true;
+        return;
       }
+      final seconds = switch (last.kind) {
+        RestKind.betweenExercises => _restPrefs.betweenExercises,
+        RestKind.sameExercise =>
+          await ref
+              .read(trainingRepositoryProvider)
+              .restTargetFor(
+                exerciseId: detail.entries[last.slot].exercise.id,
+                sessionId: detail.workout.sessionId,
+              ),
+      };
+      // A set ticked while the target was being read has started a rest of
+      // its own, and that one is newer than anything read here.
+      if (!mounted || _restResumed) return;
+      clock = RestClock(
+        workoutId: widget.workoutId,
+        startedAt: last.startedAt,
+        targetSeconds: seconds,
+        betweenExercises: last.kind == RestKind.betweenExercises,
+      );
+      ref.read(restClockProvider.notifier).start(clock);
     }
-
-    // A target held back by a page turn is the newest word on this exercise —
-    // see [_pendingRestTarget].
-    if (openHere) return (_pendingRestTarget ?? _restTargetSeconds, false);
-    if (openElsewhere) return (_restPrefs.betweenExercises, true);
-    return null;
+    final running = clock.runningAt(DateTime.now());
+    setState(() {
+      _restResumed = true;
+      _restAlerted = !running;
+      _showRestBar = running;
+    });
+    if (running) _armRestAlert();
   }
 
   void _startRest((int, bool) rest) {
     final (seconds, betweenExercises) = rest;
     _restBarHide?.cancel();
+    ref
+        .read(restClockProvider.notifier)
+        .start(
+          RestClock(
+            workoutId: widget.workoutId,
+            startedAt: DateTime.now(),
+            targetSeconds: seconds,
+            betweenExercises: betweenExercises,
+          ),
+        );
     setState(() {
-      _restTargetSeconds = seconds;
-      _restIsBetweenExercises = betweenExercises;
-      _pendingRestTarget = null;
-      _restStartedAt = DateTime.now();
+      if (!betweenExercises) _restTargetSeconds = seconds;
+      _restResumed = true;
       _restAlerted = false;
       _showRestBar = true;
     });
@@ -586,9 +643,9 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// Safe to call again at any point in a rest: both the alarm and the timers
   /// are replaced rather than added to.
   void _armRestAlert() {
-    final startedAt = _restStartedAt;
-    if (startedAt == null || _restAlerted) return;
-    final endsAt = startedAt.add(Duration(seconds: _restTargetSeconds));
+    final rest = _rest;
+    if (rest == null || _restAlerted) return;
+    final endsAt = rest.endsAt;
 
     _alarmArmed = true;
     WorkoutNotifications.instance
@@ -614,15 +671,15 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// alarm simply stays armed and rings; a later resume re-books the hand-over
   /// if there is still rest left to run.
   void _takeBackRestAlert() {
-    final startedAt = _restStartedAt;
-    if (!mounted || !_alarmArmed || _restAlerted || startedAt == null) return;
+    final rest = _rest;
+    if (!mounted || !_alarmArmed || _restAlerted || rest == null) return;
     if (_lifecycle != AppLifecycleState.resumed) return;
     _alarmArmed = false;
     WorkoutNotifications.instance.cancelRest().ignore();
 
     // Not left to the one-second clock: it is not aligned to the end of the
     // rest, so the tone would land up to a second after 0:00.
-    final endsAt = startedAt.add(Duration(seconds: _restTargetSeconds));
+    final endsAt = rest.endsAt;
     _fireAt?.cancel();
     _fireAt = Timer(_untilNow(endsAt.add(_fireMargin)), () {
       if (mounted) _checkRestElapsed();
@@ -672,16 +729,16 @@ class _LogScreenState extends ConsumerState<LogScreen>
   /// Nudging the timer sets the target for this exercise, for good: next week
   /// opens on the number you settled on.
   Future<void> _adjustRest(WorkoutDetail detail, int delta) async {
-    final seconds = clampRest(_restTargetSeconds + delta);
-    // A hand on the ± is the latest word on the target, so a value held back
-    // by a page turn does not get to overwrite it at the next set.
-    final startedAt = _restStartedAt;
+    final rest = _rest;
+    final seconds = clampRest(
+      (rest?.targetSeconds ?? _restTargetSeconds) + delta,
+    );
     final stillRunning =
-        startedAt != null &&
-        DateTime.now().difference(startedAt).inSeconds < seconds;
+        rest != null && rest.withTarget(seconds).runningAt(DateTime.now());
+    ref.read(restClockProvider.notifier).retarget(widget.workoutId, seconds);
     setState(() {
-      _restTargetSeconds = seconds;
-      _pendingRestTarget = null;
+      // The gap between exercises is not this exercise's number.
+      if (!_restIsBetweenExercises) _restTargetSeconds = seconds;
       // An extended target puts rest back on the clock, and the alert with it.
       if (stillRunning) _restAlerted = false;
     });
@@ -761,6 +818,14 @@ class _LogScreenState extends ConsumerState<LogScreen>
     if (detail != null && _restTargetKey == null) {
       _watchRestTarget(detail, _page);
     }
+    // Once, on the first build with the workout in it. After the frame,
+    // because taking the rest up sets state and arms an alarm.
+    if (detail != null && !_resumeScheduled) {
+      _resumeScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _resumeRest(detail).ignore();
+      });
+    }
 
     // Both, or neither. A set row without its ghost is a row that has to be
     // redrawn the moment the ghost lands, and the tap that opens this screen
@@ -795,7 +860,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
       _showRestBar,
       _restAlerted,
       _restStartedAt?.millisecondsSinceEpoch,
-      _restTargetSeconds,
+      _rest?.targetSeconds,
     ].join('|');
     if (signature != _notifiedSignature) {
       _notifiedSignature = signature;
@@ -936,10 +1001,10 @@ class _LogScreenState extends ConsumerState<LogScreen>
             // cell is focused, so the seconds left and the ± are both still in
             // reach at the one moment you are most likely to be looking at the
             // screen.
-            if (_showRestBar && _restStartedAt != null)
+            if (_showRestBar && _rest != null)
               RestTimerBar(
-                startedAt: _restStartedAt!,
-                targetSeconds: _restTargetSeconds,
+                startedAt: _rest!.startedAt,
+                targetSeconds: _rest!.targetSeconds,
                 onAdjust: (delta) => _adjustRest(detail, delta),
                 onDismiss: _dismissRestBar,
                 aboveKeypad: _editing != null,

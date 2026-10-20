@@ -4,7 +4,34 @@ import '../../core/providers.dart';
 import '../../data/repositories/training_repository.dart';
 import '../../domain/enums.dart';
 import '../../domain/prefill.dart';
+import '../../domain/rest.dart';
 import '../../domain/session_diff.dart';
+
+/// The rest now running, held for the life of the process rather than the
+/// life of the log screen.
+///
+/// The screen is disposed whenever you back out of it, and a rest kept in its
+/// state went with it: coming back from Home found no clock, and the next set
+/// recorded no rest taken. Kept alive on purpose — this is not `autoDispose`.
+/// What it cannot outlive is the process; for that the screen reads the rest
+/// back off the sets, see [lastRestStarted].
+final restClockProvider = NotifierProvider<RestClockNotifier, RestClock?>(
+  RestClockNotifier.new,
+);
+
+class RestClockNotifier extends Notifier<RestClock?> {
+  @override
+  RestClock? build() => null;
+
+  void start(RestClock clock) => state = clock;
+
+  /// Moves the end of the rest for [workoutId], if that is the rest held.
+  void retarget(String workoutId, int seconds) {
+    final clock = state;
+    if (clock == null || clock.workoutId != workoutId) return;
+    state = clock.withTarget(seconds);
+  }
+}
 
 final workoutDetailProvider =
     StreamProvider.family<WorkoutDetail?, String>((ref, workoutId) {

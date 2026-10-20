@@ -67,4 +67,137 @@ void main() {
       expect(formatRestClock(-30), '0:00');
     });
   });
+
+  group('RestClock', () {
+    final start = DateTime(2026, 10, 20, 18);
+    final clock = RestClock(
+      workoutId: 'w',
+      startedAt: start,
+      targetSeconds: 120,
+      betweenExercises: false,
+    );
+
+    test('counts down against the wall clock', () {
+      expect(clock.endsAt, start.add(const Duration(minutes: 2)));
+      expect(clock.remainingAt(start.add(const Duration(seconds: 30))), 90);
+      expect(clock.runningAt(start.add(const Duration(seconds: 119))), isTrue);
+      expect(clock.runningAt(start.add(const Duration(seconds: 120))), isFalse);
+    });
+
+    test('a new target moves the end and keeps the start', () {
+      final longer = clock.withTarget(180);
+      expect(longer.startedAt, start);
+      expect(longer.workoutId, 'w');
+      expect(longer.remainingAt(start.add(const Duration(seconds: 150))), 30);
+    });
+  });
+
+  group('restKindAfter', () {
+    RestSet open(String id) => (id: id, done: false, completedAtMs: null);
+    RestSet done(String id, int at) => (id: id, done: true, completedAtMs: at);
+
+    test('another open set of the movement is the exercise rest', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', 1), open('a2')]),
+        (skipped: false, sets: [open('b1')]),
+      ];
+      expect(restKindAfter(slots, 'a1'), RestKind.sameExercise);
+    });
+
+    test('the last set of a movement is the walk to the next one', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', 1), done('a2', 2)]),
+        (skipped: false, sets: [open('b1')]),
+      ];
+      expect(restKindAfter(slots, 'a2'), RestKind.betweenExercises);
+    });
+
+    test('the set itself counts as done while its write is in flight', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [open('a1')]),
+      ];
+      expect(restKindAfter(slots, 'a1'), isNull);
+    });
+
+    test('a skipped exercise leaves nothing to rest for', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', 1)]),
+        (skipped: true, sets: [open('b1')]),
+      ];
+      expect(restKindAfter(slots, 'a1'), isNull);
+    });
+  });
+
+  group('lastRestStarted', () {
+    final now = DateTime(2026, 10, 20, 18, 30);
+    int ago(int seconds) =>
+        now.subtract(Duration(seconds: seconds)).millisecondsSinceEpoch;
+    RestSet open(String id) => (id: id, done: false, completedAtMs: null);
+    RestSet done(String id, int at) => (id: id, done: true, completedAtMs: at);
+
+    test('is read off the newest completed set, wherever it sits', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', ago(300)), open('a2')]),
+        (skipped: false, sets: [done('b1', ago(40)), open('b2')]),
+      ];
+      final rest = lastRestStarted(slots, now)!;
+      expect(rest.setId, 'b1');
+      expect(rest.slot, 1);
+      expect(rest.startedAt.millisecondsSinceEpoch, ago(40));
+      expect(rest.kind, RestKind.sameExercise);
+    });
+
+    test('says when the newest set closed its movement', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', ago(90))]),
+        (skipped: false, sets: [open('b1')]),
+      ];
+      expect(lastRestStarted(slots, now)!.kind, RestKind.betweenExercises);
+    });
+
+    test('is nothing before the first set is completed', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [open('a1')]),
+      ];
+      expect(lastRestStarted(slots, now), isNull);
+    });
+
+    test('is nothing once every set is done', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', ago(30))]),
+      ];
+      expect(lastRestStarted(slots, now), isNull);
+    });
+
+    test('ignores a stamp left on a set that is no longer done', () {
+      final slots = <RestSlot>[
+        (
+          skipped: false,
+          sets: [
+            done('a1', ago(200)),
+            (id: 'a2', done: false, completedAtMs: ago(10)),
+            open('a3'),
+          ],
+        ),
+      ];
+      expect(lastRestStarted(slots, now)!.setId, 'a1');
+    });
+
+    test('is nothing for a set completed longer ago than a rest can be', () {
+      final slots = <RestSlot>[
+        (
+          skipped: false,
+          sets: [done('a1', ago(kMaxRestTakenSeconds + 1)), open('a2')],
+        ),
+      ];
+      expect(lastRestStarted(slots, now), isNull);
+    });
+
+    test('is nothing for a stamp from the future', () {
+      final slots = <RestSlot>[
+        (skipped: false, sets: [done('a1', ago(-60)), open('a2')]),
+      ];
+      expect(lastRestStarted(slots, now), isNull);
+    });
+  });
 }

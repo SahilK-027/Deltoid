@@ -90,3 +90,120 @@ String formatRestClock(int seconds) {
   final s = safe % 60;
   return '$m:${s.toString().padLeft(2, '0')}';
 }
+
+/// A rest that has started, and what it is counting towards.
+///
+/// Held outside the log screen, which is disposed whenever you back out of it,
+/// so that a rest outlives the screen it was started on. [workoutId] keeps one
+/// workout's rest from being read as another's.
+class RestClock {
+  const RestClock({
+    required this.workoutId,
+    required this.startedAt,
+    required this.targetSeconds,
+    required this.betweenExercises,
+  });
+
+  final String workoutId;
+  final DateTime startedAt;
+  final int targetSeconds;
+
+  /// The gap between two exercises rather than between two sets of one. Its
+  /// target belongs to Settings, not to the exercise on screen.
+  final bool betweenExercises;
+
+  DateTime get endsAt => startedAt.add(Duration(seconds: targetSeconds));
+
+  /// Whole seconds left at [now]; zero or below once the rest is over.
+  int remainingAt(DateTime now) =>
+      targetSeconds - now.difference(startedAt).inSeconds;
+
+  bool runningAt(DateTime now) => remainingAt(now) > 0;
+
+  RestClock withTarget(int seconds) => RestClock(
+    workoutId: workoutId,
+    startedAt: startedAt,
+    targetSeconds: seconds,
+    betweenExercises: betweenExercises,
+  );
+}
+
+/// Which pause follows a completed set: another set of the same movement, or
+/// the walk to the next one.
+enum RestKind { sameExercise, betweenExercises }
+
+/// One set as rest needs to see it.
+typedef RestSet = ({String id, bool done, int? completedAtMs});
+
+/// One exercise of a workout as rest needs to see it. A skipped exercise has
+/// no sets left to rest for.
+typedef RestSlot = ({bool skipped, List<RestSet> sets});
+
+/// The pause that follows [setId], or null when no open set is left anywhere
+/// and there is nothing to rest for.
+///
+/// [setId] is excluded by id rather than by its flag: the write marking it done
+/// may still be in flight, so it can still be open in the snapshot.
+RestKind? restKindAfter(List<RestSlot> slots, String setId) {
+  var openHere = false;
+  var openElsewhere = false;
+  for (final slot in slots) {
+    if (slot.skipped) continue;
+    final holdsIt = slot.sets.any((s) => s.id == setId);
+    for (final set in slot.sets) {
+      if (set.id == setId || set.done) continue;
+      if (holdsIt) {
+        openHere = true;
+      } else {
+        openElsewhere = true;
+      }
+    }
+  }
+  if (openHere) return RestKind.sameExercise;
+  if (openElsewhere) return RestKind.betweenExercises;
+  return null;
+}
+
+/// The rest a workout was last in, read back from its sets.
+///
+/// A rest starts in the same gesture that stamps a set's `completedAt`, so the
+/// newest stamp is when the last rest began. This is what lets a rest survive
+/// the process being killed: nothing about the clock itself is written down,
+/// and nothing needs to be.
+///
+/// Null when no set has been completed, when the newest one has nothing open
+/// after it, or when it was completed more than [kMaxRestTakenSeconds] before
+/// [now] — that is a phone left on a bench, not a rest. [slot] is the index of
+/// the exercise the set belongs to, whose target a same-exercise rest uses.
+({String setId, int slot, DateTime startedAt, RestKind kind})? lastRestStarted(
+  List<RestSlot> slots,
+  DateTime now,
+) {
+  ({String id, int slot, int at})? newest;
+  for (var i = 0; i < slots.length; i++) {
+    for (final set in slots[i].sets) {
+      final at = set.completedAtMs;
+      if (!set.done || at == null) continue;
+      if (newest == null || at > newest.at) {
+        newest = (id: set.id, slot: i, at: at);
+      }
+    }
+  }
+  if (newest == null) return null;
+  final startedAt = DateTime.fromMillisecondsSinceEpoch(newest.at);
+  final age = now.difference(startedAt).inSeconds;
+  if (age < 0 || age > kMaxRestTakenSeconds) return null;
+  final kind = restKindAfter(slots, newest.id);
+  if (kind == null) return null;
+  return (
+    setId: newest.id,
+    slot: newest.slot,
+    startedAt: startedAt,
+    kind: kind,
+  );
+}
+
+/// The longest gap recorded as a rest. A set completed forty minutes after the
+/// last one is a phone left on a bench, not a rest interval, and storing it
+/// would poison the default for next week.
+const int kMaxRestTakenSeconds = 1800;
