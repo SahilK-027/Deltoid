@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,621 tests and sixteen pgTAP tests, analyzer clean.**
+**1,636 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 

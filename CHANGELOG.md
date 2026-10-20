@@ -15,6 +15,20 @@ Releases are distributed as Android APKs. The build number after the `+` is Andr
 
 ## [Unreleased]
 
+## [1.20.1] - 2026-10-20
+
+Patch release keeping a rest running after you leave the log and making a change of chart range a smooth zoom.
+
+### Fixed
+
+- **Log:** A rest keeps running when you go back from the log screen during a session. Returning to the log shows the clock where it was, including any time added or taken off with the plus and minus controls.
+  - If Android closes the app or you swipe it away from recent apps, reopening the log picks the rest up from the last completed set. A rest that is still running carries on and sounds its alert when it ends, and one that finished while the app was closed does not sound late.
+  - The next set now records the rest that was actually taken, instead of none, after you have left the log mid-rest.
+- **Charts:** Changing the range on an exercise or bodyweight chart zooms the chart instead of redrawing it. Each point stays on its date while the scale changes, and the old line fades out as the new one fades in.
+  - Points no longer slide across the chart, and lines no longer vanish part way through the change.
+  - Dates, values and gridlines move with the zoom and fade across to the new range, so the axis keeps its numbers throughout.
+  - A pinch zoom is reset when you choose a new range.
+
 ## [1.20.0] - 2026-10-19
 
 Minor release redrawing the Consistency screen as one year at a time, by week and by day.
@@ -654,7 +668,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...HEAD
+[1.20.1]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...v1.20.1
 [1.20.0]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...v1.20.0
 [1.19.2]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...v1.19.2
 [1.19.1]: https://github.com/SahilK-027/Deltoid/compare/v1.19.0...v1.19.1
