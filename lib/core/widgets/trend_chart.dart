@@ -504,37 +504,39 @@ class _TrendChartState extends State<TrendChart>
   /// Changing the range is rendered as a change of scale rather than as a
   /// redraw.
   ///
-  /// Two things change when a new range is selected, and they conflict: the
-  /// bounds must travel, and the data must be re-aggregated at a resolution
-  /// suited to the new span. A year of weeks is not the same list of points as
-  /// three months of days, and no interpolation exists between two lists of
-  /// different lengths. Applying both at once reads as a rebuild.
+  /// Two things change when a new range is selected: the bounds must travel,
+  /// and the data is re-aggregated at a resolution suited to the new span. A
+  /// year of weeks is not the same list of points as three months of days, and
+  /// `fl_chart` interpolates two lists of different lengths index by index, so
+  /// the third week of one slides to wherever the third month of the other is.
+  /// Every point crosses the plot to somewhere it never was.
   ///
-  /// They are therefore separated in time. The bounds animate while the
-  /// previously rendered line is retained and scaled with them, which produces
-  /// the zoom; the new resolution is applied at the end of that motion, where a
-  /// change of detail within the same shape is largely imperceptible.
-  /// THEME → Charts specifies that axis furniture cross-fades rather than
-  /// travels, and this applies the same rule at one level up.
+  /// So the two charts are drawn at once, one over the other, in a single frame
+  /// whose bounds this controller carries from the old range to the new. Both
+  /// lines are plotted in real time, so a week stays on its date while the
+  /// frame around it scales, and the previous line fades out as the new one
+  /// fades in. Nothing travels except the scale (THEME → Charts).
   late final AnimationController _zoomTo = AnimationController(
     vsync: this,
-    duration: Motion.base,
+    // A transition, which THEME § 6 gives 340ms.
+    duration: Motion.slow,
     value: 1,
   )..addListener(_onZoom);
 
-  /// The bounds the chart is travelling *from*, and the series drawn while it
-  /// travels. Null once it has arrived.
-  ({double minX, double maxX, double minY, double maxY})? _from;
-  List<TrendSeries>? _held;
+  /// The frame the chart is travelling *from*. Null once it has arrived.
+  _Frame? _from;
+
+  /// The chart being left, drawn under the new one until it has faded out.
+  TrendChart? _held;
 
   /// Held rather than left to `fl_chart` so the axis can *listen* to it. The
   /// labels belong to what is on screen, and after a pinch what is on screen is
   /// no longer the window — see [_visibleAxis].
   final _zoom = TransformationController();
 
-  /// The bounds actually drawn last frame, so a change mid-flight travels from
+  /// The frame actually drawn last frame, so a change mid-flight travels from
   /// where it is rather than from where the last one started.
-  ({double minX, double maxX, double minY, double maxY})? _drawn;
+  _Frame? _drawn;
 
   @override
   void initState() {
@@ -559,9 +561,14 @@ class _TrendChartState extends State<TrendChart>
     if (old.window == widget.window) return;
 
     _from = _drawn;
-    _held = old.series;
-    _zoomTo.forward(from: 0);
-    _zoomTo.addStatusListener(_release);
+    _held = old;
+    // A pinch belongs to the range it was made in. Carried into the next one it
+    // would open a new range already zoomed into a stretch nobody chose.
+    _zoom.value = Matrix4.identity();
+    _zoomTo
+      ..removeStatusListener(_release)
+      ..addStatusListener(_release)
+      ..forward(from: 0);
   }
 
   void _release(AnimationStatus status) {
@@ -586,267 +593,140 @@ class _TrendChartState extends State<TrendChart>
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-    // The line being drawn: the one held from before the range changed while it
-    // is still travelling, the real one once it has arrived.
-    final series = _held ?? widget.series;
-    final formatValue = widget.formatValue;
-    final tooltip = widget.tooltip;
-    final window = widget.window;
-    // The readings, without the breaks between them. The value axis and its
-    // off-scale rule count readings, so an off-scale index is a position in
-    // these lists, and [readingAt] turns a spot's index into one.
-    final readings = [
-      for (final s in series) [for (final p in s.spots) if (p.isNotNull()) p],
-    ];
-    final readingAt = [
-      for (final s in series)
-        () {
-          var k = 0;
-          return [for (final p in s.spots) p.isNotNull() ? k++ : null];
-        }(),
-    ];
-    final all = [for (final r in readings) ...r];
-
-    final xs = [for (final s in all) s.x];
-
-    // The band, its gridlines and their labels, from the one function every
-    // chart's value axis comes from. A band the caller supplies is drawn as
-    // given, and the spots then set nothing; otherwise one wild point is
-    // taken off the scale rather than allowed to flatten the rest.
-    final range = widget.yRange;
-    final yAxis = ValueAxis.trend(
-      range == null
-          ? [
-              for (final r in readings) [for (final p in r) p.y],
-            ]
-          : [
-              [range.$1, range.$2],
-            ],
-      format: formatValue,
-      minStep: widget.minStep,
-      minSpan: widget.minSpan,
-      minSpanFraction: widget.minSpanFraction,
-    );
-    final valueTitles = _valueTitles(context, yAxis);
-    final topTitles = _topTitles(context);
-    OffScale? offScaleAt(int bar, int index) => switch (readingAt[bar][index]) {
-          final k? => yAxis.offScaleAt(bar, k),
-          null => null,
-        };
-    // A reading with a break either side is a line of no length, and is drawn
-    // only by its marker, so it keeps the marker when the rest are dropped.
-    final lone = [
-      for (final s in series)
-        {
-          for (var j = 0; j < s.spots.length; j++)
-            if (s.spots[j].isNotNull() &&
-                (j == 0 || s.spots[j - 1].isNull()) &&
-                (j == s.spots.length - 1 || s.spots[j + 1].isNull()))
-              s.spots[j].x,
-        },
-    ];
-    // The value a touched spot really has, which an off-scale one does not
-    // show by its position.
-    double realValue(int bar, int index, double drawn) =>
-        offScaleAt(bar, index)?.value ?? drawn;
-    // A series' point where it is drawn: an off-scale one on the edge it
-    // left by, and a break as a break.
-    FlSpot placed(int bar, int index) {
-      final p = series[bar].spots[index];
-      return switch (readingAt[bar][index]) {
-        final k? => p.copyWith(y: yAxis.place(bar, k, p.y)),
-        null => FlSpot.nullSpot,
-      };
-    }
-
-    // The window's days, or with no window the days the data covers. One
-    // session is a chart with one dot on it, and a dot is worth drawing: it
-    // establishes the current position, on the axis the next point is read
-    // against. An axis from a day to itself has no width to divide, though,
-    // so a fortnight of air is put either side of it.
-    var (from, to) = window?.xBoundsSince(widget.earliest) ??
-        (_dayAt(xs.reduce(min)), _dayAt(xs.reduce(max)));
-    if (daysBetween(from, to) < 1) {
-      from = daysBefore(from, 7);
-      to = daysBefore(to, -7);
-    }
+    final live = _Layer.of(widget);
+    final heldWidget = _held;
+    final held = heldWidget == null ? null : _Layer.of(heldWidget);
+    final series = live.series;
+    final liveTitles = _valueTitles(context, live.yAxis);
 
     return LayoutBuilder(builder: (context, box) {
-    final plotWidth = box.maxWidth - valueTitles.reservedSize;
+    // Each chart's date ladder is measured at the width it has at rest, so its
+    // labels do not re-space themselves while the gutter beside them moves.
+    final plotWidth = box.maxWidth - liveTitles.reservedSize;
+    final measure = dateLabelMeasure(context);
+    // The axis describes what is on screen rather than the window. After a
+    // pinch the two differ, and labels that continue to describe the window
+    // describe a chart that is no longer displayed, so the labels are measured
+    // against the time on screen and zooming in reports position rather than
+    // removing the dates.
+    final liveAxis = DateAxis.line(
+      from: live.from,
+      to: live.to,
+      width: plotWidth,
+      measure: measure,
+      zoom: _scale,
+    );
+
     // Markers only while they mark something, decided for each series on its
     // own by the pixels between its closest neighbours (THEME → Charts). The
     // window's days span the plot at rest, and a pinch spreads them by its
     // scale, so zooming in brings the markers back.
-    final xSpan = DateAxis.xOf(to) - DateAxis.xOf(from);
+    final xSpan = DateAxis.xOf(live.to) - DateAxis.xOf(live.from);
     final perX = xSpan > 0 ? plotWidth / xSpan : double.infinity;
-    final marked = [
-      for (final r in readings)
-        markersFit([for (final p in r) p.x], perX * _scale),
-    ];
     // The gesture is offered while the markers are dropped at rest, so the
     // line under the chart does not come and go with the pinch.
-    final dense =
-        readings.any((r) => !markersFit([for (final p in r) p.x], perX));
+    final dense = live.readings
+        .any((r) => !markersFit([for (final p in r) p.x], perX));
+
+    // The frame at this instant, part way between the previous range and the
+    // selected one. Both charts are drawn in it, so they scale together.
+    final raw = _zoomTo.value;
+    final was = _from;
+    final moving = held != null && was != null && raw < 1;
+    // Eased at both ends rather than with `emphasized`. A curve that leaves
+    // fast covers three quarters of a zoom in its first few frames, which on
+    // a chart reads as a cut followed by a slow settle; a camera pulling back
+    // gathers speed and then slows.
+    final t = Curves.easeInOutCubic.transform(raw);
+    final target = _Frame(
+      minX: liveAxis.minX,
+      maxX: liveAxis.maxX,
+      minY: live.yAxis.min,
+      maxY: live.yAxis.max,
+      reserve: liveTitles.reservedSize,
+    );
+    final frame = moving ? _Frame.lerp(was, target, t) : target;
+    _drawn = frame;
+
+    // The lines cross-fade over the whole motion, and so does the furniture —
+    // gridlines, value labels, dates. Each label stays on its value or its
+    // date and travels with the scale, so the numbers never leave the screen
+    // and come back. What a label cannot do is be read squeezed: a ladder was
+    // measured for its own range, and pressed into a wider frame its labels
+    // run into each other. So each set also fades by how far it is squeezed,
+    // gone well before it collides and back once it has room (THEME → Charts).
+    final fade = moving ? Curves.easeInOut.transform(raw) : 1.0;
+
+    // The chart being left keeps the markers it had at rest. Measured against
+    // the range being arrived at instead, a year of weeks zoomed into a month
+    // would sprout a circle on every week as it faded.
+    final heldWidth = moving
+        ? box.maxWidth - _valueTitles(context, held.yAxis).reservedSize
+        : 0.0;
+    final heldSpan =
+        moving ? DateAxis.xOf(held.to) - DateAxis.xOf(held.from) : 0.0;
+    final heldAxis = moving
+        ? DateAxis.line(
+            from: held.from,
+            to: held.to,
+            width: heldWidth,
+            measure: measure,
+          )
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           height: chartHeightFull,
-          child: Builder(builder: (context) {
-          // The axis describes what is on screen rather than the window. After
-          // a pinch the two differ, and labels that continue to describe the
-          // window describe a chart that is no longer displayed, so the labels
-          // are measured against the time on screen and zooming in reports
-          // position rather than removing the dates.
-          final axis = DateAxis.line(
-            from: from,
-            to: to,
-            width: plotWidth,
-            measure: dateLabelMeasure(context),
-            zoom: _scale,
-          );
-          var minX = axis.minX;
-          var maxX = axis.maxX;
-          var minY = yAxis.min;
-          var maxY = yAxis.max;
-
-          // The bounds at this instant, part way between the previous range
-          // and the selected one. `fl_chart` interpolates its own data changes
-          // but cannot interpolate between two spot lists of different
-          // lengths, which is what a change of resolution produces, so the
-          // transition is driven here.
-          final t = Motion.emphasized.transform(_zoomTo.value);
-          final was = _from;
-          if (was != null && t < 1) {
-            minX = _lerp(was.minX, minX, t);
-            maxX = _lerp(was.maxX, maxX, t);
-            minY = _lerp(was.minY, minY, t);
-            maxY = _lerp(was.maxY, maxY, t);
-          }
-          _drawn = (minX: minX, maxX: maxX, minY: minY, maxY: maxY);
-
-          return LineChart(
-            // Changing the range or averaging rescales the chart rather than
-            // reloading it. The box retains its size and `fl_chart`
-            // interpolates its contents: the axis bounds rescale and the line
-            // travels to its new shape, so widening from three months to a year
-            // reads as a change of scale rather than as a different chart.
-            // `base` at the emphasized curve, which THEME § 6 gives anything
-            // covering a distance.
-            duration: Motion.base,
-            curve: Motion.emphasized,
-            // Pinch to zoom the time axis, drag to pan. The vertical axis stays
-            // fixed: scaling the value axis freely would render identical
-            // progress differently depending on the last pinch.
-            transformationConfig: FlTransformationConfig(
-              scaleAxis: FlScaleAxis.horizontal,
-              minScale: 1,
-              maxScale: 12,
-              transformationController: _zoom,
-            ),
-            LineChartData(
-              minX: minX,
-              maxX: maxX,
-              minY: minY,
-              maxY: maxY,
-              // The tick ladder hangs off this. `fl_chart` phases its labels
-              // against the baseline, so anchoring it on the newest label is
-              // what puts a label on today and counts the rest back from it.
-              baselineX: axis.baselineX,
-              gridData: _gridOf(yAxis, c.border),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                topTitles: topTitles,
-                leftTitles: const AxisTitles(),
-                // Right-hand Y labels (THEME → Components): the left gutter is where the
-                // eye starts a row, and spending it on an axis pushes the plot
-                // off centre on a phone.
-                rightTitles: AxisTitles(sideTitles: valueTitles),
-                bottomTitles: AxisTitles(sideTitles: _dateTitles(context, axis)),
-              ),
-              lineTouchData: tooltip == null
-                  ? const LineTouchData(enabled: false)
-                  : LineTouchData(
-                      touchTooltipData: LineTouchTooltipData(
-                        getTooltipColor: (_) => c.surfaceHigh,
-                        // A bridge is not a reading, so it names nothing.
-                        getTooltipItems: (spots) => [
-                          for (final s in spots)
-                            s.barIndex >= series.length
-                                ? null
-                                : LineTooltipItem(
-                                    tooltip(realValue(
-                                        s.barIndex, s.spotIndex, s.y)),
-                                    context.t.labelMedium!
-                                        .copyWith(color: c.textPrimary),
-                                  ),
-                        ],
-                      ),
-                      getTouchedSpotIndicator: (bar, indices) =>
-                          bar.dashArray != null
-                              ? [for (final _ in indices) null]
-                              : defaultTouchedIndicators(bar, indices),
-                    ),
-              lineBarsData: [
-                for (var i = 0; i < series.length; i++)
-                  LineChartBarData(
-                    // An off-scale point is drawn on the edge it left by, so
-                    // the line runs to the edge and back.
-                    spots: [
-                      for (var j = 0; j < series[i].spots.length; j++)
-                        placed(i, j),
-                    ],
-                    isCurved: false,
-                    color: series[i].color,
-                    barWidth: 2,
-                    dotData: FlDotData(
-                      // The caret stays when the markers go: it is the one
-                      // mark that says the line does not end where it seems to.
-                      checkToShowDot: (spot, _) =>
-                          marked[i] ||
-                          lone[i].contains(spot.x) ||
-                          yAxis.offScale.any(
-                            (o) =>
-                                o.series == i &&
-                                readings[i][o.index].x == spot.x,
-                          ),
-                      getDotPainter: (_, _, _, index) =>
-                          switch (offScaleAt(i, index)?.edge) {
-                        final edge? => OffScaleCaret(
-                            color: series[i].color,
-                            pointsUp: edge == OffScaleEdge.top,
-                          ),
-                        null => FlDotCirclePainter(
-                            radius: 3,
-                            color: c.bg,
-                            strokeWidth: 2,
-                            strokeColor: series[i].color,
-                          ),
-                      },
+          child: Stack(
+            children: [
+              if (moving)
+                KeyedSubtree(
+                  key: const ValueKey('held'),
+                  child: IgnorePointer(
+                    child: _plot(
+                      context,
+                      held,
+                      heldAxis!,
+                      frame,
+                      lines: 1 - fade,
+                      dates: (1 - fade) *
+                          _room(heldAxis.maxX - heldAxis.minX,
+                              frame.maxX - frame.minX),
+                      values: (1 - fade) *
+                          _room(held.yAxis.max - held.yAxis.min,
+                              frame.maxY - frame.minY),
+                      perX: heldSpan > 0
+                          ? heldWidth / heldSpan
+                          : double.infinity,
+                      tooltip: null,
+                      moving: true,
+                      pinch: false,
                     ),
                   ),
-                // A gap is bridged by a faint dotted line in the series'
-                // colour, after the solid lines so that a touch's bar index
-                // still names a series. The solid line stops at the gap, and
-                // the dots carry the trend across it as unmeasured.
-                for (var i = 0; i < series.length; i++)
-                  for (final (a, b) in gapBridges([
-                    for (final p in series[i].spots) p.isNotNull(),
-                  ]))
-                    LineChartBarData(
-                      spots: [placed(i, a), placed(i, b)],
-                      isCurved: false,
-                      color: series[i].color.withValues(alpha: softLineAlpha),
-                      barWidth: 2,
-                      dashArray: softLineDash,
-                      dotData: const FlDotData(show: false),
-                    ),
-              ],
-            ),
-          );
-          }),
+                ),
+              KeyedSubtree(
+                key: const ValueKey('live'),
+                child: _plot(
+                  context,
+                  live,
+                  liveAxis,
+                  frame,
+                  lines: fade,
+                  dates: fade *
+                      _room(liveAxis.maxX - liveAxis.minX,
+                          frame.maxX - frame.minX),
+                  values: fade *
+                      _room(live.yAxis.max - live.yAxis.min,
+                          frame.maxY - frame.minY),
+                  perX: perX * _scale,
+                  tooltip: widget.tooltip,
+                  moving: moving,
+                ),
+              ),
+            ],
+          ),
         ),
         // Markers only while they mark something. Where neighbours stand
         // closer than [markerSpacing] the circles touch and the shape being
@@ -862,7 +742,7 @@ class _TrendChartState extends State<TrendChart>
             entries: _seriesLegend(
               series,
               // One pixel of the plot, in the units of its value axis.
-              tolerance: (yAxis.max - yAxis.min) /
+              tolerance: (live.yAxis.max - live.yAxis.min) /
                   (chartHeightFull -
                       xLabelStrip(context) -
                       topLabelReserve(context)),
@@ -874,6 +754,310 @@ class _TrendChartState extends State<TrendChart>
     });
   }
 
+  /// One chart's line and furniture, drawn in [frame].
+  ///
+  /// [lines], [dates] and [values] are how much of each is showing, `1` at
+  /// rest. The gridlines go with the values they mark.
+  /// While [moving], the frame is carried by [_zoomTo] rather than by
+  /// `fl_chart`, whose own interpolation would chase the moving bounds a frame
+  /// behind and then re-run once they stopped, and the plot is clipped, since a
+  /// line drawn for a wider or narrower range runs past the frame it is in.
+  Widget _plot(
+    BuildContext context,
+    _Layer layer,
+    DateAxis axis,
+    _Frame frame, {
+    required double lines,
+    required double dates,
+    required double values,
+    required double perX,
+    required String Function(double value)? tooltip,
+    required bool moving,
+    bool pinch = true,
+  }) {
+    final c = context.c;
+    final series = layer.series;
+    final yAxis = layer.yAxis;
+    Color faded(Color colour, double by) =>
+        colour.withValues(alpha: colour.a * by);
+    final marked = [
+      for (final r in layer.readings) markersFit([for (final p in r) p.x], perX),
+    ];
+    final valueTitles = _valueTitles(
+      context,
+      yAxis,
+      opacity: values,
+      reserve: frame.reserve,
+    );
+
+    return LineChart(
+      // Changing the averaging, or new data in the same range, is left to
+      // `fl_chart`: the box retains its size and the line travels to its new
+      // shape. `base` at the emphasized curve, which THEME § 6 gives anything
+      // covering a distance. A change of range is driven by [_zoomTo] instead.
+      duration: moving ? Duration.zero : Motion.base,
+      curve: Motion.emphasized,
+      // Pinch to zoom the time axis, drag to pan. The vertical axis stays
+      // fixed: scaling the value axis freely would render identical progress
+      // differently depending on the last pinch. Only the chart being arrived
+      // at is pinched; the one being left is a picture of where it was.
+      transformationConfig: !pinch
+          ? const FlTransformationConfig()
+          : FlTransformationConfig(
+              scaleAxis: FlScaleAxis.horizontal,
+              minScale: 1,
+              maxScale: 12,
+              transformationController: _zoom,
+            ),
+      LineChartData(
+        minX: frame.minX,
+        maxX: frame.maxX,
+        minY: frame.minY,
+        maxY: frame.maxY,
+        clipData: moving ? const FlClipData.all() : const FlClipData.none(),
+        // The tick ladder hangs off this. `fl_chart` phases its labels against
+        // the baseline, so anchoring it on the newest label is what puts a
+        // label on today and counts the rest back from it.
+        baselineX: axis.baselineX,
+        gridData: _gridOf(yAxis, faded(c.border, values)),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: _topTitles(context),
+          leftTitles: const AxisTitles(),
+          // Right-hand Y labels (THEME → Components): the left gutter is where
+          // the eye starts a row, and spending it on an axis pushes the plot
+          // off centre on a phone.
+          rightTitles: AxisTitles(sideTitles: valueTitles),
+          bottomTitles: AxisTitles(
+            sideTitles: _dateTitles(context, axis, opacity: dates),
+          ),
+        ),
+        lineTouchData: tooltip == null
+            ? const LineTouchData(enabled: false)
+            : LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => c.surfaceHigh,
+                  // A bridge is not a reading, so it names nothing.
+                  getTooltipItems: (spots) => [
+                    for (final s in spots)
+                      s.barIndex >= series.length
+                          ? null
+                          : LineTooltipItem(
+                              tooltip(layer.realValue(
+                                  s.barIndex, s.spotIndex, s.y)),
+                              context.t.labelMedium!
+                                  .copyWith(color: c.textPrimary),
+                            ),
+                  ],
+                ),
+                getTouchedSpotIndicator: (bar, indices) =>
+                    bar.dashArray != null
+                        ? [for (final _ in indices) null]
+                        : defaultTouchedIndicators(bar, indices),
+              ),
+        lineBarsData: [
+          for (var i = 0; i < series.length; i++)
+            LineChartBarData(
+              // An off-scale point is drawn on the edge it left by, so the
+              // line runs to the edge and back.
+              spots: [
+                for (var j = 0; j < series[i].spots.length; j++)
+                  layer.placed(i, j),
+              ],
+              isCurved: false,
+              color: faded(series[i].color, lines),
+              barWidth: 2,
+              dotData: FlDotData(
+                // The caret stays when the markers go: it is the one mark that
+                // says the line does not end where it seems to.
+                checkToShowDot: (spot, _) =>
+                    marked[i] ||
+                    layer.lone[i].contains(spot.x) ||
+                    yAxis.offScale.any(
+                      (o) =>
+                          o.series == i &&
+                          layer.readings[i][o.index].x == spot.x,
+                    ),
+                getDotPainter: (_, _, _, index) =>
+                    switch (layer.offScaleAt(i, index)?.edge) {
+                  final edge? => OffScaleCaret(
+                      color: faded(series[i].color, lines),
+                      pointsUp: edge == OffScaleEdge.top,
+                    ),
+                  null => FlDotCirclePainter(
+                      radius: 3,
+                      color: faded(c.bg, lines),
+                      strokeWidth: 2,
+                      strokeColor: faded(series[i].color, lines),
+                    ),
+                },
+              ),
+            ),
+          // A gap is bridged by a faint dotted line in the series' colour,
+          // after the solid lines so that a touch's bar index still names a
+          // series. The solid line stops at the gap, and the dots carry the
+          // trend across it as unmeasured.
+          for (var i = 0; i < series.length; i++)
+            for (final (a, b) in gapBridges([
+              for (final p in series[i].spots) p.isNotNull(),
+            ]))
+              LineChartBarData(
+                spots: [layer.placed(i, a), layer.placed(i, b)],
+                isCurved: false,
+                color: series[i]
+                    .color
+                    .withValues(alpha: softLineAlpha * lines),
+                barWidth: 2,
+                dashArray: softLineDash,
+                dotData: const FlDotData(show: false),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The bounds a [TrendChart] is drawn in, and the width of its value gutter,
+/// which moves with them so the plot does not jump when the labels change.
+class _Frame {
+  const _Frame({
+    required this.minX,
+    required this.maxX,
+    required this.minY,
+    required this.maxY,
+    required this.reserve,
+  });
+
+  final double minX;
+  final double maxX;
+  final double minY;
+  final double maxY;
+  final double reserve;
+
+  static _Frame lerp(_Frame a, _Frame b, double t) => _Frame(
+        minX: _lerp(a.minX, b.minX, t),
+        maxX: _lerp(a.maxX, b.maxX, t),
+        minY: _lerp(a.minY, b.minY, t),
+        maxY: _lerp(a.maxY, b.maxY, t),
+        reserve: _lerp(a.reserve, b.reserve, t),
+      );
+}
+
+/// What one [TrendChart]'s configuration draws: its series, the value axis
+/// they are scaled on, and the days its window covers.
+///
+/// Worked out for the chart being arrived at and, during a change of range,
+/// for the one being left as well, so that both are drawn by the same rules.
+class _Layer {
+  _Layer._({
+    required this.series,
+    required this.readings,
+    required this.readingAt,
+    required this.yAxis,
+    required this.lone,
+    required this.from,
+    required this.to,
+  });
+
+  factory _Layer.of(TrendChart w) {
+    final series = w.series;
+    // The readings, without the breaks between them. The value axis and its
+    // off-scale rule count readings, so an off-scale index is a position in
+    // these lists, and [readingAt] turns a spot's index into one.
+    final readings = [
+      for (final s in series) [for (final p in s.spots) if (p.isNotNull()) p],
+    ];
+    final readingAt = [
+      for (final s in series)
+        () {
+          var k = 0;
+          return [for (final p in s.spots) p.isNotNull() ? k++ : null];
+        }(),
+    ];
+    final xs = [for (final r in readings) for (final p in r) p.x];
+
+    // The band, its gridlines and their labels, from the one function every
+    // chart's value axis comes from. A band the caller supplies is drawn as
+    // given, and the spots then set nothing; otherwise one wild point is
+    // taken off the scale rather than allowed to flatten the rest.
+    final range = w.yRange;
+    final yAxis = ValueAxis.trend(
+      range == null
+          ? [
+              for (final r in readings) [for (final p in r) p.y],
+            ]
+          : [
+              [range.$1, range.$2],
+            ],
+      format: w.formatValue,
+      minStep: w.minStep,
+      minSpan: w.minSpan,
+      minSpanFraction: w.minSpanFraction,
+    );
+
+    // A reading with a break either side is a line of no length, and is drawn
+    // only by its marker, so it keeps the marker when the rest are dropped.
+    final lone = [
+      for (final s in series)
+        {
+          for (var j = 0; j < s.spots.length; j++)
+            if (s.spots[j].isNotNull() &&
+                (j == 0 || s.spots[j - 1].isNull()) &&
+                (j == s.spots.length - 1 || s.spots[j + 1].isNull()))
+              s.spots[j].x,
+        },
+    ];
+
+    // The window's days, or with no window the days the data covers. One
+    // session is a chart with one dot on it, and a dot is worth drawing: it
+    // establishes the current position, on the axis the next point is read
+    // against. An axis from a day to itself has no width to divide, though,
+    // so a fortnight of air is put either side of it.
+    var (from, to) = w.window?.xBoundsSince(w.earliest) ??
+        (_dayAt(xs.reduce(min)), _dayAt(xs.reduce(max)));
+    if (daysBetween(from, to) < 1) {
+      from = daysBefore(from, 7);
+      to = daysBefore(to, -7);
+    }
+
+    return _Layer._(
+      series: series,
+      readings: readings,
+      readingAt: readingAt,
+      yAxis: yAxis,
+      lone: lone,
+      from: from,
+      to: to,
+    );
+  }
+
+  final List<TrendSeries> series;
+  final List<List<FlSpot>> readings;
+  final List<List<int?>> readingAt;
+  final ValueAxis yAxis;
+  final List<Set<double>> lone;
+  final DateTime from;
+  final DateTime to;
+
+  OffScale? offScaleAt(int bar, int index) => switch (readingAt[bar][index]) {
+        final k? => yAxis.offScaleAt(bar, k),
+        null => null,
+      };
+
+  /// The value a touched spot really has, which an off-scale one does not
+  /// show by its position.
+  double realValue(int bar, int index, double drawn) =>
+      offScaleAt(bar, index)?.value ?? drawn;
+
+  /// A series' point where it is drawn: an off-scale one on the edge it left
+  /// by, and a break as a break.
+  FlSpot placed(int bar, int index) {
+    final p = series[bar].spots[index];
+    return switch (readingAt[bar][index]) {
+      final k? => p.copyWith(y: yAxis.place(bar, k, p.y)),
+      null => FlSpot.nullSpot,
+    };
+  }
 }
 
 /// The same plot with no data: the gridlines, the right-hand gutter and the
@@ -1165,26 +1349,45 @@ FlGridData _gridOf(ValueAxis axis, Color colour) => FlGridData(
 ///
 /// [printed] false holds the gutter open with nothing in it, which is what an
 /// empty chart with no history to scale against draws.
+///
+/// [opacity] and [reserve] are for a change of range, in which two sets of
+/// labels cross-fade in one gutter whose width travels between theirs.
 SideTitles _valueTitles(
   BuildContext context,
   ValueAxis axis, {
   bool printed = true,
+  double opacity = 1,
+  double? reserve,
 }) => SideTitles(
   showTitles: true,
   interval: axis.step,
-  reservedSize: axisGutter(context, printed ? axis.labels : const []),
+  reservedSize:
+      reserve ?? axisGutter(context, printed ? axis.labels : const []),
   getTitlesWidget: (value, meta) {
-    final label = printed ? axis.labelAt(value) : null;
+    final label = printed && opacity > 0 ? axis.labelAt(value) : null;
     if (label == null) return const SizedBox.shrink();
+    final style = context.t.bodySmall;
     // Wrapped for the gap between the gutter and the plot. A bare widget
     // is drawn flush against the axis.
     return SideTitleWidget(
       meta: meta,
       space: Space.xs,
-      child: Text(label, style: context.t.bodySmall, maxLines: 1),
+      child: Text(
+        label,
+        style: opacity < 1 ? _fadedStyle(style, opacity) : style,
+        maxLines: 1,
+      ),
     );
   },
 );
+
+/// [style] at [opacity] of its own colour, for labels part way through a
+/// cross-fade.
+TextStyle? _fadedStyle(TextStyle? style, double opacity) {
+  final colour = style?.color;
+  if (colour == null) return style;
+  return style!.copyWith(color: colour.withValues(alpha: colour.a * opacity));
+}
 
 /// The mark of a point off the scale: a caret on the edge it left by, in its
 /// series' colour, pointing the way the value went (THEME → Charts).
@@ -1232,19 +1435,35 @@ class OffScaleCaret extends FlDotPainter {
 /// Each label is centred on its day; [DateAxis] pads the plot so the outer
 /// two fit. The padded edges themselves are not dates anybody asked about and
 /// carry no label.
-SideTitles _dateTitles(BuildContext context, DateAxis axis) => SideTitles(
+///
+/// [opacity] is for a change of range. While the frame is travelling it is not
+/// [axis]'s own, so a date is labelled only inside the window the ladder was
+/// measured for: past it, the steps were never checked for room.
+SideTitles _dateTitles(
+  BuildContext context,
+  DateAxis axis, {
+  double opacity = 1,
+}) => SideTitles(
   showTitles: true,
   reservedSize: xLabelStrip(context),
   interval: axis.interval,
   minIncluded: false,
   maxIncluded: false,
   getTitlesWidget: (value, meta) {
+    if (opacity <= 0 || value < axis.minX || value > axis.maxX) {
+      return const SizedBox.shrink();
+    }
     final label = axis.labelAt(value);
     if (label == null) return const SizedBox.shrink();
+    final style = context.t.bodySmall;
     return SideTitleWidget(
       meta: meta,
       space: Space.sm,
-      child: Text(label, style: context.t.bodySmall, maxLines: 1),
+      child: Text(
+        label,
+        style: opacity < 1 ? _fadedStyle(style, opacity) : style,
+        maxLines: 1,
+      ),
     );
   },
 );
@@ -1280,6 +1499,17 @@ DateTime _dayAt(double x) {
 }
 
 double _lerp(double a, double b, double t) => a + (b - a) * t;
+
+/// How much of a set of axis labels can show while its scale, measured for
+/// [rest], is drawn across [now] instead.
+///
+/// Spread out, a label has more room than it was given and shows in full.
+/// Squeezed, it fades from 90% of its measured spacing and is gone at 70%,
+/// before neighbours measured with a label's width between them can touch.
+double _room(double rest, double now) {
+  if (!(now > 0) || !(rest > 0)) return 1;
+  return ((rest / now - 0.7) / 0.2).clamp(0.0, 1.0);
+}
 
 // ─── The cycle axis ─────────────────────────────────────────────────────────
 
