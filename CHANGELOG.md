@@ -13,7 +13,27 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
-## [Unreleased]
+## [1.21.0] - 2026-10-23
+
+Minor release adding custom sessions for training outside your programme, and drawing each day in History as a calendar page.
+
+### Added
+
+- **Home:** You can start a custom session, for a day you train outside your programme. `Train another session` opens the session list, and the last row, `Custom session`, opens the log with no exercises in it. Add the exercises as you train them.
+  - A custom session belongs to none of your programme's days, so it never changes the numbers a day opens with, never counts as a day done in the cycle, and does not bring the deload any closer.
+  - Each exercise in a custom session starts blank. The ⓘ beside it still says where and when you last did it, and shows those sets when tapped.
+  - The `Deload session` switch on the row marks it as a light day. It is on to begin with during a deload cycle. A deload custom session is shown in orange and left out of the strength charts, as a deload day of your programme is.
+  - `Train another session` now appears for a programme with only one day, and a programme with no days yet offers `Start a custom session`.
+- **Home:** `Log a past session` offers a custom session too, for a day you trained without the app. Its deload switch starts on whatever the cycle was on the day you pick.
+- **History:** Workout detail for a custom session has `Mark as a deload` in its ⋯ menu, or `Not a deload` once marked, to correct the switch afterwards.
+
+### Changed
+
+- **History:** Each session in the list starts with its date drawn as a calendar page, the weekday on a blue strip, or orange for a deload, over the day of the month. The date no longer repeats in the line under the session's name.
+  - A deload shows only its icon beside the name. Tap the icon to see the word `Deload` for two seconds.
+  - Rows have more space around and between their lines.
+- **History:** Sessions logged without a training day, which were called `Unplanned session`, are now called `Custom session` everywhere they appear.
+- **Regimes:** A training day can no longer be named `Custom session`, so it is never mistaken for one in History or in a chart.
 
 ## [1.20.1] - 2026-10-20
 
@@ -668,7 +688,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...v1.21.0
 [1.20.1]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...v1.20.1
 [1.20.0]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...v1.20.0
 [1.19.2]: https://github.com/SahilK-027/Deltoid/compare/v1.19.1...v1.19.2
