@@ -1786,6 +1786,32 @@ for. One button, `Edit scale weight`, opens the weigh-in sheet; the sheet is
 otherwise closed by its ✕. A hold has no pill, because nothing scores its
 load.
 
+**The reveal pill** is a status pill that shows only its icon until tapped:
+`RevealPill`, 20 tall, the same 14% tint. It is for a list in which one status
+repeats down many rows and something else on the row already marks it, which
+is History's deload rows, where the date tile's strip is orange. A tap opens
+the word beside the icon, growing over `Motion.base`, holds it for two seconds
+and folds it back; under reduced motion it appears and goes without growing.
+Its tap target is 40 wide and as tall as the line it sits on, and it claims
+the tap, so the row under it does not open. A screen reader hears the word
+whether or not it shows. A screen about one session, the log, Home's hero and
+workout detail, keeps the full pill.
+
+### Date tile
+
+History's leading mark is a day drawn as a calendar page: `DateTile`, a fixed
+50 by 58 page in `surfaceHigh` at radius 12, a 20 tall strip across its top,
+and two binder tabs, 4 by 7 in `textTertiary`, rising 3 above it and ringed in
+`bg` so they read as cut through the strip. The strip is `progress` for a
+trained day and `deload` for a light one, and carries the weekday at `micro`,
+bold, in the hue taken down by `IconTile.glyphOn`, which keeps it legible in
+the light theme where a hue is never text. The day of the month sits under it
+at the `section` size, weight 800. The month is the heading the rows sit
+under, so the page carries the weekday rather than repeating it, and the date
+leaves the meta line. The row is centred on the tile, 16 from the text, with
+16 above and below and 4 between its lines: a fixed page beside two lines or
+three, aligned to the top, floated over the shorter rows.
+
 ---
 
 ## 8. Composing a screen

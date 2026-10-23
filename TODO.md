@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,653 tests and sixteen pgTAP tests, analyzer clean.**
+**1,662 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -55,6 +55,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The trend chart draws in the same frame as the list under it — 130ms to 26ms, same numbers.
 - [x] An empty chart is still a chart: axes, gridlines, no sentence written across it.
 - [x] History's exercise search falls through to the catalog.
+- [x] History's rows lead with the day as a calendar page, blue or orange, and a deload shows as an icon that names itself on tap.
 - [x] Every chart folds through `chart_buckets.dart` and shares one control row, one axis and one transition.
 - [x] Home arrives whole: every read it draws starts in the same frame, and no section drops in after the page.
 

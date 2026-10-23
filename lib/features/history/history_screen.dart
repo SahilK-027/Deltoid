@@ -482,7 +482,8 @@ class _FeedFooter extends StatelessWidget {
   }
 }
 
-/// One trained day. Identity tile, what it was, and what was in it.
+/// One trained day. The day as a calendar page, what it was, and what was in
+/// it.
 ///
 /// The exercise line replaces the exercise *count*: they are the same fact, and
 /// the names are the one that answers "which day was that" (rule 6).
@@ -507,8 +508,9 @@ class _WorkoutRow extends StatelessWidget {
     // No `0 min` either — a duration under a minute is a clock that never ran,
     // and printing it as a zero is the bug face rule 4 is about.
     final minutes = summary.durationMinutes;
+    // The date is the tile's, so the line under the name does not say it again
+    // (THEME rule 6).
     final meta = <String>[
-      DateFormat('EEE d').format(date),
       '${summary.setCount} set${summary.setCount == 1 ? '' : 's'}',
       if (minutes != null && minutes > 0) '$minutes min',
       if (summary.skippedCount > 0) '${summary.skippedCount} skipped',
@@ -523,18 +525,18 @@ class _WorkoutRow extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-            horizontal: Space.gutter, vertical: Space.md),
+            horizontal: Space.gutter, vertical: Space.lg),
+        // Centred, because the tile is a fixed page and the text beside it is
+        // two lines or three: aligned to the top, the tile floated over the
+        // shorter rows.
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            IconTile(
-              summary.workout.isDeload
-                  ? Icons.trending_down_rounded
-                  : Icons.bolt_rounded,
-              color: mark,
-              size: 44,
+            DateTile(
+              day: '${date.day}',
+              weekday: DateFormat('EEE').format(date),
+              hue: mark,
             ),
-            const SizedBox(width: Space.md),
+            const SizedBox(width: Space.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,13 +551,19 @@ class _WorkoutRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      // The icon alone: the tile is already orange, and the
+                      // word, the same down every light row, is a tap away.
                       if (summary.workout.isDeload) ...[
                         const SizedBox(width: Space.sm),
-                        Pill('Deload', color: c.deload),
+                        RevealPill(
+                          'Deload',
+                          icon: Icons.trending_down_rounded,
+                          color: c.deload,
+                        ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: Space.xxs),
+                  const SizedBox(height: Space.xs),
                   Text(
                     meta.join(' · '),
                     style: context.t.bodyMedium,
@@ -563,7 +571,7 @@ class _WorkoutRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (summary.exerciseNames.isNotEmpty) ...[
-                    const SizedBox(height: Space.xxs),
+                    const SizedBox(height: Space.xs),
                     Text(
                       summary.exerciseNames.join(' · '),
                       style: context.t.bodySmall
@@ -576,11 +584,7 @@ class _WorkoutRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Space.sm),
-            Padding(
-              padding: const EdgeInsets.only(top: Space.md),
-              child: Icon(Icons.chevron_right_rounded,
-                  size: 20, color: c.textTertiary),
-            ),
+            Icon(Icons.chevron_right_rounded, size: 20, color: c.textTertiary),
           ],
         ),
       ),

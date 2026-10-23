@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -1796,6 +1797,221 @@ class Pill extends StatelessWidget {
             const SizedBox(width: Space.xs),
           ],
           Text(text, style: context.t.labelSmall?.copyWith(color: fg)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A [Pill] that shows only its icon until tapped, then names itself.
+///
+/// For a list where the same status repeats down many rows: History's deload
+/// rows, where the word beside every light day is the same word and the tile's
+/// orange already marks the row. A tap opens [text] beside the icon, holds it
+/// for [hold], and folds it back; a second tap restarts the hold.
+///
+/// The label grows with an [AnimatedSize] at [Motion.base], and appears
+/// without it when the platform asks for reduced motion. The timer
+/// is cancelled on dispose, so a row scrolled away mid-hold leaves nothing
+/// running. A screen reader hears [text] whether or not it is showing.
+///
+/// The tap target is 40 wide and as tall as the line it sits on: taller would
+/// make a row holding one taller than its neighbours. It claims the tap, so a
+/// tap on the icon does not also open the row under it.
+class RevealPill extends StatefulWidget {
+  const RevealPill(
+    this.text, {
+    super.key,
+    required this.icon,
+    required this.color,
+    this.hold = const Duration(seconds: 2),
+  });
+
+  final String text;
+  final IconData icon;
+  final Color color;
+  final Duration hold;
+
+  @override
+  State<RevealPill> createState() => _RevealPillState();
+}
+
+class _RevealPillState extends State<RevealPill> {
+  bool _open = false;
+  Timer? _close;
+
+  void _reveal() {
+    _close?.cancel();
+    setState(() => _open = true);
+    _close = Timer(widget.hold, () {
+      if (mounted) setState(() => _open = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _close?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final still = MediaQuery.disableAnimationsOf(context);
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(widget.icon, size: 14, color: widget.color),
+        if (_open) ...[
+          const SizedBox(width: Space.xs),
+          Text(
+            widget.text,
+            style: context.t.labelSmall?.copyWith(color: widget.color),
+          ),
+          const SizedBox(width: 2),
+        ],
+      ],
+    );
+    return Semantics(
+      label: widget.text,
+      button: true,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _reveal,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 40),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: Container(
+              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: widget.color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(Radii.pill),
+              ),
+              // No `AnimatedSize` at all under reduced motion, rather than one
+              // with a zero duration, which asserts as it relays itself out.
+              child: still
+                  ? content
+                  : AnimatedSize(
+                      duration: Motion.base,
+                      curve: Motion.curve,
+                      alignment: Alignment.centerLeft,
+                      child: content,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A day drawn as a calendar page: the weekday on a strip of [hue], the day of
+/// the month large below it, and two binder tabs rising above the page.
+///
+/// History's leading tile. The bolt it replaced was the same glyph on every
+/// row, so it said nothing; a date is what the list is scanned for. [hue] is
+/// `progress` for a trained day and `deload` for a light one, the two colours
+/// every other trained-day mark in the app uses, and the weekday is drawn in
+/// the hue taken down ([IconTile.glyphOn]) so it reads in both themes, where
+/// the hues are fills and never text.
+///
+/// A fixed size, so a column of them lines up whatever each row holds. The
+/// caller formats [day] and [weekday]: turning a date into words is domain
+/// work, not a widget's.
+class DateTile extends StatelessWidget {
+  const DateTile({
+    super.key,
+    required this.day,
+    required this.weekday,
+    required this.hue,
+  });
+
+  final String day;
+  final String weekday;
+  final Color hue;
+
+  static const width = 50.0;
+  static const pageHeight = 58.0;
+
+  /// How far the binder tabs rise above the page.
+  static const _tabRise = 3.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    // Each tab is ringed in the page background, so it reads as cut through
+    // the strip rather than laid on it.
+    Widget tab() => Container(
+      width: 8,
+      height: 11,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Container(
+        width: 4,
+        height: 7,
+        decoration: BoxDecoration(
+          color: c.textTertiary,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+
+    return SizedBox(
+      width: width,
+      height: pageHeight + _tabRise,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            top: _tabRise,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.control - 2),
+              child: ColoredBox(
+                color: c.surfaceHigh,
+                child: Column(
+                  children: [
+                    Container(
+                      height: 20,
+                      width: double.infinity,
+                      color: hue,
+                      // Low in the strip, clear of the tabs above it.
+                      padding: const EdgeInsets.only(top: 5),
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        weekday,
+                        maxLines: 1,
+                        style: context.t.labelSmall?.copyWith(
+                          color: IconTile.glyphOn(hue),
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          day,
+                          style: context.t.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(top: -1, left: 7, child: tab()),
+          Positioned(top: -1, right: 7, child: tab()),
         ],
       ),
     );
