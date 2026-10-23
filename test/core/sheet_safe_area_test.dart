@@ -28,7 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Like `clamp_bounds_test`, this reads source text rather than understanding
 /// Dart. It catches the accident, which is the only way this has ever happened.
 void main() {
-  const home = 'lib/core/widgets/primitives.dart';
+  const home = 'lib/core/widgets/primitives/sheets.dart';
 
   test('only showAppSheet opens a modal bottom sheet', () {
     final offenders = <String>[];
