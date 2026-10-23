@@ -13,6 +13,14 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.21.1] - 2026-10-23
+
+Patch release making the habit grids on Home read in the same order as the year map.
+
+### Fixed
+
+- **Home:** The 30-day grids on the Weigh-ins and Workouts tiles now fill down each column and then across, as the year map on the Weigh-ins screen does. The oldest day is still at the top left and today at the bottom right. They previously filled along each row, so the same days appeared in a different order from the year map and recent days could look missing.
+
 ## [1.21.0] - 2026-10-23
 
 Minor release adding custom sessions for training outside your programme, and drawing each day in History as a calendar page.
@@ -688,7 +696,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...HEAD
+[1.21.1]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...v1.21.0
 [1.20.1]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...v1.20.1
 [1.20.0]: https://github.com/SahilK-027/Deltoid/compare/v1.19.2...v1.20.0
