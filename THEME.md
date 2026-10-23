@@ -706,8 +706,10 @@ right, the grid, a hairline, then the figure, `3/7` in `valueSm` with
 `this week` in `body`, and a chevron. The two tiles are the same shape, so the
 row is `CrossAxisAlignment.start` for the reason a row of stat tiles is.
 
-- **The grid is the last thirty days, ten to a row**, oldest first and today
-  last, square cells at radius 4 in `heatEmpty`. Workouts fills a trained day
+- **The grid is the last thirty days in ten columns of three**, filled down
+  each column and then across, as the year map is read: the oldest day at the
+  top left and today at the bottom right. Square cells at radius 4 in
+  `heatEmpty`. Workouts fills a trained day
   with `progress` and a deload with `deload`, the colours its own map uses;
   Weigh-ins fills a day with a weigh-in in `weighIn`. No legend: the screen
   each tile opens carries one.

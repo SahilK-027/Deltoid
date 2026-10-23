@@ -157,7 +157,11 @@ class HabitAction extends StatelessWidget {
       );
 }
 
-/// The last thirty days, ten to a row, oldest first and today last.
+/// The last thirty days in ten columns of three, oldest first and today last.
+///
+/// Filled down each column and then across, the order the year map is read
+/// in. Filled along each row instead, the same days read in a different order
+/// from the map the tile opens, and a run of recent days looked missing.
 ///
 /// Thirty widgets rather than a painter: the year maps paint because they draw
 /// a year at a time, many years deep, and this is one month in one card.
@@ -167,7 +171,8 @@ class HabitGrid extends StatelessWidget {
   final Color? Function(int dayKey) fill;
   final DateTime today;
 
-  static const _perRow = 10;
+  static const _columns = 10;
+  static const _perColumn = 3;
   static const _gap = 4.0;
 
   @override
@@ -177,20 +182,20 @@ class HabitGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final cell =
-            (constraints.maxWidth - _gap * (_perRow - 1)) / _perRow;
-        return Column(
+            (constraints.maxWidth - _gap * (_columns - 1)) / _columns;
+        return Row(
           children: [
-            for (var row = 0; row * _perRow < days.length; row++) ...[
-              if (row > 0) const SizedBox(height: _gap),
-              Row(
+            for (var column = 0; column < _columns; column++) ...[
+              if (column > 0) const SizedBox(width: _gap),
+              Column(
                 children: [
-                  for (var i = 0; i < _perRow; i++) ...[
-                    if (i > 0) const SizedBox(width: _gap),
+                  for (var i = 0; i < _perColumn; i++) ...[
+                    if (i > 0) const SizedBox(height: _gap),
                     Container(
                       width: cell,
                       height: cell,
                       decoration: BoxDecoration(
-                        color: fill(days[row * _perRow + i]) ?? empty,
+                        color: fill(days[column * _perColumn + i]) ?? empty,
                         borderRadius: BorderRadius.circular(Radii.heatCell),
                       ),
                     ),

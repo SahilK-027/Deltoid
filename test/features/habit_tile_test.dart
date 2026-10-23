@@ -57,16 +57,54 @@ void main() {
     expect(find.text('3/7'), findsOneWidget);
   });
 
-  testWidgets('draws thirty days, ten to a row', (tester) async {
-    await pumpTile(tester);
+  testWidgets('draws thirty days, filled down each column', (tester) async {
+    // 15 October is the last day, so the window opens on 16 September.
+    const second = Color(0xFFFF0000);
+    const today = Color(0xFF00FF00);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark),
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 174,
+              child: HabitGrid(
+                fill: (key) => switch (key) {
+                  20260917 => second,
+                  20261015 => today,
+                  _ => null,
+                },
+                today: DateTime(2026, 10, 15),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
 
     final cells = find.descendant(
       of: find.byType(HabitGrid),
       matching: find.byType(Container),
     );
     expect(cells, findsNWidgets(30));
+    Rect cellIn(Color colour) => tester.getRect(find.byWidgetPredicate(
+          (w) =>
+              w is Container &&
+              (w.decoration as BoxDecoration?)?.color == colour,
+        ));
+
     final first = tester.getRect(cells.first);
     expect(first.width, closeTo(first.height, 0.01), reason: 'square');
+    // The second day sits under the first, as on the year map, not beside it.
+    expect(cellIn(second).left, closeTo(first.left, 0.01));
+    expect(cellIn(second).top, greaterThan(first.bottom));
+    // Today closes the grid at the bottom right: the last column's last cell,
+    // flush with the right edge.
+    final last = tester.getRect(cells.last);
+    expect(cellIn(today), last);
+    expect(last.right, closeTo(174, 0.01));
+    expect(last.bottom, greaterThan(cellIn(second).bottom));
   });
 
   testWidgets('a tap on the button does not also open the tile', (
