@@ -4,7 +4,7 @@ Status only, one line per item, of what has been built. Why anything is
 shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 [SYNC.md](SYNC.md), and the code carries the detail.
 
-**1,636 tests and sixteen pgTAP tests, analyzer clean.**
+**1,653 tests and sixteen pgTAP tests, analyzer clean.**
 
 ---
 
@@ -20,6 +20,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] Six regimes, one active, each with an identity hue and a unique living name.
 - [x] The exercise catalog archives rather than deletes; starter catalog seeded, no regime ever is.
 - [x] Stale open sessions: empty ones swept, ones with sets kept and offered Finish or Discard.
+- [x] Custom sessions: a session outside the programme, started empty from the session sheet or logged after the fact, in no cycle and no day's prefill, with its own deload switch.
 
 ### Logging
 

@@ -3408,4 +3408,191 @@ void main() {
     expect(after.cycleIndex, 1);
     expect(after.nextSessionId, empty);
   });
+
+  group('custom sessions', () {
+    /// Logs every set of one movement in [workoutId] at [weight] × 8,
+    /// adding the movement first when the workout does not hold it.
+    Future<void> logMovement(
+      String workoutId,
+      String exerciseId,
+      double weight,
+    ) async {
+      var detail = await repo.workoutDetail(workoutId);
+      if (!detail!.entries.any((e) => e.exercise.id == exerciseId)) {
+        await repo.addExerciseToWorkout(workoutId, exerciseId);
+        detail = await repo.workoutDetail(workoutId);
+      }
+      final entry = detail!.entries.firstWhere((e) => e.exercise.id == exerciseId);
+      for (final set in entry.sets) {
+        await repo.updateSet(set.id,
+            weight: Value(weight), reps: const Value(8), isDone: const Value(true));
+      }
+    }
+
+    /// Incline DB Press, which the template programmes in both Push 1 and
+    /// Push 2.
+    Future<String> inclineId() async {
+      final incline = await (db.select(db.exercises)
+            ..where((t) => t.name.equals('Incline DB Press')))
+          .getSingle();
+      return incline.id;
+    }
+
+    test('opens empty, with no session, no cycle and its own deload flag',
+        () async {
+      final regime = await activeRegime();
+      final id = await repo.startCustomWorkout(
+          regimeId: regime.id, isDeload: true);
+
+      final detail = (await repo.workoutDetail(id))!;
+      expect(detail.workout.sessionId, isNull);
+      expect(detail.workout.cycleId, isNull);
+      expect(detail.workout.isDeload, isTrue);
+      expect(detail.workout.status, WorkoutStatus.inProgress);
+      expect(detail.entries, isEmpty);
+    });
+
+    test('a second tap hands back the custom session already open', () async {
+      final regime = await activeRegime();
+      final first = await repo.startCustomWorkout(regimeId: regime.id);
+      final second = await repo.startCustomWorkout(regimeId: regime.id);
+      expect(second, first);
+    });
+
+    test('refuses to open while a programme day is in progress', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      expect(
+        () => repo.startCustomWorkout(regimeId: regime.id),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('a programme day refuses to open while a custom session is', () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      await repo.startCustomWorkout(regimeId: regime.id);
+      expect(
+        () => repo.startWorkout(regimeId: regime.id, sessionId: push1.id),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('finishing one, deload or not, leaves the cycle where it was',
+        () async {
+      final regime = await activeRegime();
+      final before = (await repo.cycleStatus(regime.id))!;
+
+      for (final deload in [false, true]) {
+        final id = await repo.startCustomWorkout(
+            regimeId: regime.id, isDeload: deload);
+        await logMovement(id, await inclineId(), 30);
+        expect(await repo.completeWorkout(id), isTrue);
+      }
+
+      final after = (await repo.cycleStatus(regime.id))!;
+      expect(after.cycleId, before.cycleId);
+      expect(after.cycleIndex, before.cycleIndex);
+      expect(after.completedSessionIds, isEmpty);
+      expect(after.nextSessionId, before.nextSessionId);
+      expect(after.cyclesSinceDeload, before.cyclesSinceDeload);
+    });
+
+    test('a programme day keeps its own prefill after a heavier custom session',
+        () async {
+      final regime = await activeRegime();
+      final push1 = await sessionNamed('Push 1');
+      final push2 = await sessionNamed('Push 2');
+      final incline = await inclineId();
+
+      final day = await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      await logMovement(day, incline, 22.5);
+      await repo.completeWorkout(day);
+
+      final custom = await repo.startCustomWorkout(regimeId: regime.id);
+      await logMovement(custom, incline, 30);
+      await repo.completeWorkout(custom);
+
+      final again =
+          await repo.startWorkout(regimeId: regime.id, sessionId: push1.id);
+      final past = await repo.pastPerformances(incline,
+          excludeWorkoutId: again, sessionId: push1.id);
+
+      final forPush1 = resolvePrefill(candidates: past, sessionId: push1.id);
+      expect(forPush1.source, PrefillSource.sameSession);
+      expect(forPush1.sets.first.weight, 22.5);
+
+      // A day that has never trained the movement opens blank, and the
+      // disclosure names the custom session as where it was last done.
+      final forPush2 = resolvePrefill(candidates: past, sessionId: push2.id);
+      expect(forPush2.source, PrefillSource.otherSession);
+      expect(forPush2.hasSuggestion, isFalse);
+      expect(forPush2.reference!.sessionId, isNull);
+
+      // And a custom session never prefills another.
+      final forCustom = resolvePrefill(candidates: past, sessionId: null);
+      expect(forCustom.hasSuggestion, isFalse);
+    });
+
+    test('its lifts stay out of cycle progress', () async {
+      final regime = await activeRegime();
+      final custom = await repo.startCustomWorkout(regimeId: regime.id);
+      await logMovement(custom, await inclineId(), 30);
+      await repo.completeWorkout(custom);
+
+      final progress = (await repo.regimeProgress(regime.id))!;
+      expect(progress.labels.keys.where((l) => l.sessionId.isEmpty), isEmpty);
+    });
+
+    test('a cycle can still reopen when a custom session followed it',
+        () async {
+      final regime = await activeRegime();
+      String? last;
+      for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Push 2', 'Pull 2', 'Leg 2']) {
+        final id = await repo.startWorkout(
+            regimeId: regime.id, sessionId: (await sessionNamed(name)).id);
+        final detail = await repo.workoutDetail(id);
+        await repo.updateSet(detail!.entries.first.sets.first.id,
+            weight: const Value(20), reps: const Value(8), isDone: const Value(true));
+        await repo.completeWorkout(id);
+        last = id;
+      }
+      expect((await repo.cycleStatus(regime.id))!.cycleIndex, 2);
+
+      final custom = await repo.startCustomWorkout(regimeId: regime.id);
+      await logMovement(custom, await inclineId(), 30);
+      await repo.completeWorkout(custom);
+
+      await repo.deleteWorkout(last!);
+      expect((await repo.cycleStatus(regime.id))!.cycleIndex, 1);
+    });
+
+    test('its deload flag can be changed, and a programme day refuses',
+        () async {
+      final regime = await activeRegime();
+      final custom = await repo.startCustomWorkout(regimeId: regime.id);
+      await repo.setCustomWorkoutDeload(custom, true);
+      expect((await repo.workoutDetail(custom))!.workout.isDeload, isTrue);
+      await repo.setCustomWorkoutDeload(custom, false);
+      expect((await repo.workoutDetail(custom))!.workout.isDeload, isFalse);
+      await repo.abandonWorkout(custom);
+
+      final day = await repo.startWorkout(
+          regimeId: regime.id, sessionId: (await sessionNamed('Push 1')).id);
+      expect(
+        () => repo.setCustomWorkoutDeload(day, true),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('a backdated one lands on its day and in no cycle', () async {
+      final regime = await activeRegime();
+      final day = daysBefore(DateTime.now(), 3);
+      final id = await repo.startCustomWorkout(regimeId: regime.id, at: day);
+      final workout = (await repo.workoutDetail(id))!.workout;
+      expect(workout.dayKey, dayKeyOf(day));
+      expect(workout.cycleId, isNull);
+    });
+  });
 }

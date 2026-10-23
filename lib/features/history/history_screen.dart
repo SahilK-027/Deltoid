@@ -543,7 +543,7 @@ class _WorkoutRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          summary.sessionName ?? unplannedSessionName,
+                          summary.sessionName ?? customSessionName,
                           style: context.t.titleMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

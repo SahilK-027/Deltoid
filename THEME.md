@@ -1962,6 +1962,15 @@ Five parts, in an order that does not change:
 2. **Today's session**: the hero, on the band's own `surface`, exactly as
    Workouts drew it — the session due or the session open, and the screen's one
    primary action.
+   Under the button, `Train another session` is a text link, the quiet
+   secondary THEME rule 3 allows, shown for a regime of one day or more. It
+   opens `Start a session`: the days as inset panels, then a `bodySmall`
+   label, `Outside the programme`, over one more panel for a custom session.
+   That panel is two lines under a hairline in `surfaceHighest`: the
+   `Custom session` row, which starts it on a tap, and a `Deload session`
+   switch, which opens on the open cycle's state. `Log a past session` ends its
+   list with the same panel, its switch opening on the cycle covering the day
+   picked.
 3. **Habits**: the two habit tiles. The Workouts tile takes the place of the
    Consistency card, and opens the same Consistency screen.
 4. **Phase**: the [Phase card](#phase-card), the one place a bulk, a cut or

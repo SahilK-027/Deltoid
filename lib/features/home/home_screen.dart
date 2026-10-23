@@ -14,6 +14,7 @@ import '../../core/widgets/ticking.dart';
 import '../../data/db/database.dart';
 import '../../domain/habits.dart';
 import '../../domain/cycle_engine.dart';
+import '../../domain/session_name.dart';
 import '../../domain/set_format.dart';
 import '../history/workout_detail_screen.dart';
 import '../log/log_screen.dart';
@@ -44,11 +45,15 @@ final _startingProvider = StateProvider<bool>((ref) => false);
 /// resume card, disposing the widget that started it. Clearing the flag through
 /// a dead `ref` throws, leaving the button disabled for the rest of the
 /// session.
+///
+/// A null [sessionId] starts a custom session, which opens empty and carries
+/// [isDeload] as its own flag.
 Future<void> _startSession(
   BuildContext context,
   WidgetRef ref, {
   required String regimeId,
-  required String sessionId,
+  required String? sessionId,
+  bool isDeload = false,
 }) async {
   if (ref.read(_startingProvider)) return;
 
@@ -57,9 +62,10 @@ Future<void> _startSession(
 
   container.read(_startingProvider.notifier).state = true;
   try {
-    final id = await container
-        .read(trainingRepositoryProvider)
-        .startWorkout(regimeId: regimeId, sessionId: sessionId);
+    final repo = container.read(trainingRepositoryProvider);
+    final id = sessionId == null
+        ? await repo.startCustomWorkout(regimeId: regimeId, isDeload: isDeload)
+        : await repo.startWorkout(regimeId: regimeId, sessionId: sessionId);
     await navigator.push(
       MaterialPageRoute(builder: (_) => LogScreen(workoutId: id)),
     );
@@ -135,7 +141,136 @@ class _SessionPickRow extends StatelessWidget {
   }
 }
 
-/// Starts a session other than the queue head.
+/// What either session sheet came back with when the custom row was tapped.
+class _CustomPick {
+  const _CustomPick({required this.isDeload});
+
+  final bool isDeload;
+}
+
+/// The custom-session choice at the foot of either session sheet.
+///
+/// The same inset panel as a day, so it reads as one more choice of the same
+/// kind, with its deload switch under a hairline inside it. The switch lives in
+/// the panel rather than in a question asked after the tap, which keeps
+/// starting a custom session one tap, and it opens on [initialDeload]: the open
+/// cycle's state when starting now, the covering cycle's when backfilling.
+///
+/// Under its own label, `Outside the programme`, so the days stay the list
+/// and this reads as the exception.
+class _CustomSessionPick extends StatefulWidget {
+  const _CustomSessionPick({
+    required this.subtitle,
+    required this.initialDeload,
+    required this.onStart,
+  });
+
+  final String subtitle;
+  final bool initialDeload;
+  final ValueChanged<bool> onStart;
+
+  @override
+  State<_CustomSessionPick> createState() => _CustomSessionPickState();
+}
+
+class _CustomSessionPickState extends State<_CustomSessionPick> {
+  late bool _deload = widget.initialDeload;
+
+  @override
+  void didUpdateWidget(_CustomSessionPick old) {
+    super.didUpdateWidget(old);
+    // The backfill sheet's date can change under the panel, and with it the
+    // cycle the session would have been in.
+    if (old.initialDeload != widget.initialDeload) {
+      _deload = widget.initialDeload;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: Space.lg, bottom: Space.sm),
+          child: Text('Outside the programme', style: context.t.bodySmall),
+        ),
+        InsetPanel(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Pressable(
+                onTap: () => widget.onStart(_deload),
+                scale: 0.98,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Space.lg,
+                    vertical: Space.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              customSessionName,
+                              style: context.t.titleMedium,
+                            ),
+                            const SizedBox(height: Space.xxs),
+                            Text(widget.subtitle, style: context.t.bodyMedium),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                        color: c.textTertiary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(height: 1, thickness: 1, color: c.surfaceHighest),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.lg,
+                  Space.sm,
+                  Space.md,
+                  Space.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Deload session', style: context.t.bodyLarge),
+                          Text(
+                            'A light day, marked orange',
+                            style: context.t.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _deload,
+                      onChanged: (on) => setState(() => _deload = on),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Starts a session other than the queue head, or a custom session.
 ///
 /// The cycle is an order, not a rota: the hero names the first session not yet
 /// trained, and this is how you say "not that one, this one". Two taps, which
@@ -154,7 +289,7 @@ Future<void> _trainAnotherSession(
       for (final id in p.sessionIds)
         if (id != p.dueSessionId) id,
   };
-  final chosen = await showAppSheet<Session>(
+  final picked = await showAppSheet<Object>(
     context,
     builder: (sheet) => AppSheet(
       title: 'Start a session',
@@ -168,10 +303,28 @@ Future<void> _trainAnotherSession(
             notDue: notDue.contains(s.id),
             onTap: () => Navigator.of(sheet).pop(s),
           ),
+        _CustomSessionPick(
+          subtitle: 'Starts empty. Add exercises as you train.',
+          initialDeload: status.isDeload,
+          onStart: (deload) =>
+              Navigator.of(sheet).pop(_CustomPick(isDeload: deload)),
+        ),
       ],
     ),
   );
-  if (chosen == null || !context.mounted) return;
+  if (picked == null || !context.mounted) return;
+
+  if (picked is _CustomPick) {
+    await _startSession(
+      context,
+      ref,
+      regimeId: regimeId,
+      sessionId: null,
+      isDeload: picked.isDeload,
+    );
+    return;
+  }
+  final chosen = picked as Session;
 
   // Training the same day twice in a cycle is legitimate, but it is far more
   // often a mis-tap on a row that already carries a tick.
@@ -214,7 +367,7 @@ Future<void> _logPastSession(
 
   final picked = await showAppSheet<_BackfillResult>(
     context,
-    builder: (sheet) => _BackfillSheet(sessions: sessions),
+    builder: (sheet) => _BackfillSheet(regimeId: regimeId, sessions: sessions),
   );
   if (picked == null || !context.mounted) return;
 
@@ -240,14 +393,25 @@ Future<void> _logPastSession(
     // nobody knows why.
     final date = picked.date!;
     final cycle = await repo.cycleCovering(regimeId, date);
-    final id = await repo.startWorkout(
-      regimeId: regimeId,
-      sessionId: picked.sessionId!,
-      at: date,
-    );
+    final sessionId = picked.sessionId;
+    final id = sessionId == null
+        // A custom session belongs to no cycle whatever its date, so the
+        // toast below says so rather than naming the covering cycle.
+        ? await repo.startCustomWorkout(
+            regimeId: regimeId,
+            isDeload: picked.isDeload,
+            at: date,
+          )
+        : await repo.startWorkout(
+            regimeId: regimeId,
+            sessionId: sessionId,
+            at: date,
+          );
     showToastOn(
       messenger,
-      cycle == null
+      sessionId == null
+          ? 'Counts towards no cycle'
+          : cycle == null
           ? 'Older than this regime, so it counts towards no cycle'
           : 'Counts towards cycle ${cycle.cycleIndex}',
     );
@@ -265,19 +429,30 @@ Future<void> _logPastSession(
 /// the overwhelmingly common case is remembering one day late.
 /// What the backfill sheet came back with: a session to write on a day, or a
 /// workout that day already holds and you asked to see.
+///
+/// A log with a null [sessionId] is a custom session, carrying its own
+/// [isDeload].
 class _BackfillResult {
-  const _BackfillResult.log({required this.sessionId, required this.date})
-    : workoutId = null;
-  const _BackfillResult.open(this.workoutId) : sessionId = null, date = null;
+  const _BackfillResult.log({
+    required this.sessionId,
+    required this.date,
+    this.isDeload = false,
+  }) : workoutId = null;
+  const _BackfillResult.open(this.workoutId)
+    : sessionId = null,
+      date = null,
+      isDeload = false;
 
   final String? sessionId;
   final DateTime? date;
+  final bool isDeload;
   final String? workoutId;
 }
 
 class _BackfillSheet extends ConsumerStatefulWidget {
-  const _BackfillSheet({required this.sessions});
+  const _BackfillSheet({required this.regimeId, required this.sessions});
 
+  final String regimeId;
   final List<Session> sessions;
 
   @override
@@ -298,6 +473,31 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
   /// of the tap and hands back the loading value, leaving the rings and the
   /// already-logged prompt with nothing to work from.
   Map<int, HeatDay> _logged = const {};
+
+  /// Whether the cycle covering [_date] was a deload, which is what the custom
+  /// session's switch opens on. False before the regime existed.
+  bool _coveringDeload = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _readCoveringDeload();
+  }
+
+  /// Read on open and on every change of day. The repository is looked up
+  /// while this state is mounted, and the answer is dropped if it no longer is.
+  Future<void> _readCoveringDeload() async {
+    final repo = ref.read(trainingRepositoryProvider);
+    final day = _date;
+    final cycle = await repo.cycleCovering(widget.regimeId, day);
+    if (!mounted || day != _date) return;
+    setState(() => _coveringDeload = cycle?.isDeload ?? false);
+  }
+
+  void _setDate(DateTime day) {
+    setState(() => _date = day);
+    _readCoveringDeload();
+  }
 
   Future<void> _pickDate() async {
     final c = context.c;
@@ -326,7 +526,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
 
     final already = logged[dayKeyOf(picked)];
     if (already?.workoutId == null) {
-      setState(() => _date = picked);
+      _setDate(picked);
       return;
     }
 
@@ -339,7 +539,7 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
     if (open) {
       Navigator.of(context).pop(_BackfillResult.open(already.workoutId!));
     } else {
-      setState(() => _date = picked);
+      _setDate(picked);
     }
   }
 
@@ -415,6 +615,13 @@ class _BackfillSheetState extends ConsumerState<_BackfillSheet> {
               context,
             ).pop(_BackfillResult.log(sessionId: s.id, date: _date)),
           ),
+        _CustomSessionPick(
+          subtitle: 'Not a day of your programme',
+          initialDeload: _coveringDeload,
+          onStart: (deload) => Navigator.of(context).pop(
+            _BackfillResult.log(sessionId: null, date: _date, isDeload: deload),
+          ),
+        ),
       ],
     );
   }
@@ -889,6 +1096,22 @@ class _NoSessionsState extends ConsumerWidget {
                       label: 'Add a session',
                       onPressed: () => addSessionPrompt(context, ref, regime.id),
                     ),
+                    // Training today does not wait for the split to be built:
+                    // a custom session needs a regime and nothing else.
+                    const SizedBox(height: Space.sm),
+                    Center(
+                      child: LinkAction(
+                        'Start a custom session',
+                        onTap: ref.watch(_startingProvider)
+                            ? null
+                            : () => _startSession(
+                                context,
+                                ref,
+                                regimeId: regime.id,
+                                sessionId: null,
+                              ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -968,13 +1191,16 @@ class _ResumeHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final owner = this.owner;
-    final name =
+    final dayName =
         owner?.sessionName ??
         sessions
             .where((s) => s.id == workout.sessionId)
             .map((s) => s.name)
-            .firstOrNull ??
-        'Workout';
+            .firstOrNull;
+    final isCustom = workout.sessionId == null;
+    final name = dayName ?? (isCustom ? customSessionName : 'Workout');
+    // What the finish and discard dialogs call it, mid-sentence.
+    final inSentence = isCustom ? sessionInSentence(null) : name;
     // Finishing this advances the cycle of the regime it was started under,
     // which is worth saying when you are looking at a different one.
     final foreignRegime = owner != null && owner.regimeId != activeRegimeId
@@ -1127,11 +1353,11 @@ class _ResumeHero extends ConsumerWidget {
             children: [
               LinkAction(
                 'Finish it',
-                onTap: () => _finishStale(context, name, started, done),
+                onTap: () => _finishStale(context, inSentence, started, done),
               ),
               LinkAction(
                 'Discard',
-                onTap: () => _discardStale(context, name, done),
+                onTap: () => _discardStale(context, inSentence, done),
               ),
             ],
           ),
@@ -1414,8 +1640,9 @@ class _NextUpHero extends ConsumerWidget {
         // description and not an instruction — training Legs before Pull is
         // normal. One tap to open the picker, one to start: the same two taps
         // an always-on session list would cost, without a six-row block
-        // claiming to be a plan for the day.
-        if (sessions.length > 1) ...[
+        // claiming to be a plan for the day. Shown for a regime of one day
+        // too, since the sheet always offers a custom session beside it.
+        if (sessions.isNotEmpty) ...[
           const SizedBox(height: Space.sm),
           Center(
             child: LinkAction(

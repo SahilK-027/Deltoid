@@ -247,4 +247,53 @@ void main() {
       expect(out.single.weight, 74.5); // 74.4 → 74.5
     });
   });
+
+  group('custom sessions', () {
+    // A custom session is a workout with no session behind it.
+    PastPerformance custom(int dayKey, List<PastSet> sets) => PastPerformance(
+          workoutId: 'w-custom-$dayKey',
+          sessionId: null,
+          sessionName: 'Custom session',
+          dayKey: dayKey,
+          isDeload: false,
+          sets: sets,
+        );
+
+    test('a newer custom performance never fills a programme day', () {
+      final result = resolvePrefill(
+        candidates: [
+          custom(20260723, [working(30, 8)]),
+          perf('push1', 'Push 1', 20260719, [working(22.5, 8)]),
+        ],
+        sessionId: 'push1',
+      );
+
+      expect(result.source, PrefillSource.sameSession);
+      expect(result.sets.single.weight, 22.5);
+    });
+
+    test('a day that has never trained the movement is told where it was', () {
+      final result = resolvePrefill(
+        candidates: [custom(20260723, [working(30, 8)])],
+        sessionId: 'push2',
+      );
+
+      expect(result.source, PrefillSource.otherSession);
+      expect(result.reference!.sessionId, isNull);
+      expect(result.hasSuggestion, isFalse);
+    });
+
+    test('a custom session opens blank, even after another custom session', () {
+      final result = resolvePrefill(
+        candidates: [
+          custom(20260723, [working(30, 8)]),
+          perf('push1', 'Push 1', 20260719, [working(22.5, 8)]),
+        ],
+        sessionId: null,
+      );
+
+      expect(result.source, PrefillSource.otherSession);
+      expect(result.hasSuggestion, isFalse);
+    });
+  });
 }

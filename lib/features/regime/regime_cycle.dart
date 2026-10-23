@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/session_name.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/cycle_order.dart';
@@ -280,9 +281,7 @@ Future<void> _showPositionSheet(
         title: 'New alternating day',
         hint: 'Leg 2, Upper B',
         help: 'Alternates with ${joinDayNames(names)}',
-        validate: (value) => taken.contains(value.trim().toLowerCase())
-            ? 'This regime already has a day called ${value.trim()}'
-            : null,
+        validate: (value) => dayNameProblem(value, taken),
       );
       if (name == null || name.isEmpty) return;
       await regimes.addAlternatingSession(first, name);

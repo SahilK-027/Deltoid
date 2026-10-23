@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/ids.dart';
+import '../../core/failure.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/calendar.dart';
@@ -61,7 +62,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
     // one looks like somewhere you navigate to rather than into.
     return Scaffold(
       appBar: AppBar(
-        title: Text(detail.session?.name ?? unplannedSessionName),
+        title: Text(detail.session?.name ?? customSessionName),
         actions: [
           if (workout.isDeload) ...[
             Pill('Deload', color: c.deload),
@@ -173,9 +174,13 @@ class WorkoutDetailScreen extends ConsumerWidget {
     );
   }
 
-  /// The three things you can do to a logged day, in a sheet rather than a
-  /// popup menu — a menu anchored to a glyph is the one surface in this app
-  /// that never got a design.
+  /// The things you can do to a logged day, in a sheet rather than a popup
+  /// menu — a menu anchored to a glyph is the one surface in this app that
+  /// never got a design.
+  ///
+  /// A custom session has a fourth: its deload flag is its own, so it is
+  /// corrected here. A programme day's deload is its cycle's, changed on the
+  /// Regime screen, and has no row.
   Future<void> _showActions(
     BuildContext context,
     WidgetRef ref,
@@ -185,7 +190,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
     final action = await showAppSheet<String>(
       context,
       builder: (sheet) => AppSheet(
-        title: detail.session?.name ?? unplannedSessionName,
+        title: detail.session?.name ?? customSessionName,
         subtitle: DateFormat(
           'd MMMM yyyy',
         ).format(dateFromDayKey(detail.workout.dayKey)),
@@ -209,6 +214,19 @@ class WorkoutDetailScreen extends ConsumerWidget {
                 : 'How it felt, what got in the way',
             onTap: () => Navigator.of(sheet).pop('notes'),
           ),
+          if (detail.workout.sessionId == null)
+            AppRow(
+              icon: detail.workout.isDeload
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+              title: detail.workout.isDeload
+                  ? 'Not a deload'
+                  : 'Mark as a deload',
+              subtitle: detail.workout.isDeload
+                  ? 'Its sets count in the strength charts again'
+                  : 'A light day. Its sets leave the strength charts',
+              onTap: () => Navigator.of(sheet).pop('deload'),
+            ),
           AppRow(
             icon: Icons.delete_outline_rounded,
             title: 'Delete this session',
@@ -225,6 +243,17 @@ class WorkoutDetailScreen extends ConsumerWidget {
         await _editDate(context, ref, detail);
       case 'notes':
         await _editNotes(context, ref, detail);
+      case 'deload':
+        try {
+          await ref
+              .read(trainingRepositoryProvider)
+              .setCustomWorkoutDeload(
+                detail.workout.id,
+                !detail.workout.isDeload,
+              );
+        } catch (e, st) {
+          reportFailure(e, st, what: 'The deload mark could not be changed.');
+        }
       case 'delete':
         await _delete(context, ref, detail);
     }
@@ -288,7 +317,7 @@ class WorkoutDetailScreen extends ConsumerWidget {
       context,
       title: 'Delete this session?',
       message:
-          '${detail.session?.name ?? unplannedSessionName} · $date\n\n'
+          '${detail.session?.name ?? customSessionName} · $date\n\n'
           '$sets logged set${sets == 1 ? '' : 's'} will be removed from '
           'history, the heatmap and every last-time suggestion. If it closed a '
           'cycle, the cycle reopens.\n\nThis cannot be undone.',

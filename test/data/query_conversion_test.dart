@@ -119,7 +119,7 @@ Future<List<PastPerformance>> performancesViaDrift(
           workoutId: w.id,
           slotId: we.id,
           sessionId: w.sessionId,
-          sessionName: session?.name ?? unplannedSessionName,
+          sessionName: session?.name ?? customSessionName,
           dayKey: w.dayKey,
           startedAt: w.startedAt,
           isDeload: w.isDeload,
@@ -472,7 +472,7 @@ void main() {
     expect(all.map((p) => p.dayKey).toList(),
         [20260409, 20260404, 20260403, 20260402, 20260401]);
     expect(all.first.sessionId, isNull);
-    expect(all.first.sessionName, unplannedSessionName);
+    expect(all.first.sessionName, customSessionName);
     expect(all.map((p) => p.isDeload).toList(),
         [false, true, false, false, false]);
     expect(all.map((p) => p.skipReason).toList(), [

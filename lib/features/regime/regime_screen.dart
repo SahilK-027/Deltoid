@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/session_name.dart';
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
@@ -469,9 +470,7 @@ class _DayBody extends ConsumerWidget {
       title: 'Rename day',
       initial: session.name,
       // Keeping its own name is a no-op, not a collision — `exceptId` above.
-      validate: (value) => taken.contains(value.trim().toLowerCase())
-          ? 'This regime already has a day called ${value.trim()}'
-          : null,
+      validate: (value) => dayNameProblem(value, taken),
     );
     if (name == null || name.isEmpty) return;
     await repo.renameSession(session.id, name);
@@ -648,9 +647,7 @@ Future<void> addSessionPrompt(
     context,
     title: 'New day',
     hint: 'Push 1, Upper A, Legs',
-    validate: (value) => taken.contains(value.trim().toLowerCase())
-        ? 'This regime already has a day called ${value.trim()}'
-        : null,
+    validate: (value) => dayNameProblem(value, taken),
   );
   if (name == null || name.isEmpty) return;
   await repo.addSession(regimeId, name);

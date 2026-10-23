@@ -110,7 +110,7 @@ class SessionSummaryScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(
                         Space.gutter, Space.lg, Space.gutter, Space.xl),
                     child: Text(
-                      detail.session?.name ?? unplannedSessionName,
+                      detail.session?.name ?? customSessionName,
                       textAlign: TextAlign.center,
                       // `section`, not `pageTitle`: the masthead type is
                       // uppercase and belongs to a tab you navigated to. This is

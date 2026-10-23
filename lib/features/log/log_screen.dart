@@ -383,7 +383,8 @@ class _LogScreenState extends ConsumerState<LogScreen>
           // Named the way a tracker names itself, because that is what this
           // line is: something running in the background that you have not
           // forgotten about.
-          title: 'Currently tracking ${detail.session?.name ?? 'your workout'}',
+          title: 'Currently tracking '
+              '${detail.session?.name ?? 'a custom session'}',
           // The movement and the set. Whether a clock joins it is decided where
           // it is known whether anything will keep that clock moving.
           body: exercise == null
@@ -773,11 +774,14 @@ class _LogScreenState extends ConsumerState<LogScreen>
     // An exercise added mid-session has no slot in the template to hold this,
     // so the write matches nothing. Silently forgetting it is worse than
     // saying so: the timer would simply be back at 120s next week.
+    // A custom session has no template at all, which is a different sentence.
     if (saved || !mounted) return;
     showToast(
       context,
-      'Rest set for today only. ${entry.exercise.name} is not in this '
-      'session\'s template, so the change is not remembered.',
+      detail.workout.sessionId == null
+          ? 'Rest set for today only. Custom sessions do not remember it.'
+          : 'Rest set for today only. ${entry.exercise.name} is not in this '
+                'session\'s template, so the change is not remembered.',
     );
   }
 
@@ -927,10 +931,16 @@ class _LogScreenState extends ConsumerState<LogScreen>
                   ? EmptyState(
                       icon: Icons.fitness_center_rounded,
                       title: 'Nothing to log yet',
-                      message:
-                          'This session has no exercises in it. Anything you '
-                          'add goes into today only. The template keeps its '
-                          'own list.',
+                      // A custom session has no template to keep a list,
+                      // so it says what its being outside the programme
+                      // means instead.
+                      message: detail.workout.sessionId == null
+                          ? 'Add the exercises you are training today. A '
+                              'custom session belongs to no day of your '
+                              'programme, so no day\'s numbers change.'
+                          : 'This session has no exercises in it. Anything you '
+                              'add goes into today only. The template keeps its '
+                              'own list.',
                       action: PrimaryButton(
                         label: 'Add an exercise',
                         onPressed: () => _addExercise(detail),
@@ -1747,7 +1757,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     await showReorderSheet(
       context,
       title: 'Reorder exercises',
-      subtitle: detail.session?.name ?? unplannedSessionName,
+      subtitle: detail.session?.name ?? customSessionName,
       items: [
         for (final e in detail.entries)
           (id: e.workoutExercise.id, label: e.exercise.name),
@@ -2295,7 +2305,13 @@ class _ExercisePage extends ConsumerWidget {
               const SizedBox(width: Space.sm),
             ],
             _InfoButton(
-              onTap: () => showExerciseInfo(context, ref, entry, prefill),
+              onTap: () => showExerciseInfo(
+                context,
+                ref,
+                entry,
+                prefill,
+                customSession: workout.sessionId == null,
+              ),
             ),
             const SizedBox(width: Space.sm),
             CircleIconButton(

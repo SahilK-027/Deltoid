@@ -159,7 +159,7 @@ class RegimeProgress {
 
   LiftLabel labelOf(LiftId lift) =>
       labels[lift] ??
-      const LiftLabel(exerciseName: '', sessionName: unplannedSessionName);
+      const LiftLabel(exerciseName: '', sessionName: customSessionName);
 }
 
 /// A regime reduced to what a list needs of it.
@@ -1841,7 +1841,7 @@ class TrainingRepository {
             sessionId: r.readNullable<String>('session_id'),
             sessionName:
                 r.readNullable<String>('session_name') ??
-                unplannedSessionName,
+                customSessionName,
             dayKey: r.read<int>('day_key'),
             startedAt: r.read<int>('started_at'),
             isDeload: r.read<bool>('is_deload'),
@@ -2188,7 +2188,7 @@ class TrainingRepository {
             startedAt: workout.startedAt,
             sessionId: workout.sessionId,
             sessionName:
-                r.readTableOrNull(db.sessions)?.name ?? unplannedSessionName,
+                r.readTableOrNull(db.sessions)?.name ?? customSessionName,
             isDeload: workout.isDeload,
             skipReason: we.skipReason,
             sets: sets,
@@ -2401,7 +2401,7 @@ class TrainingRepository {
         dayKey: dayKey,
         sessionId: r.readNullable<String>('session_id'),
         sessionName:
-            r.readNullable<String>('session_name') ?? unplannedSessionName,
+            r.readNullable<String>('session_name') ?? customSessionName,
         isDeload: r.read<bool>('is_deload'),
         topSetLoad: score.topSetLoad,
         topSetReps: score.topSetReps,
@@ -2547,7 +2547,7 @@ class TrainingRepository {
           mode == LoadMode.bodyweight ||
           mode == LoadMode.bodyweightPlus;
 
-      // An unplanned workout has no session, so its lifts key on the exercise
+      // A custom workout has no session, so its lifts key on the exercise
       // alone. That is the honest answer rather than a defect: the split
       // exists because Push 1 and Push 2 are different progressions, and work
       // done outside the programme belongs to neither.
@@ -2560,7 +2560,7 @@ class TrainingRepository {
         () => LiftLabel(
           exerciseName: r.read<String>('exercise_name'),
           sessionName:
-              r.readNullable<String>('session_name') ?? unplannedSessionName,
+              r.readNullable<String>('session_name') ?? customSessionName,
         ),
       );
 
@@ -3015,6 +3015,89 @@ class TrainingRepository {
     });
 
     return workoutId;
+  }
+
+  /// Creates a custom session: a workout with no session template behind it.
+  ///
+  /// It opens empty and is filled from the log as exercises are added. Kept
+  /// apart from [startWorkout] rather than folded into it so that `sessionId`
+  /// stays required wherever a programme day is meant, and a null cannot reach
+  /// that path by accident.
+  ///
+  /// The workout belongs to no cycle. It cannot fill a position, because
+  /// `_completedSessionIds` drops a null session, and linking it to the open
+  /// cycle would only let it pin a placeholder: `_reopenCycleIfIncomplete`
+  /// refuses to reopen a cycle while a later one holds any live workout.
+  ///
+  /// [isDeload] is the workout's own, since there is no cycle to take it from.
+  /// The start sheet offers it opening on the open cycle's state, and
+  /// [setCustomWorkoutDeload] corrects it afterwards. Nothing is prefilled, so
+  /// there is nothing to scale.
+  ///
+  /// [at] backdates it, exactly as [startWorkout] does.
+  Future<String> startCustomWorkout({
+    required String regimeId,
+    bool isDeload = false,
+    DateTime? at,
+  }) async {
+    final running = await openWorkout();
+    if (running != null) {
+      // A double tap on the row: the custom session it already opened is the
+      // one being asked for.
+      if (at == null && running.sessionId == null) return running.id;
+      throw StateError('Finish the session in progress first');
+    }
+
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.id.equals(regimeId)))
+        .getSingleOrNull();
+    if (regime == null) {
+      throw StateError('That programme has been deleted');
+    }
+
+    final workoutId = newId();
+    final now = at == null
+        ? DateTime.now()
+        : DateTime(at.year, at.month, at.day, DateTime.now().hour,
+            DateTime.now().minute);
+
+    await db.into(db.workouts).insert(
+          WorkoutsCompanion.insert(
+            id: Value(workoutId),
+            regimeId: regimeId,
+            sessionId: const Value(null),
+            cycleId: const Value(null),
+            dayKey: dayKeyOf(now),
+            startedAt: Value(now.millisecondsSinceEpoch),
+            tzOffsetMinutes: tzOffsetOf(now),
+            isDeload: Value(isDeload),
+            status: const Value(WorkoutStatus.inProgress),
+          ),
+        );
+    return workoutId;
+  }
+
+  /// Marks a custom session as a deload, or clears the mark.
+  ///
+  /// Refused for a programme day: its deload belongs to its cycle and is
+  /// changed on the Regime screen, through [setCycleDeload]. A programme day
+  /// carrying its own flag would disagree with the cycle that scheduled it.
+  Future<void> setCustomWorkoutDeload(String workoutId, bool isDeload) async {
+    final workout = await (db.select(db.workouts)
+          ..where((t) => t.id.equals(workoutId) & t.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (workout == null) return;
+    if (workout.sessionId != null) {
+      throw StateError('A programme day takes its deload from its cycle');
+    }
+    await (db.update(db.workouts)..where((t) => t.id.equals(workoutId))).write(
+      WorkoutsCompanion(
+        isDeload: Value(isDeload),
+        deviceId: Value(currentDeviceId),
+        updatedAt: Value(nowMs()),
+        dirty: const Value(true),
+      ),
+    );
   }
 
   /// The unit weights are shown in, read straight from settings.

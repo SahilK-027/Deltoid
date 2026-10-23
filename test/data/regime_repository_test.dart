@@ -461,6 +461,21 @@ void main() {
       expect(await days(regime), hasLength(6));
     });
 
+    test('no day may be called by the custom session name', () async {
+      final regime = await createRegimeFromTemplate(db, ppl);
+      final leg1 = named(await days(regime), 'Leg 1');
+
+      await expectLater(
+        repo.addSession(regime, ' custom Session'),
+        throwsA(isA<SessionNameTakenException>()),
+      );
+      await expectLater(
+        repo.addAlternatingSession(leg1.id, 'Custom session'),
+        throwsA(isA<SessionNameTakenException>()),
+      );
+      expect(await days(regime), hasLength(6));
+    });
+
     test('a rotation never reaches into another regime', () async {
       final first = await createRegimeFromTemplate(db, ppl, name: 'One');
       final second = await createRegimeFromTemplate(db, ppl, name: 'Two');

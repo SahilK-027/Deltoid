@@ -37,12 +37,16 @@ final exerciseCatalogProvider = StreamProvider<List<Exercise>>((ref) {
 /// 12 Jul" is the one rule this app exists for), and pure noise when it
 /// announces an absence, so the absence lives in here with the rest of the
 /// facts that are true but not urgent mid-set.
+///
+/// [customSession] says the open workout has no session behind it, which
+/// changes how a first time is worded rather than what is shown.
 Future<void> showExerciseInfo(
   BuildContext context,
   WidgetRef ref,
   ExerciseEntry entry,
-  PrefillResult? prefill,
-) async {
+  PrefillResult? prefill, {
+  bool customSession = false,
+}) async {
   final exercise = entry.exercise;
   final videos = exercise.formVideoUrls;
   final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
@@ -77,6 +81,7 @@ Future<void> showExerciseInfo(
             reference: prefill!.reference!,
             exercise: exercise,
             unit: unit,
+            customSession: customSession,
           )
         else
           AppRow(
@@ -662,11 +667,17 @@ class _LastElsewhere extends StatefulWidget {
     required this.reference,
     required this.exercise,
     required this.unit,
+    this.customSession = false,
   });
 
   final PastPerformance reference;
   final Exercise exercise;
   final WeightUnit unit;
+
+  /// Whether the open workout is a custom session. `First time in this
+  /// session` would be true of every movement in one, and so would say
+  /// nothing; the title says why the plate is blank instead.
+  final bool customSession;
 
   @override
   State<_LastElsewhere> createState() => _LastElsewhereState();
@@ -688,7 +699,9 @@ class _LastElsewhereState extends State<_LastElsewhere> {
       children: [
         AppRow(
           icon: Icons.call_split_rounded,
-          title: 'First time in this session',
+          title: widget.customSession
+              ? 'Custom sessions start blank'
+              : 'First time in this session',
           subtitle:
               'Last done in ${widget.reference.sessionName} · $date'
               '${sets.isEmpty ? '' : ' · Tap to see it'}',

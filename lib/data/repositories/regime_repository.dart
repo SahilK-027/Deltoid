@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/ids.dart';
 import '../../domain/enums.dart';
+import '../../domain/session_name.dart';
 import '../db/database.dart';
 import '../db/renumber.dart';
 import '../db/watch.dart';
@@ -558,7 +559,8 @@ class RegimeRepository {
     return true;
   }
 
-  /// Whether a live session of [regimeId] already answers to this name.
+  /// Whether a live session of [regimeId] already answers to this name, or the
+  /// name is reserved for custom sessions.
   ///
   /// Trimmed and case-insensitive, matching [isNameTaken] and matching the
   /// index that backs it — `idx_sessions_name_live` keys on
@@ -570,6 +572,9 @@ class RegimeRepository {
   }) async {
     final wanted = name.trim().toLowerCase();
     if (wanted.isEmpty) return false;
+    // Reserved in every regime: a day by this name would read as a custom
+    // session in History, in a chart legend and in the prefill disclosure.
+    if (isReservedSessionName(name)) return true;
 
     final live = await (db.select(db.sessions)
           ..where((t) => t.regimeId.equals(regimeId) & t.deletedAt.isNull()))
