@@ -28,10 +28,6 @@ Minor release adding an export of your training to a spreadsheet, offered beside
 
 - **More:** `Export a backup file` is now `Export`. It asks whether to export the backup file, the spreadsheet or both, and then where to save them.
 
-### Fixed
-
-- **More:** A file saved to Downloads keeps the name it was given. A spreadsheet file would otherwise have arrived as `.csv.json`.
-
 ## [1.21.1] - 2026-10-23
 
 Patch release making the habit grids on Home read in the same order as the year map.
