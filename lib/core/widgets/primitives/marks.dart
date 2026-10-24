@@ -485,7 +485,7 @@ class _RevealPillState extends State<RevealPill> {
 }
 
 /// A day drawn as a calendar page: the weekday on a strip of [hue], the day of
-/// the month large below it, and two binder tabs rising above the page.
+/// the month large below it.
 ///
 /// History's leading tile. The bolt it replaced was the same glyph on every
 /// row, so it said nothing; a date is what the list is scanned for. [hue] is
@@ -512,83 +512,51 @@ class DateTile extends StatelessWidget {
   static const width = 50.0;
   static const pageHeight = 58.0;
 
-  /// How far the binder tabs rise above the page.
-  static const _tabRise = 3.0;
-
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // Each tab is ringed in the page background, so it reads as cut through
-    // the strip rather than laid on it.
-    Widget tab() => Container(
-      width: 8,
-      height: 11,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: c.bg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Container(
-        width: 4,
-        height: 7,
-        decoration: BoxDecoration(
-          color: c.textTertiary,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-
+    // No binder tabs above the page. Grey pins on a coloured strip read as
+    // clutter at this size, and the strip and the date say "calendar page"
+    // on their own.
     return SizedBox(
       width: width,
-      height: pageHeight + _tabRise,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            top: _tabRise,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.control - 2),
-              child: ColoredBox(
-                color: c.surfaceHigh,
-                child: Column(
-                  children: [
-                    Container(
-                      height: 20,
-                      width: double.infinity,
-                      color: hue,
-                      // Low in the strip, clear of the tabs above it.
-                      padding: const EdgeInsets.only(top: 5),
-                      alignment: Alignment.topCenter,
-                      child: Text(
-                        weekday,
-                        maxLines: 1,
-                        style: context.t.labelSmall?.copyWith(
-                          color: IconTile.glyphOn(hue),
-                          fontWeight: FontWeight.w700,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          day,
-                          style: context.t.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+      height: pageHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.control - 2),
+        child: ColoredBox(
+          color: c.surfaceHigh,
+          child: Column(
+            children: [
+              Container(
+                height: 20,
+                width: double.infinity,
+                color: hue,
+                alignment: Alignment.center,
+                child: Text(
+                  weekday,
+                  maxLines: 1,
+                  style: context.t.labelSmall?.copyWith(
+                    color: IconTile.glyphOn(hue),
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
                 ),
               ),
-            ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    day,
+                    style: context.t.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Positioned(top: -1, left: 7, child: tab()),
-          Positioned(top: -1, right: 7, child: tab()),
-        ],
+        ),
       ),
     );
   }

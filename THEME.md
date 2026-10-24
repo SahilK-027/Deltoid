@@ -1802,10 +1802,10 @@ workout detail, keeps the full pill.
 ### Date tile
 
 History's leading mark is a day drawn as a calendar page: `DateTile`, a fixed
-50 by 58 page in `surfaceHigh` at radius 12, a 20 tall strip across its top,
-and two binder tabs, 4 by 7 in `textTertiary`, rising 3 above it and ringed in
-`bg` so they read as cut through the strip. The strip is `progress` for a
-trained day and `deload` for a light one, and carries the weekday at `micro`,
+50 by 58 page in `surfaceHigh` at radius 12 with a 20 tall strip across its
+top, and nothing above it. Binder tabs were drawn there once, grey pins over
+the strip, and read as clutter at this size. The strip is `progress` for a
+trained day and `deload` for a light one, and carries the weekday centred at `micro`,
 bold, in the hue taken down by `IconTile.glyphOn`, which keeps it legible in
 the light theme where a hue is never text. The day of the month sits under it
 at the `section` size, weight 800. The month is the heading the rows sit

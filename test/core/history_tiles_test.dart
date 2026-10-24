@@ -121,8 +121,8 @@ void main() {
 
       final size = tester.getSize(find.byType(DateTile));
       expect(size.width, DateTile.width);
-      // The page plus the tabs rising above it.
-      expect(size.height, greaterThan(DateTile.pageHeight));
+      // The page alone: nothing rises above it.
+      expect(size.height, DateTile.pageHeight);
       expect(
         tester.getTopLeft(find.text('Fri')).dy,
         lessThan(tester.getTopLeft(find.text('23')).dy),
