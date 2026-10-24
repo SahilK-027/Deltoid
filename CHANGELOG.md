@@ -13,6 +13,25 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.22.0] - 2026-10-24
+
+Minor release adding an export of your training to a spreadsheet, offered beside the backup file under one Export row.
+
+### Added
+
+- **More:** `Export` can save your training as a spreadsheet, for Excel, Google Sheets or another training app. It writes two CSV files, one with a row for every set of every finished session and one with a row for every weigh-in.
+  - Each set row gives the date, time, programme, session, exercise, muscle, set type, weight, reps, partial reps, seconds held, rest and notes.
+  - Weights are written in the unit set under `Weight units`.
+  - Nothing can be restored from these files. Use the backup file to move your training to another phone.
+
+### Changed
+
+- **More:** `Export a backup file` is now `Export`. It asks whether to export the backup file, the spreadsheet or both, and then where to save them.
+
+### Fixed
+
+- **More:** A file saved to Downloads keeps the name it was given. A spreadsheet file would otherwise have arrived as `.csv.json`.
+
 ## [1.21.1] - 2026-10-23
 
 Patch release making the habit grids on Home read in the same order as the year map.
@@ -696,7 +715,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...HEAD
+[1.22.0]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...v1.22.0
 [1.21.1]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...v1.21.0
 [1.20.1]: https://github.com/SahilK-027/Deltoid/compare/v1.20.0...v1.20.1
