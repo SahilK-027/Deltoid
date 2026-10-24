@@ -8,12 +8,14 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../account/backup_mark.dart';
+import '../../core/progress.dart';
 import '../../core/providers.dart';
 import '../../core/sync_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/progress_sheet.dart';
 import '../../data/backup/backup_service.dart';
+import '../../data/backup/csv_export_service.dart';
 import '../../data/backup/downloads.dart';
 import '../../data/sync/forget.dart';
 import '../../domain/initials.dart';
@@ -85,11 +87,12 @@ class MoreScreen extends ConsumerWidget {
             if (ref.watch(syncAuthProvider) != null) const _AccountSection(),
             AppRow(
               icon: Icons.ios_share,
-              title: 'Export a backup file',
-              // One clause each. What the file is and where it can go is the
-              // sheet's to say, and the sheet has the width to say it.
-              subtitle: 'Every workout, in one file',
-              onTap: () => _export(context, ref),
+              title: 'Export',
+              // One row for every way out, and the sheet asks which. What
+              // each file is for is the sheet's to say, and the sheet has the
+              // width to say it.
+              subtitle: 'A backup file, a spreadsheet, or both',
+              onTap: () => _chooseExport(context, ref),
               chevron: true,
             ),
             AppRow(
@@ -139,20 +142,102 @@ class MoreScreen extends ConsumerWidget {
     );
   }
 
+  /// Which files: the backup, the spreadsheet, or both. Then [_export] asks
+  /// where they go.
+  ///
+  /// The backup is the only one of the three this app can read back, and it
+  /// says so. The spreadsheet is never called a backup: nothing restores from
+  /// it.
+  Future<void> _chooseExport(BuildContext context, WidgetRef ref) async {
+    final kind = await showAppSheet<_ExportKind>(
+      context,
+      builder: (sheet) => AppSheet(
+        title: 'Export',
+        subtitle: 'Choose what to export',
+        contentPadding: const EdgeInsets.only(bottom: Space.md),
+        children: [
+          AppRow(
+            icon: Icons.description_outlined,
+            title: 'Backup file',
+            subtitle: 'One JSON file that Deltoid can restore from',
+            onTap: () => Navigator.of(sheet).pop(_ExportKind.backup),
+          ),
+          AppRow(
+            icon: Icons.table_chart_outlined,
+            title: 'Spreadsheet',
+            subtitle:
+                'CSV files of every set and weigh-in, for Excel or '
+                'another app',
+            onTap: () => Navigator.of(sheet).pop(_ExportKind.spreadsheet),
+          ),
+          AppRow(
+            icon: Icons.folder_copy_outlined,
+            title: 'Both',
+            subtitle: 'The backup file and the spreadsheet together',
+            onTap: () => Navigator.of(sheet).pop(_ExportKind.both),
+          ),
+        ],
+      ),
+    );
+    if (kind == null || !context.mounted) return;
+
+    final db = ref.read(databaseProvider);
+    final unit = ref.read(weightUnitProvider).valueOrNull ?? WeightUnit.kg;
+    Future<List<File>> backup(ProgressReport report) async =>
+        [await BackupService(db).exportToFile(onProgress: report)];
+    Future<List<File>> spreadsheet(ProgressReport report) =>
+        CsvExportService(db).exportToFiles(unit, onProgress: report);
+
+    await switch (kind) {
+      _ExportKind.backup => _export(
+          context,
+          title: 'Export backup file',
+          subtitle: 'Every workout, in one file',
+          subject: 'Deltoid backup',
+          failure: 'The backup could not be written.',
+          write: backup,
+        ),
+      _ExportKind.spreadsheet => _export(
+          context,
+          title: 'Export spreadsheet',
+          subtitle: 'Every set, and every weigh-in',
+          subject: 'Deltoid training log',
+          failure: 'The spreadsheet files could not be written.',
+          write: spreadsheet,
+        ),
+      _ExportKind.both => _export(
+          context,
+          title: 'Export both',
+          subtitle: 'The backup file and the spreadsheet',
+          subject: 'Deltoid backup and training log',
+          failure: 'The export files could not be written.',
+          write: (report) async =>
+              [...await backup(report), ...await spreadsheet(report)],
+        ),
+    };
+  }
+
   /// Ask where it goes, then write it with the progress on screen.
   ///
   /// A chosen destination rather than the share sheet alone: sharing a backup
   /// to yourself is a strange thing to have to do, and every other app that
   /// makes a file puts it in Downloads.
-  Future<void> _export(BuildContext context, WidgetRef ref) async {
+  Future<void> _export(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required String subject,
+    required String failure,
+    required Future<List<File>> Function(ProgressReport report) write,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
     final box = context.findRenderObject() as RenderBox?;
 
     final destination = await showAppSheet<_ExportTo>(
       context,
       builder: (sheet) => AppSheet(
-        title: 'Export backup',
-        subtitle: 'Every workout, in one file',
+        title: title,
+        subtitle: subtitle,
         // Full-bleed rows, as every other action sheet in the app: a card in
         // here is a panel inside a panel, and the gutter double-insets rows
         // that already carry their own padding.
@@ -178,29 +263,32 @@ class MoreScreen extends ConsumerWidget {
     );
     if (destination == null || !context.mounted) return;
 
-    final File file;
+    final List<File> files;
     try {
-      final result = await withProgressSheet<File>(
+      final result = await withProgressSheet<List<File>>(
         context,
         title: 'Exporting',
-        task: (report) => BackupService(
-          ref.read(databaseProvider),
-        ).exportToFile(onProgress: report),
+        task: write,
       );
       if (result == null) return;
-      file = result;
+      files = result;
     } on BackupSaveException catch (e) {
       showToastOn(messenger, e.message, destructive: true);
       return;
     } catch (e, st) {
-      reportFailure(e, st, what: 'The backup could not be written.');
+      reportFailure(e, st, what: failure);
       return;
     }
 
     if (destination == _ExportTo.downloads) {
       try {
-        final location = await saveToDownloads(file);
-        showToastOn(messenger, 'Saved to $location');
+        final locations = [for (final f in files) await saveToDownloads(f)];
+        showToastOn(
+          messenger,
+          locations.length == 1
+              ? 'Saved to ${locations.single}'
+              : 'Saved ${locations.length} files to $downloadsFolder',
+        );
       } on BackupSaveException catch (e) {
         showToastOn(messenger, e.message, destructive: true);
       }
@@ -209,11 +297,11 @@ class MoreScreen extends ConsumerWidget {
 
     // The file is kept whether or not the share sheet is used, so say where
     // it went — a backup you cannot find later is one you have to trust.
-    showToastOn(messenger, 'Saved to ${file.parent.path}');
+    showToastOn(messenger, 'Saved to ${files.first.parent.path}');
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path)],
-        subject: 'Deltoid backup',
+        files: [for (final f in files) XFile(f.path)],
+        subject: subject,
         // iPad needs an anchor for the share popover or it throws.
         sharePositionOrigin: box == null
             ? null
@@ -348,6 +436,8 @@ class MoreScreen extends ConsumerWidget {
     }
   }
 }
+
+enum _ExportKind { backup, spreadsheet, both }
 
 enum _ExportTo { downloads, share }
 

@@ -44,7 +44,7 @@ object DownloadsWriter {
             val resolver = context.contentResolver
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                put(MediaStore.Downloads.MIME_TYPE, mimeTypeOf(fileName))
                 put(MediaStore.Downloads.RELATIVE_PATH, relative)
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
@@ -84,5 +84,17 @@ object DownloadsWriter {
         val target = File(dir, fileName)
         source.copyTo(target, overwrite = true)
         return target.absolutePath
+    }
+
+    /**
+     * The type MediaStore files the copy under, read off its name.
+     *
+     * MediaStore appends the extension it expects for the type it is given, so
+     * a spreadsheet export filed as `application/json` arrived in Downloads as
+     * `deltoid-sets-….csv.json`, which no spreadsheet offers to open.
+     */
+    private fun mimeTypeOf(fileName: String): String = when {
+        fileName.endsWith(".csv") -> "text/csv"
+        else -> "application/json"
     }
 }

@@ -222,7 +222,7 @@ lib/
                             regime_repository:   programmes, sessions, catalog
                             phase_repository:    bulk, cut and maintenance
     seed/                   Starter exercise catalog and optional templates
-    backup/                 Whole-database JSON export and restore, Downloads writer
+    backup/                 Whole-database JSON export and restore, CSV export, Downloads writer
     sync/                   sync_backend.dart (the transport interface),
                             supabase_backend.dart (the only file that imports
                             the Supabase client), sync_auth.dart,

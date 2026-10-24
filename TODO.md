@@ -72,6 +72,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 ### Around the edges
 
 - [x] Backup export, restore and auto-export after a session, on an isolate, round-trip tested.
+- [x] One Export row on More that offers a backup file, a spreadsheet or both. The spreadsheet is two CSV files, one row per ticked set of every finished session and one per weigh-in, in the unit the screens show. One-way; nothing restores from them.
 - [x] More: units, three themes drawn as miniatures, adaptive launcher icon.
 - [x] One day picker for backfill, bodyweight and re-dating. A ring on every day in range — its own colour when something is logged there, grey when nothing is — a dot on today, nothing on a day that cannot be picked, and a stated reason when one is tapped. Six full rows with the neighbouring months drawn back, turned by a drag or by either end of the month bar.
 - [x] Backfill asks for the day first and keeps it on screen.

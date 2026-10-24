@@ -2101,6 +2101,11 @@ appear only while an account is signed in:
   account`; the header says that now, so the row names the thing and the
   address is its detail (rule 6).
 
+`Export` is one row. Its sheet asks what to export, `Backup file`,
+`Spreadsheet` or `Both`, and then the destination sheet asks where it goes. The
+spreadsheet is two CSV files, every set and every weigh-in, and is never called
+a backup: nothing restores from it.
+
 ---
 
 ## 9. Where the language lives in code

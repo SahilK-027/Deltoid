@@ -139,8 +139,17 @@ void main() {
       // Home, so More opens on the account (RULES § 6).
       expect(find.text('Bodyweight'), findsNothing);
       expect(find.text('Account & backup'), findsOneWidget);
-      expect(find.text('Export a backup file'), findsOneWidget);
+      expect(find.text('Export'), findsOneWidget);
       expect(find.text('Restore from a file'), findsOneWidget);
+
+      // One way out, and the sheet asks which file.
+      await tester.tap(find.text('Export'));
+      await tester.pumpAndSettle();
+      expect(find.text('Backup file'), findsOneWidget);
+      expect(find.text('Spreadsheet'), findsOneWidget);
+      expect(find.text('Both'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
 
       // A `ListView` builds what is on screen, so the tail of the page has to
       // be scrolled to before it exists at all.
