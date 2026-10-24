@@ -13,6 +13,14 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.22.1] - 2026-10-24
+
+Patch release removing the pins from the date shown on each session in History.
+
+### Fixed
+
+- **History:** The calendar page at the start of each session no longer has two grey pins above it. The weekday is centred in the coloured strip at the top of the page.
+
 ## [1.22.0] - 2026-10-24
 
 Minor release adding an export of your training to a spreadsheet, offered beside the backup file under one Export row.
@@ -711,7 +719,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.22.1...HEAD
+[1.22.1]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...v1.22.1
 [1.22.0]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...v1.22.0
 [1.21.1]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/SahilK-027/Deltoid/compare/v1.20.1...v1.21.0
