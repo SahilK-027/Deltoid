@@ -54,12 +54,17 @@ class _SessionPickRow extends StatelessWidget {
     this.done = false,
     this.isNext = false,
     this.notDue = false,
+    this.rested,
   });
 
   final Session session;
   final VoidCallback onTap;
   final bool done;
   final bool isNext;
+
+  /// The day this session is rested on in the deload, today or planned.
+  /// Training it gives the position back to the session.
+  final int? rested;
 
   /// Whether the day alternates with another and this cycle is not its turn.
   /// It can still be started, and the row says what starting it means.
@@ -89,6 +94,15 @@ class _SessionPickRow extends StatelessWidget {
                 Icon(Icons.check_rounded, size: 16, color: c.positive),
                 const SizedBox(width: Space.xs),
                 Text('Done this cycle', style: context.t.labelSmall),
+              ] else if (rested case final day?) ...[
+                Icon(Icons.bedtime_outlined, size: 16, color: c.deload),
+                const SizedBox(width: Space.xs),
+                Text(
+                  day == dayKeyOf(DateTime.now())
+                      ? 'Rested today'
+                      : 'Rest on ${restDayLabel(day)}',
+                  style: context.t.labelSmall,
+                ),
               ] else if (isNext)
                 // Sentence case, like `Done this cycle` two lines up. An
                 // uppercase micro-label is what makes a screen look like a
@@ -268,6 +282,7 @@ Future<void> _trainAnotherSession(
           _SessionPickRow(
             session: s,
             done: status.completedSessionIds.contains(s.id),
+            rested: status.rests[s.id],
             isNext: status.nextSessionId == s.id,
             notDue: notDue.contains(s.id),
             onTap: () => Navigator.of(sheet).pop(s),

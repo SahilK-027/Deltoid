@@ -24,6 +24,7 @@ part 'database.g.dart';
     SetLogs,
     BodyweightLogs,
     Phases,
+    CycleRests,
     AppSettings,
   ],
 )
@@ -44,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   /// [RULES.md § 3](RULES.md#3-schema-and-migrations) for the protocol a change
   /// follows.
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

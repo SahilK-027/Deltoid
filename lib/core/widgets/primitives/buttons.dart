@@ -10,6 +10,7 @@ class PrimaryButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.tone,
+    this.deload = false,
     this.compact = false,
   });
 
@@ -19,6 +20,11 @@ class PrimaryButton extends StatelessWidget {
 
   /// Overrides the fill. Only for a destructive confirm, never for emphasis.
   final Color? tone;
+
+  /// Drawn in the deload's orange with [DeltoidColors.onDeload] on it. For
+  /// the one action that trains a light day, never for any other emphasis:
+  /// orange means a deload and nothing else.
+  final bool deload;
 
   /// The width of its own words, 46 tall, rather than the width of the screen.
   ///
@@ -34,10 +40,16 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final enabled = onPressed != null;
-    final bg = enabled ? (tone ?? c.accent) : c.surfaceHigh;
-    final fg = enabled
-        ? (tone == null ? c.onAccent : Colors.white)
-        : c.textTertiary;
+    final bg = !enabled
+        ? c.surfaceHigh
+        : deload
+            ? c.deload
+            : (tone ?? c.accent);
+    final fg = !enabled
+        ? c.textTertiary
+        : deload
+            ? c.onDeload
+            : (tone == null ? c.onAccent : Colors.white);
 
     return Pressable(
       onTap: onPressed,

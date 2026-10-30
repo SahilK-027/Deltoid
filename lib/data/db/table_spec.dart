@@ -172,6 +172,15 @@ List<TableSpec> tableSpecs(AppDatabase db) => [
         parse: Phase.fromJson,
         syncs: true,
       ),
+      // After `cycles` and `sessions`, both of which it points at. Every column
+      // has existed since the table did, at schema 8, so a file without rests
+      // simply has no rows for it.
+      TableSpec(
+        name: 'cycle_rests',
+        table: db.cycleRests,
+        parse: CycleRest.fromJson,
+        syncs: true,
+      ),
     ];
 
 /// The zone offset a workout written before `tz_offset_minutes` existed implies.

@@ -36,6 +36,7 @@ String tableLabel(String table) => switch (table) {
   'set_logs' => 'sets',
   'bodyweight_logs' => 'bodyweight entries',
   'phases' => 'phases',
+  'cycle_rests' => 'rest days',
   'app_settings' => 'settings',
   _ => table.replaceAll('_', ' '),
 };
@@ -52,6 +53,7 @@ String tableLabelOne(String table) => switch (table) {
   'set_logs' => 'set',
   'bodyweight_logs' => 'bodyweight entry',
   'phases' => 'phase',
+  'cycle_rests' => 'rest day',
   'app_settings' => 'setting',
   _ => table.replaceAll('_', ' '),
 };

@@ -109,7 +109,9 @@ everywhere, not near-misses picked one screen at a time.
 - **Blue is progress**: a trained day on the heatmap, the calendar and History,
   and every line on every chart. A chart with one line is a chart in blue.
 - **Orange is a deload**: the heatmap cell, the band on a chart, the pill, the
-  action that makes a cycle light. Not a warning, not a set type, not a regime.
+  action that makes a cycle light, the `Train light` button, the dot on a
+  deload's rest day, and the progress rule of a light session. Not a warning,
+  not a set type, not a regime.
 
 Neither is lent to an identity, a set type or a decoration, so wherever one of
 them appears it says the same thing. `test/core/palette_test.dart` holds this:
@@ -154,6 +156,7 @@ shout where the others may not: a destructive action.
 | `cut`         | cyan                                                  | A cut, as a tint on the Phase card and the cycle chart   |
 | `maintenance` | `textSecondary`                                       | Maintenance, as a tint on the same two charts            |
 | `heatEmpty`   | `surfaceHighest` in dark, `#E8E8E8` in light          | A day not trained, and an untrained muscle               |
+| `onDeload`    | `#3A1A0E` in both                                     | The label on a `deload` fill: `Train light`              |
 
 **The identity order alternates warm and cool.** The muscle regions draw in this
 order as a stack of bars, one per row, and two warm hues on adjacent rows read
@@ -189,6 +192,18 @@ Two rules decide how the hues are shared:
   the phase is named in words in the colour of the text around it.
   `test/core/palette_test.dart` holds `bulk` and `cut` to the rule the other
   identity uses keep: neither may equal `progress`, `deload` or `negative`.
+- **A light session says so in two places on the log, and only two.** The
+  progress rule under the header is `deload` on `deloadMuted` rather than
+  `accent` on `surfaceHigh`, and the line under the exercise name reads
+  `Deload · Set 2 of 3`, `Deload` in `deload` and the rest in
+  `textSecondary`, beside the header's `Deload` pill. The buttons, the ticks
+  and the focused cell stay as they always are: the log is used mid-set, and
+  the controls a thumb finds without looking do not change colour.
+- **The cycle sheet on Regimes trades `Close this cycle` for `Rest the
+  remaining days` in a deload**, with the moon in `deload`, because a deload
+  ends by resting what is left rather than by skipping it. `Cancel the planned
+  rest` follows while days are planned. `Not a deload after all` asks first
+  when the deload holds rest days, because ending it clears them.
 - **Identity marks appear only where they separate programmes** — the regime
   library. Elsewhere a mark means _what kind of day this was_: `progress` for a
   session, `deload` for a light week. That is what a feed of trained days is
@@ -382,6 +397,7 @@ The vocabulary. Everything on every screen is one of these.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Primary**          | Full-width, height 54, radius 14, `accent` fill, `onAccent` label at `title` weight. One per screen. Pinned to the bottom when it ends a flow.                                                                                                                                                                            |
 | **Secondary**        | Same metrics, `surfaceHigh` fill, primary label, no border.                                                                                                                                                                                                                                                               |
+| **Deload**           | The primary's metrics, `deload` fill, `onDeload` label (`#3A1A0E`, a warm brown, in both themes). Only `Train <session> light` on a deload day, under `Rest today`. White on this orange is under 3:1, and black turns it muddy.                                                     |
 | **Destructive**      | `negative` fill, white label. Only inside a confirmation, never on a page.                                                                                                                                                                                                                                                |
 | **Text link**        | `title` size, primary colour, **no underline**, followed by an 18dp chevron. The "See all / Collapse" affordance.                                                                                                                                                                                                         |
 | **Circular icon**    | 40dp `surfaceHigh` circle, white glyph at 18. Add, close, refresh. **Its label is required** — a glyph alone cannot say what it does, so the name is what has to be written for the code to compile, and it carries `Semantics` as well as a tooltip (a tooltip needs a long press, which is not a gesture made mid-set). |
@@ -710,7 +726,9 @@ row is `CrossAxisAlignment.start` for the reason a row of stat tiles is.
   each column and then across, as the year map is read: the oldest day at the
   top left and today at the bottom right. Square cells at radius 4 in
   `heatEmpty`. Workouts fills a trained day
-  with `progress` and a deload with `deload`, the colours its own map uses;
+  with `progress` and a deload with `deload`, the colours its own map uses,
+  and marks a deload's rest day with a `deload` dot centred on the grey cell,
+  45% of the cell and never under 3;
   Weigh-ins fills a day with a weigh-in in `weighIn`. No legend: the screen
   each tile opens carries one.
 - **The figure counts days, not entries, in the calendar week**, Monday to
@@ -1998,7 +2016,32 @@ Five parts, in an order that does not change:
    `Custom session` row, which starts it on a tap, and a `Deload session`
    switch, which opens on the open cycle's state. `Log a past session` ends its
    list with the same panel, its switch opening on the cycle covering the day
-   picked.
+   picked. A day rested in the deload says so on its row, a moon in `deload`
+   and `Rested today` or `Rest on Thu 20 Nov`, and can still be started.
+
+   **In a deload the hero offers one choice a day, and marks nothing on its
+   own.** Under the session, `Rest today`, a secondary with the moon glyph,
+   sits above `Train <session> light`, the deload button with the downward
+   trend glyph; stacked as rule 3 stacks any two. `Rest the remaining days`
+   is a text link under them while the deload holds more than one day, or one
+   day on a day already trained. It opens a sheet listing each session against
+   the day it would rest, `Push 2 · Thu 20 Nov`, one a day from today, or from
+   tomorrow when today is spent, and the day the next cycle starts.
+   `Rest today` answers with a toast carrying `Undo`, and so does the plan.
+
+   **A rested day has no Start.** The hero's title becomes `Rest today`, with
+   a line under it: how many rest days remain and the last of them, `Last day
+   of the deload. Cycle 8 starts tomorrow.`, or the session due next. One
+   secondary, `Train <session> light instead`, takes the rest back and starts
+   it. `Cancel the planned rest` is a text link while rest days are planned.
+   A day trained with the rest of the deload planned from tomorrow reads
+   `Rest from tomorrow`, with `Cancel the planned rest` as its secondary. The
+   habit tile's play button is absent on both.
+
+   **The cycle track shows the rest.** A trained position is the filled
+   segment it always was; a rested one is a grey segment with a `deload` dot at
+   its centre, the calendar's mark at track size, and a planned one the same
+   dot at 40%.
 3. **Habits**: the two habit tiles. The Workouts tile takes the place of the
    Consistency card, and opens the same Consistency screen.
 4. **Phase**: the [Phase card](#phase-card), the one place a bulk, a cut or
@@ -2047,8 +2090,11 @@ consistent each week was, so the week is what it draws. Top to bottom:
   picked week is ringed day by day, and today is ringed. There are no weekday
   letters, which three months side by side would print three times, and no
   count beside a month name, which crowded the grid. A hairline and the
-  heatmap legend, `Rest`, `Trained`, `Deload`, close the card, the one legend
-  for both cards.
+  heatmap legend, `Rest`, `Trained`, `Deload`, `Deload rest`, close the card, the one legend
+  for both cards. A deload's rest day is a grey cell with a `deload` dot, every
+  untrained day inside a deload's span up to yesterday, and today once it is
+  chosen as rest. A planned day is not marked until it comes, and the legend
+  gains `Deload rest`, its swatch the grey square with the dot.
 
 **Each count is stated once**: sessions in the first heading, days in the
 second, the two rates in the card. The year map this screen drew put

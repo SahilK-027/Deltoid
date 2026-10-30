@@ -48,12 +48,12 @@ class _HistoryHeatmapScreenState extends ConsumerState<HistoryHeatmapScreen> {
             title: 'Nothing logged yet',
             message: 'Finish a session and every year you train lands here.',
           ),
-        final d => _body(d.days),
+        final d => _body(d.days, d.deloadRest),
       },
     );
   }
 
-  Widget _body(Map<int, HeatDay> days) {
+  Widget _body(Map<int, HeatDay> days, Set<int> deloadRest) {
     final today = DateTime.now();
     final years = consistencyYears(days.keys, today: today);
     final year = _year != null && years.contains(_year) ? _year! : years.first;
@@ -145,6 +145,7 @@ class _HistoryHeatmapScreenState extends ConsumerState<HistoryHeatmapScreen> {
                     YearCalendar(
                       year: year,
                       days: days,
+                      deloadRest: deloadRest,
                       today: today,
                       week: picked == null ? null : fold.weeks[picked].start,
                     ),

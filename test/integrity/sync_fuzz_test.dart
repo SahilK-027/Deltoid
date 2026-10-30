@@ -252,6 +252,7 @@ const _syncedTables = [
   'set_logs',
   'bodyweight_logs',
   'phases',
+  'cycle_rests',
 ];
 
 /// A small pool, so two phones collide on purpose.

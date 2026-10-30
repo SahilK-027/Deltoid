@@ -94,6 +94,7 @@ class TwoDevices {
       'set_logs',
       'bodyweight_logs',
       'phases',
+      'cycle_rests',
     ];
     return {
       for (final table in tables)

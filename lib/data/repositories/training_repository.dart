@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../core/ids.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/cycle_progress.dart';
+import '../../domain/deload_rest.dart';
 import '../../domain/enums.dart';
 import '../../domain/metrics.dart';
 import '../../domain/muscle_volume.dart';
@@ -93,7 +94,7 @@ class TrainingRepository {
   Future<Cycle?> ensureOpenCycle(String regimeId) =>
       db.transaction(() => _ensureOpenCycle(regimeId));
 
-  Future<Cycle?> _ensureOpenCycle(String regimeId) async {
+  Future<Cycle?> _ensureOpenCycle(String regimeId, {int? startedAt}) async {
     final open = await (db.select(db.cycles)
           ..where((t) =>
               t.regimeId.equals(regimeId) &
@@ -105,7 +106,24 @@ class TrainingRepository {
           ])
           ..limit(1))
         .getSingleOrNull();
-    if (open != null) return open;
+    if (open != null) {
+      // A deload whose last rest day has passed is over, and it closes here —
+      // on the first read after that day rather than on a write, because the
+      // only thing that finished it is the date. Every path that starts a
+      // session comes through this, so nothing is ever trained into a deload
+      // that has already ended.
+      final closedAt = await _restedDeloadCloseStamp(open);
+      if (closedAt == null) return open;
+      await (db.update(db.cycles)..where((t) => t.id.equals(open.id))).write(
+        CyclesCompanion(
+          completedAt: Value(closedAt),
+          deviceId: Value(currentDeviceId),
+          updatedAt: Value(nowMs()),
+          dirty: const Value(true),
+        ),
+      );
+      return _ensureOpenCycle(regimeId, startedAt: closedAt + 1);
+    }
 
     // A deleted programme opens no new cycles. A tombstoned regime is absent
     // from every screen, and `invariant_oracle` refuses a live cycle under one
@@ -156,9 +174,73 @@ class TrainingRepository {
             regimeId: regimeId,
             cycleIndex: index,
             isDeload: Value(isDeload),
+            startedAt:
+                startedAt == null ? const Value.absent() : Value(startedAt),
           ),
         );
     return (db.select(db.cycles)..where((t) => t.id.equals(id))).getSingle();
+  }
+
+  /// When [cycle] closes, if it is a deload that rested days and every one of
+  /// its positions has been trained or rested on a day now past; else null.
+  ///
+  /// The stamp is the end of the last rest day rather than now: the deload
+  /// ended when that day did, and a session logged afterwards for a day in
+  /// between belongs to the cycle that followed. It is never earlier than the
+  /// last session the deload holds, so the cycle still covers its own work.
+  Future<int?> _restedDeloadCloseStamp(Cycle cycle) async {
+    if (!cycle.isDeload) return null;
+    final rests = await _rests(cycle.id);
+    if (rests.isEmpty) return null;
+    final today = dayKeyOf(DateTime.now());
+    final lastRest = rests.values.reduce((a, b) => a > b ? a : b);
+    if (lastRest >= today) return null;
+
+    final sessionIds = await _sessionIds(cycle.regimeId);
+    final rotations = await _rotations(cycle.regimeId);
+    final settled = {
+      ...await _completedSessionIds(cycle.id),
+      for (final MapEntry(:key, :value) in rests.entries)
+        if (value < today) key,
+    };
+    if (!everyPositionTrained(sessionIds, rotations, settled)) return null;
+
+    final endOfRest =
+        dateFromDayKey(addDaysToKey(lastRest, 1)).millisecondsSinceEpoch - 1;
+    final lastWork = await db.customSelect(
+      'SELECT MAX(COALESCE(ended_at, started_at)) AS at FROM workouts '
+      'WHERE cycle_id = ? AND deleted_at IS NULL',
+      variables: [Variable<String>(cycle.id)],
+      readsFrom: {db.workouts},
+    ).getSingle();
+    final work = lastWork.readNullable<int>('at') ?? 0;
+    return [endOfRest, work, cycle.startedAt].reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Session id to the day it is rested on, for every live rest in [cycleId].
+  ///
+  /// Two rows for one session can only be a merge of two phones that both
+  /// rested it; the earlier day answers, which is the one both phones hold.
+  ///
+  /// Only while the cycle is a deload. Turning one off clears its rests, but
+  /// a rest written on another phone can arrive after that, and an ordinary
+  /// cycle has no rest days for it to spend.
+  Future<Map<String, int>> _rests(String cycleId) async {
+    final query = db.select(db.cycleRests).join([
+      innerJoin(db.cycles, db.cycles.id.equalsExp(db.cycleRests.cycleId)),
+    ])
+      ..where(db.cycleRests.cycleId.equals(cycleId) &
+          db.cycleRests.deletedAt.isNull() &
+          db.cycles.isDeload.equals(true));
+    final rows = [
+      for (final row in await query.get()) row.readTable(db.cycleRests),
+    ];
+    final out = <String, int>{};
+    for (final r in rows) {
+      final held = out[r.sessionId];
+      if (held == null || r.dayKey < held) out[r.sessionId] = r.dayKey;
+    }
+    return out;
   }
 
   /// Collapses regimes that already carry more than one open cycle.
@@ -230,6 +312,16 @@ class TrainingRepository {
                 ..where((t) => t.cycleId.equals(loser.id)))
               .write(
             WorkoutsCompanion(
+              cycleId: Value(keeper.id),
+              deviceId: Value(currentDeviceId),
+              updatedAt: Value(nowMs()),
+              dirty: const Value(true),
+            ),
+          );
+          await (db.update(db.cycleRests)
+                ..where((t) => t.cycleId.equals(loser.id)))
+              .write(
+            CycleRestsCompanion(
               cycleId: Value(keeper.id),
               deviceId: Value(currentDeviceId),
               updatedAt: Value(nowMs()),
@@ -472,8 +564,12 @@ class TrainingRepository {
     return buildPositions(
       await _sessionIds(regimeId),
       rotations: rotations,
-      trainedThisCycle:
-          open == null ? const {} : await _completedSessionIds(open.id),
+      trainedThisCycle: open == null
+          ? const {}
+          : {
+              ...await _completedSessionIds(open.id),
+              ...(await _rests(open.id)).keys,
+            },
       lastTrainedInRotation:
           await _lastTrainedInRotation(rotations, open?.id),
     );
@@ -481,7 +577,7 @@ class TrainingRepository {
 
   Stream<List<CyclePosition>> watchCyclePositions(String regimeId) {
     return db.watchQuery(
-      [db.workouts, db.cycles, db.sessions],
+      [db.workouts, db.cycles, db.sessions, db.cycleRests],
       () => cyclePositionsOf(regimeId),
     );
   }
@@ -508,6 +604,9 @@ class TrainingRepository {
       rotations: rotations,
       lastTrainedInRotation:
           await _lastTrainedInRotation(rotations, cycle.id),
+      rests: await _rests(cycle.id),
+      todayKey: dayKeyOf(DateTime.now()),
+      trainedToday: cycle.isDeload && await trainedTodayIn(cycle.id),
     );
   }
 
@@ -1263,6 +1362,12 @@ class TrainingRepository {
             dirty: const Value(true),
           ),
         );
+        // A rest planned for a day after the close would stand in a cycle that
+        // is over, spending a position nobody can reach.
+        await _tombstoneRests(
+          cycle.id,
+          after: dayKeyOf(DateTime.now()),
+        );
         await _ensureOpenCycle(regimeId);
       });
 
@@ -1315,7 +1420,16 @@ class TrainingRepository {
 
         final cycle = await _ensureOpenCycle(regimeId);
         if (cycle == null) return false;
-        final done = await _completedSessionIds(cycle.id);
+        // A rest settles its position once its day is over. One that is today
+        // or later leaves the cycle open: [_ensureOpenCycle] closes it the
+        // morning after the last one.
+        final today = dayKeyOf(DateTime.now());
+        final rests = await _rests(cycle.id);
+        if (rests.values.any((day) => day >= today)) return false;
+        final done = {
+          ...await _completedSessionIds(cycle.id),
+          ...rests.keys,
+        };
         final rotations = await _rotations(regimeId);
         if (!everyPositionTrained(sessionIds, rotations, done)) return false;
 
@@ -1333,14 +1447,218 @@ class TrainingRepository {
 
   /// Overrides whether the open cycle is a deload. The suggestion is never
   /// binding.
-  Future<void> setCycleDeload(String cycleId, bool isDeload) async {
-    await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
-      CyclesCompanion(
-        isDeload: Value(isDeload),
+  ///
+  /// Turning a deload off takes its rest days with it, the ones already taken
+  /// as well as the ones planned: an ordinary cycle has no rest days, so every
+  /// day they stood in for is owed again. The light sessions already logged
+  /// keep their deload flag, because a past log is never rewritten.
+  Future<void> setCycleDeload(String cycleId, bool isDeload) =>
+      db.transaction(() async {
+        await (db.update(db.cycles)..where((t) => t.id.equals(cycleId))).write(
+          CyclesCompanion(
+            isDeload: Value(isDeload),
+            deviceId: Value(currentDeviceId),
+            updatedAt: Value(nowMs()),
+            dirty: const Value(true),
+          ),
+        );
+        if (!isDeload) await _tombstoneRests(cycleId);
+      });
+
+  // ── Deload rest ───────────────────────────────────────────────────────
+
+  /// Rests today in place of the session due next in the open deload.
+  ///
+  /// Returns the rows written, for `Undo`, or nothing when there is nothing to
+  /// rest: no deload open, a day already rested today, or every position
+  /// already trained or rested.
+  Future<List<String>> restToday(String regimeId) => db.transaction(() async {
+        final status = await cycleStatus(regimeId);
+        if (status == null || !status.canRestToday) return const [];
+        final sessionId = status.nextSessionId;
+        if (sessionId == null) return const [];
+        return [
+          await _insertRest(status.cycleId, sessionId, status.todayKey),
+        ];
+      });
+
+  /// Rests every position the open deload still owes, one a day.
+  ///
+  /// The days start today, or tomorrow when today already holds a session
+  /// trained in this cycle or a day rested. Returns the rows written, for
+  /// `Undo`.
+  Future<List<String>> restRemainingDays(String regimeId) =>
+      db.transaction(() async {
+        final status = await cycleStatus(regimeId);
+        if (status == null || !status.isDeload) return const [];
+        final owed = status.remainingSessionIds;
+        if (owed.isEmpty) return const [];
+        final days = plannedRestDays(
+          count: owed.length,
+          todayKey: status.todayKey,
+          todayTaken:
+              status.restedTodaySessionId != null || status.trainedToday,
+        );
+        return [
+          for (var i = 0; i < owed.length; i++)
+            await _insertRest(status.cycleId, owed[i], days[i]),
+        ];
+      });
+
+  /// Whether a session in [cycleId] was completed today.
+  Future<bool> trainedTodayIn(String cycleId) async {
+    final row = await (db.select(db.workouts)
+          ..where((t) =>
+              t.cycleId.equals(cycleId) &
+              t.status.equalsValue(WorkoutStatus.completed) &
+              t.dayKey.equals(dayKeyOf(DateTime.now())) &
+              t.deletedAt.isNull())
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  /// Gives back the days planned as rest after today, so they are trained
+  /// again. Today's rest, and those already taken, stand.
+  Future<void> cancelPlannedRests(String cycleId) =>
+      _tombstoneRests(cycleId, after: dayKeyOf(DateTime.now()));
+
+  /// Takes back today's rest, so the day can be trained light instead.
+  Future<void> unrestToday(String cycleId) =>
+      _tombstoneRests(cycleId, on: dayKeyOf(DateTime.now()));
+
+  /// Takes back rest days by id: the `Undo` on the toast that wrote them.
+  Future<void> removeRests(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final stamp = nowMs();
+    await (db.update(db.cycleRests)
+          ..where((t) => t.id.isIn(ids) & t.deletedAt.isNull()))
+        .write(
+      CycleRestsCompanion(
+        deletedAt: Value(stamp),
         deviceId: Value(currentDeviceId),
-        updatedAt: Value(nowMs()),
+        updatedAt: Value(stamp),
         dirty: const Value(true),
       ),
+    );
+  }
+
+  /// Whether [cycleId] holds any rest day, taken or planned.
+  Future<bool> cycleHasRests(String cycleId) async =>
+      (await _rests(cycleId)).isNotEmpty;
+
+  Future<String> _insertRest(String cycleId, String sessionId, int dayKey) async {
+    final id = newId();
+    await db.into(db.cycleRests).insert(
+          CycleRestsCompanion.insert(
+            id: Value(id),
+            cycleId: cycleId,
+            sessionId: sessionId,
+            dayKey: dayKey,
+          ),
+        );
+    return id;
+  }
+
+  /// Tombstones the live rests in [cycleId], or only those after the day
+  /// [after] or on the day [on] when one is given; [sessionId] narrows it to
+  /// one position's rest.
+  Future<void> _tombstoneRests(
+    String cycleId, {
+    int? after,
+    int? on,
+    String? sessionId,
+  }) async {
+    final stamp = nowMs();
+    await (db.update(db.cycleRests)
+          ..where((t) =>
+              t.cycleId.equals(cycleId) &
+              t.deletedAt.isNull() &
+              (after == null
+                  ? const Constant(true)
+                  : t.dayKey.isBiggerThanValue(after)) &
+              (on == null ? const Constant(true) : t.dayKey.equals(on)) &
+              (sessionId == null
+                  ? const Constant(true)
+                  : t.sessionId.equals(sessionId))))
+        .write(
+      CycleRestsCompanion(
+        deletedAt: Value(stamp),
+        deviceId: Value(currentDeviceId),
+        updatedAt: Value(stamp),
+        dirty: const Value(true),
+      ),
+    );
+  }
+
+  /// Every day a deload rested, from the first deload to today.
+  ///
+  /// Derived from each deload cycle's span and the days trained, so a day
+  /// inside a deload marks itself whether or not the app was opened on it
+  /// ([deloadRestDays]). Today is rest only once it has been chosen as rest.
+  /// Bounded by the number of deload cycles ever opened, each a handful of
+  /// rows, and by the days they cover.
+  Future<Set<int>> deloadRestDayKeys() async {
+    final today = dayKeyOf(DateTime.now());
+    final cycles = await db.customSelect(
+      'SELECT c.id AS id, c.started_at AS started_at, '
+      'c.completed_at AS completed_at, '
+      '(SELECT MIN(w.day_key) FROM workouts w WHERE w.cycle_id = c.id '
+      "AND w.status = 'completed' AND w.is_deload = 1 "
+      'AND w.deleted_at IS NULL) AS first_work, '
+      '(SELECT COUNT(*) FROM workouts w WHERE w.cycle_id = c.id '
+      "AND w.status = 'completed' AND w.is_deload = 0 "
+      'AND w.deleted_at IS NULL) AS full_work, '
+      '(SELECT MIN(r.day_key) FROM cycle_rests r WHERE r.cycle_id = c.id '
+      'AND r.deleted_at IS NULL) AS first_rest, '
+      '(SELECT COUNT(*) FROM cycle_rests r WHERE r.cycle_id = c.id '
+      'AND r.deleted_at IS NULL AND r.day_key = ?) AS rests_today '
+      'FROM cycles c JOIN regimes g ON g.id = c.regime_id '
+      'WHERE c.is_deload = 1 AND c.deleted_at IS NULL '
+      'AND g.deleted_at IS NULL',
+      variables: [Variable<int>(today)],
+      readsFrom: {db.cycles, db.workouts, db.cycleRests, db.regimes},
+    ).get();
+    if (cycles.isEmpty) return const {};
+
+    final spans = <DeloadSpan>[];
+    var earliest = today;
+    for (final r in cycles) {
+      final work = r.readNullable<int>('first_work');
+      final rest = r.readNullable<int>('first_rest');
+      final first = [work, rest].whereType<int>().fold<int?>(
+            null,
+            (a, b) => a == null || b < a ? b : a,
+          );
+      final start = deloadStartDayKey(
+        openedDayKey: dayKeyOf(DateTime.fromMillisecondsSinceEpoch(
+          r.read<int>('started_at'),
+        )),
+        firstActivityDayKey: first,
+        madePartWay: r.read<int>('full_work') > 0,
+      );
+      if (start == null) continue;
+      final completed = r.readNullable<int>('completed_at');
+      spans.add(DeloadSpan(
+        startDayKey: start,
+        endDayKey: completed == null
+            ? null
+            : dayKeyOf(DateTime.fromMillisecondsSinceEpoch(completed)),
+        restsToday: r.read<int>('rests_today') > 0,
+      ));
+      if (start < earliest) earliest = start;
+    }
+
+    final trained = await db.customSelect(
+      'SELECT DISTINCT day_key AS day_key FROM workouts '
+      "WHERE status = 'completed' AND deleted_at IS NULL AND day_key >= ?",
+      variables: [Variable<int>(earliest)],
+      readsFrom: {db.workouts},
+    ).get();
+    return deloadRestDays(
+      spans,
+      trainedDays: {for (final r in trained) r.read<int>('day_key')},
+      todayKey: today,
     );
   }
 
@@ -3011,7 +3329,7 @@ class TrainingRepository {
 
   Stream<CycleStatus?> watchCycleStatus(String regimeId) {
     return db.watchQuery(
-      [db.workouts, db.cycles, db.sessions, db.regimes],
+      [db.workouts, db.cycles, db.sessions, db.regimes, db.cycleRests],
       () => cycleStatus(regimeId),
     );
   }
@@ -3743,6 +4061,13 @@ class TrainingRepository {
     final cycleId = workout.cycleId;
     if (cycleId == null) return true;
 
+    // A day planned as rest and then trained after all is a light day, not a
+    // rest: the session takes its position back.
+    final sessionId = workout.sessionId;
+    if (sessionId != null) {
+      await _tombstoneRests(cycleId, sessionId: sessionId);
+    }
+
     final status = await cycleStatus(workout.regimeId);
     if (status == null) return true;
     // `cycleStatus` describes the cycle open *now*. A backdated session can
@@ -4079,7 +4404,12 @@ class TrainingRepository {
     if (cycle == null || cycle.completedAt == null) return;
 
     final sessionIds = await _sessionIds(cycle.regimeId);
-    final done = await _completedSessionIds(cycle.id);
+    // A rested day still spends its position after the workout beside it is
+    // deleted.
+    final done = {
+      ...await _completedSessionIds(cycle.id),
+      ...(await _rests(cycle.id)).keys,
+    };
     final rotations = await _rotations(cycle.regimeId);
     if (sessionIds.isEmpty ||
         everyPositionTrained(sessionIds, rotations, done)) {
@@ -4112,6 +4442,9 @@ class TrainingRepository {
             ..where((t) => t.cycleId.equals(c.id) & t.deletedAt.isNull()))
           .get();
       if (held.isNotEmpty) return;
+      // A rest chosen in a later cycle is a decision made in it, and keeps
+      // it for the same reason a session does.
+      if ((await _rests(c.id)).isNotEmpty) return;
     }
 
     // A regime holds one open cycle, and a later cycle is not the only one that

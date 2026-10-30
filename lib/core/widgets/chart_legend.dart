@@ -14,6 +14,10 @@ enum LegendMark {
 
   /// An area — a band, a tint, a heat cell — keyed by a 10 square at radius 2.
   area,
+
+  /// A heat cell of rest marked by a dot: the 10 square in `heatEmpty`, with
+  /// the entry's colour as a dot at its centre. The deload's rest days.
+  dot,
 }
 
 /// One entry of a [ChartLegend]: a swatch and its name.
@@ -104,7 +108,8 @@ class ChartLegend extends StatelessWidget {
   }
 }
 
-double _swatchWidth(LegendMark mark) => mark == LegendMark.area ? 10 : 14;
+double _swatchWidth(LegendMark mark) =>
+    mark == LegendMark.area || mark == LegendMark.dot ? 10 : 14;
 
 class _Entry extends StatelessWidget {
   const _Entry({required this.entry, required this.style});
@@ -121,6 +126,23 @@ class _Entry extends StatelessWidget {
           decoration: BoxDecoration(
             color: entry.color,
             borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      LegendMark.dot => Container(
+          width: 10,
+          height: 10,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: context.c.heatEmpty,
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: Container(
+            width: 4.5,
+            height: 4.5,
+            decoration: BoxDecoration(
+              color: entry.color,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       LegendMark.line => Container(width: 14, height: 2, color: entry.color),

@@ -726,20 +726,23 @@ class _NextUpHero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
-    final nextId = status.nextSessionId;
-    if (nextId == null) {
+    final restedId = status.restedTodaySessionId;
+    final planned = status.plannedRestSessionIds;
+    // With every position trained or rested, `nextSessionId` wraps to the
+    // cycle after this one, which is not today's to offer while rest days
+    // still stand between it and now.
+    final nextId = status.hasOpenPosition || status.rests.isEmpty
+        ? status.nextSessionId
+        : null;
+    // Nothing left to start is only an empty regime outside a deload. Inside
+    // one, every position can be spoken for by rest, today's or planned.
+    if (nextId == null && restedId == null && planned.isEmpty) {
       return const EmptyState(
         icon: Icons.playlist_add_rounded,
         title: 'No sessions yet',
         message: 'Add sessions to this regime and they will show up here.',
       );
     }
-
-    final session = sessions.where((s) => s.id == nextId).firstOrNull;
-    final preview = this.preview ?? const <String>[];
-    // An empty session can be started, but only produces an empty log. Send the
-    // user to fill it in instead of into a blank page.
-    final isEmptySession = preview.isEmpty;
     // One colour on this card, and it is the blue a trained day gets on the
     // heatmap — not an accent, and not the regime's identity hue. A deload
     // overrides it: the light week is the fact this tile exists to state.
@@ -797,86 +800,247 @@ class _NextUpHero extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: Space.lg),
+        if (restedId != null)
+          ..._restDay(context, ref, restedId: restedId, planned: planned)
+        else if (nextId == null)
+          ..._restPlanned(context, ref, planned: planned)
+        else
+          ..._session(context, ref, nextId: nextId),
+      ],
+    );
+  }
+
+  String _name(String id) =>
+      sessions.where((s) => s.id == id).firstOrNull?.name ?? 'Session';
+
+  /// The day is rested: no session to start, only the way back to training
+  /// it light, and how much of the deload is left.
+  List<Widget> _restDay(
+    BuildContext context,
+    WidgetRef ref, {
+    required String restedId,
+    required List<String> planned,
+  }) {
+    final name = _name(restedId);
+    final next = status.hasOpenPosition ? status.nextSessionId : null;
+    final String note;
+    if (planned.isNotEmpty) {
+      final n = planned.length;
+      note = n == 1
+          ? 'One more rest day is planned, on '
+                '${restDayLabel(status.lastRestDayKey!)}. '
+                'Cycle ${status.cycleIndex + 1} starts the day after.'
+          : '$n more rest days are planned, the last on '
+                '${restDayLabel(status.lastRestDayKey!)}. '
+                'Cycle ${status.cycleIndex + 1} starts the day after.';
+    } else if (next == null) {
+      note = 'Last day of the deload. '
+          'Cycle ${status.cycleIndex + 1} starts tomorrow.';
+    } else {
+      note = '$name is rested. ${_name(next)} is next, '
+          'to train light or rest.';
+    }
+    return [
+      Text('Rest today', style: context.t.displayMedium),
+      const SizedBox(height: Space.xs),
+      Text(note, style: context.t.bodyMedium),
+      const SizedBox(height: Space.lg),
+      SecondaryButton(
+        label: 'Train $name light instead',
+        icon: Icons.trending_down_rounded,
+        onPressed: ref.watch(_startingProvider)
+            ? null
+            : () async {
+                await ref
+                    .read(trainingRepositoryProvider)
+                    .unrestToday(status.cycleId);
+                if (!context.mounted) return;
+                await _startSession(
+                  context,
+                  ref,
+                  regimeId: regimeId,
+                  sessionId: restedId,
+                );
+              },
+      ),
+      if (planned.isNotEmpty) ...[
+        const SizedBox(height: Space.sm),
+        Center(
+          child: LinkAction(
+            'Cancel the planned rest',
+            onTap: () => cancelPlannedRestAction(
+              context,
+              ref,
+              cycleId: status.cycleId,
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  /// Today was trained, and every day left is planned as rest from tomorrow.
+  List<Widget> _restPlanned(
+    BuildContext context,
+    WidgetRef ref, {
+    required List<String> planned,
+  }) {
+    final n = planned.length;
+    return [
+      Text('Rest from tomorrow', style: context.t.displayMedium),
+      const SizedBox(height: Space.xs),
+      Text(
+        '${n == 1 ? 'One rest day is' : '$n rest days are'} planned, the '
+        'last on ${restDayLabel(status.lastRestDayKey!)}. '
+        'Cycle ${status.cycleIndex + 1} starts the day after.',
+        style: context.t.bodyMedium,
+      ),
+      const SizedBox(height: Space.lg),
+      SecondaryButton(
+        label: 'Cancel the planned rest',
+        icon: Icons.close_rounded,
+        onPressed: () =>
+            cancelPlannedRestAction(context, ref, cycleId: status.cycleId),
+      ),
+    ];
+  }
+
+  /// The session due next, and the action that starts it. In a deload the
+  /// action trains it light, with rest offered above it.
+  List<Widget> _session(
+    BuildContext context,
+    WidgetRef ref, {
+    required String nextId,
+  }) {
+    final name = _name(nextId);
+    final preview = this.preview ?? const <String>[];
+    // An empty session can be started, but only produces an empty log. Send the
+    // user to fill it in instead of into a blank page.
+    final isEmptySession = preview.isEmpty;
+    final starting = ref.watch(_startingProvider);
+    void start() => _startSession(
+      context,
+      ref,
+      regimeId: regimeId,
+      sessionId: nextId,
+    );
+
+    return [
+      Text(
+        name,
+        style: context.t.displayMedium,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      if (preview.isNotEmpty) ...[
+        const SizedBox(height: Space.xs),
+        // One line, not two. This is a glance — "yes, that's the session I
+        // meant" — and a second line would wrap into the last 18px above the
+        // bottom of a 844pt phone.
         Text(
-          session?.name ?? 'Session',
-          style: context.t.displayMedium,
-          maxLines: 2,
+          preview.take(3).join('  ·  ') +
+              (preview.length > 3 ? '  ·  +${preview.length - 3} more' : ''),
+          style: context.t.bodyMedium,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (preview.isNotEmpty) ...[
-          const SizedBox(height: Space.xs),
-          // One line, not two. This is a glance — "yes, that's the session I
-          // meant" — and a second line would wrap into the last 18px above the
-          // bottom of a 844pt phone.
-          Text(
-            preview.take(3).join('  ·  ') +
-                (preview.length > 3 ? '  ·  +${preview.length - 3} more' : ''),
-            style: context.t.bodyMedium,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-        if (isEmptySession) ...[
-          const SizedBox(height: Space.sm),
-          Text(
-            'This session has no exercises yet.',
-            style: context.t.bodyMedium,
-          ),
-        ],
-        const SizedBox(height: Space.lg),
-        if (isEmptySession)
+      ],
+      if (isEmptySession) ...[
+        const SizedBox(height: Space.sm),
+        Text(
+          'This session has no exercises yet.',
+          style: context.t.bodyMedium,
+        ),
+      ],
+      const SizedBox(height: Space.lg),
+      if (isEmptySession)
+        SecondaryButton(
+          label: 'Add exercises',
+          icon: Icons.add_rounded,
+          // The picker, not a trip to the Regime tab: the session is one
+          // exercise away from being startable, and sending someone to
+          // another tab to fix it is three taps and a way back.
+          onPressed: () async {
+            final exercise = await pickExercise(context, ref);
+            if (exercise == null) return;
+            await ref
+                .read(regimeRepositoryProvider)
+                .addExerciseToSession(nextId, exercise.id);
+          },
+        )
+      else if (status.isDeload) ...[
+        // A deload day is one choice, and both are offered as equals in
+        // reach: rest first, the quieter of the two, and the light session
+        // under it in the deload's own orange. Nothing is rested unless it
+        // is chosen.
+        if (status.canRestToday) ...[
           SecondaryButton(
-            label: 'Add exercises',
-            icon: Icons.add_rounded,
-            // The picker, not a trip to the Regime tab: the session is one
-            // exercise away from being startable, and sending someone to
-            // another tab to fix it is three taps and a way back.
-            onPressed: () async {
-              final exercise = await pickExercise(context, ref);
-              if (exercise == null) return;
-              await ref
-                  .read(regimeRepositoryProvider)
-                  .addExerciseToSession(nextId, exercise.id);
-            },
-          )
-        else
-          PrimaryButton(
-            label: 'Start ${session?.name ?? 'session'}',
-            icon: Icons.play_arrow_rounded,
-            onPressed: ref.watch(_startingProvider)
+            label: 'Rest today',
+            icon: Icons.bedtime_outlined,
+            onPressed: starting
                 ? null
-                : () => _startSession(
+                : () => restTodayAction(context, ref, regimeId: regimeId),
+          ),
+          const SizedBox(height: Space.sm),
+        ],
+        PrimaryButton(
+          label: 'Train $name light',
+          icon: Icons.trending_down_rounded,
+          deload: true,
+          onPressed: starting ? null : start,
+        ),
+      ] else
+        PrimaryButton(
+          label: 'Start $name',
+          icon: Icons.play_arrow_rounded,
+          onPressed: starting ? null : start,
+        ),
+      // Offered whenever it plans more than `Rest today` would: several days
+      // left, or one left on a day already trained, which it rests tomorrow.
+      if (status.isDeload &&
+          (status.remainingSessionIds.length > 1 ||
+              (status.remainingSessionIds.isNotEmpty &&
+                  !status.canRestToday))) ...[
+        const SizedBox(height: Space.sm),
+        Center(
+          child: LinkAction(
+            'Rest the remaining days',
+            onTap: starting
+                ? null
+                : () => restRemainingDaysAction(
                     context,
                     ref,
                     regimeId: regimeId,
-                    sessionId: nextId,
+                    status: status,
+                    sessions: sessions,
                   ),
           ),
-        // The hero names the first session not yet trained, which is a
-        // description and not an instruction — training Legs before Pull is
-        // normal. One tap to open the picker, one to start: the same two taps
-        // an always-on session list would cost, without a six-row block
-        // claiming to be a plan for the day. Shown for a regime of one day
-        // too, since the sheet always offers a custom session beside it.
-        if (sessions.isNotEmpty) ...[
-          const SizedBox(height: Space.sm),
-          Center(
-            child: LinkAction(
-              'Train another session',
-              onTap: ref.watch(_startingProvider)
-                  ? null
-                  : () => _trainAnotherSession(
-                      context,
-                      ref,
-                      regimeId: regimeId,
-                      sessions: sessions,
-                      status: status,
-                    ),
-            ),
-          ),
-        ],
+        ),
       ],
-    );
+      // The hero names the first session not yet trained, which is a
+      // description and not an instruction — training Legs before Pull is
+      // normal. One tap to open the picker, one to start: the same two taps
+      // an always-on session list would cost, without a six-row block
+      // claiming to be a plan for the day. Shown for a regime of one day
+      // too, since the sheet always offers a custom session beside it.
+      if (sessions.isNotEmpty) ...[
+        const SizedBox(height: Space.xs),
+        Center(
+          child: LinkAction(
+            'Train another session',
+            onTap: starting
+                ? null
+                : () => _trainAnotherSession(
+                    context,
+                    ref,
+                    regimeId: regimeId,
+                    sessions: sessions,
+                    status: status,
+                  ),
+          ),
+        ),
+      ],
+    ];
   }
 
   /// The cycle in words, under the track that draws it.
@@ -919,6 +1083,7 @@ class _CycleTrack extends StatelessWidget {
     final total = status.total;
     if (total <= 0) return const SizedBox.shrink();
 
+    final states = status.states;
     return Row(
       children: [
         for (var i = 0; i < total; i++) ...[
@@ -928,16 +1093,41 @@ class _CycleTrack extends StatelessWidget {
               duration: Motion.slow,
               curve: Motion.emphasized,
               height: 5,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: i < status.done ? mark : c.surfaceHighest,
+                color: states[i] == PositionState.trained
+                    ? mark
+                    : c.surfaceHighest,
                 borderRadius: BorderRadius.circular(Radii.pill),
               ),
+              // A rested day is the calendar's mark at track size: grey with
+              // an orange dot, so it reads as rest and as deload at once. A
+              // planned one is the same dot, dimmed, until its day comes.
+              child: switch (states[i]) {
+                PositionState.rested => _TrackDot(color: c.deload),
+                PositionState.planned =>
+                  _TrackDot(color: c.deload.withValues(alpha: 0.4)),
+                _ => null,
+              },
             ),
           ),
         ],
       ],
     );
   }
+}
+
+class _TrackDot extends StatelessWidget {
+  const _TrackDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 5,
+    height: 5,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
 /// The two habit tiles, Weigh-ins on the left and Workouts on the right
@@ -997,6 +1187,8 @@ class _HabitsSection extends ConsumerWidget {
                   null => null,
                   final day => day.isDeload ? c.deload : c.progress,
                 },
+                dot: (key) =>
+                    heatmap.deloadRest.contains(key) ? c.deload : null,
                 // Counted as the Consistency card counted it, a dash included
                 // while nothing has been trained in its window.
                 thisWeek: consistency.isEmpty ? null : consistency.thisWeek,
@@ -1055,6 +1247,14 @@ class _PlayAction extends ConsumerWidget {
       );
     }
 
+    // A rested day has nothing to start; the hero's way back to training it
+    // is a deliberate choice, not a tap on a tile.
+    if (status?.restedTodaySessionId != null) return const SizedBox.shrink();
+    // Nor does a deload whose days left are all planned as rest.
+    if (status case final s?
+        when !s.hasOpenPosition && s.rests.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
     final nextId = status?.nextSessionId;
     if (nextId == null || (preview[nextId] ?? const []).isEmpty) {
       return const SizedBox.shrink();

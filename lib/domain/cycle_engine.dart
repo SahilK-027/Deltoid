@@ -163,6 +163,9 @@ class CycleStatus {
     required this.deloadAfterCycles,
     this.rotations = const {},
     this.lastTrainedInRotation = const {},
+    this.rests = const {},
+    this.todayKey = 0,
+    this.trainedToday = false,
   });
 
   /// The open cycle's row id, so that a screen displaying a cycle can also
@@ -193,25 +196,113 @@ class CycleStatus {
   /// A rotation absent from it has never been trained.
   final Map<String, String> lastTrainedInRotation;
 
+  /// Session id to the day it is rested on, for the days of a deload rested
+  /// instead of trained. A day after [todayKey] is a plan: the position is
+  /// spoken for, so nothing offers it as next, but it is not rest until its
+  /// day arrives. Empty outside a deload.
+  final Map<String, int> rests;
+
+  /// Today as `yyyyMMdd`, which [rests] are read against.
+  final int todayKey;
+
+  /// Whether a session of this cycle was completed today. A deload day holds
+  /// one choice, so a day trained light cannot also be rested.
+  final bool trainedToday;
+
+  /// Whether `Rest today` has anything to do: a deload, a position still
+  /// open, and a day not yet spent on training or rest.
+  bool get canRestToday =>
+      isDeload &&
+      hasOpenPosition &&
+      !trainedToday &&
+      restedTodaySessionId == null;
+
   /// The positions of this cycle in programme order, each naming the day it
   /// trains.
+  ///
+  /// A rested day spends its position as a trained one does, so a rotation
+  /// rested in this cycle names the member that was rested.
   List<CyclePosition> get positions => buildPositions(
         sessionIds,
         rotations: rotations,
-        trainedThisCycle: completedSessionIds,
+        trainedThisCycle: _spoken,
         lastTrainedInRotation: lastTrainedInRotation,
       );
+
+  /// Trained, or rested on any day, planned ones included.
+  Set<String> get _spoken => {...completedSessionIds, ...rests.keys};
+
+  /// Trained, or rested on a day that has passed: what closes the cycle.
+  ///
+  /// Today's rest is not yet over, so a deload whose last position is rested
+  /// today closes tomorrow, and Home says so in the meantime.
+  Set<String> get _settled => {
+        ...completedSessionIds,
+        for (final MapEntry(:key, :value) in rests.entries)
+          if (value < todayKey) key,
+      };
 
   bool _trained(CyclePosition p) =>
       p.sessionIds.any(completedSessionIds.contains);
 
+  bool _taken(CyclePosition p) => p.sessionIds.any(_spoken.contains);
+
   /// Positions rather than days: two days that alternate are one of them.
   int get total => cyclePositions(sessionIds, rotations).length;
 
-  int get done => positions.where(_trained).length;
+  /// Positions trained, or rested today or before.
+  int get done => states
+      .where((m) => m == PositionState.trained || m == PositionState.rested)
+      .length;
 
-  bool get isComplete =>
-      everyPositionTrained(sessionIds, rotations, completedSessionIds);
+  bool get isComplete => everyPositionTrained(sessionIds, rotations, _settled);
+
+  /// What each position holds, in programme order.
+  List<PositionState> get states => [
+        for (final p in positions)
+          if (_trained(p))
+            PositionState.trained
+          else
+            switch (_restDayOf(p)) {
+              null => PositionState.open,
+              final day when day > todayKey => PositionState.planned,
+              _ => PositionState.rested,
+            },
+      ];
+
+  int? _restDayOf(CyclePosition p) {
+    for (final id in p.sessionIds) {
+      final day = rests[id];
+      if (day != null) return day;
+    }
+    return null;
+  }
+
+  /// The day rested today, or null. A deload rests one day at a time, so
+  /// there is at most one; the first in programme order answers if a merge
+  /// left two.
+  String? get restedTodaySessionId {
+    for (final p in positions) {
+      for (final id in p.sessionIds) {
+        if (rests[id] == todayKey) return id;
+      }
+    }
+    return null;
+  }
+
+  /// The days planned as rest after today, in the order they fall.
+  List<String> get plannedRestSessionIds {
+    final planned = [
+      for (final MapEntry(:key, :value) in rests.entries)
+        if (value > todayKey) (id: key, day: value),
+    ]..sort((a, b) => a.day.compareTo(b.day));
+    return [for (final p in planned) p.id];
+  }
+
+  /// The last day this cycle rests, or null when it rests none.
+  int? get lastRestDayKey => rests.isEmpty
+      ? null
+      : rests.values.reduce((a, b) => a > b ? a : b);
 
   double get progress => total == 0 ? 0 : done / total;
 
@@ -228,16 +319,20 @@ class CycleStatus {
     final all = positions;
     if (all.isEmpty) return null;
     for (final p in all) {
-      if (!_trained(p)) return p.dueSessionId;
+      if (!_taken(p)) return p.dueSessionId;
     }
     return _after(all.first.sessionIds, all.first.dueSessionId);
   }
 
+  /// Whether a position is still waiting to be trained or rested.
+  bool get hasOpenPosition => positions.any((p) => !_taken(p));
+
   /// The sessions outstanding in this cycle, in programme order: the day due
-  /// in each position not yet trained. A day whose turn it is not owes nothing.
+  /// in each position neither trained nor rested. A day whose turn it is not
+  /// owes nothing.
   List<String> get remainingSessionIds => [
         for (final p in positions)
-          if (!_trained(p)) p.dueSessionId,
+          if (!_taken(p)) p.dueSessionId,
       ];
 
   /// Whether the cycle following this one should be a deload.
@@ -269,6 +364,9 @@ class CycleStatus {
     int? cyclesSinceDeload,
     bool? deloadEnabled,
     int? deloadAfterCycles,
+    Map<String, int>? rests,
+    int? todayKey,
+    bool? trainedToday,
   }) {
     return CycleStatus(
       cycleId: cycleId,
@@ -281,8 +379,26 @@ class CycleStatus {
       deloadAfterCycles: deloadAfterCycles ?? this.deloadAfterCycles,
       rotations: rotations,
       lastTrainedInRotation: lastTrainedInRotation,
+      rests: rests ?? this.rests,
+      todayKey: todayKey ?? this.todayKey,
+      trainedToday: trainedToday ?? this.trainedToday,
     );
   }
+}
+
+/// What one position of a cycle holds.
+enum PositionState {
+  /// Neither trained nor rested yet.
+  open,
+
+  /// Trained in this cycle, light or full.
+  trained,
+
+  /// Rested, today or on a day that has passed.
+  rested,
+
+  /// Planned as rest on a day still to come.
+  planned,
 }
 
 /// The parameters of the cycle to be opened once the current one closes.

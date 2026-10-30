@@ -900,6 +900,41 @@ class Phases extends Table with SyncColumns {
       ];
 }
 
+/// A day of a deload rested instead of trained.
+///
+/// A deload is a stretch of time rather than a set of sessions, and resting
+/// through part or all of it is as much a deload as training light. A row here
+/// spends one position of a deload cycle on rest: [sessionId] is the day it
+/// stands in for, and [dayKey] is the day it is rested on. Rows are written
+/// one a day, by `Rest today`, or several at once by `Rest the remaining days`,
+/// which plans the remaining positions on the days that follow; a row whose day
+/// has not arrived is a plan, and nothing reads it as rest until it has.
+///
+/// Rest is never logged work, so it lives beside `workouts` rather than inside
+/// it. Every reader of a workout asks for completed ones, and a rest that was
+/// a workout row would be one forgotten filter away from a session nobody
+/// trained. See [RULES § 2](RULES.md#2-data).
+@TableIndex(name: 'idx_cycle_rests_cycle', columns: {#cycleId})
+/// What this device still owes the server — see [Exercises] for why it is
+/// partial.
+@TableIndex.sql(
+  'CREATE INDEX idx_cycle_rests_dirty '
+  'ON cycle_rests (dirty) WHERE dirty = 1',
+)
+class CycleRests extends Table with SyncColumns {
+  TextColumn get cycleId => text().references(Cycles, #id)();
+  TextColumn get sessionId => text().references(Sessions, #id)();
+
+  /// The day rested, as `yyyyMMdd`.
+  IntColumn get dayKey => integer()();
+
+  @override
+  List<String> get customConstraints => [
+        _liveOrTombstoned,
+        'CHECK (day_key BETWEEN 19000101 AND 21001231)',
+      ];
+}
+
 /// Key/value store for local preferences and sync bookkeeping
 /// (`last_pull_at`, `device_id`, `user_id`, `units`). Not synced.
 class AppSettings extends Table {

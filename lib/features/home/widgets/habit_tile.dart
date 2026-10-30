@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
@@ -22,9 +24,14 @@ class HabitTile extends StatelessWidget {
     required this.onTap,
     this.action,
     this.today,
+    this.dot,
   });
 
   final String title;
+
+  /// The colour of a dot centred in a day's cell, or null for none. Only the
+  /// Workouts tile passes it, for the days a deload rested.
+  final Color? Function(int dayKey)? dot;
 
   /// The colour of a day in the grid, or null for a day the habit was not kept,
   /// which draws in `heatEmpty`.
@@ -85,7 +92,7 @@ class HabitTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: Space.lg),
-          HabitGrid(fill: fill, today: today ?? DateTime.now()),
+          HabitGrid(fill: fill, dot: dot, today: today ?? DateTime.now()),
           const SizedBox(height: Space.lg),
           const Divider(),
           const SizedBox(height: Space.md),
@@ -166,9 +173,18 @@ class HabitAction extends StatelessWidget {
 /// Thirty widgets rather than a painter: the year maps paint because they draw
 /// a year at a time, many years deep, and this is one month in one card.
 class HabitGrid extends StatelessWidget {
-  const HabitGrid({super.key, required this.fill, required this.today});
+  const HabitGrid({
+    super.key,
+    required this.fill,
+    required this.today,
+    this.dot,
+  });
 
   final Color? Function(int dayKey) fill;
+
+  /// A dot centred on the cell, about 45% of it and never under 3pt: a rest
+  /// day of a deload, which has to read apart from plain rest at this size.
+  final Color? Function(int dayKey)? dot;
   final DateTime today;
 
   static const _columns = 10;
@@ -194,10 +210,22 @@ class HabitGrid extends StatelessWidget {
                     Container(
                       width: cell,
                       height: cell,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: fill(days[column * _perColumn + i]) ?? empty,
                         borderRadius: BorderRadius.circular(Radii.heatCell),
                       ),
+                      child: switch (dot?.call(days[column * _perColumn + i])) {
+                        null => null,
+                        final colour => Container(
+                          width: math.max(3, cell * 0.45),
+                          height: math.max(3, cell * 0.45),
+                          decoration: BoxDecoration(
+                            color: colour,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      },
                     ),
                   ],
                 ],

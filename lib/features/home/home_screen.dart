@@ -21,6 +21,7 @@ import '../log/log_screen.dart';
 import '../log/widgets/exercise_sheets.dart';
 import '../regime/regime_screen.dart';
 import '../regime/regime_setup.dart';
+import 'deload_rest_actions.dart';
 import 'heatmap_data.dart';
 import 'history_heatmap_screen.dart';
 import 'home_providers.dart';

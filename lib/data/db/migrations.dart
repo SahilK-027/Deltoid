@@ -27,13 +27,16 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
   // Declared in `tables.dart` so a fresh install gets them from `createAll`,
   // and created here for a database that already exists.
   //
-  // `idx_phases_dirty` is left to the rung that creates its table. At this
-  // rung the table does not exist yet, and an index on a missing table throws
-  // at open.
+  // `idx_phases_dirty` and `idx_cycle_rests_dirty` are left to the rungs that
+  // create their tables. At this rung neither table exists yet, and an index
+  // on a missing table throws at open.
   if (from < 2) {
     await createIndexesIfMissing(
       db,
-      (name) => name.endsWith('_dirty') && !name.startsWith('idx_phases_'),
+      (name) =>
+          name.endsWith('_dirty') &&
+          !name.startsWith('idx_phases_') &&
+          !name.startsWith('idx_cycle_rests_'),
     );
   }
 
@@ -121,6 +124,21 @@ Future<void> upgradeSchema(AppDatabase db, Migrator m, int from, int to) async {
     await createIndexesIfMissing(
       db,
       (name) => name.startsWith('idx_phases_'),
+    );
+  }
+
+  // 7 → 8 · Days of a deload rested instead of trained.
+  //
+  // A table of its own, `cycle_rests`, with its index on the cycle and the
+  // partial index on `dirty`. `createTable` writes `CREATE TABLE IF NOT
+  // EXISTS`, so the step replays safely. Nothing is backfilled: no existing
+  // install has rested a deload day, because no build before this one could
+  // say so. See [CycleRests].
+  if (from < 8) {
+    await m.createTable(db.cycleRests);
+    await createIndexesIfMissing(
+      db,
+      (name) => name.startsWith('idx_cycle_rests_'),
     );
   }
 }

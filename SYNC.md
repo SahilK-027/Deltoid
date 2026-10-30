@@ -156,10 +156,10 @@ create policy "own rows only" on <table>
 
 ## 4. What the server holds
 
-The ten tables carrying `SyncColumns`, and those only:
+The eleven tables carrying `SyncColumns`, and those only:
 
 `exercises`, `regimes`, `sessions`, `session_exercises`, `cycles`, `workouts`,
-`workout_exercises`, `set_logs`, `bodyweight_logs`, `phases`.
+`workout_exercises`, `set_logs`, `bodyweight_logs`, `phases`, `cycle_rests`.
 
 **A rotation is a column on `sessions` and nothing else.** `rotation_id` names
 which days of a regime alternate in one position of the cycle, and it merges
@@ -205,6 +205,18 @@ last-write-wins is never asked to settle a pair, which is the trap
 prompt is due are pure functions in `lib/domain/` over rows both phones hold,
 so both phones reach the same answer however the rows arrived. Like a
 rotation's next day, none of them is sent.
+
+**A deload's rest day is a row of its own.** `cycle_rests` holds one row per
+position of a deload rested rather than trained: `cycle_id`, `session_id` and
+the `day_key` it rests on, a day after today being a plan. A rest is a choice
+about a day, made on one phone and owed to the other, so it syncs as everything
+else does; a phone that rested Push 1 this morning must not offer it this
+evening on the other. It is not a `workouts` row, because every reader of
+`workouts` counts sessions, and a rest is not one. Which days the calendar
+dots, and when a fully rested deload closes, are derived from these rows and
+the cycle's own, so neither is sent. Its server migration,
+`20261030120000_cycle_rests.sql`, is applied before the build that adds it is
+installed on a synced phone, on the terms the `phases` migration was.
 
 **`app_settings` never syncs.** It holds `device_id`, the unit preference and
 the theme — which phone you are on, and how that phone should look. Syncing
@@ -511,6 +523,13 @@ last-write-wins against the delete.
 Which slot is free is arithmetic over plain values, so the deciding lives in
 `domain/` and is tested without a database; see [§ 17](#17-the-architecture).
 
+**Two rests for one position need no rule.** Two phones offline on the same
+deload day can each rest it, and both rows arrive. A cycle reads its rests as a
+map from session to day, the earliest day winning, and the calendar reads a
+set of days, so a second copy changes nothing either reads. No unique index
+refuses it, because a refusal is a row stranded dirty on the phone that wrote
+it.
+
 ---
 
 ## 10. Adoption
@@ -664,6 +683,9 @@ fails a build rather than a history.
 | 20  | Both start a phase, on different days        | Both survive. The earlier runs until the later one starts, on both phones, because the end is derived and was never written.                                                                                                                                                                                                      |
 | 21  | A clears the phase, B changes its length     | One row, two edits. Row LWW on `server_updated_at`, so one phone's whole edit stands; a lost `Clear phase` is pressed again.                                                                                                                                                                                                      |
 | 22  | A phone on a build without phases pulls      | Its registry has no `phases`, so it never asks for them. The rows wait on the server and arrive when that phone is updated.                                                                                                                                                                                                       |
+| 23  | Both rest the same deload day                | Both rows survive and read as one rest. [§ 9](#9-collision--two-rows-one-slot)                                                                                                                                                                                                                                                    |
+| 24  | A rests a day, B trains it                   | The trained session takes the position back, and its completion tombstones the rest on whichever phone finished it.                                                                                                                                                                                                               |
+| 25  | A ends the deload, B rests a day of it       | Row LWW on the cycle. A rest under a cycle that is no longer a deload is read by nothing, so it spends no position and dots no day.                                                                                                                                                                   |
 
 ---
 
@@ -933,8 +955,9 @@ there is no second copy of the answer — which is the same reason
 Counting what is owed needs an index, though. `COUNT(*) WHERE dirty` across a
 `set_logs` holding 168k rows is a scan, re-run every time a set is ticked; a
 partial index on `dirty = 1` is empty whenever nothing is owed and costs nothing
-to carry. One per syncable table, nine on the first rung of the ladder and a
-tenth on the rung that added `phases`.
+to carry. One per syncable table, nine on the first rung of the ladder, a
+tenth on the rung that added `phases` and an eleventh on the rung that added
+`cycle_rests`.
 
 ### What must never be re-stamped
 

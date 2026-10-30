@@ -138,7 +138,7 @@ class _LogTopBar extends StatelessWidget {
           const SizedBox(height: Space.md),
           // Full-bleed: inside the bar's padding, a finished session stopped a
           // gutter short at each end and the track never looked full.
-          _ProgressTrack(done: done, total: total),
+          _ProgressTrack(done: done, total: total, isDeload: isDeload),
         ],
       ),
     );
@@ -146,10 +146,19 @@ class _LogTopBar extends StatelessWidget {
 }
 
 class _ProgressTrack extends StatelessWidget {
-  const _ProgressTrack({required this.done, required this.total});
+  const _ProgressTrack({
+    required this.done,
+    required this.total,
+    required this.isDeload,
+  });
 
   final int done;
   final int total;
+
+  /// Drawn in the deload's orange on its muted ground: the one rule on the
+  /// screen that changes colour in a light session, so the week reads at a
+  /// glance while the buttons, ticks and focus stay as they always are.
+  final bool isDeload;
 
   @override
   Widget build(BuildContext context) {
@@ -160,12 +169,12 @@ class _ProgressTrack extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, box) => Stack(
           children: [
-            Container(color: c.surfaceHigh),
+            Container(color: isDeload ? c.deloadMuted : c.surfaceHigh),
             AnimatedContainer(
               duration: Motion.base,
               curve: Motion.curve,
               width: box.maxWidth * fraction,
-              color: c.accent,
+              color: isDeload ? c.deload : c.accent,
             ),
           ],
         ),
@@ -265,8 +274,20 @@ class _ExercisePage extends ConsumerWidget {
                   ),
                   if (!skipped && counted > 0) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      'Set $position of $counted',
+                    // In a deload the line says so before it counts, in the
+                    // deload's orange, so the light week is stated on every
+                    // page and not only in the bar above.
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          if (workout.isDeload)
+                            TextSpan(
+                              text: 'Deload  ·  ',
+                              style: TextStyle(color: c.deload),
+                            ),
+                          TextSpan(text: 'Set $position of $counted'),
+                        ],
+                      ),
                       style: context.t.bodyMedium?.copyWith(
                         color: c.textSecondary,
                       ),

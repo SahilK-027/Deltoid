@@ -23,9 +23,18 @@ class HeatDay {
 }
 
 class HeatmapData {
-  const HeatmapData({required this.days, required this.consistency});
+  const HeatmapData({
+    required this.days,
+    required this.consistency,
+    this.deloadRest = const {},
+  });
 
   final Map<int, HeatDay> days;
+
+  /// The days a deload rested, drawn as a grey cell with an orange dot. A day
+  /// of rest is not a day trained, so it is kept out of [days] and out of the
+  /// consistency count.
+  final Set<int> deloadRest;
 
   /// How often you have been training — see [computeConsistency] for why it is
   /// not always a rate.
@@ -39,7 +48,11 @@ class HeatmapData {
 /// [today] is the seam the tests need and nothing else passes: a grid folded
 /// against `DateTime.now()` can be checked for its `days` and never for its
 /// rate.
-HeatmapData buildHeatmap(List<Workout> completed, {DateTime? today}) {
+HeatmapData buildHeatmap(
+  List<Workout> completed, {
+  DateTime? today,
+  Set<int> deloadRest = const {},
+}) {
   final days = <int, HeatDay>{};
   for (final w in completed) {
     final existing = days[w.dayKey];
@@ -59,6 +72,7 @@ HeatmapData buildHeatmap(List<Workout> completed, {DateTime? today}) {
 
   return HeatmapData(
     days: days,
+    deloadRest: deloadRest,
     consistency: computeConsistency(
       completedDayKeys: completed.map((w) => w.dayKey),
       today: today ?? DateTime.now(),
@@ -77,8 +91,13 @@ String _larger(String? a, String b) =>
 /// towards the rate — [computeConsistency] wants one key per session — so the
 /// keys are expanded back out, which is a few thousand integers rather than a
 /// few thousand objects across an isolate port.
-HeatmapData buildHeatmapFromDays(List<LoggedDay> logged, {DateTime? today}) {
+HeatmapData buildHeatmapFromDays(
+  List<LoggedDay> logged, {
+  DateTime? today,
+  Set<int> deloadRest = const {},
+}) {
   return HeatmapData(
+    deloadRest: deloadRest,
     days: {
       for (final d in logged)
         d.dayKey: HeatDay(

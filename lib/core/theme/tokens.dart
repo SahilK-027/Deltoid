@@ -35,6 +35,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     required this.onAccent,
     required this.deload,
     required this.deloadMuted,
+    required this.onDeload,
     required this.warning,
     required this.warningMuted,
     required this.positive,
@@ -86,6 +87,11 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
   /// set type, not a regime — so a light week is never one colour among many.
   final Color deload;
   final Color deloadMuted;
+
+  /// The label on a [deload] fill: a warm brown rather than white, which
+  /// reads at under 3:1 on orange, or black, which turns the fill muddy.
+  /// The same in both themes, because the fill it sits on is.
+  final Color onDeload;
 
   /// A rule the app is stating: a limit reached, a consequence worth reading
   /// before acting. Yellow, and its own token rather than a second use of
@@ -200,6 +206,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     onAccent: Color(0xFF121212),
     deload: orange,
     deloadMuted: Color(0xFF3A2318),
+    onDeload: Color(0xFF3A1A0E),
     warning: yellow,
     warningMuted: Color(0xFF3A3117),
     positive: green,
@@ -232,6 +239,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     onAccent: Color(0xFFFFFFFF),
     deload: orange,
     deloadMuted: Color(0xFFFBE4D6),
+    onDeload: Color(0xFF3A1A0E),
     warning: yellow,
     warningMuted: Color(0xFFFBEED2),
     positive: green,
@@ -331,6 +339,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
     Color? onAccent,
     Color? deload,
     Color? deloadMuted,
+    Color? onDeload,
     Color? warning,
     Color? warningMuted,
     Color? positive,
@@ -355,6 +364,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       onAccent: onAccent ?? this.onAccent,
       deload: deload ?? this.deload,
       deloadMuted: deloadMuted ?? this.deloadMuted,
+      onDeload: onDeload ?? this.onDeload,
       warning: warning ?? this.warning,
       warningMuted: warningMuted ?? this.warningMuted,
       positive: positive ?? this.positive,
@@ -388,6 +398,7 @@ class DeltoidColors extends ThemeExtension<DeltoidColors> {
       onAccent: c(onAccent, other.onAccent),
       deload: c(deload, other.deload),
       deloadMuted: c(deloadMuted, other.deloadMuted),
+      onDeload: c(onDeload, other.onDeload),
       warning: c(warning, other.warning),
       warningMuted: c(warningMuted, other.warningMuted),
       positive: c(positive, other.positive),

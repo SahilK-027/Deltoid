@@ -13,6 +13,7 @@ import '../../data/db/database.dart';
 import '../../data/repositories/regime_repository.dart';
 import '../../domain/cycle_engine.dart';
 import '../../domain/enums.dart';
+import '../home/deload_rest_actions.dart';
 import '../log/widgets/exercise_sheets.dart';
 import 'exercise_catalog_screen.dart';
 import 'regime_cycle.dart';
@@ -285,46 +286,99 @@ Future<void> _showCycleSheet(
     return 'A session';
   }
 
+  final planned = status.plannedRestSessionIds;
+  final rested = status.rests.length - planned.length;
+
   return showAppSheet<void>(
     context,
     builder: (sheet) => AppSheet(
       title: 'Cycle ${status.cycleIndex}',
-      subtitle: '${status.done} of ${status.total} days trained',
+      subtitle: rested == 0
+          ? '${status.done} of ${status.total} days trained'
+          : '${status.done} of ${status.total} days trained or rested',
       contentPadding: const EdgeInsets.only(bottom: Space.md),
       children: [
-        AppRow(
-          icon: Icons.skip_next_rounded,
-          title: 'Close this cycle',
-          subtitle: canClose
-              ? '${remaining.map(nameOf).join(', ')} would be skipped'
-              : status.done == 0
-                  ? 'Nothing trained yet this cycle'
-                  : 'Every day is done. The next workout opens a new one.',
-          onTap: !canClose
-              ? null
-              : () async {
-                  final navigator = Navigator.of(sheet);
-                  final ok = await confirmAction(
-                    context,
-                    title: 'Close cycle ${status.cycleIndex}?',
-                    // Name what it costs. "Are you sure" tells you nothing;
-                    // "Leg 2 won't be trained this cycle" is the decision.
-                    message:
-                        '${remaining.map(nameOf).join(', ')} won\'t be trained '
-                        'this cycle.\n\nThe next cycle starts from the top, and '
-                        'this one counts towards your deload.',
-                    confirmLabel: 'Close cycle',
-                    destructive: false,
-                  );
-                  if (!ok) return;
-                  final regime = ref.read(activeRegimeProvider).valueOrNull;
-                  if (regime == null) return;
-                  await ref
-                      .read(trainingRepositoryProvider)
-                      .advanceCycle(regime.id);
-                  navigator.pop();
-                },
-        ),
+        // A deload ends by resting what is left rather than by skipping it:
+        // a rested day is part of the light week, a skipped one is not.
+        if (status.isDeload)
+          AppRow(
+            icon: Icons.bedtime_outlined,
+            title: 'Rest the remaining days',
+            tint: remaining.isEmpty ? null : sheet.c.deload,
+            subtitle: remaining.isEmpty
+                ? planned.isEmpty
+                    ? 'Every day of this deload is trained or rested'
+                    : 'Every day left already has a rest planned'
+                : '${remaining.map(nameOf).join(', ')} rest one a day, '
+                      'and the next cycle starts after them',
+            subtitleMaxLines: 3,
+            onTap: remaining.isEmpty
+                ? null
+                : () async {
+                    final navigator = Navigator.of(sheet);
+                    final regime = ref.read(activeRegimeProvider).valueOrNull;
+                    if (regime == null) return;
+                    navigator.pop();
+                    await restRemainingDaysAction(
+                      context,
+                      ref,
+                      regimeId: regime.id,
+                      status: status,
+                      sessions: sessions,
+                    );
+                  },
+          )
+        else
+          AppRow(
+            icon: Icons.skip_next_rounded,
+            title: 'Close this cycle',
+            subtitle: canClose
+                ? '${remaining.map(nameOf).join(', ')} would be skipped'
+                : status.done == 0
+                    ? 'Nothing trained yet this cycle'
+                    : 'Every day is done. The next workout opens a new one.',
+            onTap: !canClose
+                ? null
+                : () async {
+                    final navigator = Navigator.of(sheet);
+                    final ok = await confirmAction(
+                      context,
+                      title: 'Close cycle ${status.cycleIndex}?',
+                      // Name what it costs. "Are you sure" tells you nothing;
+                      // "Leg 2 won't be trained this cycle" is the decision.
+                      message:
+                          '${remaining.map(nameOf).join(', ')} won\'t be '
+                          'trained this cycle.\n\nThe next cycle starts from '
+                          'the top, and this one counts towards your deload.',
+                      confirmLabel: 'Close cycle',
+                      destructive: false,
+                    );
+                    if (!ok) return;
+                    final regime = ref.read(activeRegimeProvider).valueOrNull;
+                    if (regime == null) return;
+                    await ref
+                        .read(trainingRepositoryProvider)
+                        .advanceCycle(regime.id);
+                    navigator.pop();
+                  },
+          ),
+        if (status.isDeload && planned.isNotEmpty)
+          AppRow(
+            icon: Icons.close_rounded,
+            title: 'Cancel the planned rest',
+            subtitle: '${planned.map(nameOf).join(', ')} '
+                '${planned.length == 1 ? 'is' : 'are'} trained again',
+            subtitleMaxLines: 3,
+            onTap: () async {
+              final navigator = Navigator.of(sheet);
+              navigator.pop();
+              await cancelPlannedRestAction(
+                context,
+                ref,
+                cycleId: status.cycleId,
+              );
+            },
+          ),
         AppRow(
           icon: Icons.trending_down_rounded,
           title: status.isDeload ? 'Not a deload after all' : 'Make it a deload',
@@ -332,8 +386,27 @@ Future<void> _showCycleSheet(
               ? 'Back to full weight and full sets'
               : 'Lighter weights, fewer sets, for this cycle only',
           tint: status.isDeload ? null : sheet.c.deload,
+          chevron: true,
           onTap: () async {
             final navigator = Navigator.of(sheet);
+            // Rest days belong to the deload, so ending it clears them, and
+            // the days they stood in for are owed again. Said first, because
+            // a planned week of rest disappearing is not undone by one tap.
+            if (status.isDeload && status.rests.isNotEmpty) {
+              final n = status.rests.length;
+              final ok = await confirmAction(
+                context,
+                title: 'Not a deload after all?',
+                message:
+                    '${n == 1 ? 'Its rest day is' : 'Its $n rest days are'} '
+                    'cleared, and those sessions are owed again at full '
+                    'weight. Sessions already trained light keep their '
+                    'deload mark.',
+                confirmLabel: 'End the deload',
+                destructive: false,
+              );
+              if (!ok) return;
+            }
             await ref
                 .read(trainingRepositoryProvider)
                 .setCycleDeload(status.cycleId, !status.isDeload);

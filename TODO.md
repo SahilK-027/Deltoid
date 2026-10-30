@@ -21,6 +21,7 @@ shaped the way it is belongs in [THEME.md](THEME.md), [RULES.md](RULES.md) and
 - [x] The exercise catalog archives rather than deletes; starter catalog seeded, no regime ever is.
 - [x] Stale open sessions: empty ones swept, ones with sets kept and offered Finish or Discard.
 - [x] Custom sessions: a session outside the programme, started empty from the session sheet or logged after the fact, in no cycle and no day's prefill, with its own deload switch.
+- [x] A deload can be rested as well as trained light: `Rest today` spends the day due, one choice a day with `Undo`, and `Rest the remaining days` plans one rest a day for what is left, after which the next cycle opens on its own. Rest days are their own synced table, never workouts, and the calendar marks them with an orange dot. Schema 7 → 8, server rung included.
 
 ### Logging
 

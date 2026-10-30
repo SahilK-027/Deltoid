@@ -138,6 +138,12 @@ void main() {
         expect(
             _contrast(c.textPrimary, c.deloadMuted), greaterThanOrEqualTo(4.5));
       });
+
+      test('the light session button reads on its orange', () {
+        // `Train light` is a label on `deload`, in both themes. White on this
+        // orange is under 3:1, which is why `onDeload` exists at all.
+        expect(_contrast(c.onDeload, c.deload), greaterThanOrEqualTo(4.5));
+      });
     });
   }
 

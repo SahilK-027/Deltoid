@@ -77,6 +77,11 @@ void main() {
       from: DateTime(2026, 7, 1),
       plannedWeeks: 12,
     );
+    // A deload with the rest of its days planned as rest, for a `cycle_rests`
+    // row.
+    final status = await repo.cycleStatus(regime.id);
+    await repo.setCycleDeload(status!.cycleId, true);
+    await repo.restRemainingDays(regime.id);
   }
 
   /// One serialised row per table, as both readers meet them: the export writes
@@ -189,14 +194,14 @@ void main() {
   });
 
   test('only app_settings stays off the server', () async {
-    // SYNC.md § 4: the ten tables carrying `SyncColumns`, and those only.
+    // SYNC.md § 4: the eleven tables carrying `SyncColumns`, and those only.
     // `app_settings` holds `device_id`, which is the tie-break — syncing it
     // would break the very thing it exists for.
     expect(
       [for (final spec in tableSpecs(db)) if (!spec.syncs) spec.name],
       ['app_settings'],
     );
-    expect(tableSpecs(db).where((s) => s.syncs).length, 10);
+    expect(tableSpecs(db).where((s) => s.syncs).length, 11);
 
     // And a syncable table is exactly one carrying the sync columns, which is
     // what makes that count a fact about the schema rather than a list somebody
@@ -275,5 +280,10 @@ const _presentInEveryRowEverWritten = <String, Set<String>>{
   'phases': {
     'id', 'updatedAt', 'deviceId', 'dirty', //
     'kind', 'dayKey',
+  },
+  // Whole at schema 8, for the same reason.
+  'cycle_rests': {
+    'id', 'updatedAt', 'deviceId', 'dirty', //
+    'cycleId', 'sessionId', 'dayKey',
   },
 };

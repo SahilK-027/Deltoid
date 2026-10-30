@@ -225,6 +225,9 @@ Stream<OwedSummary> watchOwedSummary(AppDatabase db) {
     'sessions',
     'session_exercises',
     'cycles',
+    // A rest spends a position of the cycle, so it is part of where the
+    // programme stands rather than a session of its own.
+    'cycle_rests',
   ];
   final programmeSql = programmeTables
       .map((t) => '(SELECT COUNT(*) FROM $t WHERE dirty = 1)')

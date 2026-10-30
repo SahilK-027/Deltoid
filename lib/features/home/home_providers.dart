@@ -48,9 +48,14 @@ final fullHeatmapProvider = StreamProvider<HeatmapData>((ref) {
   final db = ref.watch(databaseProvider);
   final repo = ref.watch(trainingRepositoryProvider);
 
+  // The deload's rest days are read from the cycles that hold them, so the
+  // grid listens to those tables too.
   return db.watchQuery(
-    [db.workouts],
-    () async => buildHeatmapFromDays(await repo.loggedDays()),
+    [db.workouts, db.cycles, db.cycleRests, db.regimes],
+    () async => buildHeatmapFromDays(
+      await repo.loggedDays(),
+      deloadRest: await repo.deloadRestDayKeys(),
+    ),
   );
 });
 
@@ -119,13 +124,17 @@ final homeProvider = StreamProvider<HomeData>((ref) {
       db.exercises,
       db.workouts,
       db.cycles,
+      db.cycleRests,
     ],
     () async {
       final from = dayKeyOf(daysBefore(DateTime.now(), heatmapWeeks * 7 + 7));
       final snapshot = await repo.todaySnapshot(heatmapFromDayKey: from);
       return HomeData(
         snapshot: snapshot,
-        heatmap: buildHeatmap(snapshot.recentCompleted),
+        heatmap: buildHeatmap(
+          snapshot.recentCompleted,
+          deloadRest: await repo.deloadRestDayKeys(),
+        ),
       );
     },
   );

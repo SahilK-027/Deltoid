@@ -23,10 +23,14 @@ class YearCalendar extends StatelessWidget {
     required this.days,
     required this.today,
     this.week,
+    this.deloadRest = const {},
   });
 
   final int year;
   final Map<int, HeatDay> days;
+
+  /// The days a deload rested, drawn as a grey cell with an orange dot.
+  final Set<int> deloadRest;
   final DateTime today;
 
   /// The Monday of the week to ring, or null.
@@ -66,6 +70,7 @@ class YearCalendar extends StatelessWidget {
                     painter: _MonthPainter(
                       first: DateTime(year, r * _columns + k + 1, 1),
                       days: days,
+                      deloadRest: deloadRest,
                       todayKey: todayKey,
                       week: week,
                       cell: cell,
@@ -110,6 +115,7 @@ class _MonthPainter extends CustomPainter {
   _MonthPainter({
     required this.first,
     required this.days,
+    required this.deloadRest,
     required this.todayKey,
     required this.week,
     required this.cell,
@@ -119,6 +125,7 @@ class _MonthPainter extends CustomPainter {
 
   final DateTime first;
   final Map<int, HeatDay> days;
+  final Set<int> deloadRest;
   final int todayKey;
   final DateTime? week;
   final double cell;
@@ -162,6 +169,15 @@ class _MonthPainter extends CustomPainter {
         Paint()
           ..color = heatColourIn(colours, day, isFuture: key > todayKey),
       );
+      // A deload's rest day: the grey of rest, marked as the deload's by a
+      // dot at the centre, about 45% of the cell and never under 3pt.
+      if (day == null && deloadRest.contains(key)) {
+        canvas.drawCircle(
+          rect.center,
+          math.max(3.0, cell * 0.45) / 2,
+          Paint()..color = colours.deload,
+        );
+      }
 
       final inWeek = weekStart != null &&
           !date.isBefore(weekStart) &&
@@ -184,6 +200,7 @@ class _MonthPainter extends CustomPainter {
   @override
   bool shouldRepaint(_MonthPainter old) =>
       !identical(old.days, days) ||
+      !identical(old.deloadRest, deloadRest) ||
       old.first != first ||
       old.todayKey != todayKey ||
       old.week != week ||

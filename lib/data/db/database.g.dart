@@ -7756,6 +7756,518 @@ class PhasesCompanion extends UpdateCompanion<Phase> {
   }
 }
 
+class $CycleRestsTable extends CycleRests
+    with TableInfo<$CycleRestsTable, CycleRest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CycleRestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: newId,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    clientDefault: nowMs,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAt = GeneratedColumn<int>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => currentDeviceId,
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _cycleIdMeta = const VerificationMeta(
+    'cycleId',
+  );
+  @override
+  late final GeneratedColumn<String> cycleId = GeneratedColumn<String>(
+    'cycle_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cycles (id)',
+    ),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES sessions (id)',
+    ),
+  );
+  static const VerificationMeta _dayKeyMeta = const VerificationMeta('dayKey');
+  @override
+  late final GeneratedColumn<int> dayKey = GeneratedColumn<int>(
+    'day_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    updatedAt,
+    deletedAt,
+    deviceId,
+    dirty,
+    cycleId,
+    sessionId,
+    dayKey,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cycle_rests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CycleRest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    if (data.containsKey('cycle_id')) {
+      context.handle(
+        _cycleIdMeta,
+        cycleId.isAcceptableOrUnknown(data['cycle_id']!, _cycleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cycleIdMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('day_key')) {
+      context.handle(
+        _dayKeyMeta,
+        dayKey.isAcceptableOrUnknown(data['day_key']!, _dayKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dayKeyMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CycleRest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CycleRest(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
+      cycleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cycle_id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      dayKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day_key'],
+      )!,
+    );
+  }
+
+  @override
+  $CycleRestsTable createAlias(String alias) {
+    return $CycleRestsTable(attachedDatabase, alias);
+  }
+}
+
+class CycleRest extends DataClass implements Insertable<CycleRest> {
+  final String id;
+  final int updatedAt;
+  final int? deletedAt;
+  final String deviceId;
+  final bool dirty;
+  final String cycleId;
+  final String sessionId;
+
+  /// The day rested, as `yyyyMMdd`.
+  final int dayKey;
+  const CycleRest({
+    required this.id,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.deviceId,
+    required this.dirty,
+    required this.cycleId,
+    required this.sessionId,
+    required this.dayKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(deletedAt);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    map['dirty'] = Variable<bool>(dirty);
+    map['cycle_id'] = Variable<String>(cycleId);
+    map['session_id'] = Variable<String>(sessionId);
+    map['day_key'] = Variable<int>(dayKey);
+    return map;
+  }
+
+  CycleRestsCompanion toCompanion(bool nullToAbsent) {
+    return CycleRestsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      deviceId: Value(deviceId),
+      dirty: Value(dirty),
+      cycleId: Value(cycleId),
+      sessionId: Value(sessionId),
+      dayKey: Value(dayKey),
+    );
+  }
+
+  factory CycleRest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CycleRest(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      deletedAt: serializer.fromJson<int?>(json['deletedAt']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
+      cycleId: serializer.fromJson<String>(json['cycleId']),
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      dayKey: serializer.fromJson<int>(json['dayKey']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'deletedAt': serializer.toJson<int?>(deletedAt),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'dirty': serializer.toJson<bool>(dirty),
+      'cycleId': serializer.toJson<String>(cycleId),
+      'sessionId': serializer.toJson<String>(sessionId),
+      'dayKey': serializer.toJson<int>(dayKey),
+    };
+  }
+
+  CycleRest copyWith({
+    String? id,
+    int? updatedAt,
+    Value<int?> deletedAt = const Value.absent(),
+    String? deviceId,
+    bool? dirty,
+    String? cycleId,
+    String? sessionId,
+    int? dayKey,
+  }) => CycleRest(
+    id: id ?? this.id,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    deviceId: deviceId ?? this.deviceId,
+    dirty: dirty ?? this.dirty,
+    cycleId: cycleId ?? this.cycleId,
+    sessionId: sessionId ?? this.sessionId,
+    dayKey: dayKey ?? this.dayKey,
+  );
+  CycleRest copyWithCompanion(CycleRestsCompanion data) {
+    return CycleRest(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+      cycleId: data.cycleId.present ? data.cycleId.value : this.cycleId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      dayKey: data.dayKey.present ? data.dayKey.value : this.dayKey,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CycleRest(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('dirty: $dirty, ')
+          ..write('cycleId: $cycleId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('dayKey: $dayKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    updatedAt,
+    deletedAt,
+    deviceId,
+    dirty,
+    cycleId,
+    sessionId,
+    dayKey,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CycleRest &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.deviceId == this.deviceId &&
+          other.dirty == this.dirty &&
+          other.cycleId == this.cycleId &&
+          other.sessionId == this.sessionId &&
+          other.dayKey == this.dayKey);
+}
+
+class CycleRestsCompanion extends UpdateCompanion<CycleRest> {
+  final Value<String> id;
+  final Value<int> updatedAt;
+  final Value<int?> deletedAt;
+  final Value<String> deviceId;
+  final Value<bool> dirty;
+  final Value<String> cycleId;
+  final Value<String> sessionId;
+  final Value<int> dayKey;
+  final Value<int> rowid;
+  const CycleRestsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.cycleId = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.dayKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CycleRestsCompanion.insert({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.dirty = const Value.absent(),
+    required String cycleId,
+    required String sessionId,
+    required int dayKey,
+    this.rowid = const Value.absent(),
+  }) : cycleId = Value(cycleId),
+       sessionId = Value(sessionId),
+       dayKey = Value(dayKey);
+  static Insertable<CycleRest> custom({
+    Expression<String>? id,
+    Expression<int>? updatedAt,
+    Expression<int>? deletedAt,
+    Expression<String>? deviceId,
+    Expression<bool>? dirty,
+    Expression<String>? cycleId,
+    Expression<String>? sessionId,
+    Expression<int>? dayKey,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (dirty != null) 'dirty': dirty,
+      if (cycleId != null) 'cycle_id': cycleId,
+      if (sessionId != null) 'session_id': sessionId,
+      if (dayKey != null) 'day_key': dayKey,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CycleRestsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? updatedAt,
+    Value<int?>? deletedAt,
+    Value<String>? deviceId,
+    Value<bool>? dirty,
+    Value<String>? cycleId,
+    Value<String>? sessionId,
+    Value<int>? dayKey,
+    Value<int>? rowid,
+  }) {
+    return CycleRestsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deviceId: deviceId ?? this.deviceId,
+      dirty: dirty ?? this.dirty,
+      cycleId: cycleId ?? this.cycleId,
+      sessionId: sessionId ?? this.sessionId,
+      dayKey: dayKey ?? this.dayKey,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(deletedAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
+    if (cycleId.present) {
+      map['cycle_id'] = Variable<String>(cycleId.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (dayKey.present) {
+      map['day_key'] = Variable<int>(dayKey.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CycleRestsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('dirty: $dirty, ')
+          ..write('cycleId: $cycleId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('dayKey: $dayKey, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AppSettingsTable extends AppSettings
     with TableInfo<$AppSettingsTable, AppSetting> {
   @override
@@ -7981,6 +8493,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SetLogsTable setLogs = $SetLogsTable(this);
   late final $BodyweightLogsTable bodyweightLogs = $BodyweightLogsTable(this);
   late final $PhasesTable phases = $PhasesTable(this);
+  late final $CycleRestsTable cycleRests = $CycleRestsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final Index idxExercisesDirty = Index(
     'idx_exercises_dirty',
@@ -8118,6 +8631,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_phases_dirty',
     'CREATE INDEX idx_phases_dirty ON phases (dirty) WHERE dirty = 1',
   );
+  late final Index idxCycleRestsCycle = Index(
+    'idx_cycle_rests_cycle',
+    'CREATE INDEX idx_cycle_rests_cycle ON cycle_rests (cycle_id)',
+  );
+  late final Index idxCycleRestsDirty = Index(
+    'idx_cycle_rests_dirty',
+    'CREATE INDEX idx_cycle_rests_dirty ON cycle_rests (dirty) WHERE dirty = 1',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8133,6 +8654,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     setLogs,
     bodyweightLogs,
     phases,
+    cycleRests,
     appSettings,
     idxExercisesDirty,
     idxRegimesSingleActive,
@@ -8168,6 +8690,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxBodyweightLogsDirty,
     idxPhasesStartLive,
     idxPhasesDirty,
+    idxCycleRestsCycle,
+    idxCycleRestsDirty,
   ];
 }
 
@@ -9568,6 +10092,24 @@ final class $$SessionsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$CycleRestsTable, List<CycleRest>>
+  _cycleRestsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.cycleRests,
+    aliasName: 'sessions__id__cycle_rests__session_id',
+  );
+
+  $$CycleRestsTableProcessedTableManager get cycleRestsRefs {
+    final manager = $$CycleRestsTableTableManager(
+      $_db,
+      $_db.cycleRests,
+    ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_cycleRestsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$SessionsTableFilterComposer
@@ -9683,6 +10225,31 @@ class $$SessionsTableFilterComposer
           }) => $$WorkoutsTableFilterComposer(
             $db: $db,
             $table: $db.workouts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> cycleRestsRefs(
+    Expression<bool> Function($$CycleRestsTableFilterComposer f) f,
+  ) {
+    final $$CycleRestsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.cycleRests,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CycleRestsTableFilterComposer(
+            $db: $db,
+            $table: $db.cycleRests,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9875,6 +10442,31 @@ class $$SessionsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> cycleRestsRefs<T extends Object>(
+    Expression<T> Function($$CycleRestsTableAnnotationComposer a) f,
+  ) {
+    final $$CycleRestsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.cycleRests,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CycleRestsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cycleRests,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$SessionsTableTableManager
@@ -9894,6 +10486,7 @@ class $$SessionsTableTableManager
             bool regimeId,
             bool sessionExercisesRefs,
             bool workoutsRefs,
+            bool cycleRestsRefs,
           })
         > {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
@@ -9968,12 +10561,14 @@ class $$SessionsTableTableManager
                 regimeId = false,
                 sessionExercisesRefs = false,
                 workoutsRefs = false,
+                cycleRestsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (sessionExercisesRefs) db.sessionExercises,
                     if (workoutsRefs) db.workouts,
+                    if (cycleRestsRefs) db.cycleRests,
                   ],
                   addJoins:
                       <
@@ -10051,6 +10646,27 @@ class $$SessionsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (cycleRestsRefs)
+                        await $_getPrefetchedData<
+                          Session,
+                          $SessionsTable,
+                          CycleRest
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SessionsTableReferences
+                              ._cycleRestsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SessionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).cycleRestsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.sessionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -10075,6 +10691,7 @@ typedef $$SessionsTableProcessedTableManager =
         bool regimeId,
         bool sessionExercisesRefs,
         bool workoutsRefs,
+        bool cycleRestsRefs,
       })
     >;
 typedef $$SessionExercisesTableCreateCompanionBuilder =
@@ -10783,6 +11400,24 @@ final class $$CyclesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$CycleRestsTable, List<CycleRest>>
+  _cycleRestsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.cycleRests,
+    aliasName: 'cycles__id__cycle_rests__cycle_id',
+  );
+
+  $$CycleRestsTableProcessedTableManager get cycleRestsRefs {
+    final manager = $$CycleRestsTableTableManager(
+      $_db,
+      $_db.cycleRests,
+    ).filter((f) => f.cycleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_cycleRestsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$CyclesTableFilterComposer
@@ -10878,6 +11513,31 @@ class $$CyclesTableFilterComposer
           }) => $$WorkoutsTableFilterComposer(
             $db: $db,
             $table: $db.workouts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> cycleRestsRefs(
+    Expression<bool> Function($$CycleRestsTableFilterComposer f) f,
+  ) {
+    final $$CycleRestsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.cycleRests,
+      getReferencedColumn: (t) => t.cycleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CycleRestsTableFilterComposer(
+            $db: $db,
+            $table: $db.cycleRests,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -11053,6 +11713,31 @@ class $$CyclesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> cycleRestsRefs<T extends Object>(
+    Expression<T> Function($$CycleRestsTableAnnotationComposer a) f,
+  ) {
+    final $$CycleRestsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.cycleRests,
+      getReferencedColumn: (t) => t.cycleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CycleRestsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cycleRests,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CyclesTableTableManager
@@ -11068,7 +11753,11 @@ class $$CyclesTableTableManager
           $$CyclesTableUpdateCompanionBuilder,
           (Cycle, $$CyclesTableReferences),
           Cycle,
-          PrefetchHooks Function({bool regimeId, bool workoutsRefs})
+          PrefetchHooks Function({
+            bool regimeId,
+            bool workoutsRefs,
+            bool cycleRestsRefs,
+          })
         > {
   $$CyclesTableTableManager(_$AppDatabase db, $CyclesTable table)
     : super(
@@ -11139,59 +11828,94 @@ class $$CyclesTableTableManager
                     (e.readTable(table), $$CyclesTableReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback: ({regimeId = false, workoutsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (workoutsRefs) db.workouts],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (regimeId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.regimeId,
-                                referencedTable: $$CyclesTableReferences
-                                    ._regimeIdTable(db),
-                                referencedColumn: $$CyclesTableReferences
-                                    ._regimeIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                regimeId = false,
+                workoutsRefs = false,
+                cycleRestsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (workoutsRefs) db.workouts,
+                    if (cycleRestsRefs) db.cycleRests,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (regimeId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.regimeId,
+                                    referencedTable: $$CyclesTableReferences
+                                        ._regimeIdTable(db),
+                                    referencedColumn: $$CyclesTableReferences
+                                        ._regimeIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (workoutsRefs)
+                        await $_getPrefetchedData<Cycle, $CyclesTable, Workout>(
+                          currentTable: table,
+                          referencedTable: $$CyclesTableReferences
+                              ._workoutsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CyclesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).workoutsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cycleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (cycleRestsRefs)
+                        await $_getPrefetchedData<
+                          Cycle,
+                          $CyclesTable,
+                          CycleRest
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CyclesTableReferences
+                              ._cycleRestsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CyclesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).cycleRestsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cycleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (workoutsRefs)
-                    await $_getPrefetchedData<Cycle, $CyclesTable, Workout>(
-                      currentTable: table,
-                      referencedTable: $$CyclesTableReferences
-                          ._workoutsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$CyclesTableReferences(db, table, p0).workoutsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.cycleId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -11208,7 +11932,11 @@ typedef $$CyclesTableProcessedTableManager =
       $$CyclesTableUpdateCompanionBuilder,
       (Cycle, $$CyclesTableReferences),
       Cycle,
-      PrefetchHooks Function({bool regimeId, bool workoutsRefs})
+      PrefetchHooks Function({
+        bool regimeId,
+        bool workoutsRefs,
+        bool cycleRestsRefs,
+      })
     >;
 typedef $$WorkoutsTableCreateCompanionBuilder =
     WorkoutsCompanion Function({
@@ -13853,6 +14581,466 @@ typedef $$PhasesTableProcessedTableManager =
       Phase,
       PrefetchHooks Function()
     >;
+typedef $$CycleRestsTableCreateCompanionBuilder =
+    CycleRestsCompanion Function({
+      Value<String> id,
+      Value<int> updatedAt,
+      Value<int?> deletedAt,
+      Value<String> deviceId,
+      Value<bool> dirty,
+      required String cycleId,
+      required String sessionId,
+      required int dayKey,
+      Value<int> rowid,
+    });
+typedef $$CycleRestsTableUpdateCompanionBuilder =
+    CycleRestsCompanion Function({
+      Value<String> id,
+      Value<int> updatedAt,
+      Value<int?> deletedAt,
+      Value<String> deviceId,
+      Value<bool> dirty,
+      Value<String> cycleId,
+      Value<String> sessionId,
+      Value<int> dayKey,
+      Value<int> rowid,
+    });
+
+final class $$CycleRestsTableReferences
+    extends BaseReferences<_$AppDatabase, $CycleRestsTable, CycleRest> {
+  $$CycleRestsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CyclesTable _cycleIdTable(_$AppDatabase db) =>
+      db.cycles.createAlias('cycle_rests__cycle_id__cycles__id');
+
+  $$CyclesTableProcessedTableManager get cycleId {
+    final $_column = $_itemColumn<String>('cycle_id')!;
+
+    final manager = $$CyclesTableTableManager(
+      $_db,
+      $_db.cycles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cycleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
+      db.sessions.createAlias('cycle_rests__session_id__sessions__id');
+
+  $$SessionsTableProcessedTableManager get sessionId {
+    final $_column = $_itemColumn<String>('session_id')!;
+
+    final manager = $$SessionsTableTableManager(
+      $_db,
+      $_db.sessions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CycleRestsTableFilterComposer
+    extends Composer<_$AppDatabase, $CycleRestsTable> {
+  $$CycleRestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dayKey => $composableBuilder(
+    column: $table.dayKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CyclesTableFilterComposer get cycleId {
+    final $$CyclesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cycleId,
+      referencedTable: $db.cycles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CyclesTableFilterComposer(
+            $db: $db,
+            $table: $db.cycles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SessionsTableFilterComposer get sessionId {
+    final $$SessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CycleRestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CycleRestsTable> {
+  $$CycleRestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dayKey => $composableBuilder(
+    column: $table.dayKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CyclesTableOrderingComposer get cycleId {
+    final $$CyclesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cycleId,
+      referencedTable: $db.cycles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CyclesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cycles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SessionsTableOrderingComposer get sessionId {
+    final $$SessionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CycleRestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CycleRestsTable> {
+  $$CycleRestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
+  GeneratedColumn<int> get dayKey =>
+      $composableBuilder(column: $table.dayKey, builder: (column) => column);
+
+  $$CyclesTableAnnotationComposer get cycleId {
+    final $$CyclesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cycleId,
+      referencedTable: $db.cycles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CyclesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cycles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SessionsTableAnnotationComposer get sessionId {
+    final $$SessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CycleRestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CycleRestsTable,
+          CycleRest,
+          $$CycleRestsTableFilterComposer,
+          $$CycleRestsTableOrderingComposer,
+          $$CycleRestsTableAnnotationComposer,
+          $$CycleRestsTableCreateCompanionBuilder,
+          $$CycleRestsTableUpdateCompanionBuilder,
+          (CycleRest, $$CycleRestsTableReferences),
+          CycleRest,
+          PrefetchHooks Function({bool cycleId, bool sessionId})
+        > {
+  $$CycleRestsTableTableManager(_$AppDatabase db, $CycleRestsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CycleRestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CycleRestsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CycleRestsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<String> cycleId = const Value.absent(),
+                Value<String> sessionId = const Value.absent(),
+                Value<int> dayKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CycleRestsCompanion(
+                id: id,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                deviceId: deviceId,
+                dirty: dirty,
+                cycleId: cycleId,
+                sessionId: sessionId,
+                dayKey: dayKey,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                required String cycleId,
+                required String sessionId,
+                required int dayKey,
+                Value<int> rowid = const Value.absent(),
+              }) => CycleRestsCompanion.insert(
+                id: id,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                deviceId: deviceId,
+                dirty: dirty,
+                cycleId: cycleId,
+                sessionId: sessionId,
+                dayKey: dayKey,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CycleRestsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({cycleId = false, sessionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (cycleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.cycleId,
+                                referencedTable: $$CycleRestsTableReferences
+                                    ._cycleIdTable(db),
+                                referencedColumn: $$CycleRestsTableReferences
+                                    ._cycleIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+                    if (sessionId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.sessionId,
+                                referencedTable: $$CycleRestsTableReferences
+                                    ._sessionIdTable(db),
+                                referencedColumn: $$CycleRestsTableReferences
+                                    ._sessionIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CycleRestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CycleRestsTable,
+      CycleRest,
+      $$CycleRestsTableFilterComposer,
+      $$CycleRestsTableOrderingComposer,
+      $$CycleRestsTableAnnotationComposer,
+      $$CycleRestsTableCreateCompanionBuilder,
+      $$CycleRestsTableUpdateCompanionBuilder,
+      (CycleRest, $$CycleRestsTableReferences),
+      CycleRest,
+      PrefetchHooks Function({bool cycleId, bool sessionId})
+    >;
 typedef $$AppSettingsTableCreateCompanionBuilder =
     AppSettingsCompanion Function({
       required String key,
@@ -14016,6 +15204,8 @@ class $AppDatabaseManager {
       $$BodyweightLogsTableTableManager(_db, _db.bodyweightLogs);
   $$PhasesTableTableManager get phases =>
       $$PhasesTableTableManager(_db, _db.phases);
+  $$CycleRestsTableTableManager get cycleRests =>
+      $$CycleRestsTableTableManager(_db, _db.cycleRests);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
 }

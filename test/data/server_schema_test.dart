@@ -163,7 +163,7 @@ void main() {
     // rows — one of those survives a policy being dropped by accident.
     final sql = migrations();
     expect(sql, isNot(contains(' to anon')));
-    expect(RegExp('grant [^;]+ to authenticated;').allMatches(sql).length, 10);
+    expect(RegExp('grant [^;]+ to authenticated;').allMatches(sql).length, 11);
   });
 
   test('the server refuses nothing it cannot un-refuse', () {

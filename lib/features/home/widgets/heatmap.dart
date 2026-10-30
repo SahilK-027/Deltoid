@@ -46,6 +46,7 @@ class HeatmapLegend extends StatelessWidget {
               LegendEntry('Rest', c.heatEmpty),
               LegendEntry('Trained', c.progress),
               LegendEntry('Deload', c.deload),
+              LegendEntry('Deload rest', c.deload, mark: LegendMark.dot),
             ],
     );
   }
