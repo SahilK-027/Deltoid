@@ -55,6 +55,10 @@ void showToastOn(
         duration: Duration(
           milliseconds: actionLabel == null ? 1800 : 3200,
         ),
+        // Flutter keeps a snack bar with an action up until it is dismissed
+        // unless told otherwise, which turned every `Undo` into a banner that
+        // sat over the page until the next toast replaced it.
+        persist: false,
         backgroundColor: c.surfaceHighest,
         behavior: SnackBarBehavior.floating,
         elevation: 0,
