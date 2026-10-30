@@ -13,6 +13,38 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.23.0] - 2026-10-30
+
+Minor release letting a deload rest its days instead of training them.
+
+### Added
+
+- **Home:** During a deload, `Rest today` turns the session due today into a rest day. A toast offers `Undo`.
+- **Home:** During a deload, `Rest the remaining days` plans one rest day for each session the deload still holds, starting today or, if you trained today, tomorrow.
+  - A sheet lists each session with its date and the day the next cycle starts before anything is planned.
+  - `Cancel the planned rest` gives the planned days back, on Home and on the cycle sheet.
+- **Home:** On a rest day, `Train <session> light instead` takes back the rest and starts that session.
+- **Home:** The cycle track shows rested days in the deload colour and planned rest days as a fainter mark. The session picker marks a session as `Rested today` or `Rest on <date>`.
+- **Calendar:** Rest days of a deload are marked with a dot on the Workouts tile and the year calendar, and the legend adds `Deload rest`.
+- **Sync:** Rest days are backed up and synced with the rest of your training.
+
+### Changed
+
+- **Home:** The button that starts a deload session is drawn in the deload colour and reads `Train <session> light`.
+- **Log:** During a deload, the set track is drawn in the deload colour and the subtitle reads `Deload · Set 2 of 4`.
+- **Regimes:** On the cycle sheet of a deload, `Rest the remaining days` replaces `Close this cycle`. `Not a deload after all` asks first when it would clear rest days.
+- **Regimes:** A deload whose remaining days are all rested ends the day after its last rest day, and the next cycle starts then.
+
+### Fixed
+
+- **Regimes:** The toast shown after removing an exercise from a day now clears by itself after a few seconds, instead of staying until the next message.
+
+### Upgrade notes
+
+- **Schema change.** Adds the `cycle_rests` table. The local schema migrates from version 7 to 8 on first launch.
+- If you sync to your own server, apply `supabase/migrations/20261030120000_cycle_rests.sql` with `supabase db push` before installing this build on a synced phone. Until the server has the new table, sync fails and changes wait on the phone.
+- A backup written by this build is refused by earlier builds, which say that it was written by a newer version.
+
 ## [1.22.1] - 2026-10-24
 
 Patch release removing the pins from the date shown on each session in History.
@@ -719,7 +751,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.22.1...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.23.0...HEAD
+[1.23.0]: https://github.com/SahilK-027/Deltoid/compare/v1.22.1...v1.23.0
 [1.22.1]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...v1.22.1
 [1.22.0]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...v1.22.0
 [1.21.1]: https://github.com/SahilK-027/Deltoid/compare/v1.21.0...v1.21.1
