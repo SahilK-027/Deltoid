@@ -80,6 +80,35 @@ void main() {
     expect(seen.last, contains('Cycle 1'));
   });
 
+  testWidgets('counts the cycle and names the one other session owed',
+      (tester) async {
+    await createRegimeFromTemplate(db, ppl);
+    final regime = await (db.select(db.regimes)
+          ..where((t) => t.isActive.equals(true)))
+        .getSingle();
+    final repo = TrainingRepository(db);
+    // Out of programme order: Push 2 and Leg 2 are left, with Push 2 first.
+    for (final name in ['Push 1', 'Pull 1', 'Leg 1', 'Pull 2']) {
+      final session = await (db.select(db.sessions)
+            ..where((t) => t.name.equals(name)))
+          .getSingle();
+      final id = await repo.startWorkout(
+        regimeId: regime.id,
+        sessionId: session.id,
+      );
+      final set = (await repo.workoutDetail(id))!.entries.first.sets.first;
+      await repo.updateSet(set.id,
+          weight: const Value(20), reps: const Value(8), isDone: const Value(true));
+      await repo.completeWorkout(id);
+    }
+    await pumpWorkouts(tester);
+
+    final seen = await frames(tester);
+    expect(seen.last, contains('Cycle 1  ·  4 of 6'));
+    expect(seen.last, contains('Start Push 2'));
+    expect(seen.last, contains('Train Leg 2 or another session'));
+  });
+
   testWidgets('arrives in one frame, not in layers', (tester) async {
     await createRegimeFromTemplate(db, ppl);
     await pumpWorkouts(tester);

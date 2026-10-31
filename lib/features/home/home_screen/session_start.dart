@@ -272,13 +272,20 @@ Future<void> _trainAnotherSession(
       for (final id in p.sessionIds)
         if (id != p.dueSessionId) id,
   };
+  // Sessions still owed this cycle come first: the sheet is usually opened
+  // to train one of them out of order.
+  final byId = {for (final s in sessions) s.id: s};
+  final ordered = [
+    for (final id in status.owedFirst([for (final s in sessions) s.id]))
+      byId[id]!,
+  ];
   final picked = await showAppSheet<Object>(
     context,
     builder: (sheet) => AppSheet(
       title: 'Start a session',
       subtitle: 'Cycle ${status.cycleIndex}',
       children: [
-        for (final s in sessions)
+        for (final s in ordered)
           _SessionPickRow(
             session: s,
             done: status.completedSessionIds.contains(s.id),

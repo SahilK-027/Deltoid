@@ -790,9 +790,8 @@ class _NextUpHero extends ConsumerWidget {
         _CycleTrack(status: status, mark: mark),
         const SizedBox(height: Space.sm),
         // Everything the cycle needs in words, on one quiet line under the
-        // thing it describes. `1 of 6 done` is gone: six segments above say
-        // it faster than the words can, and rule 6 keeps the graphic when it
-        // does.
+        // thing it describes. The count is said as well as drawn: the track
+        // fills from the left, so it says how many and never which.
         Text(
           _cycleNote(status),
           style: context.t.labelSmall,
@@ -1017,6 +1016,10 @@ class _NextUpHero extends ConsumerWidget {
           ),
         ),
       ],
+      // One other session still owed is named, so the usual alternative to
+      // the hero is in the link itself. Two or more would not fit the line,
+      // and the picker lists them first either way.
+      //
       // The hero names the first session not yet trained, which is a
       // description and not an instruction — training Legs before Pull is
       // normal. One tap to open the picker, one to start: the same two taps
@@ -1027,7 +1030,12 @@ class _NextUpHero extends ConsumerWidget {
         const SizedBox(height: Space.xs),
         Center(
           child: LinkAction(
-            'Train another session',
+            switch (status.remainingSessionIds
+                .where((id) => id != nextId)
+                .toList()) {
+              [final other] => 'Train ${_name(other)} or another session',
+              _ => 'Train another session',
+            },
             onTap: starting
                 ? null
                 : () => _trainAnotherSession(
@@ -1055,7 +1063,8 @@ class _NextUpHero extends ConsumerWidget {
   /// silent when deloads are off for this regime (`cyclesUntilDeload` is -1
   /// then, and there is nothing to promise).
   static String _cycleNote(CycleStatus status) {
-    final cycle = 'Cycle ${status.cycleIndex}';
+    final cycle =
+        'Cycle ${status.cycleIndex}  ·  ${status.done} of ${status.total}';
     if (status.isDeload || status.deloadAfterThisCycle) return cycle;
     final remaining = status.cyclesUntilDeload;
     if (remaining <= 0) return cycle;
@@ -1064,11 +1073,16 @@ class _NextUpHero extends ConsumerWidget {
   }
 }
 
-/// Progress through the cycle as one hairline track, segment per session.
+/// Progress through the cycle as circles on a line, one circle per session,
+/// spanning the card's width.
 ///
-/// Unlabelled and 5pt tall — it says "two of five" faster than the words next
-/// to it can. Labelled bars would repeat the session list underneath it, name
-/// for name.
+/// A count, not a map: circles fill from the left in the order of
+/// [CycleStatus.trackStates], whatever order the sessions were trained in. A
+/// trained session is a filled circle in the card's one colour; a rested one
+/// an orange ring, and a planned one the same ring dashed until its day comes.
+/// An open session is a ring in `borderStrong`, the unfilled-track hairline.
+/// The line between two circles takes the card's colour once the circle after
+/// it is done, so the filled run reads as a bar at a glance.
 class _CycleTrack extends StatelessWidget {
   const _CycleTrack({required this.status, required this.mark});
 
@@ -1078,38 +1092,41 @@ class _CycleTrack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // A regime with no sessions never reaches here, but a zero would divide the
-    // row into nothing and render as a stray gap.
-    final total = status.total;
-    if (total <= 0) return const SizedBox.shrink();
+    // A regime with no sessions never reaches here, but an empty row would
+    // leave a stray gap above the caption.
+    if (status.total <= 0) return const SizedBox.shrink();
 
-    final states = status.states;
+    final states = status.trackStates;
+    bool done(PositionState s) =>
+        s == PositionState.trained || s == PositionState.rested;
     return Row(
       children: [
-        for (var i = 0; i < total; i++) ...[
-          if (i > 0) const SizedBox(width: Space.xs),
-          Expanded(
-            child: AnimatedContainer(
-              duration: Motion.slow,
-              curve: Motion.emphasized,
-              height: 5,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: states[i] == PositionState.trained
-                    ? mark
-                    : c.surfaceHighest,
-                borderRadius: BorderRadius.circular(Radii.pill),
+        for (final (i, state) in states.indexed) ...[
+          if (i > 0)
+            Expanded(
+              child: AnimatedContainer(
+                duration: Motion.slow,
+                curve: Motion.emphasized,
+                height: 2,
+                margin: const EdgeInsets.symmetric(horizontal: Space.xs),
+                decoration: BoxDecoration(
+                  color: done(state) ? mark : c.surfaceHighest,
+                  borderRadius: BorderRadius.circular(Radii.pill),
+                ),
               ),
-              // A rested day is the calendar's mark at track size: grey with
-              // an orange dot, so it reads as rest and as deload at once. A
-              // planned one is the same dot, dimmed, until its day comes.
-              child: switch (states[i]) {
-                PositionState.rested => _TrackDot(color: c.deload),
-                PositionState.planned =>
-                  _TrackDot(color: c.deload.withValues(alpha: 0.4)),
-                _ => null,
-              },
             ),
+          _TrackCircle(
+            style: switch (state) {
+              PositionState.trained => _CircleStyle.filled,
+              PositionState.rested => _CircleStyle.ring,
+              PositionState.planned => _CircleStyle.dashed,
+              PositionState.open => _CircleStyle.open,
+            },
+            color: switch (state) {
+              PositionState.trained => mark,
+              PositionState.rested || PositionState.planned => c.deload,
+              PositionState.open => c.borderStrong,
+            },
           ),
         ],
       ],
@@ -1117,17 +1134,58 @@ class _CycleTrack extends StatelessWidget {
   }
 }
 
-class _TrackDot extends StatelessWidget {
-  const _TrackDot({required this.color});
+enum _CircleStyle { filled, ring, dashed, open }
 
+class _TrackCircle extends StatelessWidget {
+  const _TrackCircle({required this.style, required this.color});
+
+  final _CircleStyle style;
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 5,
-    height: 5,
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 18,
+    child: CustomPaint(painter: _TrackCirclePainter(style, color)),
   );
+}
+
+class _TrackCirclePainter extends CustomPainter {
+  _TrackCirclePainter(this.style, this.color);
+
+  final _CircleStyle style;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = size.center(Offset.zero);
+    if (style == _CircleStyle.filled) {
+      canvas.drawCircle(centre, size.width / 2, Paint()..color = color);
+      return;
+    }
+    // A rested day's ring is heavier than the hairline of an open one, so the
+    // two read apart by weight as well as colour.
+    final width = style == _CircleStyle.ring ? 3.5 : 2.0;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    final radius = (size.width - width) / 2;
+    if (style != _CircleStyle.dashed) {
+      canvas.drawCircle(centre, radius, paint);
+      return;
+    }
+    // Ten dashes with gaps of the same length.
+    const dashes = 10;
+    const sweep = math.pi / dashes;
+    final rect = Rect.fromCircle(center: centre, radius: radius);
+    for (var i = 0; i < dashes; i++) {
+      canvas.drawArc(rect, i * 2 * sweep, sweep, false, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TrackCirclePainter old) =>
+      old.style != style || old.color != color;
 }
 
 /// The two habit tiles, Weigh-ins on the left and Workouts on the right

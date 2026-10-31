@@ -2009,8 +2009,12 @@ Five parts, in an order that does not change:
    Workouts drew it — the session due or the session open, and the screen's one
    primary action.
    Under the button, `Train another session` is a text link, the quiet
-   secondary THEME rule 3 allows, shown for a regime of one day or more. It
-   opens `Start a session`: the days as inset panels, then a `bodySmall`
+   secondary THEME rule 3 allows, shown for a regime of one day or more. When
+   exactly one other session is still owed this cycle the link names it,
+   `Train Leg 2 or another session`; with two or more it keeps the plain
+   wording, because the names would not fit the line. It opens
+   `Start a session`: the sessions still owed first and the rest after, each
+   group in programme order, as inset panels, then a `bodySmall`
    label, `Outside the programme`, over one more panel for a custom session.
    That panel is two lines under a hairline in `surfaceHighest`: the
    `Custom session` row, which starts it on a tap, and a `Deload session`
@@ -2038,10 +2042,18 @@ Five parts, in an order that does not change:
    `Rest from tomorrow`, with `Cancel the planned rest` as its secondary. The
    habit tile's play button is absent on both.
 
-   **The cycle track shows the rest.** A trained position is the filled
-   segment it always was; a rested one is a grey segment with a `deload` dot at
-   its centre, the calendar's mark at track size, and a planned one the same
-   dot at 40%.
+   **The cycle track is a count, not a map.** A row of 18pt circles, one per
+   position, joined by a 2pt line that spans the card's width, filled from the
+   left: trained, then rested, then planned, then open. Sessions are trained
+   in any order, and a track placed in programme order drew gaps that read as
+   a fault. The line under it says the count in words,
+   `Cycle 5 · 4 of 6 · Deload in 1 cycle`, so the track never has to say
+   which. A trained position is a filled circle in the card's colour,
+   `progress` or `deload`; a rested one a `deload` ring 3.5 wide; a planned
+   one the same ring, 2 wide and dashed; an open one a 2 ring in
+   `borderStrong`, the unfilled-track hairline. The line leading into a
+   circle takes the card's colour once that position is trained or rested,
+   and is `surfaceHighest` otherwise, so the filled run still reads as a bar.
 3. **Habits**: the two habit tiles. The Workouts tile takes the place of the
    Consistency card, and opens the same Consistency screen.
 4. **Phase**: the [Phase card](#phase-card), the one place a bulk, a cut or

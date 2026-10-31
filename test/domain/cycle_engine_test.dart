@@ -316,4 +316,65 @@ void main() {
     expect(s.isComplete, isFalse);
     expect(s.progress, 0);
   });
+
+  group('the track on Home', () {
+    test('counts from the left whatever order the cycle was trained in', () {
+      // Pull 2 trained ahead of Push 2: placed by position, the track drew
+      // a grey gap between blue segments.
+      final s = status(done: {'push1', 'pull1', 'leg1', 'pull2'});
+      expect(s.states, [
+        PositionState.trained,
+        PositionState.trained,
+        PositionState.trained,
+        PositionState.open,
+        PositionState.trained,
+        PositionState.open,
+      ]);
+      expect(s.trackStates, [
+        PositionState.trained,
+        PositionState.trained,
+        PositionState.trained,
+        PositionState.trained,
+        PositionState.open,
+        PositionState.open,
+      ]);
+    });
+
+    test('a deload fills trained, then rested, then planned, then open', () {
+      final s = CycleStatus(
+        cycleId: 'cycle-7',
+        cycleIndex: 7,
+        isDeload: true,
+        sessionIds: ppl,
+        completedSessionIds: const {'leg1'},
+        cyclesSinceDeload: 6,
+        deloadEnabled: true,
+        deloadAfterCycles: 6,
+        rests: const {'push1': 20261117, 'pull2': 20261118},
+        todayKey: 20261117,
+      );
+      expect(s.trackStates, [
+        PositionState.trained,
+        PositionState.rested,
+        PositionState.planned,
+        PositionState.open,
+        PositionState.open,
+        PositionState.open,
+      ]);
+    });
+  });
+
+  group('the session picker', () {
+    test('lists the sessions still owed first, each group in order', () {
+      final s = status(done: {'push1', 'leg1'});
+      expect(s.owedFirst(ppl), [
+        'pull1',
+        'push2',
+        'pull2',
+        'leg2',
+        'push1',
+        'leg1',
+      ]);
+    });
+  });
 }

@@ -270,6 +270,35 @@ class CycleStatus {
             },
       ];
 
+  /// The same states counted rather than placed: trained first, then rested,
+  /// then planned, then open.
+  ///
+  /// The track on Home draws this. Sessions are trained in whatever order
+  /// suits the week, so a track in programme order showed gaps that read as a
+  /// fault; a count fills from the left however the cycle was trained.
+  List<PositionState> get trackStates {
+    final all = states;
+    return [
+      for (final kind in const [
+        PositionState.trained,
+        PositionState.rested,
+        PositionState.planned,
+        PositionState.open,
+      ])
+        ...all.where((s) => s == kind),
+    ];
+  }
+
+  /// [ids] with the sessions still owed this cycle first, each group kept in
+  /// the order it came in.
+  List<String> owedFirst(List<String> ids) {
+    final owed = remainingSessionIds.toSet();
+    return [
+      ...ids.where(owed.contains),
+      ...ids.where((id) => !owed.contains(id)),
+    ];
+  }
+
   int? _restDayOf(CyclePosition p) {
     for (final id in p.sessionIds) {
       final day = rests[id];
