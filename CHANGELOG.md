@@ -13,6 +13,19 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.24.0] - 2026-10-31
+
+Minor release making the cycle track on Home a count, so sessions trained in any order fill it from the left.
+
+### Changed
+
+- **Home:** The cycle track is a row of circles joined by a line across the card. It fills from the left whatever order the sessions were trained in, where 1.23.0 placed each session in programme order and left gaps.
+  - A trained session is a filled circle, blue or, during a deload, orange. A rested day is a solid orange ring, a planned rest day a dashed orange ring, and a session still to train a grey ring.
+  - The line takes the circle colour up to the last session done.
+- **Home:** The line under the track gives the count, such as `Cycle 5 · 4 of 6 · Deload in 1 cycle`.
+- **Home:** When exactly one other session is still owed this cycle, the link under the start button names it, such as `Train Leg 2 or another session`.
+- **Home:** `Start a session` lists the sessions still owed this cycle first, and the sessions already done after them.
+
 ## [1.23.0] - 2026-10-30
 
 Minor release letting a deload rest its days instead of training them.
@@ -751,7 +764,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.23.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.24.0...HEAD
+[1.24.0]: https://github.com/SahilK-027/Deltoid/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/SahilK-027/Deltoid/compare/v1.22.1...v1.23.0
 [1.22.1]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...v1.22.1
 [1.22.0]: https://github.com/SahilK-027/Deltoid/compare/v1.21.1...v1.22.0
