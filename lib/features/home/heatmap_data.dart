@@ -8,9 +8,13 @@ class HeatDay {
     required this.workouts,
     required this.isDeload,
     this.workoutId,
-  });
+    int? deloadWorkouts,
+  }) : deloadWorkouts = deloadWorkouts ?? (isDeload ? workouts : 0);
 
   final int workouts;
+
+  /// How many of [workouts] were deload sessions.
+  final int deloadWorkouts;
 
   /// Deload days render in a different hue — an easy week should be visibly an
   /// easy week, not a gap in the record.
@@ -59,6 +63,7 @@ HeatmapData buildHeatmap(
     days[w.dayKey] = HeatDay(
       workouts: (existing?.workouts ?? 0) + 1,
       isDeload: (existing?.isDeload ?? false) || w.isDeload,
+      deloadWorkouts: (existing?.deloadWorkouts ?? 0) + (w.isDeload ? 1 : 0),
       // **The largest id, matching `loggedDays`' `max(id)`.** Taking the first
       // row of the day the loop happens to see is not deterministic: the query
       // behind it orders on `dayKey` alone, so on a day with two sessions the
@@ -104,6 +109,7 @@ HeatmapData buildHeatmapFromDays(
           workouts: d.workouts,
           isDeload: d.isDeload,
           workoutId: d.anyWorkoutId,
+          deloadWorkouts: d.deloadWorkouts,
         ),
     },
     consistency: computeConsistency(

@@ -12,7 +12,7 @@ void main() {
           {Set<DateTime> deload = const {}}) =>
       {
         for (final MapEntry(:key, :value) in sessions.entries)
-          dayKeyOf(key): (sessions: value, deload: deload.contains(key)),
+          dayKeyOf(key): (sessions: value, deload: deload.contains(key) ? value : 0),
       };
 
   group('weeks', () {
@@ -92,6 +92,25 @@ void main() {
 
       expect(y.weeks.first.deload, isTrue);
       expect(y.weeks.last.deload, isFalse);
+    });
+
+    test('a week half deload counts only its deload sessions as deload', () {
+      final y = foldConsistencyYear(
+        logged(
+          {
+            DateTime(2026, 10, 5): 1,
+            DateTime(2026, 10, 6): 1,
+            DateTime(2026, 10, 7): 1,
+            DateTime(2026, 10, 8): 1,
+          },
+          deload: {DateTime(2026, 10, 7), DateTime(2026, 10, 8)},
+        ),
+        year: 2026,
+        today: today,
+      );
+
+      expect(y.weeks.first.sessions, 4);
+      expect(y.weeks.first.deloadSessions, 2);
     });
 
     test('walks a clock change without losing a week', () {
@@ -192,7 +211,7 @@ void main() {
           first: first,
           last: last,
           sessions: 0,
-          deload: false,
+          deloadSessions: 0,
         );
 
     test('names the month once when both ends share it', () {

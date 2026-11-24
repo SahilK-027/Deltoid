@@ -1,83 +1,29 @@
-/// Which days a deload rested, worked out from the cycles rather than stored.
+/// Which days a deload rested.
 ///
-/// A deload is a stretch of time, not a set of sessions: from the day after
-/// the cycle before it closed to the day it closes itself. Inside that stretch
-/// a day with a session is a light day, and every other day is deload rest,
-/// whether it was rested on purpose with `Rest today`, planned with `Rest the
-/// remaining days`, or simply passed without the app being opened. Only the
-/// days a person chose to rest are written down (`cycle_rests`), because those
-/// spend a position of the cycle; the calendar's dots are derived, so a week
-/// away from the app inside a deload marks itself.
+/// Only the days a person chose to rest are written down (`cycle_rests`),
+/// because those spend a position of the cycle. They, and only they, are drawn
+/// on the calendar as deload rest.
 library;
 
-/// One deload cycle, as the days it covers.
-class DeloadSpan {
-  const DeloadSpan({
-    required this.startDayKey,
-    required this.endDayKey,
-    required this.restsToday,
-  });
-
-  /// The first day of the deload, as `yyyyMMdd`.
-  final int startDayKey;
-
-  /// The day it closed on, or null while it is still open.
-  final int? endDayKey;
-
-  /// Whether today is rested in it. A day is not over until it has passed, so
-  /// today counts as rest only when it was chosen as rest: an untrained
-  /// morning may still become a light day.
-  final bool restsToday;
-}
-
-/// The first day a deload covers, or null when it covers none yet.
+/// The days the calendar dots as deload rest.
 ///
-/// The cycle opens the moment the one before it closes, which is usually
-/// during that cycle's last session, and that day belongs to the cycle it
-/// finished. So the deload starts the day after, unless something in it already
-/// happened on the day it opened: a light day trained, or rest chosen, that
-/// same evening.
+/// Only a day someone chose to rest in a deload counts: `Rest today`, or a day
+/// planned by `Rest the remaining days` once it arrives. Each of those spent a
+/// position of the cycle, which is what the orange dot records. A day simply
+/// not trained inside a deload spent nothing, since the session due stays due,
+/// so it is an ordinary rest day and draws as one.
 ///
-/// A cycle already holding sessions at full weight was made a deload part of
-/// the way through, from the cycle sheet, and its days before that were not
-/// light. Nothing records when the switch was thrown, so such a deload starts
-/// on its first light day or rest day, and covers nothing until it has one.
-int? deloadStartDayKey({
-  required int openedDayKey,
-  int? firstActivityDayKey,
-  bool madePartWay = false,
-}) {
-  if (madePartWay) return firstActivityDayKey;
-  final next = addDaysToKey(openedDayKey, 1);
-  if (firstActivityDayKey != null && firstActivityDayKey < next) {
-    return firstActivityDayKey < openedDayKey
-        ? openedDayKey
-        : firstActivityDayKey;
-  }
-  return next;
-}
-
-/// Every day of [spans] up to [todayKey] that held no session.
-///
-/// [trainedDays] are the days with a completed workout, in any regime: a day
-/// trained is never rest, whatever cycle it counted towards.
+/// A planned day after [todayKey] has not happened yet, and a day that was
+/// trained after all is a light day rather than rest.
 Set<int> deloadRestDays(
-  Iterable<DeloadSpan> spans, {
+  Iterable<int> restDayKeys, {
   required Set<int> trainedDays,
   required int todayKey,
-}) {
-  final out = <int>{};
-  for (final span in spans) {
-    final end = span.endDayKey ?? todayKey;
-    var day = span.startDayKey;
-    while (day <= end && day <= todayKey) {
-      final counts = day < todayKey || span.restsToday;
-      if (counts && !trainedDays.contains(day)) out.add(day);
-      day = addDaysToKey(day, 1);
-    }
-  }
-  return out;
-}
+}) =>
+    {
+      for (final day in restDayKeys)
+        if (day <= todayKey && !trainedDays.contains(day)) day,
+    };
 
 /// The days `Rest the remaining days` plans, one per day still owed.
 ///

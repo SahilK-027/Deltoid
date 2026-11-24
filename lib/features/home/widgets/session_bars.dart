@@ -15,9 +15,9 @@ import '../../../domain/value_axis.dart';
 ///
 /// Drawn in the language of the volume chart (THEME → Charts): dashed
 /// gridlines, y labels on the right, the date strip from [DateAxis.bars], and
-/// one painter for every bar. A bar is progress blue, or the deload orange for
-/// a week that held a deload, the two colours the calendar under it uses for
-/// the same days. A week without a session draws nothing, so a gap in the
+/// one painter for every bar. A bar is progress blue, with its deload sessions
+/// stacked on top in the deload orange, the two colours the calendar under it
+/// uses for the same days. A week without a session draws nothing, so a gap in the
 /// training is a gap in the chart.
 ///
 /// **Read by a tooltip over the bar.** Pressing or dragging across the plot
@@ -247,7 +247,9 @@ class _Tip extends StatelessWidget {
                 children: [
                   if (week.deload)
                     TextSpan(
-                      text: ' · Deload',
+                      text: week.deloadSessions == week.sessions
+                          ? ' · Deload'
+                          : ' · ${week.deloadSessions} deload',
                       style: TextStyle(color: c.deload),
                     ),
                 ],
@@ -333,20 +335,36 @@ class _BarsPainter extends CustomPainter {
       final w = weeks[i];
       if (w.sessions <= 0) continue;
       final h = math.min(size.height, size.height * w.sessions / max);
-      final hue = w.deload ? deload : progress;
-      final colour = picked == null || picked == i
-          ? hue
-          // The rest step back rather than the picked one lighting up, as the
-          // volume chart's do.
-          : hue.withValues(alpha: 0.35);
-      canvas.drawRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromLTWH(slot * i + inset, size.height - h, ink, h),
-          topLeft: radius,
-          topRight: radius,
-        ),
-        Paint()..color = colour,
-      );
+      // The rest step back rather than the picked one lighting up, as the
+      // volume chart's do.
+      Color shade(Color hue) =>
+          picked == null || picked == i ? hue : hue.withValues(alpha: 0.35);
+      final light = w.deloadSessions.clamp(0, w.sessions);
+      final split = h * (w.sessions - light) / w.sessions;
+      final left = slot * i + inset;
+      // The full sessions at the base, the deload ones stacked over them. Only
+      // the top segment carries the rounded corners.
+      if (split > 0) {
+        final top = light == 0;
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTWH(left, size.height - split, ink, split),
+            topLeft: top ? radius : Radius.zero,
+            topRight: top ? radius : Radius.zero,
+          ),
+          Paint()..color = shade(progress),
+        );
+      }
+      if (light > 0) {
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTWH(left, size.height - h, ink, h - split),
+            topLeft: radius,
+            topRight: radius,
+          ),
+          Paint()..color = shade(deload),
+        );
+      }
     }
   }
 

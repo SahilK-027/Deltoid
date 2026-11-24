@@ -274,13 +274,18 @@ class LoggedDay {
     required this.workouts,
     required this.isDeload,
     required this.anyWorkoutId,
-  });
+    int? deloadWorkouts,
+  }) : deloadWorkouts = deloadWorkouts ?? (isDeload ? workouts : 0);
 
   final int dayKey;
   final int workouts;
 
   /// True when any workout that day was a light week.
   final bool isDeload;
+
+  /// How many of [workouts] were deload sessions, so a week can show how much
+  /// of it was light rather than colouring all of it by one session.
+  final int deloadWorkouts;
 
   /// One of the day's workouts, so a day on the calendar can be opened.
   final String anyWorkoutId;

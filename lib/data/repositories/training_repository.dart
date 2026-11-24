@@ -771,7 +771,8 @@ class TrainingRepository {
       // to open. `max` because it has to be *some* deterministic one.
       'MAX(id) AS any_id, '
       // Stored as an integer, so the max is "was any of them a deload".
-      'MAX(is_deload) AS deload '
+      'MAX(is_deload) AS deload, '
+      'SUM(is_deload) AS deload_n '
       'FROM workouts '
       "WHERE status = 'completed' AND deleted_at IS NULL "
       'GROUP BY day_key ORDER BY day_key',
@@ -792,6 +793,7 @@ class TrainingRepository {
             workouts: r.readNullable<int>('n') ?? 0,
             isDeload: (r.readNullable<int>('deload') ?? 0) != 0,
             anyWorkoutId: r.read<String>('any_id'),
+            deloadWorkouts: r.readNullable<int>('deload_n') ?? 0,
           ),
     ];
   }
@@ -1591,72 +1593,33 @@ class TrainingRepository {
     );
   }
 
-  /// Every day a deload rested, from the first deload to today.
+  /// Every day a deload was chosen as rest, up to today.
   ///
-  /// Derived from each deload cycle's span and the days trained, so a day
-  /// inside a deload marks itself whether or not the app was opened on it
-  /// ([deloadRestDays]). Today is rest only once it has been chosen as rest.
-  /// Bounded by the number of deload cycles ever opened, each a handful of
-  /// rows, and by the days they cover.
+  /// Read from the rest rows of deload cycles, so only a day that spent a
+  /// position of the cycle is marked ([deloadRestDays]). A day inside a deload
+  /// that was simply not trained is an ordinary rest day.
   Future<Set<int>> deloadRestDayKeys() async {
     final today = dayKeyOf(DateTime.now());
-    final cycles = await db.customSelect(
-      'SELECT c.id AS id, c.started_at AS started_at, '
-      'c.completed_at AS completed_at, '
-      '(SELECT MIN(w.day_key) FROM workouts w WHERE w.cycle_id = c.id '
-      "AND w.status = 'completed' AND w.is_deload = 1 "
-      'AND w.deleted_at IS NULL) AS first_work, '
-      '(SELECT COUNT(*) FROM workouts w WHERE w.cycle_id = c.id '
-      "AND w.status = 'completed' AND w.is_deload = 0 "
-      'AND w.deleted_at IS NULL) AS full_work, '
-      '(SELECT MIN(r.day_key) FROM cycle_rests r WHERE r.cycle_id = c.id '
-      'AND r.deleted_at IS NULL) AS first_rest, '
-      '(SELECT COUNT(*) FROM cycle_rests r WHERE r.cycle_id = c.id '
-      'AND r.deleted_at IS NULL AND r.day_key = ?) AS rests_today '
-      'FROM cycles c JOIN regimes g ON g.id = c.regime_id '
-      'WHERE c.is_deload = 1 AND c.deleted_at IS NULL '
-      'AND g.deleted_at IS NULL',
+    final rests = await db.customSelect(
+      'SELECT DISTINCT r.day_key AS day_key FROM cycle_rests r '
+      'JOIN cycles c ON c.id = r.cycle_id '
+      'JOIN regimes g ON g.id = c.regime_id '
+      'WHERE r.deleted_at IS NULL AND c.is_deload = 1 '
+      'AND c.deleted_at IS NULL AND g.deleted_at IS NULL AND r.day_key <= ?',
       variables: [Variable<int>(today)],
-      readsFrom: {db.cycles, db.workouts, db.cycleRests, db.regimes},
+      readsFrom: {db.cycles, db.cycleRests, db.regimes},
     ).get();
-    if (cycles.isEmpty) return const {};
-
-    final spans = <DeloadSpan>[];
-    var earliest = today;
-    for (final r in cycles) {
-      final work = r.readNullable<int>('first_work');
-      final rest = r.readNullable<int>('first_rest');
-      final first = [work, rest].whereType<int>().fold<int?>(
-            null,
-            (a, b) => a == null || b < a ? b : a,
-          );
-      final start = deloadStartDayKey(
-        openedDayKey: dayKeyOf(DateTime.fromMillisecondsSinceEpoch(
-          r.read<int>('started_at'),
-        )),
-        firstActivityDayKey: first,
-        madePartWay: r.read<int>('full_work') > 0,
-      );
-      if (start == null) continue;
-      final completed = r.readNullable<int>('completed_at');
-      spans.add(DeloadSpan(
-        startDayKey: start,
-        endDayKey: completed == null
-            ? null
-            : dayKeyOf(DateTime.fromMillisecondsSinceEpoch(completed)),
-        restsToday: r.read<int>('rests_today') > 0,
-      ));
-      if (start < earliest) earliest = start;
-    }
+    if (rests.isEmpty) return const {};
+    final days = [for (final r in rests) r.read<int>('day_key')];
 
     final trained = await db.customSelect(
       'SELECT DISTINCT day_key AS day_key FROM workouts '
       "WHERE status = 'completed' AND deleted_at IS NULL AND day_key >= ?",
-      variables: [Variable<int>(earliest)],
+      variables: [Variable<int>(days.reduce((a, b) => a < b ? a : b))],
       readsFrom: {db.workouts},
     ).get();
     return deloadRestDays(
-      spans,
+      days,
       trainedDays: {for (final r in trained) r.read<int>('day_key')},
       todayKey: today,
     );

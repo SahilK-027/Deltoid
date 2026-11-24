@@ -2,8 +2,8 @@ import '../core/ids.dart';
 import 'volume_history.dart' show weekStartOf;
 
 /// What one logged day contributes to a year of consistency: how many sessions
-/// it held, and whether any of them was a deload.
-typedef LoggedDayCount = ({int sessions, bool deload});
+/// it held, and how many of them were deloads.
+typedef LoggedDayCount = ({int sessions, int deload});
 
 /// One week of a [ConsistencyYear]: a bar on the Consistency chart.
 class TrainingWeek {
@@ -12,7 +12,7 @@ class TrainingWeek {
     required this.first,
     required this.last,
     required this.sessions,
-    required this.deload,
+    required this.deloadSessions,
   });
 
   /// The Monday the week begins on, which for the first week of a year can
@@ -27,9 +27,13 @@ class TrainingWeek {
 
   final int sessions;
 
-  /// Whether any session in the week was a deload. The bar is then drawn in
-  /// the deload colour, as the days are in the calendar.
-  final bool deload;
+  /// How many of [sessions] were deloads. The bar draws that share in the
+  /// deload colour on top of the rest, so a week half light and half full is
+  /// drawn half and half rather than all orange.
+  final int deloadSessions;
+
+  /// Whether any session in the week was a deload.
+  bool get deload => deloadSessions > 0;
 }
 
 /// One calendar year of training, a week at a time.
@@ -128,7 +132,7 @@ ConsistencyYear foldConsistencyYear(
         !w.isAfter(last);
         w = DateTime(w.year, w.month, w.day + 7)) {
       var count = 0;
-      var deload = false;
+      var deload = 0;
       DateTime? first;
       DateTime? end;
       for (var i = 0; i < 7; i++) {
@@ -139,14 +143,14 @@ ConsistencyYear foldConsistencyYear(
         final day = days[dayKeyOf(d)];
         if (day == null || day.sessions <= 0) continue;
         count += day.sessions;
-        deload = deload || day.deload;
+        deload += day.deload.clamp(0, day.sessions);
       }
       weeks.add(TrainingWeek(
         start: w,
         first: first!,
         last: end!,
         sessions: count,
-        deload: deload,
+        deloadSessions: deload,
       ));
       if (w == thisWeek) continue;
       weeksCounted++;

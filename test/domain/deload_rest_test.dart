@@ -44,99 +44,23 @@ void main() {
     });
   });
 
-  group('the deload span', () {
-    test('starts the day after the cycle opened', () {
-      expect(deloadStartDayKey(openedDayKey: 20261116), monday);
-    });
-
-    test('starts on the day it opened when something happened that day', () {
-      expect(
-        deloadStartDayKey(
-          openedDayKey: 20261116,
-          firstActivityDayKey: 20261116,
-        ),
-        20261116,
-      );
-    });
-
-    test('made a deload part of the way through, starts at its first light '
-        'or rest day', () {
-      expect(
-        deloadStartDayKey(
-          openedDayKey: 20261001,
-          firstActivityDayKey: monday,
-          madePartWay: true,
-        ),
-        monday,
-      );
-      expect(
-        deloadStartDayKey(openedDayKey: 20261001, madePartWay: true),
-        isNull,
-        reason: 'no light or rest day yet, so no day of it is rest',
-      );
-    });
-
-    test('never starts before the day it opened', () {
-      expect(
-        deloadStartDayKey(
-          openedDayKey: 20261116,
-          firstActivityDayKey: 20261110,
-        ),
-        20261116,
-      );
-    });
-  });
-
   group('rest days on the calendar', () {
-    test('mark every untrained past day of the deload', () {
+    test('mark only the days chosen as rest', () {
+      // 19 November passed untrained inside the deload, with nothing chosen:
+      // the session due stayed due, so it is an ordinary rest day.
       final days = deloadRestDays(
-        [
-          const DeloadSpan(
-            startDayKey: monday,
-            endDayKey: null,
-            restsToday: false,
-          ),
-        ],
+        [20261117, 20261118],
         trainedDays: {20261118},
         todayKey: 20261120,
       );
-      expect(days, {20261117, 20261119});
+      expect(days, {20261117});
     });
 
-    test('mark today only once it is chosen as rest', () {
-      const open = DeloadSpan(
-        startDayKey: monday,
-        endDayKey: null,
-        restsToday: false,
-      );
-      const rested = DeloadSpan(
-        startDayKey: monday,
-        endDayKey: null,
-        restsToday: true,
-      );
+    test('mark today once it is chosen, and never a planned day ahead', () {
       expect(
-        deloadRestDays([open], trainedDays: {}, todayKey: monday),
-        isEmpty,
-      );
-      expect(
-        deloadRestDays([rested], trainedDays: {}, todayKey: monday),
+        deloadRestDays([monday, 20261118], trainedDays: {}, todayKey: monday),
         {monday},
       );
-    });
-
-    test('stop at the day the deload closed, and never reach the future', () {
-      final days = deloadRestDays(
-        [
-          const DeloadSpan(
-            startDayKey: monday,
-            endDayKey: 20261119,
-            restsToday: false,
-          ),
-        ],
-        trainedDays: {},
-        todayKey: 20261125,
-      );
-      expect(days, {20261117, 20261118, 20261119});
     });
   });
 

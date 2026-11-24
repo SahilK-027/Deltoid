@@ -59,7 +59,7 @@ class _HistoryHeatmapScreenState extends ConsumerState<HistoryHeatmapScreen> {
     final year = _year != null && years.contains(_year) ? _year! : years.first;
     final logged = <int, LoggedDayCount>{
       for (final MapEntry(:key, :value) in days.entries)
-        key: (sessions: value.workouts, deload: value.isDeload),
+        key: (sessions: value.workouts, deload: value.deloadWorkouts),
     };
     final fold = foldConsistencyYear(logged, year: year, today: today);
     final picked =

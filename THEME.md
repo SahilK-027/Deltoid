@@ -2089,9 +2089,10 @@ consistent each week was, so the week is what it draws. Top to bottom:
   presses of an arrow. The screen opens on this year;
 - `Sessions per week`, its trailing figure the year's sessions, `187
   sessions`, over a card: a [stat row](#stat-tile) of `Average a week` and
-  `Weeks trained`, `38 of 42`, then a bar a week. A bar is `progress`, or
-  `deload` for a week that held a deload, and a week without a session draws
-  nothing. Both figures leave out the week under way, which on a Monday
+  `Weeks trained`, `38 of 42`, then a bar a week. A bar is `progress`, its
+  deload sessions stacked on top in `deload`, so a week half light and half
+  full is drawn half and half; the tooltip then reads `4 sessions · 2 deload`.
+  A week without a session draws nothing. Both figures leave out the week under way, which on a Monday
   morning holds nothing yet; with no whole week behind them they print `——`.
   A press or a drag picks a week, named in a tooltip over its bar
   ([Charts](#charts)), and the pick stays until the same week is pressed
