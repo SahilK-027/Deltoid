@@ -13,6 +13,15 @@ Each entry follows the same template:
 
 Releases are distributed as Android APKs. The build number after the `+` is Android's `versionCode`; it increases with every release so that each build installs over the previous one.
 
+## [1.24.1] - 2026-11-24
+
+Patch release correcting how deload weeks and deload rest days are drawn on Consistency.
+
+### Fixed
+
+- **Consistency:** A week that mixed full and deload sessions is no longer drawn wholly in orange. Its bar shows the full sessions in blue with the deload sessions stacked above them in orange, and its tooltip reads, for example, `2 sessions · 1 deload`.
+- **Consistency:** The orange dot marks only a deload day chosen as rest with `Rest today` or `Rest the remaining days`. A day inside a deload that was simply not trained is drawn as an ordinary rest day, and the session due stays due.
+
 ## [1.24.0] - 2026-10-31
 
 Minor release making the cycle track on Home a count, so sessions trained in any order fill it from the left.
@@ -764,7 +773,8 @@ Initial release of Deltoid, an offline-first training log for Android.
 - **Sync:** Optional cloud backup with Google sign-in. Without an account the app runs entirely on the device.
 - **Settings:** Kilograms or pounds, light or dark theme, and support for the system font size.
 
-[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/SahilK-027/Deltoid/compare/v1.24.1...HEAD
+[1.24.1]: https://github.com/SahilK-027/Deltoid/compare/v1.24.0...v1.24.1
 [1.24.0]: https://github.com/SahilK-027/Deltoid/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/SahilK-027/Deltoid/compare/v1.22.1...v1.23.0
 [1.22.1]: https://github.com/SahilK-027/Deltoid/compare/v1.22.0...v1.22.1
